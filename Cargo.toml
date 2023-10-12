@@ -23,3 +23,5 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 uuid = { version = "1.4", features = ["fast-rng", "v4", "serde"] }
 bigdecimal = { version = "0.4.1", features = ["serde"] }
+starknet = "0.6.0"
+thiserror = "1.0.49"

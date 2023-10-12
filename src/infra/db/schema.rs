@@ -7,5 +7,6 @@ diesel::table! {
         publisher -> Text,
         timestamp -> Timestamp,
         price -> Numeric,
+        source -> Varchar,
     }
 }

@@ -3,10 +3,13 @@ use axum::response::IntoResponse;
 use axum::Json;
 use serde_json::json;
 
+use crate::domain::models::entry::EntryError;
+
 #[derive(Debug)]
 pub enum AppError {
     InternalServerError,
     BodyParsingError(String),
+    Entry(EntryError),
 }
 
 pub fn internal_error<E>(_err: E) -> AppError {
@@ -23,6 +26,10 @@ impl IntoResponse for AppError {
             Self::BodyParsingError(message) => (
                 StatusCode::BAD_REQUEST,
                 format!("Bad request error: {}", message),
+            ),
+            Self::Entry(err) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Entry error: {}", err),
             ),
         };
         (status, Json(json!({ "message": err_msg }))).into_response()

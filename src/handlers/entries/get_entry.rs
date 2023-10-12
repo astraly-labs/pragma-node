@@ -1,6 +1,5 @@
 use axum::extract::State;
 use axum::Json;
-use axum_macros::debug_handler;
 
 use crate::domain::models::entry::{EntryError, EntryModel};
 use crate::handlers::entries::EntryResponse;
@@ -14,12 +13,14 @@ fn currency_pair_to_pair_id(quote: &str, base: &str) -> String {
     format!("{}/{}", quote.to_uppercase(), base.to_uppercase())
 }
 
-#[debug_handler]
 pub async fn get_entry(
     State(state): State<AppState>,
     PathExtractor(pair): PathExtractor<(String, String)>,
 ) -> Result<Json<EntryResponse>, EntryError> {
+    // Construct pair id
     let pair_id = currency_pair_to_pair_id(&pair.0, &pair.1);
+
+    // Get entries from database with given pair id (only the latest one grouped by source)
     let entry = entry_repository::get(&state.pool, pair_id.clone())
         .await
         .map_err(|db_error| match db_error {
