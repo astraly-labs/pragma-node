@@ -1,5 +1,5 @@
 [package]
-name = "axum-diesel-real-world"
+name = "pragma-node"
 version = "0.1.0"
 edition = "2021"
 
@@ -8,7 +8,11 @@ edition = "2021"
 axum = { version = "0.6", features = ["macros"] }
 axum-macros = "0.3"
 chrono = { version = "0.4.26", features = ["serde"] }
-diesel = { version = "2.1", features = ["postgres", "extras"] }
+diesel = { version = "2.1", features = [
+  "postgres",
+  "extras",
+  "postgres_backend",
+] }
 diesel_migrations = "2"
 deadpool-diesel = { version = "0.4", features = ["postgres"] }
 dotenvy = "0.15"

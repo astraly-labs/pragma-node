@@ -1,5 +1,6 @@
 use axum::extract::State;
 use axum::Json;
+use axum_macros::debug_handler;
 use chrono::NaiveDateTime;
 
 use crate::domain::models::entry::EntryError;
@@ -8,6 +9,7 @@ use crate::infra::repositories::entry_repository;
 use crate::utils::JsonExtractor;
 use crate::AppState;
 
+#[debug_handler]
 pub async fn create_entry(
     State(state): State<AppState>,
     JsonExtractor(new_entry): JsonExtractor<CreateEntryRequest>,

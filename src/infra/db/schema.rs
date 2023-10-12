@@ -2,7 +2,7 @@
 
 diesel::table! {
     entries (id) {
-        id -> Int4,
+        id -> Uuid,
         pair_id -> Varchar,
         publisher -> Text,
         timestamp -> Timestamp,

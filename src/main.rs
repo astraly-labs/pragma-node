@@ -1,4 +1,3 @@
-#![feature(trivial_bounds)]
 use std::net::SocketAddr;
 
 use deadpool_diesel::postgres::{Manager, Pool};
