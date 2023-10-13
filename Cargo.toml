@@ -25,3 +25,6 @@ uuid = { version = "1.4", features = ["fast-rng", "v4", "serde"] }
 bigdecimal = { version = "0.4.1", features = ["serde"] }
 starknet = "0.6.0"
 thiserror = "1.0.49"
+
+[dev-dependencies]
+rstest = "0.18.2"
