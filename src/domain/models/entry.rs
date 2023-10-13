@@ -7,6 +7,8 @@ use uuid::Uuid;
 
 use crate::infra::errors::InfraError;
 
+use super::publisher::PublisherError;
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct EntryModel {
     pub id: Uuid,
@@ -27,8 +29,10 @@ pub enum EntryError {
     InfraError(InfraError),
     #[error("invalid signature")]
     InvalidSignature(EcdsaVerifyError),
-    #[error("unauthorized publisher: {0}")]
-    Unauthorized(String),
+    #[error("unauthorized request")]
+    Unauthorized,
+    #[error("publisher error: {0}")]
+    PublisherError(PublisherError),
 }
 
 impl IntoResponse for EntryError {
@@ -46,10 +50,7 @@ impl IntoResponse for EntryError {
                 StatusCode::BAD_REQUEST,
                 format!("Invalid signature: {}", err),
             ),
-            Self::Unauthorized(publisher) => (
-                StatusCode::UNAUTHORIZED,
-                format!("Unauthorized publisher: {}", publisher),
-            ),
+            Self::Unauthorized => (StatusCode::UNAUTHORIZED, format!("Unauthorized publisher")),
             _ => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 String::from("Internal server error"),
