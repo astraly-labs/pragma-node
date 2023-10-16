@@ -55,8 +55,6 @@ pub(crate) fn build_publish_message(entries: &Vec<Entry>) -> TypedData<PublishMe
         serde_json::to_string(entries).unwrap()
     );
 
-    println!("raw_message: {:?}", raw_message);
-
     serde_json::from_str(&raw_message).expect("Error parsing the JSON")
 }
 
@@ -75,6 +73,7 @@ pub async fn create_entries(
     let publisher_name = new_entries.entries[0].base.publisher.clone();
 
     // Fetch public key from database
+    // TODO: Fetch it from contract
     let public_key = publisher_repository::get(&state.pool, publisher_name.clone())
         .await
         .map_err(EntryError::InfraError)?
@@ -88,9 +87,22 @@ pub async fn create_entries(
         public_key
     );
 
-    let message_hash = build_publish_message(&new_entries.entries).message_hash(public_key);
-    println!("message_hash: {:?}", message_hash);
-    println!("public_key: {:?}", public_key);
+    // Fetch account address from database
+    // TODO: Cache it
+    let account_address = publisher_repository::get(&state.pool, publisher_name.clone())
+        .await
+        .map_err(EntryError::InfraError)?
+        .account_address;
+    let account_address = FieldElement::from_hex_be(&account_address)
+        .map_err(|_| EntryError::PublisherError(PublisherError::InvalidAddress(account_address)))?;
+
+    tracing::info!(
+        "Retrieved {:?} account address: {:?}",
+        publisher_name,
+        account_address
+    );
+
+    let message_hash = build_publish_message(&new_entries.entries).message_hash(account_address);
 
     if !ecdsa_verify(
         &public_key,

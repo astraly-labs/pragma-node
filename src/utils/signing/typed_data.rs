@@ -282,7 +282,6 @@ where
 ///
 /// * The hex string of the value.
 pub(crate) fn get_hex(value: &Value) -> Result<String, &'static str> {
-    println!("value: {:?}", value);
     match value {
         Value::Number(n) => {
             if let Some(i) = n.as_i64() {

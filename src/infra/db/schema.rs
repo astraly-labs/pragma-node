@@ -18,6 +18,7 @@ diesel::table! {
         master_key -> Varchar,
         active_key -> Varchar,
         active -> Bool,
+        account_address -> Varchar,
     }
 }
 

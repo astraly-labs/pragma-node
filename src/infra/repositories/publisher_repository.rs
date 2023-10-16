@@ -18,6 +18,7 @@ pub struct PublisherDb {
     pub master_key: String,
     pub active_key: String,
     pub active: bool,
+    pub account_address: String,
 }
 
 #[derive(Deserialize, Insertable)]
@@ -26,6 +27,7 @@ pub struct NewPublisherDb {
     pub name: String,
     pub master_key: String,
     pub active_key: String,
+    pub account_address: String,
 }
 
 #[derive(Deserialize)]
@@ -111,6 +113,7 @@ fn adapt_publisher_db_to_publisher(entry_db: PublisherDb) -> PublisherModel {
         name: entry_db.name,
         master_key: entry_db.master_key,
         active_key: entry_db.active_key,
+        account_address: entry_db.account_address,
         active: entry_db.active,
     }
 }

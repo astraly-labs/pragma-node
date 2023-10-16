@@ -12,6 +12,7 @@ pub struct PublisherModel {
     pub name: String,
     pub master_key: String,
     pub active_key: String,
+    pub account_address: String,
     pub active: bool,
 }
 
@@ -25,6 +26,8 @@ pub enum PublisherError {
     InfraError(InfraError),
     #[error("invalid key : {0}")]
     InvalidKey(String),
+    #[error("invalid address : {0}")]
+    InvalidAddress(String),
 }
 
 impl IntoResponse for PublisherError {
