@@ -18,6 +18,7 @@ pub struct EntryDb {
     pub id: Uuid,
     pub pair_id: String,
     pub publisher: String,
+    pub source: String,
     pub timestamp: NaiveDateTime,
     pub price: BigDecimal,
 }
@@ -27,6 +28,7 @@ pub struct EntryDb {
 pub struct NewEntryDb {
     pub pair_id: String,
     pub publisher: String,
+    pub source: String,
     pub timestamp: NaiveDateTime,
     pub price: BigDecimal,
 }
@@ -58,7 +60,7 @@ pub async fn insert(
 
 pub async fn get(
     pool: &deadpool_diesel::postgres::Pool,
-    pair_id: &str,
+    pair_id: String,
 ) -> Result<EntryModel, InfraError> {
     let conn = pool.get().await.map_err(adapt_infra_error)?;
     let res = conn
@@ -75,7 +77,7 @@ pub async fn get(
     Ok(adapt_entry_db_to_entry(res))
 }
 
-pub async fn get_all(
+pub async fn _get_all(
     pool: &deadpool_diesel::postgres::Pool,
     filter: EntriesFilter,
 ) -> Result<Vec<EntryModel>, InfraError> {
@@ -111,6 +113,7 @@ fn adapt_entry_db_to_entry(entry_db: EntryDb) -> EntryModel {
         id: entry_db.id,
         pair_id: entry_db.pair_id,
         publisher: entry_db.publisher,
+        source: entry_db.source,
         timestamp: entry_db.timestamp.timestamp() as u64,
         price: entry_db.price.to_u128().unwrap(), // TODO: remove unwrap
     }

@@ -2,24 +2,37 @@ use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::Json;
 use serde_json::json;
+use starknet::core::crypto::EcdsaVerifyError;
 use uuid::Uuid;
 
 use crate::infra::errors::InfraError;
+
+use super::publisher::PublisherError;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct EntryModel {
     pub id: Uuid,
     pub pair_id: String,
     pub publisher: String,
+    pub source: String,
     pub timestamp: u64,
     pub price: u128,
 }
 
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum EntryError {
+    #[error("internal server error")]
     InternalServerError,
+    #[error("entry not found: {0}")]
     NotFound(String),
+    #[error("infra error: {0}")]
     InfraError(InfraError),
+    #[error("invalid signature")]
+    InvalidSignature(EcdsaVerifyError),
+    #[error("unauthorized request")]
+    Unauthorized,
+    #[error("publisher error: {0}")]
+    PublisherError(PublisherError),
 }
 
 impl IntoResponse for EntryError {
@@ -33,6 +46,11 @@ impl IntoResponse for EntryError {
                 StatusCode::INTERNAL_SERVER_ERROR,
                 format!("Internal server error: {}", db_error),
             ),
+            Self::InvalidSignature(err) => (
+                StatusCode::BAD_REQUEST,
+                format!("Invalid signature: {}", err),
+            ),
+            Self::Unauthorized => (StatusCode::UNAUTHORIZED, format!("Unauthorized publisher")),
             _ => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 String::from("Internal server error"),

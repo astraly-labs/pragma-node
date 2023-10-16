@@ -3,7 +3,7 @@ use axum::response::IntoResponse;
 use axum::routing::{get, post};
 use axum::Router;
 
-use crate::handlers::entries::{create_entry, get_entry};
+use crate::handlers::entries::{create_entries, get_entry};
 use crate::AppState;
 
 pub fn app_router(state: AppState) -> Router<AppState> {
@@ -26,7 +26,7 @@ async fn handler_404() -> impl IntoResponse {
 
 fn data_routes(state: AppState) -> Router<AppState> {
     Router::new()
-        .route("/publish", post(create_entry))
+        .route("/publish", post(create_entries))
         .route("/:quote/:base", get(get_entry))
         .with_state(state)
 }
