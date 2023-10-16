@@ -1,4 +1,3 @@
-use rstest::rstest;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 use starknet::core::{
@@ -7,10 +6,12 @@ use starknet::core::{
     utils::{cairo_short_string_to_felt, get_selector_from_name},
 };
 use std::fs;
+use std::path::Path;
 use std::{
     collections::{HashMap, HashSet},
     str::FromStr,
 };
+use std::io::Read;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct StarkNetDomain {
@@ -28,13 +29,27 @@ pub struct Parameter {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub enum ChainId {
+    String(String),
+    Number(u64),
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DomainType {
+  name: String,
+  version: String,
+  #[serde(rename = "chainId")]
+  chain_id: ChainId,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct TypedData {
     #[serde(rename = "types")]
     types: HashMap<String, Vec<Parameter>>,
     #[serde(rename = "primaryType")]
     primary_type: String,
     #[serde(rename = "domain")]
-    domain: HashMap<String, String>,
+    domain: DomainType,
     #[serde(rename = "message")]
     message: HashMap<String, String>,
 }
@@ -148,7 +163,7 @@ impl TypedData {
     /// # Returns
     ///
     /// * The encoded type.
-    fn encode_type(&self, type_name: &str) -> String {
+    pub fn encode_type(&self, type_name: &str) -> String {
         let mut dependencies = self.get_dependencies(type_name);
         let primary = dependencies.remove(0);
         dependencies.sort();
@@ -295,25 +310,60 @@ pub(crate) fn get_hex(value: &Value) -> Result<String, &'static str> {
     }
 }
 
-const TYPED_DATA_DIR: &str = "./mock"; // Update this to your actual directory path.
+const TYPED_DATA_DIR: &str = "src/utils/signing/mock"; // Update this to your actual directory path.
 
-fn load_typed_data(file_name: &str) -> TypedData {
+pub(crate) fn load_typed_data(file_name: &str) -> TypedData {
     let file_path = format!("{}/{}", TYPED_DATA_DIR, file_name);
-    let text = fs::read_to_string(file_path).expect("Unable to read the file");
-    let typed_data: TypedData = serde_json::from_str(&text).expect("Error parsing the JSON");
+    let path = Path::new(&file_path);
+    let mut file = fs::File::open(&path).expect("Error opening the file");
+    let mut buff = String::new();
+    file.read_to_string(&mut buff).unwrap();
+    let typed_data: TypedData = serde_json::from_str(&buff).expect("Error parsing the JSON");
     typed_data
 }
 
-#[rstest]
-#[case(json!(123), "0x7b")]
-#[case(json!("123"), "0x7b")]
-#[case(json!("0x7b"), "0x7b")]
-#[case(json!("short_string"), "0x73686f72745f737472696e67")]
-fn test_get_hex(#[case] value: Value, #[case] result: &str) {
-    assert_eq!(get_hex(&value).unwrap(), result);
+#[cfg(test)]
+mod tests {
+    use rstest::rstest;
+    use super::*;
+
+    #[rstest]
+    #[case(json!(123), "0x7b")]
+    #[case(json!("123"), "0x7b")]
+    #[case(json!("0x7b"), "0x7b")]
+    #[case(json!("short_string"), "0x73686f72745f737472696e67")]
+    fn test_get_hex(#[case] value: Value, #[case] result: &str) {
+        assert_eq!(get_hex(&value).unwrap(), result);
+    }
+
+    const TD: &str = "typed_data_example.json";
+    const TD_STRING: &str = "typed_data_long_string_example.json";
+    const TD_FELT_ARR: &str = "typed_data_felt_array_example.json";
+    const TD_STRUCT_ARR: &str = "typed_data_struct_array_example.json";
+
+    #[rstest]
+    #[case(
+        TD,
+        "Mail",
+        "Mail(from:Person,to:Person,contents:felt)Person(name:felt,wallet:felt)"
+    )]
+    #[case(
+        TD_FELT_ARR,
+        "Mail",
+        "Mail(from:Person,to:Person,felts_len:felt,felts:felt*)Person(name:felt,wallet:felt)"
+    )]
+    #[case(TD_STRING, "Mail", "Mail(from:Person,to:Person,contents:String)Person(name:felt,wallet:felt)String(len:felt,data:felt*)")]
+    #[case(TD_STRUCT_ARR, "Mail", "Mail(from:Person,to:Person,posts_len:felt,posts:Post*)Person(name:felt,wallet:felt)Post(title:felt,content:felt)")]
+    fn test_encode_type(
+        #[case] example: &str,
+        #[case] type_name: &str,
+        #[case] encoded_type: &str,
+    ) {
+        println!("example: {:?}", example);
+        println!("type_name: {:?}", type_name);
+        println!("encoded_type: {:?}", encoded_type);
+        let typed_data = load_typed_data(example);
+        let res = typed_data.encode_type(type_name);
+        assert_eq!(res, encoded_type);
+    }
 }
-
-// ... Continue with other tests ...
-
-// Note: You'll need to define or import the functions and structs being tested,
-// such as `TypedData`, `get_hex`, etc., and adjust the function signatures and logic accordingly.
