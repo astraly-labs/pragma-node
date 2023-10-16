@@ -55,6 +55,8 @@ pub(crate) fn build_publish_message(entries: &Vec<Entry>) -> TypedData<PublishMe
         serde_json::to_string(entries).unwrap()
     );
 
+    println!("raw_message: {:?}", raw_message);
+
     serde_json::from_str(&raw_message).expect("Error parsing the JSON")
 }
 
@@ -87,6 +89,8 @@ pub async fn create_entries(
     );
 
     let message_hash = build_publish_message(&new_entries.entries).message_hash(public_key);
+    println!("message_hash: {:?}", message_hash);
+    println!("public_key: {:?}", public_key);
 
     if !ecdsa_verify(
         &public_key,
@@ -98,6 +102,7 @@ pub async fn create_entries(
     )
     .map_err(EntryError::InvalidSignature)?
     {
+        tracing::error!("Invalid signature for message hash {:?}", &message_hash);
         return Err(EntryError::Unauthorized);
     }
 
@@ -160,5 +165,15 @@ mod tests {
         assert_eq!(typed_data.domain.version, "1");
         assert_eq!(typed_data.message.action, "Publish");
         assert_eq!(typed_data.message.entries, entries);
+
+        let msg_hash = typed_data.message_hash(FieldElement::ZERO);
+        // Hash computed with the Pragma SDK (python)
+        assert_eq!(
+            msg_hash,
+            FieldElement::from_hex_be(
+                "0x7D224FC341B4E905D6A25ADAF7E4D1A75BE53B4F7C5D7C2A80B0653C76E2F44"
+            )
+            .unwrap()
+        );
     }
 }

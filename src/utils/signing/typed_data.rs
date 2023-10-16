@@ -77,7 +77,7 @@ where
                     // Assuming you have a method called `struct_hash` similar to the Python version
                     let hashes: Vec<FieldElement> = arr
                         .iter()
-                        .map(|data| FieldElement::from_str(&get_hex(data).unwrap()).unwrap())
+                        .map(|data| self.struct_hash(&type_name, data.as_object().unwrap()))
                         .collect();
                     // Assuming you have a method called `compute_hash_on_elements`
                     return Ok(compute_hash_on_elements(&hashes));
@@ -564,18 +564,17 @@ mod tests {
         );
     }
 
-    // TODO: Fix this test `called `Result::unwrap()` on an `Err` value: "Unsupported value type for get_hex"`
-    // #[test]
-    // fn test_struct_hash_mail_struct_array() {
-    //     let typed_data: TypedData<MailTypeStructArray> = load_typed_data(TD_STRUCT_ARR);
-    //     let json_str = serde_json::to_string(&typed_data.message).unwrap();
-    //     let json_map: Map<String, Value> = serde_json::from_str(&json_str).unwrap();
-    //     let result = typed_data.struct_hash("Mail", &json_map);
-    //     assert_eq!(
-    //         format!("{:#x}", result),
-    //         "0x5650ec45a42c4776a182159b9d33118a46860a6e6639bb8166ff71f3c41eaef"
-    //     );
-    // }
+    #[test]
+    fn test_struct_hash_mail_struct_array() {
+        let typed_data: TypedData<MailTypeStructArray> = load_typed_data(TD_STRUCT_ARR);
+        let json_str = serde_json::to_string(&typed_data.message).unwrap();
+        let json_map: Map<String, Value> = serde_json::from_str(&json_str).unwrap();
+        let result = typed_data.struct_hash("Mail", &json_map);
+        assert_eq!(
+            format!("{:#x}", result),
+            "0x5650ec45a42c4776a182159b9d33118a46860a6e6639bb8166ff71f3c41eaef"
+        );
+    }
 
     #[rstest]
     #[case(
@@ -593,11 +592,11 @@ mod tests {
         "0xcd2a3d9f938e13cd947ec05abc7fe734df8dd826",
         "0x30ab43ef724b08c3b0a9bbe425e47c6173470be75d1d4c55fd5bf9309896bce"
     )]
-    // #[case(
-    //     TD_STRUCT_ARR,
-    //     "0xcd2a3d9f938e13cd947ec05abc7fe734df8dd826",
-    //     "0x5914ed2764eca2e6a41eb037feefd3d2e33d9af6225a9e7fe31ac943ff712c"
-    // )]
+    #[case(
+        TD_STRUCT_ARR,
+        "0xcd2a3d9f938e13cd947ec05abc7fe734df8dd826",
+        "0x5914ed2764eca2e6a41eb037feefd3d2e33d9af6225a9e7fe31ac943ff712c"
+    )]
     fn test_message_hash(
         #[case] example: &str,
         #[case] account_address: &str,
@@ -618,10 +617,10 @@ mod tests {
                 let typed_data: TypedData<MailTypeFeltArray> = load_typed_data(example);
                 typed_data.message_hash(account_address)
             }
-            // TD_STRUCT_ARR => {
-            //     let typed_data: TypedData<MailTypeStructArray> = load_typed_data(example);
-            //     typed_data.message_hash(account_address)
-            // }
+            TD_STRUCT_ARR => {
+                let typed_data: TypedData<MailTypeStructArray> = load_typed_data(example);
+                typed_data.message_hash(account_address)
+            }
             _ => panic!("Unsupported example type"),
         };
 
