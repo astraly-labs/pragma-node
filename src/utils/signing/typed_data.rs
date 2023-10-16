@@ -5,9 +5,6 @@ use starknet::core::{
     types::FieldElement,
     utils::{cairo_short_string_to_felt, get_selector_from_name},
 };
-use std::fs;
-use std::io::Read;
-use std::path::Path;
 use std::{
     collections::{HashMap, HashSet},
     str::FromStr,
@@ -30,22 +27,22 @@ pub struct Parameter {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DomainType {
-    name: String,
-    version: String,
+    pub name: String,
+    pub version: String,
     #[serde(rename = "chainId")]
-    chain_id: u64,
+    pub chain_id: Option<u64>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TypedData<T: Serialize> {
     #[serde(rename = "types")]
-    types: HashMap<String, Vec<Parameter>>,
+    pub types: HashMap<String, Vec<Parameter>>,
     #[serde(rename = "primaryType")]
-    primary_type: String,
+    pub primary_type: String,
     #[serde(rename = "domain")]
-    domain: DomainType,
+    pub domain: DomainType,
     #[serde(rename = "message")]
-    message: T,
+    pub message: T,
 }
 
 impl<T> TypedData<T>
@@ -307,25 +304,28 @@ pub(crate) fn get_hex(value: &Value) -> Result<String, &'static str> {
     }
 }
 
-const TYPED_DATA_DIR: &str = "src/utils/signing/mock"; // Update this to your actual directory path.
-
-pub(crate) fn load_typed_data<T>(file_name: &str) -> TypedData<T>
-where
-    T: Serialize + for<'de> Deserialize<'de>,
-{
-    let file_path = format!("{}/{}", TYPED_DATA_DIR, file_name);
-    let path = Path::new(&file_path);
-    let mut file = fs::File::open(&path).expect("Error opening the file");
-    let mut buff = String::new();
-    file.read_to_string(&mut buff).unwrap();
-    let typed_data: TypedData<T> = serde_json::from_str(&buff).expect("Error parsing the JSON");
-    typed_data
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use rstest::rstest;
+    use std::fs;
+    use std::io::Read;
+    use std::path::Path;
+
+    const TYPED_DATA_DIR: &str = "src/utils/signing/mock"; // Update this to your actual directory path.
+
+    pub(crate) fn load_typed_data<T>(file_name: &str) -> TypedData<T>
+    where
+        T: Serialize + for<'de> Deserialize<'de>,
+    {
+        let file_path = format!("{}/{}", TYPED_DATA_DIR, file_name);
+        let path = Path::new(&file_path);
+        let mut file = fs::File::open(&path).expect("Error opening the file");
+        let mut buff = String::new();
+        file.read_to_string(&mut buff).unwrap();
+        let typed_data: TypedData<T> = serde_json::from_str(&buff).expect("Error parsing the JSON");
+        typed_data
+    }
 
     #[derive(Debug, Serialize, Deserialize)]
     struct WalletType {

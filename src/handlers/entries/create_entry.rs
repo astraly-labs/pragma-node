@@ -8,8 +8,55 @@ use crate::domain::models::entry::EntryError;
 use crate::domain::models::publisher::PublisherError;
 use crate::handlers::entries::{CreateEntryRequest, CreateEntryResponse};
 use crate::infra::repositories::{entry_repository, publisher_repository};
-use crate::utils::JsonExtractor;
+use crate::utils::{JsonExtractor, TypedData};
 use crate::AppState;
+use serde::{Deserialize, Serialize};
+
+use super::Entry;
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PublishMessage {
+    action: String,
+    entries: Vec<Entry>,
+}
+
+pub(crate) fn build_publish_message(entries: &Vec<Entry>) -> TypedData<PublishMessage> {
+    // Construct the raw string with placeholders for the entries
+    let raw_message = format!(
+        r#"{{
+            "domain": {{"name": "Pragma", "version": "1"}},
+            "primaryType": "Request",
+            "message": {{
+                "action": "Publish",
+                "entries": {}
+            }},
+            "types": {{
+                "StarkNetDomain": [
+                    {{"name": "name", "type": "felt"}},
+                    {{"name": "version", "type": "felt"}}
+                ],
+                "Request": [
+                    {{"name": "action", "type": "felt"}},
+                    {{"name": "entries", "type": "Entry*"}}
+                ],
+                "Entry": [
+                    {{"name": "base", "type": "Base"}},
+                    {{"name": "pair_id", "type": "felt"}},
+                    {{"name": "price", "type": "felt"}},
+                    {{"name": "volume", "type": "felt"}}
+                ],
+                "Base": [
+                    {{"name": "publisher", "type": "felt"}},
+                    {{"name": "source", "type": "felt"}},
+                    {{"name": "timestamp", "type": "felt"}}
+                ]
+            }}
+        }}"#,
+        serde_json::to_string(entries).unwrap()
+    );
+
+    serde_json::from_str(&raw_message).expect("Error parsing the JSON")
+}
 
 pub async fn create_entries(
     State(state): State<AppState>,
@@ -39,8 +86,7 @@ pub async fn create_entries(
         public_key
     );
 
-    // TODO: Compute message hash
-    let message_hash = FieldElement::ZERO;
+    let message_hash = build_publish_message(&new_entries.entries).message_hash(public_key);
 
     if !ecdsa_verify(
         &public_key,
@@ -74,4 +120,45 @@ pub async fn create_entries(
     Ok(Json(CreateEntryResponse {
         number_entries_created: new_entries.entries.len(),
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::handlers::entries::BaseEntry;
+
+    use super::*;
+    use rstest::rstest;
+
+    #[rstest]
+    fn test_build_publish_message_empty() {
+        let entries = vec![];
+        let typed_data = build_publish_message(&entries);
+
+        assert_eq!(typed_data.primary_type, "Request");
+        assert_eq!(typed_data.domain.name, "Pragma");
+        assert_eq!(typed_data.domain.version, "1");
+        assert_eq!(typed_data.message.action, "Publish");
+        assert_eq!(typed_data.message.entries, entries);
+    }
+
+    #[rstest]
+    fn test_build_publish_message() {
+        let entries = vec![Entry {
+            base: BaseEntry {
+                timestamp: 0,
+                source: "source".to_string(),
+                publisher: "publisher".to_string(),
+            },
+            pair_id: "pair_id".to_string(),
+            price: 0,
+            volume: 0,
+        }];
+        let typed_data = build_publish_message(&entries);
+
+        assert_eq!(typed_data.primary_type, "Request");
+        assert_eq!(typed_data.domain.name, "Pragma");
+        assert_eq!(typed_data.domain.version, "1");
+        assert_eq!(typed_data.message.action, "Publish");
+        assert_eq!(typed_data.message.entries, entries);
+    }
 }

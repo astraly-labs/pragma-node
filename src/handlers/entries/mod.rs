@@ -7,14 +7,14 @@ use starknet::core::types::FieldElement;
 mod create_entry;
 mod get_entry;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct BaseEntry {
     timestamp: u64,
     source: String,
     publisher: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct Entry {
     base: BaseEntry,
     pair_id: String,
@@ -22,7 +22,7 @@ pub struct Entry {
     volume: u128,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct CreateEntryRequest {
     signature: Vec<FieldElement>,
     entries: Vec<Entry>,
