@@ -13,7 +13,7 @@ Follow these steps to get started with your Rust backend project based on this t
 
    ```bash
    git clone https://github.com/Quentin-Piot/axum-diesel-real-world.git
-      ```
+   ```
 
 2. Choose a specific module/framework branch or work with the default configuration.
 
@@ -21,9 +21,9 @@ Follow these steps to get started with your Rust backend project based on this t
 
 4. Build and run your Rust backend:
 
-    ```bash
-    cargo run
-    ```
+   ```bash
+   cargo run
+   ```
 
 ## Project Structure
 
@@ -31,6 +31,7 @@ The project follows a modular structure to keep your code organized and maintain
 project structure:
 
 - `src/`: Contains the main source code of your application.
+
   - `domain/`: Define your domain logic using DDD principles.
     - `models/`: Define your domain models.
   - `handlers/`: Define your API handlers.
