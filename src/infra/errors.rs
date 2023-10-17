@@ -1,8 +1,9 @@
 use std::fmt;
 
 use deadpool_diesel::InteractError;
+use utoipa::ToSchema;
 
-#[derive(Debug)]
+#[derive(Debug, ToSchema)]
 pub enum InfraError {
     InternalServerError,
     NotFound,
