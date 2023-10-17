@@ -58,6 +58,15 @@ pub(crate) fn build_publish_message(entries: &Vec<Entry>) -> TypedData<PublishMe
     serde_json::from_str(&raw_message).expect("Error parsing the JSON")
 }
 
+#[utoipa::path(
+        post,
+        path = "/v1/data/publish",
+        request_body = CreateEntryRequest,
+        responses(
+            (status = 200, description = "Entries published successfuly", body = CreateEntryResponse),
+            (status = 401, description = "Unauthorized Publisher", body = EntryError)
+        )
+    )]
 pub async fn create_entries(
     State(state): State<AppState>,
     JsonExtractor(new_entries): JsonExtractor<CreateEntryRequest>,

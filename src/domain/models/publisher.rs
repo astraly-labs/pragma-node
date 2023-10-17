@@ -2,11 +2,12 @@ use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::Json;
 use serde_json::json;
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::infra::errors::InfraError;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, ToSchema)]
 pub struct PublisherModel {
     pub id: Uuid,
     pub name: String,
@@ -16,7 +17,7 @@ pub struct PublisherModel {
     pub active: bool,
 }
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, ToSchema)]
 pub enum PublisherError {
     #[error("internal server error")]
     InternalServerError,

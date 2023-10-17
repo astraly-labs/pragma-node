@@ -15,6 +15,17 @@ fn currency_pair_to_pair_id(quote: &str, base: &str) -> String {
     format!("{}/{}", quote.to_uppercase(), base.to_uppercase())
 }
 
+#[utoipa::path(
+        get,
+        path = "/v1/data/{quote}/{base}",
+        responses(
+            (status = 200, description = "Get median entry successfuly", body = [GetEntryResponse])
+        ),
+        params(
+            ("quote" = String, Path, description = "Quote Asset"),
+            ("base" = String, Path, description = "Base Asset")
+        ),
+    )]
 pub async fn get_entry(
     State(state): State<AppState>,
     PathExtractor(pair): PathExtractor<(String, String)>,

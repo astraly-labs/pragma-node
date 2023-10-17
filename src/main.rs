@@ -2,6 +2,7 @@ use std::net::SocketAddr;
 
 use deadpool_diesel::postgres::{Manager, Pool};
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+use utoipa::OpenApi;
 
 use crate::config::config;
 use crate::errors::internal_error;
@@ -25,6 +26,22 @@ pub struct AppState {
 #[tokio::main]
 async fn main() {
     init_tracing();
+
+    #[derive(OpenApi)]
+    #[openapi(
+        paths(
+            handlers::entries::create_entry::create_entries,
+            handlers::entries::get_entry::get_entry,
+        ),
+        components(
+            schemas(domain::models::entry::EntryModel, domain::models::entry::EntryError),
+            schemas(domain::models::publisher::PublisherModel, domain::models::publisher::PublisherError)
+        ),
+        tags(
+            (name = "pragma-node", description = "Pragma Node API")
+        )
+    )]
+    struct ApiDoc;
 
     let config = config().await;
 
