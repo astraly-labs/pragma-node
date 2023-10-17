@@ -3,13 +3,14 @@ use axum::response::IntoResponse;
 use axum::Json;
 use serde_json::json;
 use starknet::core::crypto::EcdsaVerifyError;
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::infra::errors::InfraError;
 
 use super::publisher::PublisherError;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, ToSchema)]
 pub struct EntryModel {
     pub id: Uuid,
     pub pair_id: String,
@@ -19,7 +20,7 @@ pub struct EntryModel {
     pub price: u128,
 }
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, ToSchema)]
 pub enum EntryError {
     #[error("internal server error")]
     InternalServerError,

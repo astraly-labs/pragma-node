@@ -3,11 +3,16 @@ use axum::response::IntoResponse;
 use axum::routing::{get, post};
 use axum::Router;
 
+use utoipa::OpenApi as OpenApiT;
+use utoipa_swagger_ui::SwaggerUi;
+
 use crate::handlers::entries::{create_entries, get_entry};
 use crate::AppState;
 
-pub fn app_router(state: AppState) -> Router<AppState> {
+pub fn app_router<T: OpenApiT>(state: AppState) -> Router<AppState> {
+    let open_api = T::openapi();
     Router::new()
+        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", open_api))
         .route("/", get(root))
         .nest("/v1/data", data_routes(state.clone()))
         .fallback(handler_404)

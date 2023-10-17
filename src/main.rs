@@ -2,6 +2,7 @@ use std::net::SocketAddr;
 
 use deadpool_diesel::postgres::{Manager, Pool};
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+use utoipa::OpenApi;
 
 use crate::config::config;
 use crate::errors::internal_error;
@@ -26,6 +27,27 @@ pub struct AppState {
 async fn main() {
     init_tracing();
 
+    #[derive(OpenApi)]
+    #[openapi(
+        paths(
+            handlers::entries::create_entry::create_entries,
+            handlers::entries::get_entry::get_entry,
+        ),
+        components(
+            schemas(domain::models::entry::EntryModel, domain::models::entry::EntryError),
+            schemas(domain::models::publisher::PublisherModel, domain::models::publisher::PublisherError),
+            schemas(handlers::entries::CreateEntryRequest, handlers::entries::CreateEntryResponse, handlers::entries::GetEntryResponse),
+            schemas(handlers::entries::Entry, handlers::entries::BaseEntry),
+            schemas(infra::errors::InfraError)
+        ),
+        tags(
+            (name = "pragma-node", description = "Pragma Node API")
+        )
+    )]
+    struct ApiDoc;
+
+    println!("{}", ApiDoc::openapi().to_pretty_json().unwrap());
+
     let config = config().await;
 
     let manager = Manager::new(
@@ -40,7 +62,7 @@ async fn main() {
 
     let state = AppState { pool };
 
-    let app = app_router(state.clone()).with_state(state);
+    let app = app_router::<ApiDoc>(state.clone()).with_state(state);
 
     let host = config.server_host();
     let port = config.server_port();
