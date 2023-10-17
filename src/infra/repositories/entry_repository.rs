@@ -112,14 +112,17 @@ pub async fn _get_all(
 
 #[derive(Serialize, Queryable)]
 pub struct MedianEntry {
+    pub source: String,
     pub time: NaiveDateTime,
     pub median_price: BigDecimal,
 }
 
 #[derive(Serialize, QueryableByName)]
 pub struct MedianEntryRaw {
-    #[sql_type = "diesel::sql_types::Numeric"]
-    pub time: BigDecimal,
+    #[sql_type = "diesel::sql_types::Text"]
+    pub source: String,
+    #[sql_type = "diesel::sql_types::Timestamp"]
+    pub time: NaiveDateTime,
     #[sql_type = "diesel::sql_types::Numeric"]
     pub median_price: BigDecimal,
 }
@@ -132,12 +135,13 @@ pub async fn get_median_entries(
 
     let raw_sql = r#"
         SELECT
-            FLOOR(EXTRACT(EPOCH FROM "timestamp") / 300) * 300 AS "time",
+            source,
+            MAX("timestamp") AS "time",
             PERCENTILE_DISC(0.5) WITHIN GROUP(ORDER BY price) AS "median_price"
         FROM entries
         WHERE pair_id = $1
-        GROUP BY 1
-        ORDER BY 1
+        GROUP BY source
+        ORDER BY source;
     "#;
 
     let raw_entries: Vec<MedianEntryRaw> = conn
@@ -153,8 +157,9 @@ pub async fn get_median_entries(
     let entries: Vec<MedianEntry> = raw_entries
         .into_iter()
         .map(|raw_entry| MedianEntry {
-            time: NaiveDateTime::from_timestamp_opt(raw_entry.time.to_i64().unwrap(), 0).unwrap(),
+            time: raw_entry.time,
             median_price: raw_entry.median_price,
+            source: raw_entry.source,
         })
         .collect();
 
