@@ -284,11 +284,8 @@ where
 pub(crate) fn get_hex(value: &Value) -> Result<String, &'static str> {
     match value {
         Value::Number(n) => {
-            if let Some(i) = n.as_i64() {
-                Ok(format!("{:#x}", i))
-            } else {
-                Err("Number is not an i64")
-            }
+            let i = FieldElement::from_dec_str(&n.to_string()).expect("Error parsing number");
+            Ok(format!("{:#x}", i))
         }
         Value::String(s) => {
             if s.starts_with("0x") {
