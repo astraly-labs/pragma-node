@@ -118,8 +118,8 @@ pub struct MedianEntry {
 
 #[derive(Serialize, QueryableByName)]
 pub struct MedianEntryRaw {
-    #[sql_type = "diesel::sql_types::Timestamp"]
-    pub time: NaiveDateTime,
+    #[sql_type = "diesel::sql_types::Numeric"]
+    pub time: BigDecimal,
     #[sql_type = "diesel::sql_types::Numeric"]
     pub median_price: BigDecimal,
 }
@@ -153,7 +153,7 @@ pub async fn get_median_entries(
     let entries: Vec<MedianEntry> = raw_entries
         .into_iter()
         .map(|raw_entry| MedianEntry {
-            time: raw_entry.time,
+            time: NaiveDateTime::from_timestamp_opt(raw_entry.time.to_i64().unwrap(), 0).unwrap(),
             median_price: raw_entry.median_price,
         })
         .collect();

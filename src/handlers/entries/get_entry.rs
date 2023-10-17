@@ -43,7 +43,7 @@ fn adapt_entry_to_entry_response(
     GetEntryResponse {
         pair_id,
         timestamp: timestamp.timestamp() as u64,
-        num_sources_aggregated: 0, // TODO: add real value
+        num_sources_aggregated: entries.len(),
         price: price.to_u128().unwrap(),
     }
 }
