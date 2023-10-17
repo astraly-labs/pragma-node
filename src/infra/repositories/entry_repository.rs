@@ -1,5 +1,7 @@
 use bigdecimal::{BigDecimal, ToPrimitive};
-use chrono::NaiveDateTime;
+use chrono::{Date, DateTime, Local, NaiveDate, NaiveDateTime};
+use diesel::dsl::sql;
+use diesel::prelude::QueryableByName;
 use diesel::{
     ExpressionMethods, Insertable, PgTextExpressionMethods, QueryDsl, Queryable, RunQueryDsl,
     Selectable, SelectableHelper,
@@ -103,6 +105,57 @@ pub async fn _get_all(
     let entries: Vec<EntryModel> = res
         .into_iter()
         .map(|entry_db| adapt_entry_db_to_entry(entry_db))
+        .collect();
+
+    Ok(entries)
+}
+
+#[derive(Serialize, Queryable)]
+pub struct MedianEntry {
+    pub time: NaiveDateTime,
+    pub median_price: BigDecimal,
+}
+
+#[derive(Serialize, QueryableByName)]
+pub struct MedianEntryRaw {
+    #[sql_type = "diesel::sql_types::Numeric"]
+    pub time: BigDecimal,
+    #[sql_type = "diesel::sql_types::Numeric"]
+    pub median_price: BigDecimal,
+}
+
+pub async fn get_median_entries(
+    pool: &deadpool_diesel::postgres::Pool,
+    pair_id: String,
+) -> Result<Vec<MedianEntry>, InfraError> {
+    let conn = pool.get().await.map_err(adapt_infra_error)?;
+
+    let raw_sql = r#"
+        SELECT
+            FLOOR(EXTRACT(EPOCH FROM "timestamp") / 300) * 300 AS "time",
+            PERCENTILE_DISC(0.5) WITHIN GROUP(ORDER BY price) AS "median_price"
+        FROM entries
+        WHERE pair_id = $1
+        GROUP BY 1
+        ORDER BY 1
+    "#;
+
+    let raw_entries: Vec<MedianEntryRaw> = conn
+        .interact(move |conn| {
+            diesel::sql_query(raw_sql)
+                .bind::<diesel::sql_types::Text, _>(pair_id)
+                .load::<MedianEntryRaw>(conn)
+        })
+        .await
+        .map_err(adapt_infra_error)?
+        .map_err(adapt_infra_error)?;
+
+    let entries: Vec<MedianEntry> = raw_entries
+        .into_iter()
+        .map(|raw_entry| MedianEntry {
+            time: NaiveDateTime::from_timestamp_opt(raw_entry.time.to_i64().unwrap(), 0).unwrap(),
+            median_price: raw_entry.median_price,
+        })
         .collect();
 
     Ok(entries)
