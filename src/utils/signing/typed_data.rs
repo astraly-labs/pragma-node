@@ -313,7 +313,7 @@ mod tests {
     {
         let file_path = format!("{}/{}", TYPED_DATA_DIR, file_name);
         let path = Path::new(&file_path);
-        let mut file = fs::File::open(&path).expect("Error opening the file");
+        let mut file = fs::File::open(path).expect("Error opening the file");
         let mut buff = String::new();
         file.read_to_string(&mut buff).unwrap();
         let typed_data: TypedData<T> = serde_json::from_str(&buff).expect("Error parsing the JSON");
