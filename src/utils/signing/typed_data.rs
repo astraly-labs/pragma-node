@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value};
 use starknet::core::{
     crypto::compute_hash_on_elements,
     types::FieldElement,
@@ -80,16 +80,16 @@ where
                         .map(|data| self.struct_hash(&type_name, data.as_object().unwrap()))
                         .collect();
                     // Assuming you have a method called `compute_hash_on_elements`
-                    return Ok(compute_hash_on_elements(&hashes));
+                    Ok(compute_hash_on_elements(&hashes))
                 } else {
                     let hashes: Vec<FieldElement> = arr
                         .iter()
                         .map(|val| FieldElement::from_str(&get_hex(val).unwrap()).unwrap())
                         .collect();
-                    return Ok(compute_hash_on_elements(&hashes));
+                    Ok(compute_hash_on_elements(&hashes))
                 }
             } else {
-                return Err("Expected a list for pointer type");
+                Err("Expected a list for pointer type")
             }
         } else if self.is_struct(type_name) {
             if let Value::Object(obj) = value {
@@ -144,7 +144,7 @@ where
         // collect dependencies into a set
         Self::collect_deps(type_name, &self.types, &mut dependencies);
         let mut result = vec![type_name.to_string()];
-        result.extend(dependencies.into_iter());
+        result.extend(dependencies);
         result
     }
 
@@ -163,7 +163,7 @@ where
         dependencies.sort();
 
         let types = std::iter::once(primary)
-            .chain(dependencies.into_iter())
+            .chain(dependencies)
             .collect::<Vec<_>>();
 
         types
@@ -211,13 +211,9 @@ where
     /// * The hash of the struct.
     pub fn struct_hash(&self, type_name: &str, data: &Map<String, Value>) -> FieldElement {
         let type_hash = self.type_hash(type_name);
-        let encoded_data = self
-            .encode_data(type_name, data)
-            .iter()
-            .cloned()
-            .collect::<Vec<FieldElement>>();
+        let encoded_data = self.encode_data(type_name, data).to_vec();
         let elements = std::iter::once(type_hash)
-            .chain(encoded_data.into_iter())
+            .chain(encoded_data)
             .collect::<Vec<FieldElement>>();
 
         compute_hash_on_elements(&elements)
@@ -304,6 +300,7 @@ pub(crate) fn get_hex(value: &Value) -> Result<String, &'static str> {
 mod tests {
     use super::*;
     use rstest::rstest;
+    use serde_json::json;
     use std::fs;
     use std::io::Read;
     use std::path::Path;

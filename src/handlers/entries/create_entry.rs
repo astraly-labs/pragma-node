@@ -127,21 +127,22 @@ pub async fn create_entries(
         return Err(EntryError::Unauthorized);
     }
 
-    // Iterate over new entries
-    for new_entry in &new_entries.entries {
-        let new_entry_db = entry_repository::NewEntryDb {
+    let new_entries_db = new_entries
+        .entries
+        .iter()
+        .map(|new_entry| entry_repository::NewEntryDb {
             pair_id: new_entry.pair_id.clone(),
             publisher: new_entry.base.publisher.clone(),
             source: new_entry.base.source.clone(),
             timestamp: NaiveDateTime::from_timestamp_opt(new_entry.base.timestamp as i64, 0)
                 .unwrap(), // TODO: remove unwrap
             price: new_entry.price.into(),
-        };
+        })
+        .collect();
 
-        let _created_entry = entry_repository::insert(&state.pool, new_entry_db)
-            .await
-            .map_err(EntryError::InfraError)?;
-    }
+    let _created_entries = entry_repository::insert_entries(&state.pool, new_entries_db)
+        .await
+        .map_err(EntryError::InfraError)?;
 
     Ok(Json(CreateEntryResponse {
         number_entries_created: new_entries.entries.len(),

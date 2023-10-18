@@ -6,6 +6,7 @@ use serde_json::json;
 use crate::domain::models::entry::EntryError;
 
 #[derive(Debug)]
+#[allow(unused)]
 pub enum AppError {
     InternalServerError,
     BodyParsingError(String),

@@ -31,12 +31,13 @@ pub struct NewPublisherDb {
 }
 
 #[derive(Deserialize)]
+#[allow(unused)]
 pub struct PublishersFilter {
     is_active: Option<bool>,
     name_contains: Option<String>,
 }
 
-pub async fn insert(
+pub async fn _insert(
     pool: &deadpool_diesel::postgres::Pool,
     new_entry: NewPublisherDb,
 ) -> Result<PublisherModel, InfraError> {
@@ -101,7 +102,7 @@ pub async fn _get_all(
 
     let entries: Vec<PublisherModel> = res
         .into_iter()
-        .map(|entry_db| adapt_publisher_db_to_publisher(entry_db))
+        .map(adapt_publisher_db_to_publisher)
         .collect();
 
     Ok(entries)
