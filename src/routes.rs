@@ -6,7 +6,7 @@ use axum::Router;
 use utoipa::OpenApi as OpenApiT;
 use utoipa_swagger_ui::SwaggerUi;
 
-use crate::handlers::entries::{create_entries, get_entry};
+use crate::handlers::entries::{convert_amount, create_entries, get_entry};
 use crate::AppState;
 
 pub fn app_router<T: OpenApiT>(state: AppState) -> Router<AppState> {
@@ -33,5 +33,6 @@ fn data_routes(state: AppState) -> Router<AppState> {
     Router::new()
         .route("/publish", post(create_entries))
         .route("/:quote/:base", get(get_entry))
+        .route("/:quote/:base/:amount", get(convert_amount))
         .with_state(state)
 }

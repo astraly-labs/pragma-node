@@ -59,7 +59,7 @@ fn adapt_entry_to_entry_response(
     }
 }
 
-fn compute_median_price_and_time(
+pub(crate) fn compute_median_price_and_time(
     entries: &mut Vec<MedianEntry>,
 ) -> Option<(BigDecimal, NaiveDateTime)> {
     if entries.is_empty() {

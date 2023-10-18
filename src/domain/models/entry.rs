@@ -34,6 +34,8 @@ pub enum EntryError {
     Unauthorized,
     #[error("publisher error: {0}")]
     PublisherError(PublisherError),
+    #[error("invalid input amount: {0}")]
+    InvalidAmount(String),
 }
 
 impl IntoResponse for EntryError {
