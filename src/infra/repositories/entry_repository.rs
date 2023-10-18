@@ -76,10 +76,7 @@ pub async fn insert_entries(
         .map_err(adapt_infra_error)?
         .map_err(adapt_infra_error)?;
 
-    let entries: Vec<EntryModel> = res
-        .into_iter()
-        .map(adapt_entry_db_to_entry)
-        .collect();
+    let entries: Vec<EntryModel> = res.into_iter().map(adapt_entry_db_to_entry).collect();
 
     Ok(entries)
 }
@@ -126,10 +123,7 @@ pub async fn _get_all(
         .map_err(adapt_infra_error)?
         .map_err(adapt_infra_error)?;
 
-    let entries: Vec<EntryModel> = res
-        .into_iter()
-        .map(adapt_entry_db_to_entry)
-        .collect();
+    let entries: Vec<EntryModel> = res.into_iter().map(adapt_entry_db_to_entry).collect();
 
     Ok(entries)
 }
