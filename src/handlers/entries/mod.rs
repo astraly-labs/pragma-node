@@ -1,10 +1,13 @@
 use serde::{Deserialize, Serialize};
 
-pub use create_entry::create_entries;
-pub use get_entry::get_entry;
 use starknet::core::types::FieldElement;
 use utoipa::ToSchema;
 
+pub use convert_amount::convert_amount;
+pub use create_entry::create_entries;
+pub use get_entry::get_entry;
+
+pub mod convert_amount;
 pub mod create_entry;
 pub mod get_entry;
 
@@ -40,4 +43,13 @@ pub struct GetEntryResponse {
     pair_id: String,
     price: u128,
     timestamp: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct ConvertAmountResponse {
+    num_sources_aggregated: usize,
+    pair_id: String,
+    price: u128,
+    timestamp: u64,
+    converted_amount: u128,
 }

@@ -34,6 +34,8 @@ pub enum EntryError {
     Unauthorized,
     #[error("publisher error: {0}")]
     PublisherError(PublisherError),
+    #[error("invalid input amount: {0}")]
+    InvalidAmount(String),
 }
 
 impl IntoResponse for EntryError {
@@ -51,7 +53,10 @@ impl IntoResponse for EntryError {
                 StatusCode::BAD_REQUEST,
                 format!("Invalid signature: {}", err),
             ),
-            Self::Unauthorized => (StatusCode::UNAUTHORIZED, format!("Unauthorized publisher")),
+            Self::Unauthorized => (
+                StatusCode::UNAUTHORIZED,
+                "Unauthorized publisher".to_string(),
+            ),
             _ => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 String::from("Internal server error"),

@@ -1,6 +1,5 @@
 use bigdecimal::{BigDecimal, ToPrimitive};
-use chrono::{Date, DateTime, Local, NaiveDate, NaiveDateTime};
-use diesel::dsl::sql;
+use chrono::NaiveDateTime;
 use diesel::prelude::QueryableByName;
 use diesel::{
     ExpressionMethods, Insertable, PgTextExpressionMethods, QueryDsl, Queryable, RunQueryDsl,
@@ -36,12 +35,13 @@ pub struct NewEntryDb {
 }
 
 #[derive(Deserialize)]
+#[allow(unused)]
 pub struct EntriesFilter {
     pair_id: Option<String>,
     publisher_contains: Option<String>,
 }
 
-pub async fn insert(
+pub async fn _insert(
     pool: &deadpool_diesel::postgres::Pool,
     new_entry: NewEntryDb,
 ) -> Result<EntryModel, InfraError> {
@@ -60,7 +60,28 @@ pub async fn insert(
     Ok(adapt_entry_db_to_entry(res))
 }
 
-pub async fn get(
+pub async fn insert_entries(
+    pool: &deadpool_diesel::postgres::Pool,
+    new_entries: Vec<NewEntryDb>,
+) -> Result<Vec<EntryModel>, InfraError> {
+    let conn = pool.get().await.map_err(adapt_infra_error)?;
+    let res = conn
+        .interact(move |conn| {
+            diesel::insert_into(entries::table)
+                .values(&new_entries)
+                .returning(EntryDb::as_returning())
+                .load(conn)
+        })
+        .await
+        .map_err(adapt_infra_error)?
+        .map_err(adapt_infra_error)?;
+
+    let entries: Vec<EntryModel> = res.into_iter().map(adapt_entry_db_to_entry).collect();
+
+    Ok(entries)
+}
+
+pub async fn _get(
     pool: &deadpool_diesel::postgres::Pool,
     pair_id: String,
 ) -> Result<EntryModel, InfraError> {
@@ -102,10 +123,7 @@ pub async fn _get_all(
         .map_err(adapt_infra_error)?
         .map_err(adapt_infra_error)?;
 
-    let entries: Vec<EntryModel> = res
-        .into_iter()
-        .map(|entry_db| adapt_entry_db_to_entry(entry_db))
-        .collect();
+    let entries: Vec<EntryModel> = res.into_iter().map(adapt_entry_db_to_entry).collect();
 
     Ok(entries)
 }
