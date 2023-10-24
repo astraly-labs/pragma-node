@@ -21,6 +21,8 @@ pub enum PublisherError {
     InvalidKey(String),
     #[error("invalid address : {0}")]
     InvalidAddress(String),
+    #[error("inactive publisher : {0}")]
+    InactivePublisher(String),
 }
 
 impl IntoResponse for PublisherError {
@@ -33,6 +35,10 @@ impl IntoResponse for PublisherError {
             Self::InvalidAddress(address) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 format!("Invalid Address: {}", address),
+            ),
+            Self::InactivePublisher(publisher_name) => (
+                StatusCode::FORBIDDEN,
+                format!("Inactive Publisher: {}", publisher_name),
             ),
         };
         (

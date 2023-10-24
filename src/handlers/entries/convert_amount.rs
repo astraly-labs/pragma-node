@@ -27,7 +27,7 @@ fn currency_pair_to_pair_id(quote: &str, base: &str) -> String {
         params(
             ("quote" = String, Path, description = "Quote Asset"),
             ("base" = String, Path, description = "Base Asset"),
-            ("base" = String, Path, description = "Amount of quote asset to convert")
+            ("amount" = String, Path, description = "Amount of quote asset to convert")
         ),
     )]
 pub async fn convert_amount(
