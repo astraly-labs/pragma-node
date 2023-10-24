@@ -36,6 +36,8 @@ pub enum EntryError {
     PublisherError(PublisherError),
     #[error("invalid input amount: {0}")]
     InvalidAmount(String),
+    #[error("pair id invalid: {0}")]
+    UnknownPairId(String),
 }
 
 impl IntoResponse for EntryError {
