@@ -1,6 +1,5 @@
 use axum::extract::{Query, State};
 use axum::Json;
-use bigdecimal::ToPrimitive;
 use serde::Deserialize;
 use utoipa::IntoParams;
 
@@ -11,7 +10,7 @@ use crate::infra::repositories::entry_repository::{self, MedianEntry};
 use crate::utils::PathExtractor;
 use crate::AppState;
 
-use super::utils::currency_pair_to_pair_id;
+use super::utils::{compute_volatility, currency_pair_to_pair_id};
 
 /// Volatility query
 #[derive(Deserialize, IntoParams)]
@@ -83,33 +82,11 @@ fn adapt_entry_to_entry_response(
     entries: &Vec<MedianEntry>,
     decimals: u32,
 ) -> GetVolatilityResponse {
-    let mut values = Vec::new();
-    for i in 1..entries.len() {
-        if entries[i].median_price.to_f64().unwrap() > 0.0
-            && entries[i - 1].median_price.to_f64().unwrap() > 0.0
-            && (entries[i].time - entries[i - 1].time).num_seconds() > 0
-        {
-            let log_return = (entries[i].median_price.to_f64().unwrap()
-                / entries[i - 1].median_price.to_f64().unwrap())
-            .ln()
-            .powi(2);
-
-            let time = (entries[i].time - entries[i - 1].time)
-                .num_seconds()
-                .to_f64()
-                .unwrap()
-                / 31536000 as f64; // One year in seconds
-
-            values.push((log_return, time));
-        }
-    }
-
-    let variance: f64 = values.iter().map(|v| v.0 / v.1).sum::<f64>() / values.len() as f64;
-    let volatility = variance.sqrt();
+    let volatility = compute_volatility(entries);
 
     GetVolatilityResponse {
         pair_id,
         volatility,
         decimals,
     }
-}
+  }
