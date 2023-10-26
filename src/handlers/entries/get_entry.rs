@@ -42,6 +42,11 @@ pub async fn get_entry(
             InfraError::NotFound => EntryError::NotFound(pair_id.clone()),
         })?;
 
+    // Error if no entries found
+    if entries.is_empty() {
+        return Err(EntryError::UnknownPairId(pair_id));
+    }
+
     Ok(Json(adapt_entry_to_entry_response(pair_id, &mut entries)))
 }
 

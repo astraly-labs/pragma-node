@@ -81,12 +81,21 @@ pub async fn create_entries(
 
     let publisher_name = new_entries.entries[0].base.publisher.clone();
 
+    let publisher = publisher_repository::get(&state.pool, publisher_name.clone())
+        .await
+        .map_err(EntryError::InfraError)?;
+
+    // Check if publisher is active
+    if !publisher.active {
+        tracing::error!("Publisher {:?} is not active", publisher_name);
+        return Err(EntryError::PublisherError(
+            PublisherError::InactivePublisher(publisher_name),
+        ));
+    }
+
     // Fetch public key from database
     // TODO: Fetch it from contract
-    let public_key = publisher_repository::get(&state.pool, publisher_name.clone())
-        .await
-        .map_err(EntryError::InfraError)?
-        .active_key;
+    let public_key = publisher.active_key;
     let public_key = FieldElement::from_hex_be(&public_key)
         .map_err(|_| EntryError::PublisherError(PublisherError::InvalidKey(public_key)))?;
 
