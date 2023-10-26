@@ -17,6 +17,7 @@ pub struct CurrencyModel {
 }
 
 #[derive(Debug, thiserror::Error, ToSchema)]
+#[allow(unused)]
 pub enum CurrencyError {
     #[error("internal server error")]
     InternalServerError,
