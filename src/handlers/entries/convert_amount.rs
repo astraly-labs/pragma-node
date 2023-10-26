@@ -27,7 +27,7 @@ fn currency_pair_to_pair_id(quote: &str, base: &str) -> String {
         params(
             ("quote" = String, Path, description = "Quote Asset"),
             ("base" = String, Path, description = "Base Asset"),
-            ("amount" = String, Path, description = "Amount of quote asset to convert")
+            ("amount" = String, Path, description = "Amount of base asset to convert")
         ),
     )]
 pub async fn convert_amount(
@@ -48,10 +48,20 @@ pub async fn convert_amount(
             InfraError::NotFound => EntryError::NotFound(pair_id.clone()),
         })?;
 
+    let decimals = entry_repository::get_decimals(&state.pool, &pair_id)
+        .await
+        .map_err(|db_error| match db_error {
+            InfraError::InternalServerError => EntryError::InternalServerError,
+            InfraError::NotFound => EntryError::NotFound(pair_id.clone()),
+        })?;
+
+    println!("Decimals: {}", decimals);
+
     Ok(Json(adapt_entries_to_convert_response(
         pair_id,
         &mut entries,
         amount,
+        decimals,
     )))
 }
 
@@ -59,11 +69,11 @@ fn adapt_entries_to_convert_response(
     pair_id: String,
     entries: &mut Vec<MedianEntry>,
     amount: BigDecimal,
+    decimals: u32,
 ) -> ConvertAmountResponse {
     let (price, timestamp) = compute_median_price_and_time(entries).unwrap_or_default();
 
-    // TODO: Fetch decimals
-    let converted_amount = amount * price.clone() / BigDecimal::from(10u32.pow(8));
+    let converted_amount = amount * price.clone() / BigDecimal::from(10u32.pow(decimals));
 
     ConvertAmountResponse {
         pair_id,

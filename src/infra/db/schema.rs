@@ -1,6 +1,17 @@
 // @generated automatically by Diesel CLI.
 
 diesel::table! {
+    currencies (id) {
+        id -> Uuid,
+        name -> Varchar,
+        decimals -> Numeric,
+        #[sql_name = "abstract"]
+        abstract_ -> Bool,
+        ethereum_address -> Nullable<Varchar>,
+    }
+}
+
+diesel::table! {
     entries (id) {
         id -> Uuid,
         pair_id -> Varchar,
@@ -22,4 +33,8 @@ diesel::table! {
     }
 }
 
-diesel::allow_tables_to_appear_in_same_query!(entries, publishers,);
+diesel::allow_tables_to_appear_in_same_query!(
+    currencies,
+    entries,
+    publishers,
+);

@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::domain::models::entry::EntryModel;
-use crate::infra::db::schema::entries;
+use crate::infra::db::schema::{currencies, entries};
 use crate::infra::errors::{adapt_infra_error, InfraError};
 
 #[derive(Serialize, Queryable, Selectable)]
@@ -182,6 +182,29 @@ pub async fn get_median_entries(
         .collect();
 
     Ok(entries)
+}
+
+pub async fn get_decimals(
+    pool: &deadpool_diesel::postgres::Pool,
+    pair_id: &str,
+) -> Result<u32, InfraError> {
+    let conn = pool.get().await.map_err(adapt_infra_error)?;
+
+    let base_currency = pair_id.split('/').last().unwrap().to_uppercase();
+
+    // Fetch currency in DB
+    let decimals: BigDecimal = conn
+        .interact(move |conn| {
+            currencies::table
+                .filter(currencies::name.eq(base_currency))
+                .select(currencies::decimals)
+                .first::<BigDecimal>(conn)
+        })
+        .await
+        .map_err(adapt_infra_error)?
+        .map_err(adapt_infra_error)?;
+
+    Ok(decimals.to_u32().unwrap())
 }
 
 fn adapt_entry_db_to_entry(entry_db: EntryDb) -> EntryModel {
