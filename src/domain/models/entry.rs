@@ -21,6 +21,12 @@ pub struct EntryModel {
 }
 
 #[derive(Debug, thiserror::Error, ToSchema)]
+pub enum VolatilityError {
+    #[error("invalid timestamps range: {0} > {1}")]
+    InvalidTimestampsRange(u64, u64),
+}
+
+#[derive(Debug, thiserror::Error, ToSchema)]
 pub enum EntryError {
     #[error("internal server error")]
     InternalServerError,
@@ -38,6 +44,8 @@ pub enum EntryError {
     InvalidAmount(String),
     #[error("pair id invalid: {0}")]
     UnknownPairId(String),
+    #[error("volatility error: {0}")]
+    VolatilityError(#[from] VolatilityError),
 }
 
 impl IntoResponse for EntryError {

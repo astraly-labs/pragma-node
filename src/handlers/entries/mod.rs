@@ -6,10 +6,14 @@ use utoipa::ToSchema;
 pub use convert_amount::convert_amount;
 pub use create_entry::create_entries;
 pub use get_entry::get_entry;
+pub use get_volatility::get_volatility;
 
 pub mod convert_amount;
 pub mod create_entry;
 pub mod get_entry;
+pub mod get_volatility;
+
+pub mod utils;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, ToSchema)]
 pub struct BaseEntry {
@@ -52,4 +56,11 @@ pub struct ConvertAmountResponse {
     price: u128,
     timestamp: u64,
     converted_amount: u128,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct GetVolatilityResponse {
+    pair_id: String,
+    volatility: f64,
+    decimals: u32,
 }
