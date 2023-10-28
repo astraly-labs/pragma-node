@@ -128,7 +128,7 @@ pub async fn _get_all(
     Ok(entries)
 }
 
-#[derive(Serialize, Queryable)]
+#[derive(Debug, Serialize, Queryable)]
 pub struct MedianEntry {
     pub source: String,
     pub time: NaiveDateTime,
@@ -180,6 +180,52 @@ pub async fn get_median_entries(
         .interact(move |conn| {
             diesel::sql_query(raw_sql)
                 .bind::<diesel::sql_types::Text, _>(pair_id)
+                .load::<MedianEntryRaw>(conn)
+        })
+        .await
+        .map_err(adapt_infra_error)?
+        .map_err(adapt_infra_error)?;
+
+    let entries: Vec<MedianEntry> = raw_entries
+        .into_iter()
+        .map(|raw_entry| MedianEntry {
+            time: raw_entry.time,
+            median_price: raw_entry.median_price,
+            source: raw_entry.source,
+        })
+        .collect();
+
+    Ok(entries)
+}
+
+pub async fn get_entries_between(
+    pool: &deadpool_diesel::postgres::Pool,
+    pair_id: String,
+    start_timestamp: u64,
+    end_timestamp: u64,
+) -> Result<Vec<MedianEntry>, InfraError> {
+    let conn = pool.get().await.map_err(adapt_infra_error)?;
+    let start_datetime = NaiveDateTime::from_timestamp_opt(start_timestamp as i64, 0).unwrap();
+    let end_datetime = NaiveDateTime::from_timestamp_opt(end_timestamp as i64, 0).unwrap();
+
+    let raw_sql = r#"
+        SELECT
+            source,
+            "timestamp" AS "time",
+            PERCENTILE_DISC(0.5) WITHIN GROUP(ORDER BY price) AS "median_price"
+        FROM entries
+        WHERE pair_id = $1
+        AND "timestamp" BETWEEN $2 AND $3
+        GROUP BY (timestamp, source)
+        ORDER BY timestamp ASC;
+    "#;
+
+    let raw_entries = conn
+        .interact(move |conn| {
+            diesel::sql_query(raw_sql)
+                .bind::<diesel::sql_types::Text, _>(pair_id)
+                .bind::<diesel::sql_types::Timestamp, _>(start_datetime)
+                .bind::<diesel::sql_types::Timestamp, _>(end_datetime)
                 .load::<MedianEntryRaw>(conn)
         })
         .await

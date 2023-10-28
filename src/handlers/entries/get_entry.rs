@@ -1,7 +1,6 @@
 use axum::extract::State;
 use axum::Json;
-use bigdecimal::{BigDecimal, ToPrimitive};
-use chrono::NaiveDateTime;
+use bigdecimal::ToPrimitive;
 
 use crate::domain::models::entry::EntryError;
 use crate::handlers::entries::GetEntryResponse;
@@ -10,10 +9,7 @@ use crate::infra::repositories::entry_repository::{self, MedianEntry};
 use crate::utils::PathExtractor;
 use crate::AppState;
 
-/// Converts a currency pair to a pair id.
-fn currency_pair_to_pair_id(quote: &str, base: &str) -> String {
-    format!("{}/{}", quote.to_uppercase(), base.to_uppercase())
-}
+use super::utils::{compute_median_price_and_time, currency_pair_to_pair_id};
 
 #[utoipa::path(
         get,
@@ -62,31 +58,4 @@ fn adapt_entry_to_entry_response(
         num_sources_aggregated: entries.len(),
         price: price.to_u128().unwrap(),
     }
-}
-
-pub(crate) fn compute_median_price_and_time(
-    entries: &mut Vec<MedianEntry>,
-) -> Option<(BigDecimal, NaiveDateTime)> {
-    if entries.is_empty() {
-        return None;
-    }
-
-    // Compute median price
-    entries.sort_by(|a, b| a.median_price.cmp(&b.median_price));
-    let mid = entries.len() / 2;
-    let median_price = if entries.len() % 2 == 0 {
-        (&entries[mid - 1].median_price + &entries[mid].median_price) / BigDecimal::from(2)
-    } else {
-        entries[mid].median_price.clone()
-    };
-
-    // Compute median time
-    entries.sort_by(|a, b| a.time.cmp(&b.time));
-    let median_time = if entries.len() % 2 == 0 {
-        entries[mid - 1].time
-    } else {
-        entries[mid].time
-    };
-
-    Some((median_price, median_time))
 }

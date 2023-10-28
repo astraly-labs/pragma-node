@@ -37,9 +37,9 @@ async fn main() {
         components(
             schemas(domain::models::entry::EntryModel, domain::models::entry::EntryError),
             schemas(domain::models::publisher::PublisherModel, domain::models::publisher::PublisherError),
-            schemas(handlers::entries::CreateEntryRequest, handlers::entries::CreateEntryResponse, handlers::entries::GetEntryResponse, handlers::entries::ConvertAmountResponse),
+            schemas(handlers::entries::CreateEntryRequest, handlers::entries::CreateEntryResponse, handlers::entries::GetEntryResponse, handlers::entries::ConvertAmountResponse, handlers::entries::GetVolatilityResponse),
             schemas(handlers::entries::Entry, handlers::entries::BaseEntry),
-            schemas(infra::errors::InfraError)
+            schemas(infra::errors::InfraError),
         ),
         tags(
             (name = "pragma-node", description = "Pragma Node API")

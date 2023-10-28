@@ -1,4 +1,4 @@
-use std::fmt;
+use std::fmt::{self, Debug};
 
 use deadpool_diesel::InteractError;
 use utoipa::ToSchema;
@@ -9,7 +9,8 @@ pub enum InfraError {
     NotFound,
 }
 
-pub fn adapt_infra_error<T: Error>(error: T) -> InfraError {
+pub fn adapt_infra_error<T: Error + Debug>(error: T) -> InfraError {
+    println!("Error: {:?}", error);
     error.as_infra_error()
 }
 

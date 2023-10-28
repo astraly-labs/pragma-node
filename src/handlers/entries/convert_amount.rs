@@ -10,7 +10,7 @@ use crate::infra::repositories::entry_repository::{self, MedianEntry};
 use crate::utils::PathExtractor;
 use crate::AppState;
 
-use super::get_entry::compute_median_price_and_time;
+use super::utils::compute_median_price_and_time;
 use super::ConvertAmountResponse;
 
 /// Converts a currency pair to a pair id.
@@ -54,8 +54,6 @@ pub async fn convert_amount(
             InfraError::InternalServerError => EntryError::InternalServerError,
             InfraError::NotFound => EntryError::NotFound(pair_id.clone()),
         })?;
-
-    println!("Decimals: {}", decimals);
 
     Ok(Json(adapt_entries_to_convert_response(
         pair_id,
