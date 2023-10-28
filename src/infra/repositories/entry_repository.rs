@@ -152,14 +152,28 @@ pub async fn get_median_entries(
     let conn = pool.get().await.map_err(adapt_infra_error)?;
 
     let raw_sql = r#"
+        -- select the latest entry for every publisher,source combination
+        WITH latest_entries AS (
+            SELECT * FROM (
+                      SELECT
+                          "timestamp",
+                          "publisher",
+                          source,
+                          price,
+                          row_number() OVER(PARTITION BY "publisher","source" ORDER BY "timestamp" DESC ) AS rn
+                      FROM entries
+                      WHERE pair_id = 'BTC/USD'
+                  ) t
+             WHERE t.rn = 1
+        )
+
         SELECT
             source,
-            MAX("timestamp") AS "time",
+            PERCENTILE_DISC(0.5) WITHIN GROUP(ORDER BY "timestamp") AS "time",
             PERCENTILE_DISC(0.5) WITHIN GROUP(ORDER BY price) AS "median_price"
-        FROM entries
-        WHERE pair_id = $1
+        FROM latest_entries
         GROUP BY source
-        ORDER BY source;
+        ORDER BY source
     "#;
 
     let raw_entries: Vec<MedianEntryRaw> = conn
