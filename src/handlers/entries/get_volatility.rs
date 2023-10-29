@@ -23,7 +23,7 @@ pub struct VolatilityQuery {
 
 #[utoipa::path(
         get,
-        path = "/v1/volatility/{quote}/{base}",
+        path = "/node/v1/volatility/{quote}/{base}",
         responses(
             (status = 200, description = "Get realized volatility successfuly", body = [GetVolatilityResponse])
         ),
@@ -89,4 +89,4 @@ fn adapt_entry_to_entry_response(
         volatility,
         decimals,
     }
-  }
+}

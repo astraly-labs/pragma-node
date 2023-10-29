@@ -60,7 +60,7 @@ pub(crate) fn build_publish_message(entries: &Vec<Entry>) -> TypedData<PublishMe
 
 #[utoipa::path(
         post,
-        path = "/v1/data/publish",
+        path = "/node/v1/data/publish",
         request_body = CreateEntryRequest,
         responses(
             (status = 200, description = "Entries published successfuly", body = CreateEntryResponse),
