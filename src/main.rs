@@ -33,6 +33,7 @@ async fn main() {
             handlers::entries::create_entry::create_entries,
             handlers::entries::get_entry::get_entry,
             handlers::entries::convert_amount::convert_amount,
+            handlers::entries::get_volatility::get_volatility,
         ),
         components(
             schemas(domain::models::entry::EntryModel, domain::models::entry::EntryError),
