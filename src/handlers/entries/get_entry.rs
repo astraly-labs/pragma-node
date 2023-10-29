@@ -13,7 +13,7 @@ use super::utils::{compute_median_price_and_time, currency_pair_to_pair_id};
 
 #[utoipa::path(
         get,
-        path = "/v1/data/{quote}/{base}",
+        path = "/node/v1/data/{quote}/{base}",
         responses(
             (status = 200, description = "Get median entry successfuly", body = [GetEntryResponse])
         ),

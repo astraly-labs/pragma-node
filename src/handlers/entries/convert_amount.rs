@@ -20,7 +20,7 @@ fn currency_pair_to_pair_id(quote: &str, base: &str) -> String {
 
 #[utoipa::path(
         get,
-        path = "/v1/data/{quote}/{base}/{amount}",
+        path = "/node/v1/data/{quote}/{base}/{amount}",
         responses(
             (status = 200, description = "Amount converted successfuly", body = [ConvertAmountResponse])
         ),
