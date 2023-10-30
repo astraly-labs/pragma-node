@@ -32,15 +32,9 @@ pub(crate) fn compute_median_price_and_time(
         entries[mid].median_price.clone()
     };
 
-    // Compute median time
-    entries.sort_by(|a, b| a.time.cmp(&b.time));
-    let median_time = if entries.len() % 2 == 0 {
-        entries[mid - 1].time
-    } else {
-        entries[mid].time
-    };
+    let latest_time = entries.last().unwrap().time;
 
-    Some((median_price, median_time))
+    Some((median_price, latest_time))
 }
 
 /// Computes the volatility from a list of entries.
