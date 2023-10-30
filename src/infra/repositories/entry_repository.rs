@@ -250,13 +250,13 @@ pub async fn get_decimals(
 ) -> Result<u32, InfraError> {
     let conn = pool.get().await.map_err(adapt_infra_error)?;
 
-    let base_currency = pair_id.split('/').last().unwrap().to_uppercase();
+    let quote_currency = pair_id.split('/').next().unwrap().to_uppercase();
 
     // Fetch currency in DB
     let decimals: BigDecimal = conn
         .interact(move |conn| {
             currencies::table
-                .filter(currencies::name.eq(base_currency))
+                .filter(currencies::name.eq(quote_currency))
                 .select(currencies::decimals)
                 .first::<BigDecimal>(conn)
         })

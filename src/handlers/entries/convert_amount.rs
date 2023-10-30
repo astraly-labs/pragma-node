@@ -2,6 +2,7 @@ use std::str::FromStr;
 
 use axum::extract::State;
 use axum::Json;
+use bigdecimal::num_bigint::{BigInt, ToBigInt};
 use bigdecimal::{BigDecimal, ToPrimitive};
 
 use crate::domain::models::entry::EntryError;
@@ -71,7 +72,13 @@ fn adapt_entries_to_convert_response(
 ) -> ConvertAmountResponse {
     let (price, timestamp) = compute_median_price_and_time(entries).unwrap_or_default();
 
-    let converted_amount = amount * price.clone() / BigDecimal::from(10u32.pow(decimals));
+    let converted_amount = amount / price.clone();
+    let scaler = BigInt::from(10).pow(decimals);
+    let converted_amount = converted_amount
+        .to_bigint()
+        .unwrap()
+        .checked_mul(&scaler)
+        .unwrap();
 
     ConvertAmountResponse {
         pair_id,
