@@ -162,7 +162,7 @@ pub async fn get_median_entries(
                           price,
                           row_number() OVER(PARTITION BY "publisher","source" ORDER BY "timestamp" DESC ) AS rn
                       FROM entries
-                      WHERE pair_id = 'BTC/USD'
+                      WHERE pair_id = $1
                   ) t
              WHERE t.rn = 1
         )
