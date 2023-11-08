@@ -57,16 +57,15 @@ pub(crate) fn compute_volatility(entries: &Vec<MedianEntry>) -> f64 {
                 .num_seconds()
                 .to_f64()
                 .unwrap()
-                / 31536000 as f64; // One year in seconds
+                / 3153600_f64; // One year in seconds
 
             values.push((log_return, time));
         }
     }
 
     let variance: f64 = values.iter().map(|v| v.0 / v.1).sum::<f64>() / values.len() as f64;
-    let volatility = variance.sqrt() * 10_f64.powi(8);
 
-    volatility
+    variance.sqrt() * 10_f64.powi(8)
 }
 
 #[test]
