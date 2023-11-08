@@ -45,7 +45,7 @@ pub struct CreateEntryResponse {
 pub struct GetEntryResponse {
     num_sources_aggregated: usize,
     pair_id: String,
-    price: u128,
+    price: String,
     timestamp: u64,
 }
 
@@ -53,9 +53,9 @@ pub struct GetEntryResponse {
 pub struct ConvertAmountResponse {
     num_sources_aggregated: usize,
     pair_id: String,
-    price: u128,
+    price: String,
     timestamp: u64,
-    converted_amount: u128,
+    converted_amount: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]

@@ -1,6 +1,6 @@
 use axum::extract::State;
 use axum::Json;
-use bigdecimal::ToPrimitive;
+use bigdecimal::num_bigint::ToBigInt;
 
 use crate::domain::models::entry::EntryError;
 use crate::handlers::entries::GetEntryResponse;
@@ -56,6 +56,6 @@ fn adapt_entry_to_entry_response(
         pair_id,
         timestamp: timestamp.timestamp() as u64,
         num_sources_aggregated: entries.len(),
-        price: price.to_u128().unwrap(),
+        price: price.to_bigint().unwrap().to_str_radix(16),
     }
 }
