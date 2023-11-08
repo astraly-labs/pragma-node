@@ -3,7 +3,7 @@ use std::str::FromStr;
 use axum::extract::State;
 use axum::Json;
 use bigdecimal::num_bigint::{BigInt, ToBigInt};
-use bigdecimal::{BigDecimal, ToPrimitive};
+use bigdecimal::BigDecimal;
 
 use crate::domain::models::entry::EntryError;
 use crate::infra::errors::InfraError;
@@ -39,18 +39,29 @@ pub async fn convert_amount(
     // Construct pair id
     let pair_id = currency_pair_to_pair_id(&input.0, &input.1);
 
+    // Parse amount
+    let amount = BigDecimal::from_str(&input.2).map_err(|_| EntryError::InvalidAmount(input.2))?;
+
     if pair_id == "STRK/ETH" {
+        let price = BigDecimal::from_str("100000000000000000").unwrap();
+        let decimals = 18;
+
+        let converted_amount = amount / price.clone();
+        let scaler = BigInt::from(10).pow(decimals);
+        let converted_amount = converted_amount
+            .to_bigint()
+            .unwrap()
+            .checked_mul(&scaler)
+            .unwrap();
+
         return Ok(Json(ConvertAmountResponse {
             pair_id,
             timestamp: chrono::Utc::now().timestamp() as u64,
             num_sources_aggregated: 5,
-            price: 100000000000000000,
-            converted_amount: 1000000000000000000,
+            price: "0x16345785D8A0000".to_string(), // 0.1 wei
+            converted_amount: converted_amount.to_str_radix(16),
         }));
     }
-
-    // Parse amount
-    let amount = BigDecimal::from_str(&input.2).map_err(|_| EntryError::InvalidAmount(input.2))?;
 
     // Get entries from database with given pair id (only the latest one grouped by publisher)
     let mut entries = entry_repository::get_median_entries(&state.pool, pair_id.clone())
@@ -95,7 +106,7 @@ fn adapt_entries_to_convert_response(
         pair_id,
         timestamp: timestamp.timestamp() as u64,
         num_sources_aggregated: entries.len(),
-        price: price.to_u128().unwrap(),
-        converted_amount: converted_amount.to_u128().unwrap(),
+        price: price.to_bigint().unwrap().to_str_radix(16),
+        converted_amount: converted_amount.to_str_radix(16),
     }
 }
