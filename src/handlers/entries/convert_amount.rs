@@ -58,7 +58,7 @@ pub async fn convert_amount(
             pair_id,
             timestamp: chrono::Utc::now().timestamp() as u64,
             num_sources_aggregated: 5,
-            price: "0x16345785D8A0000".to_string(), // 0.1 wei
+            price: "16345785D8A0000".to_string(), // 0.1 wei
             converted_amount: converted_amount.to_str_radix(16),
         }));
     }
