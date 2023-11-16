@@ -2,6 +2,8 @@ use std::net::SocketAddr;
 
 use deadpool_diesel::postgres::{Manager, Pool};
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+use utoipa::openapi::security::{ApiKey, ApiKeyValue, SecurityScheme};
+use utoipa::Modify;
 use utoipa::OpenApi;
 
 use crate::config::config;
@@ -42,11 +44,25 @@ async fn main() {
             schemas(handlers::entries::Entry, handlers::entries::BaseEntry),
             schemas(infra::errors::InfraError),
         ),
+        modifiers(&SecurityAddon),
         tags(
             (name = "pragma-node", description = "Pragma Node API")
         )
     )]
     struct ApiDoc;
+
+    struct SecurityAddon;
+
+    impl Modify for SecurityAddon {
+        fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
+            if let Some(components) = openapi.components.as_mut() {
+                components.add_security_scheme(
+                    "api_key",
+                    SecurityScheme::ApiKey(ApiKey::Header(ApiKeyValue::new("pragma_apikey"))),
+                )
+            }
+        }
+    }
 
     println!("{}", ApiDoc::openapi().to_pretty_json().unwrap());
 
