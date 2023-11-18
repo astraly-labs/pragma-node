@@ -154,26 +154,24 @@ pub async fn get_median_entries(
     let raw_sql = r#"
         -- select the latest entry for every publisher,source combination
         WITH latest_entries AS (
-            SELECT * FROM (
-                      SELECT
-                          "timestamp",
-                          "publisher",
-                          source,
-                          price,
-                          row_number() OVER(PARTITION BY "publisher","source" ORDER BY "timestamp" DESC ) AS rn
-                      FROM entries
-                      WHERE pair_id = $1
-                  ) t
-             WHERE t.rn = 1
+            SELECT
+                "timestamp",
+                "publisher",
+                source,
+                price,
+                row_number() OVER (PARTITION BY "publisher", "source" ORDER BY "timestamp" DESC) AS rn
+            FROM entries
+            WHERE pair_id = $1
         )
 
         SELECT
             source,
-            PERCENTILE_DISC(0.5) WITHIN GROUP(ORDER BY "timestamp") AS "time",
-            PERCENTILE_DISC(0.5) WITHIN GROUP(ORDER BY price) AS "median_price"
+            PERCENTILE_DISC(0.5) WITHIN GROUP (ORDER BY "timestamp") AS "time",
+            PERCENTILE_DISC(0.5) WITHIN GROUP (ORDER BY price) AS "median_price"
         FROM latest_entries
+        WHERE rn = 1
         GROUP BY source
-        ORDER BY source
+        ORDER BY source;
     "#;
 
     let raw_entries: Vec<MedianEntryRaw> = conn
