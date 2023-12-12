@@ -34,13 +34,12 @@ async fn main() {
         paths(
             handlers::entries::create_entry::create_entries,
             handlers::entries::get_entry::get_entry,
-            handlers::entries::convert_amount::convert_amount,
             handlers::entries::get_volatility::get_volatility,
         ),
         components(
             schemas(domain::models::entry::EntryModel, domain::models::entry::EntryError),
             schemas(domain::models::publisher::PublisherModel, domain::models::publisher::PublisherError),
-            schemas(handlers::entries::CreateEntryRequest, handlers::entries::CreateEntryResponse, handlers::entries::GetEntryResponse, handlers::entries::ConvertAmountResponse, handlers::entries::GetVolatilityResponse),
+            schemas(handlers::entries::CreateEntryRequest, handlers::entries::CreateEntryResponse, handlers::entries::GetEntryResponse, handlers::entries::GetVolatilityResponse),
             schemas(handlers::entries::Entry, handlers::entries::BaseEntry),
             schemas(infra::errors::InfraError),
         ),
