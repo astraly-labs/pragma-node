@@ -30,6 +30,17 @@ pub async fn get_entry(
     // Construct pair id
     let pair_id = currency_pair_to_pair_id(&pair.1, &pair.0);
 
+    // Mock strk/eth pair
+    if pair_id == "STRK/ETH" {
+        return Ok(Json(GetEntryResponse {
+            pair_id,
+            timestamp: chrono::Utc::now().timestamp_millis() as u64,
+            num_sources_aggregated: 5,
+            price: "0x16345785D8A0000".to_string(), // 0.1 wei
+            decimals: 18,
+        }));
+    }
+
     // Get entries from database with given pair id (only the latest one grouped by publisher)
     let mut entries = entry_repository::get_median_entries(&state.pool, pair_id.clone())
         .await
