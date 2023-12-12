@@ -45,7 +45,9 @@ pub struct GetEntryResponse {
     pair_id: String,
     price: String,
     timestamp: u64,
+    decimals: u32,
 }
+
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct GetVolatilityResponse {
     pair_id: String,
