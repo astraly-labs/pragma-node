@@ -7,6 +7,7 @@ use rdkafka::producer::future_producer::OwnedDeliveryResult;
 lazy_static! {
     static ref KAFKA_PRODUCER: FutureProducer = {
         ClientConfig::new()
+            // soon loaded by config
             .set("bootstrap.servers", "localhost:29092")
             .create()
             .expect("can't create kafka producer")
