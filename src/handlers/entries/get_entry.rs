@@ -33,10 +33,10 @@ pub async fn get_entry(
     // Mock strk/eth pair
     if pair_id == "STRK/ETH" {
         return Ok(Json(GetEntryResponse {
-            pair_id,
+            pair_id: "ETH/STRK".to_string(),
             timestamp: chrono::Utc::now().timestamp_millis() as u64,
             num_sources_aggregated: 5,
-            price: "0x16345785D8A0000".to_string(), // 0.1 wei
+            price: "0x8ac7230489e80000".to_string(), // 0.1 wei
             decimals: 18,
         }));
     }
