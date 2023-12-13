@@ -46,6 +46,8 @@ pub enum EntryError {
     UnknownPairId(String),
     #[error("volatility error: {0}")]
     VolatilityError(#[from] VolatilityError),
+    #[error("can't publish data: {0}")]
+    PublishData(String),
 }
 
 impl IntoResponse for EntryError {

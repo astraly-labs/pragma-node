@@ -52,3 +52,60 @@ services:
 #   db-password:
 #     file: db/password.txt
 
+  pragma-zookeeper:
+    container_name: "pragma-zookeeper"
+    image: confluentinc/cp-zookeeper:latest
+    restart: "always"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - pragma-zookeeper-network
+    volumes:
+      - pragma_zookeeper_data:/var/lib/zookeeper/data
+      - pragma_zookeeper_logs:/var/lib/zookeeper/log
+    ports:
+      - "22181:2181"
+
+  pragma-kafka:
+    container_name: "pragma-kafka"
+    image: confluentinc/cp-kafka:latest
+    depends_on:
+      pragma-zookeeper:
+        condition: service_started
+    networks:
+      - pragma-kafka-network
+      - pragma-zookeeper-network
+    ports:
+      - "29092:29092"
+      - "9092:9092"
+    expose:
+      - "29092"
+    healthcheck:
+      test: [ "CMD", "kafka-topics", "--list", "--bootstrap-server", "pragma-kafka:9092" ]
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: pragma-zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://pragma-kafka:9092,PLAINTEXT_E://pragma-kafka:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,PLAINTEXT_E:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_SOCKET_REQUEST_MAX_BYTES: "10000000"
+      KAFKA_MESSAGE_MAX_BYTES: "10000000"
+      KAFKA_TOPIC_MAX_MESSAGE_BYTES: "15728640"
+      KAFKA_REPLICA_FETCH_MAX_BYTES: "15728640"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+networks:
+    pragma-kafka-network:
+      # production
+      #driver: bridge
+      #internal: true
+    pragma-zookeeper-network:
+      # production
+      #driver: bridge
+      #internal: true
+
+volumes:
+    pragma_zookeeper_data:
+    pragma_zookeeper_logs:

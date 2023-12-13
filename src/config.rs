@@ -15,9 +15,17 @@ struct DatabaseConfig {
 }
 
 #[derive(Debug)]
+struct KafkaConfig {
+    brokers: Vec<String>,
+    topic: String,
+    group_id: String,
+}
+
+#[derive(Debug)]
 pub struct Config {
     server: ServerConfig,
     db: DatabaseConfig,
+    kafka: KafkaConfig,
 }
 
 impl Config {
@@ -31,6 +39,10 @@ impl Config {
 
     pub fn server_port(&self) -> u16 {
         self.server.port
+    }
+
+    pub fn kafka_topic(&self) -> &str {
+        &self.kafka.topic
     }
 }
 
@@ -50,9 +62,17 @@ async fn init_config() -> Config {
         url: env::var("DATABASE_URL").expect("DATABASE_URL must be set"),
     };
 
+    let kafka_config = KafkaConfig {
+        brokers: vec![env::var("KAFKA_BROKERS")
+            .unwrap_or_else(|_| String::from("pragma-kafka:9092"))],
+        topic: env::var("KAFKA_TOPIC").unwrap_or_else(|_| String::from("pragma-data")),
+        group_id: env::var("KAFKA_GROUP_ID").unwrap_or_else(|_| String::from("pragma-data")),
+    };
+
     Config {
         server: server_config,
         db: database_config,
+        kafka: kafka_config,
     }
 }
 

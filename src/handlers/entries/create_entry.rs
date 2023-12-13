@@ -9,6 +9,7 @@ use crate::domain::models::publisher::PublisherError;
 use crate::handlers::entries::{CreateEntryRequest, CreateEntryResponse};
 use crate::infra::repositories::{entry_repository, publisher_repository};
 use crate::utils::{JsonExtractor, TypedData};
+use crate::infra::kafka;
 use crate::AppState;
 use serde::{Deserialize, Serialize};
 
@@ -149,9 +150,13 @@ pub async fn create_entries(
         })
         .collect();
 
-    let _created_entries = entry_repository::insert_entries(&state.pool, new_entries_db)
-        .await
-        .map_err(EntryError::InfraError)?;
+    let data = serde_json::to_vec(&new_entries)
+        .map_err(|e| EntryError::PublishData(e.to_string()))?;
+
+    if let Err(e) = kafka::send_message("pragma-data", &data).await {
+        tracing::error!("Error sending message to kafka: {:?}", e);
+        return Err(EntryError::PublishData(String::from("Error sending message to kafka")));
+    };
 
     Ok(Json(CreateEntryResponse {
         number_entries_created: new_entries.entries.len(),
