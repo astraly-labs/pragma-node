@@ -13,11 +13,11 @@ lazy_static! {
     };
 }
 
-pub async fn send_message(topic: &str, message: &[u8]) -> OwnedDeliveryResult {
+pub async fn send_message(topic: &str, message: &[u8], key: &str) -> OwnedDeliveryResult {
     let delivery_status = KAFKA_PRODUCER.send(
         FutureRecord::to(topic)
             .payload(message)
-            .key("first-data"),
+            .key(key),
         std::time::Duration::from_secs(0),
     );
     delivery_status.await

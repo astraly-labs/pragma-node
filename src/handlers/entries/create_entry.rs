@@ -21,7 +21,7 @@ pub struct PublishMessage {
     entries: Vec<Entry>,
 }
 
-pub(crate) fn build_publish_message(entries: &Vec<Entry>) -> TypedData<PublishMessage> {
+pub(crate) fn build_publish_message(entries: &Vec<Entry>) -> Result<TypedData<PublishMessage>, EntryError> {
     // Construct the raw string with placeholders for the entries
     let raw_message = format!(
         r#"{{
@@ -53,10 +53,12 @@ pub(crate) fn build_publish_message(entries: &Vec<Entry>) -> TypedData<PublishMe
                 ]
             }}
         }}"#,
-        serde_json::to_string(entries).unwrap()
+        serde_json::to_string(entries)
+            .map_err(|e| EntryError::BuildPublish(e.to_string()))?
     );
 
-    serde_json::from_str(&raw_message).expect("Error parsing the JSON")
+    serde_json::from_str(&raw_message)
+        .map_err(|e| EntryError::BuildPublish(e.to_string()))
 }
 
 #[utoipa::path(
@@ -121,7 +123,8 @@ pub async fn create_entries(
         account_address
     );
 
-    let message_hash = build_publish_message(&new_entries.entries).message_hash(account_address);
+    let message_hash = build_publish_message(&new_entries.entries)?
+        .message_hash(account_address);
 
     if !ecdsa_verify(
         &public_key,
@@ -137,23 +140,10 @@ pub async fn create_entries(
         return Err(EntryError::Unauthorized);
     }
 
-    let new_entries_db = new_entries
-        .entries
-        .iter()
-        .map(|new_entry| entry_repository::NewEntryDb {
-            pair_id: new_entry.pair_id.clone(),
-            publisher: new_entry.base.publisher.clone(),
-            source: new_entry.base.source.clone(),
-            timestamp: NaiveDateTime::from_timestamp_opt(new_entry.base.timestamp as i64, 0)
-                .unwrap(), // TODO: remove unwrap
-            price: new_entry.price.into(),
-        })
-        .collect();
-
     let data = serde_json::to_vec(&new_entries)
         .map_err(|e| EntryError::PublishData(e.to_string()))?;
 
-    if let Err(e) = kafka::send_message("pragma-data", &data).await {
+    if let Err(e) = kafka::send_message("pragma-data", &data, &publisher_name).await {
         tracing::error!("Error sending message to kafka: {:?}", e);
         return Err(EntryError::PublishData(String::from("Error sending message to kafka")));
     };
@@ -173,7 +163,7 @@ mod tests {
     #[rstest]
     fn test_build_publish_message_empty() {
         let entries = vec![];
-        let typed_data = build_publish_message(&entries);
+        let typed_data = build_publish_message(&entries).unwrap();
 
         assert_eq!(typed_data.primary_type, "Request");
         assert_eq!(typed_data.domain.name, "Pragma");
@@ -194,7 +184,8 @@ mod tests {
             price: 0,
             volume: 0,
         }];
-        let typed_data = build_publish_message(&entries);
+        let typed_data = build_publish_message(&entries)
+            .unwrap();
 
         assert_eq!(typed_data.primary_type, "Request");
         assert_eq!(typed_data.domain.name, "Pragma");

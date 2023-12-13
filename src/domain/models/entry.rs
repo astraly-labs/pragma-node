@@ -48,6 +48,8 @@ pub enum EntryError {
     VolatilityError(#[from] VolatilityError),
     #[error("can't publish data: {0}")]
     PublishData(String),
+    #[error("can't build publish message: {0}")]
+    BuildPublish(String)
 }
 
 impl IntoResponse for EntryError {
