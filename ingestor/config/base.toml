@@ -1,6 +1,0 @@
-[kafka]
-    brokers = [
-        "localhost:29092"
-    ]
-    topic="pragma-data"
-    group_id="pragma-data"
