@@ -1,15 +1,13 @@
 use bigdecimal::{BigDecimal, ToPrimitive};
 use chrono::NaiveDateTime;
 use diesel::prelude::QueryableByName;
-use diesel::{
-    ExpressionMethods, QueryDsl, Queryable, RunQueryDsl,
-};
+use diesel::{ExpressionMethods, QueryDsl, Queryable, RunQueryDsl};
 use serde::{Deserialize, Serialize};
 
+use crate::infra::db::schema::currencies;
+use crate::infra::errors::{adapt_infra_error, InfraError};
 use pragma_entities::dto;
 use pragma_entities::{Entry, NewEntry};
-use crate::infra::db::schema::{currencies};
-use crate::infra::errors::{adapt_infra_error, InfraError};
 
 #[derive(Deserialize)]
 #[allow(unused)]

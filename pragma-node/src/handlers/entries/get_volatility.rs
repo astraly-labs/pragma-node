@@ -3,12 +3,12 @@ use axum::Json;
 use serde::Deserialize;
 use utoipa::IntoParams;
 
-use pragma_entities::{EntryError, VolatilityError};
 use crate::handlers::entries::GetVolatilityResponse;
 use crate::infra::errors::InfraError;
 use crate::infra::repositories::entry_repository::{self, MedianEntry};
 use crate::utils::PathExtractor;
 use crate::AppState;
+use pragma_entities::{EntryError, VolatilityError};
 
 use super::utils::{compute_volatility, currency_pair_to_pair_id};
 

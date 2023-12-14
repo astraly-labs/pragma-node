@@ -1,14 +1,14 @@
+use crate::handlers::entries::{CreateEntryRequest, CreateEntryResponse};
+use crate::infra::kafka;
+use crate::infra::repositories::publisher_repository;
+use crate::utils::{JsonExtractor, TypedData};
+use crate::AppState;
 use axum::extract::State;
 use axum::Json;
+use pragma_entities::{EntryError, PublisherError};
+use serde::{Deserialize, Serialize};
 use starknet::core::crypto::{ecdsa_verify, Signature};
 use starknet::core::types::FieldElement;
-use pragma_entities::{EntryError, PublisherError};
-use crate::handlers::entries::{CreateEntryRequest, CreateEntryResponse};
-use crate::infra::repositories::{publisher_repository};
-use crate::utils::{JsonExtractor, TypedData};
-use crate::infra::kafka;
-use crate::AppState;
-use serde::{Deserialize, Serialize};
 
 use super::Entry;
 
@@ -18,7 +18,9 @@ pub struct PublishMessage {
     entries: Vec<Entry>,
 }
 
-pub(crate) fn build_publish_message(entries: &Vec<Entry>) -> Result<TypedData<PublishMessage>, EntryError> {
+pub(crate) fn build_publish_message(
+    entries: &Vec<Entry>,
+) -> Result<TypedData<PublishMessage>, EntryError> {
     // Construct the raw string with placeholders for the entries
     let raw_message = format!(
         r#"{{
@@ -50,12 +52,10 @@ pub(crate) fn build_publish_message(entries: &Vec<Entry>) -> Result<TypedData<Pu
                 ]
             }}
         }}"#,
-        serde_json::to_string(entries)
-            .map_err(|e| EntryError::BuildPublish(e.to_string()))?
+        serde_json::to_string(entries).map_err(|e| EntryError::BuildPublish(e.to_string()))?
     );
 
-    serde_json::from_str(&raw_message)
-        .map_err(|e| EntryError::BuildPublish(e.to_string()))
+    serde_json::from_str(&raw_message).map_err(|e| EntryError::BuildPublish(e.to_string()))
 }
 
 #[utoipa::path(
@@ -120,8 +120,7 @@ pub async fn create_entries(
         account_address
     );
 
-    let message_hash = build_publish_message(&new_entries.entries)?
-        .message_hash(account_address);
+    let message_hash = build_publish_message(&new_entries.entries)?.message_hash(account_address);
 
     if !ecdsa_verify(
         &public_key,
@@ -137,12 +136,14 @@ pub async fn create_entries(
         return Err(EntryError::Unauthorized);
     }
 
-    let data = serde_json::to_vec(&new_entries)
-        .map_err(|e| EntryError::PublishData(e.to_string()))?;
+    let data =
+        serde_json::to_vec(&new_entries).map_err(|e| EntryError::PublishData(e.to_string()))?;
 
     if let Err(e) = kafka::send_message("pragma-data", &data, &publisher_name).await {
         tracing::error!("Error sending message to kafka: {:?}", e);
-        return Err(EntryError::PublishData(String::from("Error sending message to kafka")));
+        return Err(EntryError::PublishData(String::from(
+            "Error sending message to kafka",
+        )));
     };
 
     Ok(Json(CreateEntryResponse {
@@ -181,8 +182,7 @@ mod tests {
             price: 0,
             volume: 0,
         }];
-        let typed_data = build_publish_message(&entries)
-            .unwrap();
+        let typed_data = build_publish_message(&entries).unwrap();
 
         assert_eq!(typed_data.primary_type, "Request");
         assert_eq!(typed_data.domain.name, "Pragma");
@@ -192,12 +192,6 @@ mod tests {
 
         let msg_hash = typed_data.message_hash(FieldElement::ZERO);
         // Hash computed with the Pragma SDK (python)
-        assert_eq!(
-            msg_hash,
-            FieldElement::from_hex_be(
-                ""
-            )
-            .unwrap()
-        );
+        assert_eq!(msg_hash, FieldElement::from_hex_be("").unwrap());
     }
 }

@@ -7,6 +7,5 @@ pub fn init() {
         .with_target(false)
         .finish();
 
-    tracing::subscriber::set_global_default(subscriber)
-        .expect("can't set tracing subscriber")
+    tracing::subscriber::set_global_default(subscriber).expect("can't set tracing subscriber")
 }

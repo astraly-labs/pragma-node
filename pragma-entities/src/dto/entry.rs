@@ -1,7 +1,7 @@
-use utoipa::ToSchema;
-use uuid::Uuid;
 use bigdecimal::ToPrimitive;
 use serde::Deserialize;
+use utoipa::ToSchema;
+use uuid::Uuid;
 
 #[derive(Clone, Debug, PartialEq, ToSchema)]
 pub struct Entry {

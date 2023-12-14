@@ -27,14 +27,12 @@ impl Ingestor {
                 .map_err(ErrorKind::ReadConfig)?
                 .as_str(),
         )
-            .map_err(ErrorKind::LoadConfig)
+        .map_err(ErrorKind::LoadConfig)
     }
 }
 
 pub fn load_configuration() -> Ingestor {
-    let path = std::env::var("INGESTOR_CONF")
-        .expect("can't find configuration path.");
+    let path = std::env::var("INGESTOR_CONF").expect("can't find configuration path.");
     info!("loading configuration file '{}'", path);
-    Ingestor::from_file(path.as_str())
-        .expect("can't load configuration file.")
+    Ingestor::from_file(path.as_str()).expect("can't load configuration file.")
 }

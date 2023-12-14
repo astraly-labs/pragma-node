@@ -1,11 +1,14 @@
-use diesel::{ExpressionMethods, Insertable, PgTextExpressionMethods, QueryDsl, Queryable, RunQueryDsl, Selectable, SelectableHelper, PgConnection};
-use bigdecimal::BigDecimal;
-use diesel::internal::derives::multiconnection::chrono::NaiveDateTime;
-use serde::{Deserialize, Serialize};
-use uuid::Uuid;
-use crate::schema::entries;
 use crate::dto::entry as dto;
 use crate::models::DieselResult;
+use crate::schema::entries;
+use bigdecimal::BigDecimal;
+use diesel::internal::derives::multiconnection::chrono::NaiveDateTime;
+use diesel::{
+    ExpressionMethods, Insertable, PgConnection, PgTextExpressionMethods, QueryDsl, Queryable,
+    RunQueryDsl, Selectable, SelectableHelper,
+};
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 #[derive(Serialize, Queryable, Selectable)]
 #[diesel(table_name = entries)]
@@ -30,7 +33,6 @@ pub struct NewEntry {
 }
 
 impl Entry {
-
     pub fn create_one(conn: &mut PgConnection, data: NewEntry) -> DieselResult<Entry> {
         diesel::insert_into(entries::table)
             .values(data)
@@ -52,7 +54,10 @@ impl Entry {
             .get_result(conn)
     }
 
-    pub fn with_filters(conn: &mut PgConnection, filters: dto::EntriesFilter) -> DieselResult<Vec<Entry>> {
+    pub fn with_filters(
+        conn: &mut PgConnection,
+        filters: dto::EntriesFilter,
+    ) -> DieselResult<Vec<Entry>> {
         let mut query = entries::table.into_boxed::<diesel::pg::Pg>();
 
         if let Some(pair_id) = filters.pair_id {

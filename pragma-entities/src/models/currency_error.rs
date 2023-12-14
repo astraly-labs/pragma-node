@@ -1,9 +1,9 @@
-use serde_json::json;
-use utoipa::ToSchema;
+use crate::error::InfraError;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::Json;
-use crate::error::InfraError;
+use serde_json::json;
+use utoipa::ToSchema;
 
 #[derive(Debug, thiserror::Error, ToSchema)]
 #[allow(unused)]

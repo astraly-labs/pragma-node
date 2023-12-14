@@ -63,8 +63,9 @@ async fn init_config() -> Config {
     };
 
     let kafka_config = KafkaConfig {
-        brokers: vec![env::var("KAFKA_BROKERS")
-            .unwrap_or_else(|_| String::from("pragma-kafka:9092"))],
+        brokers: vec![
+            env::var("KAFKA_BROKERS").unwrap_or_else(|_| String::from("pragma-kafka:9092"))
+        ],
         topic: env::var("KAFKA_TOPIC").unwrap_or_else(|_| String::from("pragma-data")),
         group_id: env::var("KAFKA_GROUP_ID").unwrap_or_else(|_| String::from("pragma-data")),
     };

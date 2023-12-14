@@ -5,11 +5,11 @@ use axum::Json;
 use bigdecimal::num_bigint::{BigInt, ToBigInt};
 use bigdecimal::BigDecimal;
 
-use pragma_entities::EntryError;
 use crate::infra::errors::InfraError;
 use crate::infra::repositories::entry_repository::{self, MedianEntry};
 use crate::utils::PathExtractor;
 use crate::AppState;
+use pragma_entities::EntryError;
 
 use super::utils::compute_median_price_and_time;
 use super::ConvertAmountResponse;

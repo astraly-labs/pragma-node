@@ -1,11 +1,11 @@
-use axum::http::StatusCode;
-use axum::Json;
-use axum::response::IntoResponse;
-use serde_json::json;
-use utoipa::ToSchema;
-use starknet::core::crypto::EcdsaVerifyError;
-use crate::models::publisher_error::PublisherError;
 use crate::error::InfraError;
+use crate::models::publisher_error::PublisherError;
+use axum::http::StatusCode;
+use axum::response::IntoResponse;
+use axum::Json;
+use serde_json::json;
+use starknet::core::crypto::EcdsaVerifyError;
+use utoipa::ToSchema;
 
 #[derive(Debug, thiserror::Error, ToSchema)]
 pub enum VolatilityError {
@@ -36,7 +36,7 @@ pub enum EntryError {
     #[error("can't publish data: {0}")]
     PublishData(String),
     #[error("can't build publish message: {0}")]
-    BuildPublish(String)
+    BuildPublish(String),
 }
 
 impl IntoResponse for EntryError {

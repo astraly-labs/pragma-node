@@ -1,14 +1,13 @@
+use crate::config::CONFIG;
 use rdkafka::client::ClientContext;
 use rdkafka::config::{ClientConfig, RDKafkaLogLevel};
 use rdkafka::consumer::stream_consumer::StreamConsumer;
 use rdkafka::consumer::{BaseConsumer, CommitMode, Consumer, ConsumerContext, Rebalance};
 use rdkafka::message::{Headers, Message};
-use tracing::{info, warn};
 use tokio::sync::mpsc::UnboundedSender;
-use crate::config::CONFIG;
+use tracing::{info, warn};
 
 pub async fn consume(tx: UnboundedSender<Vec<u8>>) {
-
     let consumer: BaseConsumer = ClientConfig::new()
         .set("group.id", &CONFIG.kafka.group_id)
         .set("bootstrap.servers", &CONFIG.kafka.brokers.join(","))

@@ -1,6 +1,5 @@
-use pragma_entities::{Publishers,NewPublisher, dto};
 use pragma_entities::{adapt_infra_error, InfraError};
-
+use pragma_entities::{dto, NewPublisher, Publishers};
 
 pub async fn _insert(
     pool: &deadpool_diesel::postgres::Pool,
@@ -22,8 +21,9 @@ pub async fn get(
     name: String,
 ) -> Result<dto::Publisher, InfraError> {
     let conn = pool.get().await.map_err(adapt_infra_error)?;
-    let res = conn.as_ref()
-        .interact(move | conn| Publishers::get_by_name(conn, name))
+    let res = conn
+        .as_ref()
+        .interact(move |conn| Publishers::get_by_name(conn, name))
         .await
         .map_err(adapt_infra_error)?
         .map_err(adapt_infra_error)
@@ -43,10 +43,7 @@ pub async fn _get_all(
         .map_err(adapt_infra_error)?
         .map_err(adapt_infra_error)?;
 
-    let entries: Vec<dto::Publisher> = res
-        .into_iter()
-        .map(dto::Publisher::from)
-        .collect();
+    let entries: Vec<dto::Publisher> = res.into_iter().map(dto::Publisher::from).collect();
 
     Ok(entries)
 }

@@ -1,9 +1,9 @@
 use diesel::PgConnection;
-use uuid::Uuid;
 use diesel::{
     ExpressionMethods, Insertable, PgTextExpressionMethods, QueryDsl, Queryable, RunQueryDsl,
     Selectable, SelectableHelper,
 };
+use uuid::Uuid;
 
 use serde::{Deserialize, Serialize};
 
@@ -40,7 +40,10 @@ impl Publishers {
             .get_result(conn)
     }
 
-    pub fn with_filters(conn: &mut PgConnection, filters: dto::PublishersFilter) -> DieselResult<Vec<Publishers>> {
+    pub fn with_filters(
+        conn: &mut PgConnection,
+        filters: dto::PublishersFilter,
+    ) -> DieselResult<Vec<Publishers>> {
         let mut query = publishers::table.into_boxed::<diesel::pg::Pg>();
         if let Some(is_active) = filters.is_active {
             query = query.filter(publishers::active.eq(is_active));
