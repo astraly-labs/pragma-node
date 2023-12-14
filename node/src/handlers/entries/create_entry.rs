@@ -198,7 +198,7 @@ mod tests {
         assert_eq!(
             msg_hash,
             FieldElement::from_hex_be(
-                "0x7D224FC341B4E905D6A25ADAF7E4D1A75BE53B4F7C5D7C2A80B0653C76E2F44"
+                ""
             )
             .unwrap()
         );
