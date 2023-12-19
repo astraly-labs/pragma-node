@@ -9,17 +9,18 @@ use tracing::{info, warn};
 
 pub async fn consume(tx: UnboundedSender<Vec<u8>>) {
     let consumer: BaseConsumer = ClientConfig::new()
-        .set("group.id", &CONFIG.kafka.group_id)
-        .set("bootstrap.servers", &CONFIG.kafka.brokers.join(","))
+        .set("group.id", &CONFIG.group_id)
+        .set("bootstrap.servers", &CONFIG.brokers.join(","))
         .set("enable.partition.eof", "false")
         .set("session.timeout.ms", "6000")
+        .set("auto.offset.reset", "earliest")
         .set("enable.auto.commit", "true")
         .set_log_level(RDKafkaLogLevel::Debug)
         .create()
         .expect("Consumer creation failed");
 
     consumer
-        .subscribe(&[&CONFIG.kafka.topic])
+        .subscribe(&[&CONFIG.topic])
         .expect("Can't subscribe to specified topics");
 
     info!("start consuming...");

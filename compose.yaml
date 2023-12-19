@@ -91,7 +91,23 @@ services:
       KAFKA_TOPIC_MAX_MESSAGE_BYTES: "15728640"
       KAFKA_REPLICA_FETCH_MAX_BYTES: "15728640"
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+
+  pragma-ingestor-1:
+    container_name: "pragma-ingestor-1"
+    depends_on:
+      pragma-kafka:
+        condition: service_started
+      db:
+        condition: service_started
+    networks:
+      - pragma-kafka-network
+    build:
+      dockerfile: infra/pragma-ingestor/Dockerfile
+    environment:
+      BROKERS: pragma-kafka:9092
+      TOPIC: pragma-data
+      GROUP_ID: pragma-data
 
 networks:
     pragma-kafka-network:
@@ -110,4 +126,4 @@ volumes:
 
 secrets:
   db-password:
-    file: db/password.txt
+    file: infra/db/password.txt
