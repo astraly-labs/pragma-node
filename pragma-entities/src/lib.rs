@@ -1,7 +1,9 @@
+pub mod connection;
+pub mod db;
 pub mod dto;
 pub mod error;
 pub mod models;
-mod schema;
+pub mod schema;
 
 // exporting for idiomatic use
 pub use error::{adapt_infra_error, InfraError};

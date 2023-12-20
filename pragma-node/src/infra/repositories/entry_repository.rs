@@ -4,10 +4,9 @@ use diesel::prelude::QueryableByName;
 use diesel::{ExpressionMethods, QueryDsl, Queryable, RunQueryDsl};
 use serde::{Deserialize, Serialize};
 
-use crate::infra::db::schema::currencies;
 use crate::infra::errors::{adapt_infra_error, InfraError};
 use pragma_entities::dto;
-use pragma_entities::{Entry, NewEntry};
+use pragma_entities::{schema::currencies, Entry, NewEntry};
 
 #[derive(Deserialize)]
 #[allow(unused)]
@@ -27,22 +26,6 @@ pub async fn _insert(
         .map_err(adapt_infra_error)?
         .map_err(adapt_infra_error)
         .map(dto::Entry::from)?;
-    Ok(res)
-}
-
-pub async fn insert_entries(
-    pool: &deadpool_diesel::postgres::Pool,
-    new_entries: Vec<NewEntry>,
-) -> Result<Vec<dto::Entry>, InfraError> {
-    let conn = pool.get().await.map_err(adapt_infra_error)?;
-    let res = conn
-        .interact(move |conn| Entry::create_many(conn, new_entries))
-        .await
-        .map_err(adapt_infra_error)?
-        .map_err(adapt_infra_error)?
-        .into_iter()
-        .map(dto::Entry::from)
-        .collect();
     Ok(res)
 }
 
@@ -85,11 +68,11 @@ pub struct MedianEntry {
 
 #[derive(Serialize, QueryableByName)]
 pub struct MedianEntryRaw {
-    #[sql_type = "diesel::sql_types::Text"]
+    #[diesel(sql_type = diesel::sql_types::Text)]
     pub source: String,
-    #[sql_type = "diesel::sql_types::Timestamp"]
+    #[diesel(sql_type = diesel::sql_types::Timestamp)]
     pub time: NaiveDateTime,
-    #[sql_type = "diesel::sql_types::Numeric"]
+    #[diesel(sql_type = diesel::sql_types::Numeric)]
     pub median_price: BigDecimal,
 }
 

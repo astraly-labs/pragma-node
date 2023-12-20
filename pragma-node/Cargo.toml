@@ -16,6 +16,7 @@ diesel = { version = "2.1", features = [
 diesel_migrations = "2"
 deadpool-diesel = { version = "0.4", features = ["postgres"] }
 dotenvy = "0.15"
+envy = "0.4.2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", features = ["arbitrary_precision"] }
 tokio = { version = "1.0", features = ["sync", "macros", "rt-multi-thread"] }
@@ -31,6 +32,7 @@ rdkafka = "0.35.0"
 lazy_static = "1.4.0"
 time = "0.3.29"
 pragma-entities = { path = "../pragma-entities", version = "1.0.0" }
+pragma-common = { path = "../pragma-common", version = "1.0.0" }
 
 [dev-dependencies]
 rstest = "0.18.2"

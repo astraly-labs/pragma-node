@@ -1,3 +1,4 @@
+use crate::config::config;
 use crate::handlers::entries::{CreateEntryRequest, CreateEntryResponse};
 use crate::infra::kafka;
 use crate::infra::repositories::publisher_repository;
@@ -5,7 +6,8 @@ use crate::utils::{JsonExtractor, TypedData};
 use crate::AppState;
 use axum::extract::State;
 use axum::Json;
-use pragma_entities::{EntryError, PublisherError};
+use chrono::NaiveDateTime;
+use pragma_entities::{EntryError, NewEntry, PublisherError};
 use serde::{Deserialize, Serialize};
 use starknet::core::crypto::{ecdsa_verify, Signature};
 use starknet::core::types::FieldElement;
@@ -73,6 +75,8 @@ pub async fn create_entries(
 ) -> Result<Json<CreateEntryResponse>, EntryError> {
     tracing::info!("Received new entries: {:?}", new_entries);
 
+    let config = config().await;
+
     if new_entries.entries.is_empty() {
         return Ok(Json(CreateEntryResponse {
             number_entries_created: 0,
@@ -136,10 +140,22 @@ pub async fn create_entries(
         return Err(EntryError::Unauthorized);
     }
 
-    let data =
-        serde_json::to_vec(&new_entries).map_err(|e| EntryError::PublishData(e.to_string()))?;
+    let new_entries_db = new_entries
+        .entries
+        .iter()
+        .map(|entry| NewEntry {
+            pair_id: entry.pair_id.clone(),
+            publisher: entry.base.publisher.clone(),
+            source: entry.base.source.clone(),
+            timestamp: NaiveDateTime::from_timestamp_opt(entry.base.timestamp as i64, 0).unwrap(), // TODO: remove unwrap
+            price: entry.price.into(),
+        })
+        .collect::<Vec<NewEntry>>();
 
-    if let Err(e) = kafka::send_message("pragma-data", &data, &publisher_name).await {
+    let data =
+        serde_json::to_vec(&new_entries_db).map_err(|e| EntryError::PublishData(e.to_string()))?;
+
+    if let Err(e) = kafka::send_message(config.kafka_topic(), &data, &publisher_name).await {
         tracing::error!("Error sending message to kafka: {:?}", e);
         return Err(EntryError::PublishData(String::from(
             "Error sending message to kafka",

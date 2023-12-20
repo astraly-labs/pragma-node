@@ -1,4 +1,4 @@
-pub fn init() {
+pub fn init_tracing() {
     let subscriber = tracing_subscriber::fmt()
         .compact()
         .with_file(true)

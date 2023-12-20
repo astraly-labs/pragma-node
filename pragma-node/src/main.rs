@@ -1,7 +1,6 @@
 use std::net::SocketAddr;
 
-use deadpool_diesel::postgres::{Manager, Pool};
-use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+use deadpool_diesel::postgres::Pool;
 use utoipa::openapi::security::{ApiKey, ApiKeyValue, SecurityScheme};
 use utoipa::Modify;
 use utoipa::OpenApi;
@@ -17,8 +16,6 @@ mod infra;
 mod routes;
 mod utils;
 
-pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations/");
-
 #[derive(Clone)]
 pub struct AppState {
     pool: Pool,
@@ -26,7 +23,7 @@ pub struct AppState {
 
 #[tokio::main]
 async fn main() {
-    init_tracing();
+    pragma_common::tracing::init_tracing();
 
     #[derive(OpenApi)]
     #[openapi(
@@ -67,15 +64,9 @@ async fn main() {
 
     let config = config().await;
 
-    let manager = Manager::new(
-        config.db_url().to_string(),
-        deadpool_diesel::Runtime::Tokio1,
-    );
-    let pool = Pool::builder(manager).build().unwrap();
+    let pool = pragma_entities::connection::init_pool("pragma-node-api").expect("can't init pool");
 
-    {
-        run_migrations(&pool).await;
-    }
+    pragma_entities::db::run_migrations(&pool).await;
 
     let state = AppState { pool };
 
@@ -94,19 +85,4 @@ async fn main() {
         .await
         .map_err(internal_error)
         .unwrap()
-}
-
-fn init_tracing() {
-    tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::INFO)
-        .with_target(false)
-        .init();
-}
-
-async fn run_migrations(pool: &Pool) {
-    let conn = pool.get().await.unwrap();
-    conn.interact(|conn| conn.run_pending_migrations(MIGRATIONS).map(|_| ()))
-        .await
-        .unwrap()
-        .unwrap();
 }

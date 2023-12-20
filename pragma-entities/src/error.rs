@@ -1,12 +1,23 @@
 use std::fmt::{self, Debug};
 
 use deadpool_diesel::InteractError;
+use thiserror::Error;
 use utoipa::ToSchema;
 
 #[derive(Debug, ToSchema)]
 pub enum InfraError {
     InternalServerError,
     NotFound,
+}
+
+#[derive(Debug, Error)]
+pub enum ErrorKind {
+    #[error("cannot init database pool : {0}")]
+    PoolDatabase(String),
+    #[error("cannot find environment variable for database init : {0}")]
+    VariableDatabase(String),
+    #[error("database init error : {0}")]
+    GenericInitDatabase(String),
 }
 
 pub fn adapt_infra_error<T: Error + Debug>(error: T) -> InfraError {

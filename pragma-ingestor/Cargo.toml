@@ -17,5 +17,6 @@ tracing = "0.1"
 tracing-subscriber = "0.3"
 tokio = { version = "1.11.0", features = ["full"] }
 pragma-entities = { path = "../pragma-entities", version = "1.0.0" }
+pragma-common = { path = "../pragma-common", version = "1.0.0" }
 dotenvy = "0.15.7"
 envy = "0.4.2"

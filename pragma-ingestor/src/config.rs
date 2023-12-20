@@ -17,8 +17,7 @@ pub struct Ingestor {
 
 impl Ingestor {
     pub fn from_env() -> Result<Self, ErrorKind> {
-        envy::from_env::<Ingestor>()
-            .map_err(ErrorKind::LoadConfig)
+        envy::from_env::<Ingestor>().map_err(ErrorKind::LoadConfig)
     }
 }
 

@@ -8,17 +8,17 @@
 # database or a cache. For examples, see the Awesome Compose repository:
 # https://github.com/docker/awesome-compose
 services:
-  server:
-    environment:
-      - PORT=3000
-      - DATABASE_URL=postgres://postgres:postgres@host.docker.internal:5432/project_f
-      - HOST=0.0.0.0
-      - RUST_LOG=info
-    build:
-      context: .
-      target: final
-    ports:
-      - 3000:3000
+#  server:
+#    environment:
+#      - PORT=3000
+#      - DATABASE_URL=postgres://postgres:postgres@host.docker.internal:5432/project_f
+#      - HOST=0.0.0.0
+#      - RUST_LOG=info
+#    build:
+#      context: .
+#      target: final
+#    ports:
+#      - 3000:3000
 # The commented out section below is an example of how to define a PostgreSQL
 # database that your application can use. `depends_on` tells Docker Compose to
 # start the database before your application. The `db-data` volume persists the
@@ -28,12 +28,29 @@ services:
 #     depends_on:
 #       db:
 #         condition: service_healthy
+  pragma-node:
+    container_name: "pragma-node"
+    depends_on:
+      pragma-kafka:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+    networks:
+      - pragma-kafka-network
+      - pragma-db-network
+    ports:
+      - "3000:3000"
+    build:
+      dockerfile: infra/pragma-node/Dockerfile
+
   db:
     image: timescale/timescaledb:1.7.4-pg12
     restart: always
     user: postgres
     secrets:
       - db-password
+    networks:
+      - pragma-db-network
     volumes:
       - db-data:/var/lib/postgresql/data
     environment:
@@ -86,10 +103,10 @@ services:
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://pragma-kafka:9092,PLAINTEXT_E://pragma-kafka:29092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,PLAINTEXT_E:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-      KAFKA_SOCKET_REQUEST_MAX_BYTES: "10000000"
-      KAFKA_MESSAGE_MAX_BYTES: "10000000"
-      KAFKA_TOPIC_MAX_MESSAGE_BYTES: "15728640"
-      KAFKA_REPLICA_FETCH_MAX_BYTES: "15728640"
+      #KAFKA_SOCKET_REQUEST_MAX_BYTES: "10000000"
+      #KAFKA_MESSAGE_MAX_BYTES: "10000000"
+      #KAFKA_TOPIC_MAX_MESSAGE_BYTES: "15728640"
+      #KAFKA_REPLICA_FETCH_MAX_BYTES: "15728640"
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
 
@@ -97,11 +114,12 @@ services:
     container_name: "pragma-ingestor-1"
     depends_on:
       pragma-kafka:
-        condition: service_started
+        condition: service_healthy
       db:
-        condition: service_started
+        condition: service_healthy
     networks:
       - pragma-kafka-network
+      - pragma-db-network
     build:
       dockerfile: infra/pragma-ingestor/Dockerfile
     environment:
@@ -110,6 +128,10 @@ services:
       GROUP_ID: pragma-data
 
 networks:
+    pragma-db-network:
+      # production
+      #driver: bridge
+      #internal: true
     pragma-kafka-network:
       # production
       #driver: bridge

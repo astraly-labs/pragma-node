@@ -2,6 +2,7 @@
 members = [
     "pragma-node",
     "pragma-ingestor",
-    "pragma-entities"
+    "pragma-entities",
+    "pragma-common"
 ]
 resolver = "2"

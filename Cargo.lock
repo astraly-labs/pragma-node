@@ -1535,6 +1535,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "pragma-common"
+version = "1.0.0"
+dependencies = [
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "pragma-entities"
 version = "1.0.0"
 dependencies = [
@@ -1559,6 +1567,7 @@ dependencies = [
  "dotenvy",
  "envy",
  "lazy_static",
+ "pragma-common",
  "pragma-entities",
  "rdkafka",
  "serde",
@@ -1583,7 +1592,9 @@ dependencies = [
  "diesel",
  "diesel_migrations",
  "dotenvy",
+ "envy",
  "lazy_static",
+ "pragma-common",
  "pragma-entities",
  "rdkafka",
  "rstest",

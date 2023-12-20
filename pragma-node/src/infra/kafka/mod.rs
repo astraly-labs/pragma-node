@@ -5,9 +5,10 @@ use rdkafka::producer::{FutureProducer, FutureRecord};
 
 lazy_static! {
     static ref KAFKA_PRODUCER: FutureProducer = {
+        let brokers =
+            std::env::var("KAFKA_BROKERS").expect("can't load kafka brokers list from env");
         ClientConfig::new()
-            // soon loaded by config
-            .set("bootstrap.servers", "localhost:29092")
+            .set("bootstrap.servers", brokers)
             .create()
             .expect("can't create kafka producer")
     };

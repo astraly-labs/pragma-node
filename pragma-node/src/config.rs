@@ -1,38 +1,42 @@
-use std::env;
-
 use dotenvy::dotenv;
+use serde::Deserialize;
 use tokio::sync::OnceCell;
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
 struct ServerConfig {
     host: String,
     port: u16,
 }
 
-#[derive(Debug)]
-struct DatabaseConfig {
-    url: String,
-}
-
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
 struct KafkaConfig {
-    brokers: Vec<String>,
     topic: String,
-    group_id: String,
 }
 
 #[derive(Debug)]
 pub struct Config {
     server: ServerConfig,
-    db: DatabaseConfig,
     kafka: KafkaConfig,
 }
 
-impl Config {
-    pub fn db_url(&self) -> &str {
-        &self.db.url
+impl Default for KafkaConfig {
+    fn default() -> Self {
+        Self {
+            topic: "pragma-data".to_string(),
+        }
     }
+}
 
+impl Default for ServerConfig {
+    fn default() -> Self {
+        Self {
+            host: "127.0.0.1".to_string(),
+            port: 3000,
+        }
+    }
+}
+
+impl Config {
     pub fn server_host(&self) -> &str {
         &self.server.host
     }
@@ -50,29 +54,13 @@ pub static CONFIG: OnceCell<Config> = OnceCell::const_new();
 
 async fn init_config() -> Config {
     dotenv().ok();
-    let server_config = ServerConfig {
-        host: env::var("HOST").unwrap_or_else(|_| String::from("127.0.0.1")),
-        port: env::var("PORT")
-            .unwrap_or_else(|_| String::from("3000"))
-            .parse::<u16>()
-            .unwrap(),
-    };
 
-    let database_config = DatabaseConfig {
-        url: env::var("DATABASE_URL").expect("DATABASE_URL must be set"),
-    };
+    let server_config = envy::from_env::<ServerConfig>().unwrap_or(ServerConfig::default());
 
-    let kafka_config = KafkaConfig {
-        brokers: vec![
-            env::var("KAFKA_BROKERS").unwrap_or_else(|_| String::from("pragma-kafka:9092"))
-        ],
-        topic: env::var("KAFKA_TOPIC").unwrap_or_else(|_| String::from("pragma-data")),
-        group_id: env::var("KAFKA_GROUP_ID").unwrap_or_else(|_| String::from("pragma-data")),
-    };
+    let kafka_config = envy::from_env::<KafkaConfig>().unwrap_or(KafkaConfig::default());
 
     Config {
         server: server_config,
-        db: database_config,
         kafka: kafka_config,
     }
 }

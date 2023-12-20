@@ -7,6 +7,7 @@ COPY pragma-ingestor/. .
 RUN mkdir /home/pragma-entities
 
 COPY pragma-entities/. /home/pragma-entities/.
+COPY pragma-common/. /home/pragma-common/.
 
 ENV CARGO_HOME="/home/pragma-ingestor/"
 RUN cargo install --path .
