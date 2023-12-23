@@ -8,6 +8,26 @@ This repository contains the source code of the Pragma Node, which comprises sev
 - **Pragma Entities**: Library containing models/Data Transfer Objects (DTOs) and functions for entities.
 - **Pragma Offchain Service**: Offchain service aggregating and storing data from Data Providers.
 
+## Getting Started
+
+Follow these steps to get started with your Rust backend project based on this template:
+
+1. Clone this repository:
+
+   ```bash
+   git clone https://github.com/Quentin-Piot/axum-diesel-real-world.git
+   ```
+
+2. Choose a specific module/framework branch or work with the default configuration.
+
+3. Customize the project to your needs.
+
+4. Build and run your Rust backend:
+
+   ```bash
+   cargo run
+   ```
+
 # Services description
 
 ### Pragma Node
