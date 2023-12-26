@@ -27,8 +27,6 @@ pub enum EntryError {
     Unauthorized,
     #[error("publisher error: {0}")]
     PublisherError(#[from] PublisherError),
-    #[error("invalid input amount: {0}")]
-    InvalidAmount(String),
     #[error("pair id invalid: {0}")]
     UnknownPairId(String),
     #[error("volatility error: {0}")]
