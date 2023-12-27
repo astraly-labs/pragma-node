@@ -1,8 +1,3 @@
 [workspace]
-members = [
-    "pragma-node",
-    "pragma-ingestor",
-    "pragma-entities",
-    "pragma-common"
-]
+members = ["pragma-node", "pragma-ingestor", "pragma-entities", "pragma-common"]
 resolver = "2"

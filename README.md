@@ -46,12 +46,12 @@ This library contains the models and functions common to different services.
 
 This library contains models and DTOs related to the entities used in the services and Pragma's database.
 
-
 # Services Structure
 
 The project follows a modular structure to keep the code organized and maintainable. Here's a brief overview of the project structure:
 
 ### Pragma Node
+
 - `src/`: Contains the main source code of the application.
   - `handlers/`: Define your API handlers.
   - `infra/`: Define your infrastructure logic.
@@ -64,6 +64,7 @@ The project follows a modular structure to keep the code organized and maintaina
   - `routes.rs`: Defines application routes.
 
 ### Pragma Ingestor
+
 - `src/`: Contains the main source code of the application.
   - `main.rs`: Application's entry point.
   - `config.rs`: File containing the configuration structure.
@@ -71,6 +72,7 @@ The project follows a modular structure to keep the code organized and maintaina
   - `errors.rs`: Contains error kinds and error formatting logic.
 
 ### Pragma Entities
+
 - `migrations`: Contains database migrations.
 - `src/`: Contains the main source code of the application.
   - `models/`: Defines application models.
@@ -82,6 +84,7 @@ The project follows a modular structure to keep the code organized and maintaina
   - `lib.rs`: Defines the library's entry point.
 
 ### Pragma Common
+
 - `src/`: Contains the main source code of the application.
   - `lib.rs`: Defines the library's entry point.
   - `tracing.rs`: Defines common tracing logic.
