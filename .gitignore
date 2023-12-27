@@ -1,3 +1,5 @@
 /target
 .idea
 .env
+db/
+infra/db/password.txt
