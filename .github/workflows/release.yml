@@ -13,9 +13,11 @@ jobs:
     with:
       release_tag_name: ${{ github.event.release.tag_name }}
       docker_context: ./infra/pragma-ingestor
+      package_name: ghcr.io/pragma-ingestor
   docker_release_build_node:
     name: Docker release build
     uses: ./.github/workflows/docker-build.yml
     with:
       release_tag_name: ${{ github.event.release.tag_name }}
       docker_context: ./infra/pragma-node
+      package_name: ghcr.io/pragma-node

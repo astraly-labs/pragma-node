@@ -12,6 +12,10 @@ on:
         description: "Docker context"
         type: string
         required: true
+      package_name:
+        description: "Package name"
+        type: string
+        required: true
   workflow_call:
     inputs:
       release_tag_name:
@@ -22,9 +26,10 @@ on:
         description: "Docker context"
         type: string
         required: true
-
-env:
-  REGISTRY_IMAGE: ghcr.io/${{ github.repository }}
+      package_name:
+        description: "Package name"
+        type: string
+        required: true
 
 jobs:
   build:
@@ -43,7 +48,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v4
         with:
-          images: ${{ env.REGISTRY_IMAGE }}
+          images: ${{ inputs.package_name }}
           tags: |
             type=raw,value=${{ inputs.release_tag_name }}
 
@@ -68,7 +73,7 @@ jobs:
           file: Dockerfile
           platforms: ${{ matrix.platform }}
           labels: ${{ steps.meta.outputs.labels }}
-          outputs: type=image,name=${{ env.REGISTRY_IMAGE
+          outputs: type=image,name=${{ inputs.package_name
             }},push-by-digest=true,name-canonical=true,push=true
 
       - name: Export digest
@@ -103,7 +108,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v4
         with:
-          images: ${{ env.REGISTRY_IMAGE }}
+          images: ${{ inputs.package_name }}
           tags: |
             type=raw,value=${{ inputs.release_tag_name }}
 
@@ -122,9 +127,9 @@ jobs:
             echo "No tags specified, skipping docker buildx imagetools create command"
           else
             docker buildx imagetools create $tags \
-              $(printf '${{ env.REGISTRY_IMAGE }}@sha256:%s ' *)
+              $(printf '${{ inputs.package_name }}@sha256:%s ' *)
           fi
 
       - name: Inspect image
         run: |
-          docker buildx imagetools inspect ${{ env.REGISTRY_IMAGE }}:${{ steps.meta.outputs.version }}
+          docker buildx imagetools inspect ${{ inputs.package_name }}:${{ steps.meta.outputs.version }}
