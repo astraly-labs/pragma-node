@@ -15,7 +15,7 @@ Follow these steps to get started with your Rust backend project based on this t
 1. Clone this repository:
 
    ```bash
-   git clone https://github.com/Quentin-Piot/axum-diesel-real-world.git
+   git clone https://github.com/astraly-labs/pragma-node.git
    ```
 
 2. Choose a specific module/framework branch or work with the default configuration.
