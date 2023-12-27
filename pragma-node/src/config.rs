@@ -55,9 +55,9 @@ pub static CONFIG: OnceCell<Config> = OnceCell::const_new();
 async fn init_config() -> Config {
     dotenv().ok();
 
-    let server_config = envy::from_env::<ServerConfig>().unwrap_or(ServerConfig::default());
+    let server_config = envy::from_env::<ServerConfig>().unwrap_or_default();
 
-    let kafka_config = envy::from_env::<KafkaConfig>().unwrap_or(KafkaConfig::default());
+    let kafka_config = envy::from_env::<KafkaConfig>().unwrap_or_default();
 
     Config {
         server: server_config,
