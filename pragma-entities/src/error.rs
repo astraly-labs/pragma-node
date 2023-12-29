@@ -8,6 +8,7 @@ use utoipa::ToSchema;
 pub enum InfraError {
     InternalServerError,
     NotFound,
+    InvalidTimeStamp,
 }
 
 #[derive(Debug, Error)]
@@ -30,6 +31,7 @@ impl fmt::Display for InfraError {
         match self {
             InfraError::NotFound => write!(f, "Not found"),
             InfraError::InternalServerError => write!(f, "Internal server error"),
+            InfraError::InvalidTimeStamp => write!(f, "Invalid timestamp")
         }
     }
 }

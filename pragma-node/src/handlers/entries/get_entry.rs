@@ -1,13 +1,12 @@
 use axum::extract::State;
 use axum::Json;
-use bigdecimal::num_bigint::ToBigInt;
+use bigdecimal::num_bigint::{BigInt, ToBigInt};
 
 use crate::handlers::entries::GetEntryResponse;
-use crate::infra::errors::InfraError;
 use crate::infra::repositories::entry_repository::{self, MedianEntry};
 use crate::utils::PathExtractor;
 use crate::AppState;
-use pragma_entities::EntryError;
+use pragma_entities::{EntryError, error::InfraError};
 
 use super::utils::{compute_median_price_and_time, currency_pair_to_pair_id};
 
@@ -47,6 +46,7 @@ pub async fn get_entry(
         .map_err(|db_error| match db_error {
             InfraError::InternalServerError => EntryError::InternalServerError,
             InfraError::NotFound => EntryError::NotFound(pair_id.clone()),
+            InfraError::InvalidTimeStamp => EntryError::InvalidTimestamp,
         })?;
 
     // Error if no entries found
@@ -59,6 +59,7 @@ pub async fn get_entry(
         .map_err(|db_error| match db_error {
             InfraError::InternalServerError => EntryError::InternalServerError,
             InfraError::NotFound => EntryError::NotFound(pair_id.clone()),
+            InfraError::InvalidTimeStamp => EntryError::InvalidTimestamp,
         })?;
 
     Ok(Json(adapt_entry_to_entry_response(
@@ -79,7 +80,7 @@ fn adapt_entry_to_entry_response(
         pair_id,
         timestamp: timestamp.timestamp_millis() as u64,
         num_sources_aggregated: entries.len(),
-        price: format!("0x{}", price.to_bigint().unwrap().to_str_radix(16)),
+        price: format!("0x{}", price.to_bigint().unwrap_or(BigInt::default()).to_str_radix(16)),
         decimals,
     }
 }

@@ -68,3 +68,30 @@ async fn init_config() -> Config {
 pub async fn config() -> &'static Config {
     CONFIG.get_or_init(init_config).await
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_default_server_config() {
+        let server_config = ServerConfig::default();
+        assert_eq!(server_config.host, "0.0.0.0");
+        assert_eq!(server_config.port, 3000);
+    }
+
+    #[tokio::test]
+    async fn test_default_kafka_config() {
+        let kafka_config = KafkaConfig::default();
+        assert_eq!(kafka_config.topic, "pragma-data");
+    }
+
+    #[tokio::test]
+    async fn test_config_values() {
+        let config = init_config().await;
+        assert_eq!(config.server_host(), "0.0.0.0");
+        assert_eq!(config.server_port(), 3000);
+        assert_eq!(config.kafka_topic(), "pragma-data");
+    }
+}

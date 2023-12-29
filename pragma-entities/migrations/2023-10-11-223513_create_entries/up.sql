@@ -5,7 +5,7 @@ CREATE TABLE entries (
   id uuid DEFAULT uuid_generate_v4(),
   pair_id VARCHAR NOT NULL,
   publisher TEXT NOT NULL,
-  timestamp TIMESTAMP NOT NULL,
+  timestamp TIMESTAMPTZ NOT NULL,
   price NUMERIC NOT NULL,
   PRIMARY KEY (id)
 )
