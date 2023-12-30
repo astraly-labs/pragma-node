@@ -6,7 +6,7 @@ use crate::handlers::entries::GetEntryResponse;
 use crate::infra::repositories::entry_repository::{self, MedianEntry};
 use crate::utils::PathExtractor;
 use crate::AppState;
-use pragma_entities::{EntryError, error::InfraError};
+use pragma_entities::{error::InfraError, EntryError};
 
 use super::utils::{compute_median_price_and_time, currency_pair_to_pair_id};
 
@@ -80,7 +80,13 @@ fn adapt_entry_to_entry_response(
         pair_id,
         timestamp: timestamp.timestamp_millis() as u64,
         num_sources_aggregated: entries.len(),
-        price: format!("0x{}", price.to_bigint().unwrap_or(BigInt::default()).to_str_radix(16)),
+        price: format!(
+            "0x{}",
+            price
+                .to_bigint()
+                .unwrap_or(BigInt::default())
+                .to_str_radix(16)
+        ),
         decimals,
     }
 }

@@ -5,7 +5,11 @@ use diesel::{ExpressionMethods, QueryDsl, Queryable, RunQueryDsl};
 use serde::{Deserialize, Serialize};
 
 use pragma_entities::dto;
-use pragma_entities::{schema::currencies, Entry, NewEntry, error::{InfraError, adapt_infra_error}};
+use pragma_entities::{
+    error::{adapt_infra_error, InfraError},
+    schema::currencies,
+    Entry, NewEntry,
+};
 
 #[derive(Deserialize)]
 #[allow(unused)]

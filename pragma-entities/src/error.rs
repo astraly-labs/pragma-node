@@ -31,7 +31,7 @@ impl fmt::Display for InfraError {
         match self {
             InfraError::NotFound => write!(f, "Not found"),
             InfraError::InternalServerError => write!(f, "Internal server error"),
-            InfraError::InvalidTimeStamp => write!(f, "Invalid timestamp")
+            InfraError::InvalidTimeStamp => write!(f, "Invalid timestamp"),
         }
     }
 }

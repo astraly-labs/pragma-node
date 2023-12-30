@@ -69,7 +69,6 @@ pub async fn config() -> &'static Config {
     CONFIG.get_or_init(init_config).await
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;

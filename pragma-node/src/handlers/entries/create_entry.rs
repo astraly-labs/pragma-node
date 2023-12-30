@@ -144,9 +144,10 @@ pub async fn create_entries(
         .entries
         .iter()
         .map(|entry| {
-            let timestamp = match NaiveDateTime::from_timestamp_opt(entry.base.timestamp as i64, 0) {
+            let timestamp = match NaiveDateTime::from_timestamp_opt(entry.base.timestamp as i64, 0)
+            {
                 Some(timestamp) => timestamp,
-                None => return Err(EntryError::InvalidTimestamp)
+                None => return Err(EntryError::InvalidTimestamp),
             };
 
             Ok(NewEntry {
