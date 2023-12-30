@@ -7,5 +7,5 @@ CREATE TABLE entries (
   publisher TEXT NOT NULL,
   timestamp TIMESTAMPTZ NOT NULL,
   price NUMERIC NOT NULL,
-  PRIMARY KEY (id)
+  PRIMARY KEY (id, timestamp)
 )
