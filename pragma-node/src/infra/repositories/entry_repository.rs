@@ -4,9 +4,12 @@ use diesel::prelude::QueryableByName;
 use diesel::{ExpressionMethods, QueryDsl, Queryable, RunQueryDsl};
 use serde::{Deserialize, Serialize};
 
-use crate::infra::errors::{adapt_infra_error, InfraError};
 use pragma_entities::dto;
-use pragma_entities::{schema::currencies, Entry, NewEntry};
+use pragma_entities::{
+    error::{adapt_infra_error, InfraError},
+    schema::currencies,
+    Entry, NewEntry,
+};
 
 #[derive(Deserialize)]
 #[allow(unused)]
@@ -127,8 +130,10 @@ pub async fn get_entries_between(
     end_timestamp: u64,
 ) -> Result<Vec<MedianEntry>, InfraError> {
     let conn = pool.get().await.map_err(adapt_infra_error)?;
-    let start_datetime = NaiveDateTime::from_timestamp_opt(start_timestamp as i64, 0).unwrap();
-    let end_datetime = NaiveDateTime::from_timestamp_opt(end_timestamp as i64, 0).unwrap();
+    let start_datetime = NaiveDateTime::from_timestamp_opt(start_timestamp as i64, 0)
+        .ok_or(InfraError::InvalidTimeStamp)?;
+    let end_datetime = NaiveDateTime::from_timestamp_opt(end_timestamp as i64, 0)
+        .ok_or(InfraError::InvalidTimeStamp)?;
 
     let raw_sql = r#"
         SELECT

@@ -37,7 +37,7 @@ async fn main() {
             schemas(pragma_entities::dto::Publisher, pragma_entities::PublisherError),
             schemas(handlers::entries::CreateEntryRequest, handlers::entries::CreateEntryResponse, handlers::entries::GetEntryResponse, handlers::entries::GetVolatilityResponse),
             schemas(handlers::entries::Entry, handlers::entries::BaseEntry),
-            schemas(infra::errors::InfraError),
+            schemas(pragma_entities::error::InfraError),
         ),
         modifiers(&SecurityAddon),
         tags(

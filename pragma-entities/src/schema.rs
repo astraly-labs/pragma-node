@@ -16,7 +16,7 @@ diesel::table! {
         id -> Uuid,
         pair_id -> Varchar,
         publisher -> Text,
-        timestamp -> Timestamp,
+        timestamp -> Timestamptz,
         price -> Numeric,
         source -> Varchar,
     }

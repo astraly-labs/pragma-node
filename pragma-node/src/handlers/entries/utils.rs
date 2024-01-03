@@ -44,7 +44,7 @@ pub(crate) fn compute_median_price_and_time(
 pub(crate) fn compute_volatility(entries: &Vec<MedianEntry>) -> f64 {
     let mut values = Vec::new();
     for i in 1..entries.len() {
-        if entries[i].median_price.to_f64().unwrap() > 0.0
+        if entries[i].median_price.to_f64().unwrap_or(0.0) > 0.0
             && entries[i - 1].median_price.to_f64().unwrap() > 0.0
             && (entries[i].time - entries[i - 1].time).num_seconds() > 0
         {
