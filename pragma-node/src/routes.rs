@@ -7,6 +7,8 @@ use utoipa::OpenApi as OpenApiT;
 use utoipa_swagger_ui::SwaggerUi;
 
 use crate::handlers::entries::{create_entries, get_entry, get_volatility};
+use crate::handlers::spots::create::create_spots;
+use crate::handlers::perp::create::create_perps;
 use crate::AppState;
 
 pub fn app_router<T: OpenApiT>(state: AppState) -> Router<AppState> {
@@ -33,6 +35,8 @@ async fn handler_404() -> impl IntoResponse {
 fn data_routes(state: AppState) -> Router<AppState> {
     Router::new()
         .route("/publish", post(create_entries))
+        .route("/spot", post(create_spots))
+        .route("/perp", post(create_perps))
         .route("/:base/:quote", get(get_entry))
         .with_state(state)
 }

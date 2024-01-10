@@ -2,7 +2,7 @@ use axum::extract::State;
 use axum::Json;
 use bigdecimal::num_bigint::ToBigInt;
 
-use crate::handlers::entries::GetEntryResponse;
+use crate::requests::GetEntryResponse;
 use crate::infra::errors::InfraError;
 use crate::infra::repositories::entry_repository::{self, MedianEntry};
 use crate::utils::PathExtractor;

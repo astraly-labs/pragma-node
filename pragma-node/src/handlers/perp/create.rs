@@ -1,9 +1,9 @@
 use crate::config::config;
-use crate::requests::{CreateEntryRequest, CreateEntryResponse, Entry};
 use crate::infra::kafka;
 use crate::infra::repositories::publisher_repository;
 use crate::utils::{JsonExtractor, TypedData};
 use crate::AppState;
+use crate::requests::{CreatePerpRequest, CreateSpotTimestamp ,CreatePerpResponse, Entry};
 use axum::extract::State;
 use axum::Json;
 use chrono::NaiveDateTime;
@@ -60,28 +60,32 @@ pub(crate) fn build_publish_message(
 
 #[utoipa::path(
         post,
-        path = "/node/v1/data/publish",
-        request_body = CreateEntryRequest,
+        path = "/node/v1/data/spot",
+        request_body = CreatePerpRequest,
         responses(
-            (status = 200, description = "Entries published successfuly", body = CreateEntryResponse),
+            (status = 200, description = "Entries published successfuly", body = CreateSpotResponse),
             (status = 401, description = "Unauthorized Publisher", body = EntryError)
         )
     )]
-pub async fn create_entries(
+pub async fn create_perps(
     State(state): State<AppState>,
-    JsonExtractor(new_entries): JsonExtractor<CreateEntryRequest>,
-) -> Result<Json<CreateEntryResponse>, EntryError> {
-    tracing::info!("Received new entries: {:?}", new_entries);
+    JsonExtractor(new_perps): JsonExtractor<CreatePerpRequest>,
+) -> Result<Json<CreatePerpResponse>, EntryError> {
+    tracing::info!("Received new perps: {:?}", new_perps);
 
     let config = config().await;
 
-    if new_entries.entries.is_empty() {
-        return Ok(Json(CreateEntryResponse {
-            number_entries_created: 0,
+    if new_perps.entries.is_empty() {
+        return Ok(Json(CreatePerpResponse {
+            data_range: CreateSpotTimestamp {
+                start_timestamp: new_perps.data_range.start_timestamp,
+                end_timestamp: new_perps.data_range.end_timestamp,
+            },
+            .. Default::default()
         }));
     }
 
-    let publisher_name = new_entries.entries[0].base.publisher.clone();
+    let publisher_name = new_perps.entries[0].base.publisher.clone();
 
     let publisher = publisher_repository::get(&state.pool, publisher_name.clone())
         .await
@@ -122,14 +126,14 @@ pub async fn create_entries(
         account_address
     );
 
-    let message_hash = build_publish_message(&new_entries.entries)?.message_hash(account_address);
+    let message_hash = build_publish_message(&new_perps.entries)?.message_hash(account_address);
 
     if !ecdsa_verify(
         &public_key,
         &message_hash,
         &Signature {
-            r: new_entries.signature[0],
-            s: new_entries.signature[1],
+            r: new_perps.signature[0],
+            s: new_perps.signature[1],
         },
     )
     .map_err(EntryError::InvalidSignature)?
@@ -138,7 +142,7 @@ pub async fn create_entries(
         return Err(EntryError::Unauthorized);
     }
 
-    let new_entries_db = new_entries
+    let new_entries_db = new_perps
         .entries
         .iter()
         .map(|entry| NewEntry {
@@ -160,14 +164,21 @@ pub async fn create_entries(
         )));
     };
 
-    Ok(Json(CreateEntryResponse {
-        number_entries_created: new_entries.entries.len(),
+    Ok(Json(CreatePerpResponse {
+        pair_id: new_perps.pair_id,
+        price: new_perps.price,
+        data_range: CreateSpotTimestamp {
+            start_timestamp: new_perps.data_range.start_timestamp,
+            end_timestamp: new_perps.data_range.end_timestamp,
+        },
+        volume: new_perps.volume,
+        .. Default::default()
     }))
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::handlers::entries::BaseEntry;
+    use crate::requests::BaseEntry;
 
     use super::*;
     use rstest::rstest;

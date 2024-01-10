@@ -15,6 +15,7 @@ mod handlers;
 mod infra;
 mod routes;
 mod utils;
+mod requests;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -35,8 +36,8 @@ async fn main() {
         components(
             schemas(pragma_entities::dto::Entry, pragma_entities::EntryError),
             schemas(pragma_entities::dto::Publisher, pragma_entities::PublisherError),
-            schemas(handlers::entries::CreateEntryRequest, handlers::entries::CreateEntryResponse, handlers::entries::GetEntryResponse, handlers::entries::GetVolatilityResponse),
-            schemas(handlers::entries::Entry, handlers::entries::BaseEntry),
+            schemas(requests::CreateEntryRequest, requests::CreateEntryResponse, requests::GetEntryResponse, requests::GetVolatilityResponse),
+            schemas(requests::Entry, requests::BaseEntry),
             schemas(infra::errors::InfraError),
         ),
         modifiers(&SecurityAddon),
