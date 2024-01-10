@@ -1,7 +1,6 @@
 path: "/"
 container_port: 8080
-alb_scheme: internal
-health_check_path: "/node"
+health_check_path: "/"
 container_environment:
   - region: "eu-west-3"
   - prefix: "/conf/{{ SERVICE_NAME }}/{{ RUN_ENV }}"

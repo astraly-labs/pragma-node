@@ -1,6 +1,5 @@
 path: "/"
 container_port: 8080
-alb_scheme: internal
 health_check_path: "/node"
 container_environment:
   - region: "eu-west-3"
