@@ -8,7 +8,7 @@ lazy_static! {
         let brokers =
             std::env::var("KAFKA_BROKERS").expect("can't load kafka brokers list from env");
         ClientConfig::new()
-            .set("bootstrap.servers", brokers)
+            .set("bootstrap.servers", &brokers)
             .create()
             .expect("can't create kafka producer")
     };
