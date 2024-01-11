@@ -30,6 +30,10 @@ services:
   #         condition: service_healthy
   pragma-node:
     container_name: "pragma-node"
+    environment:
+      - DATABASE_MAX_CONN=5
+      - TOPIC=pragma-data
+      - KAFKA_BROKERS=pragma-kafka:9092
     depends_on:
       pragma-kafka:
         condition: service_healthy
@@ -119,6 +123,12 @@ services:
 
   pragma-ingestor-1:
     container_name: "pragma-ingestor-1"
+    environment:
+      - DATABASE_URL=postgres://postgres:test-password@db:5432/pragma
+      - DATABASE_MAX_CONN=5
+      - BROKERS=pragma-kafka:9092
+      - TOPIC=pragma-data
+      - GROUP_ID=pragma-data
     depends_on:
       pragma-kafka:
         condition: service_healthy
@@ -129,10 +139,6 @@ services:
       - pragma-db-network
     build:
       dockerfile: infra/pragma-ingestor/Dockerfile
-    environment:
-      BROKERS: pragma-kafka:9092
-      TOPIC: pragma-data
-      GROUP_ID: pragma-data
 
 networks:
   pragma-db-network:
