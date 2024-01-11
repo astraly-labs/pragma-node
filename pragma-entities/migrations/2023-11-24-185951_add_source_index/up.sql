@@ -1,3 +1,3 @@
 -- Your SQL goes here
-DROP INDEX IF EXISTS idx_entries_publisher_source_timestamp;
-CREATE INDEX idx_entries_source ON entries(source);
+CREATE UNIQUE INDEX idx_entries_unique
+  ON entries(pair_id, source, timestamp);

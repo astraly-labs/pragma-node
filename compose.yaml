@@ -44,7 +44,7 @@ services:
       dockerfile: infra/pragma-node/Dockerfile
 
   db:
-    image: timescale/timescaledb:1.7.4-pg12
+    image: timescale/timescaledb-ha:pg14-latest
     restart: always
     user: postgres
     secrets:
@@ -61,7 +61,7 @@ services:
     expose:
       - 5432
     healthcheck:
-      test: ["CMD", "pg_isready"]
+      test: [ "CMD", "pg_isready" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -102,7 +102,7 @@ services:
           "kafka-topics",
           "--list",
           "--bootstrap-server",
-          "pragma-kafka:9092",
+          "pragma-kafka:9092"
         ]
     environment:
       KAFKA_BROKER_ID: 1
@@ -152,6 +152,7 @@ volumes:
   db-data:
   pragma_zookeeper_data:
   pragma_zookeeper_logs:
+
 
 secrets:
   db-password:
