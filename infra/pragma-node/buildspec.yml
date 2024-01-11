@@ -1,8 +1,5 @@
 version: 0.2
 phases:
-  install:
-    runtime-versions:
-      nodejs: 18
   pre_build:
     commands:
       - echo Logging in to Amazon ECR...
@@ -16,7 +13,7 @@ phases:
       - echo Build started on `date`
       - echo Building the Docker image...
       - ls -ltr
-      - docker build -t $REPOSITORY_URI:latest .
+      - docker build -f infra/pragma-node/Dockerfile -t $REPOSITORY_URI:latest .
       - docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$IMAGE_TAG
   post_build:
     commands:
@@ -29,4 +26,5 @@ phases:
 artifacts:
   files:
     - imagedefinitions.json
-    - config.yml
+    - infra/pragma-node/config.yml
+  discard-paths: yes

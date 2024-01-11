@@ -25,6 +25,6 @@ USER ingestor:pragma
 WORKDIR /home/pragma-ingestor
 
 COPY --from=builder --chown=ingestor:pragma  /home/pragma-ingestor/bin/pragma-ingestor /usr/local/bin/pragma-ingestor
-COPY infra/pragma-ingestor/config/.env.example .env
+# COPY infra/pragma-ingestor/config/.env.example .env
 
 CMD ["pragma-ingestor"]
