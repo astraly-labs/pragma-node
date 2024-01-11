@@ -10,3 +10,4 @@ container_environment:
       - TOPIC
       - HOST
       - PORT
+      - KAFKA_BROKERS
