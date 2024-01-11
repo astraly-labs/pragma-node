@@ -90,7 +90,7 @@ pub async fn get_median_entries(
         SELECT
             source,
             MAX(timestamp) AS time,
-            (PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price))::numeric AS median_price
+            (approx_percentile(0.5, uddsketch(100, 0.01, price)) WITHIN GROUP (ORDER BY price))::numeric AS median_price
         FROM
             entries
         WHERE
