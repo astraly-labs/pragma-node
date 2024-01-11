@@ -6,6 +6,7 @@ container_environment:
   - prefix: "/conf/{{ SERVICE_NAME }}/{{ RUN_ENV }}"
   - keys:
       - DATABASE_URL
+      - DATABASE_MAX_CONN
       - BROKERS
       - TOPIC
       - GROUP_ID
