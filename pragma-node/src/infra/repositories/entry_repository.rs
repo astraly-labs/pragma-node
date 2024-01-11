@@ -66,17 +66,17 @@ pub async fn _get_all(
 pub struct MedianEntry {
     pub time: NaiveDateTime,
     pub median_price: BigDecimal,
-    pub num_sources: i32,
+    pub num_sources: i64,
 }
 
-#[derive(Serialize, QueryableByName)]
+#[derive(Serialize, QueryableByName, Clone, Debug)]
 pub struct MedianEntryRaw {
-    #[diesel(sql_type = diesel::sql_types::Timestamp)]
+    #[diesel(sql_type = diesel::sql_types::Timestamptz)]
     pub time: NaiveDateTime,
     #[diesel(sql_type = diesel::sql_types::Numeric)]
     pub median_price: BigDecimal,
-    #[diesel(sql_type = diesel::sql_types::Integer)]
-    pub num_sources: i32,
+    #[diesel(sql_type = diesel::sql_types::BigInt)]
+    pub num_sources: i64,
 }
 
 pub async fn get_median_price(
