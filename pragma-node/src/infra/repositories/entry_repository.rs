@@ -64,42 +64,43 @@ pub async fn _get_all(
 
 #[derive(Debug, Serialize, Queryable)]
 pub struct MedianEntry {
-    pub source: String,
     pub time: NaiveDateTime,
     pub median_price: BigDecimal,
+    pub num_sources: i32,
 }
 
 #[derive(Serialize, QueryableByName)]
 pub struct MedianEntryRaw {
-    #[diesel(sql_type = diesel::sql_types::Text)]
-    pub source: String,
     #[diesel(sql_type = diesel::sql_types::Timestamp)]
     pub time: NaiveDateTime,
     #[diesel(sql_type = diesel::sql_types::Numeric)]
     pub median_price: BigDecimal,
+    #[diesel(sql_type = diesel::sql_types::Integer)]
+    pub num_sources: i32,
 }
 
-pub async fn get_median_entries(
+pub async fn get_median_price(
     pool: &deadpool_diesel::postgres::Pool,
     pair_id: String,
-) -> Result<Vec<MedianEntry>, InfraError> {
+) -> Result<MedianEntry, InfraError> {
     let conn = pool.get().await.map_err(adapt_infra_error)?;
 
     let raw_sql = r#"
         -- query the materialized realtime view
         SELECT
-            source,
-            MAX(bucket) AS time,
-            approx_percentile(0.5, percentile_agg) AS median_price
+            bucket AS time,
+            median_price,
+            num_sources
         FROM
             price_1_min_agg
         WHERE
             pair_id = $1
         ORDER BY
-            source;
+            time
+        LIMIT 1;
     "#;
 
-    let raw_entries: Vec<MedianEntryRaw> = conn
+    let raw_entry = conn
         .interact(move |conn| {
             diesel::sql_query(raw_sql)
                 .bind::<diesel::sql_types::Text, _>(pair_id)
@@ -109,16 +110,15 @@ pub async fn get_median_entries(
         .map_err(adapt_infra_error)?
         .map_err(adapt_infra_error)?;
 
-    let entries: Vec<MedianEntry> = raw_entries
-        .into_iter()
-        .map(|raw_entry| MedianEntry {
-            time: raw_entry.time,
-            median_price: raw_entry.median_price,
-            source: raw_entry.source,
-        })
-        .collect();
+    let raw_entry = raw_entry.first().ok_or(InfraError::NotFound)?;
 
-    Ok(entries)
+    let entry: MedianEntry = MedianEntry {
+        time: raw_entry.time,
+        median_price: raw_entry.median_price.clone(),
+        num_sources: raw_entry.num_sources,
+    };
+
+    Ok(entry)
 }
 
 pub async fn get_entries_between(
@@ -135,14 +135,16 @@ pub async fn get_entries_between(
 
     let raw_sql = r#"
         SELECT
-            source,
-            "timestamp" AS "time",
-            PERCENTILE_DISC(0.5) WITHIN GROUP(ORDER BY price) AS "median_price"
-        FROM entries
-        WHERE pair_id = $1
-        AND "timestamp" BETWEEN $2 AND $3
-        GROUP BY (timestamp, source)
-        ORDER BY timestamp ASC;
+            bucket AS time,
+            median_price,
+            num_sources
+        FROM price_1_min_agg
+        WHERE 
+            pair_id = $1
+        AND 
+            time BETWEEN $2 AND $3
+        ORDER BY 
+            time DESC;
     "#;
 
     let raw_entries = conn
@@ -162,7 +164,7 @@ pub async fn get_entries_between(
         .map(|raw_entry| MedianEntry {
             time: raw_entry.time,
             median_price: raw_entry.median_price,
-            source: raw_entry.source,
+            num_sources: raw_entry.num_sources,
         })
         .collect();
 

@@ -16,6 +16,7 @@ pub(crate) fn currency_pair_to_pair_id(quote: &str, base: &str) -> String {
 /// The median is computed as the middle value of a sorted list of values.
 /// If the list has an even number of values, the median is computed as the average of the two middle values.
 /// If the list is empty, None is returned.
+#[allow(dead_code)]
 pub(crate) fn compute_median_price_and_time(
     entries: &mut Vec<MedianEntry>,
 ) -> Option<(BigDecimal, NaiveDateTime)> {
@@ -74,27 +75,27 @@ fn test_volatility() {
         MedianEntry {
             time: chrono::NaiveDateTime::from_timestamp_opt(1640995200, 0).unwrap(),
             median_price: bigdecimal::BigDecimal::from(47686),
-            source: "source".to_string(),
+            num_sources: 5,
         },
         MedianEntry {
             time: chrono::NaiveDateTime::from_timestamp_opt(1641081600, 0).unwrap(),
             median_price: bigdecimal::BigDecimal::from(47345),
-            source: "source".to_string(),
+            num_sources: 5,
         },
         MedianEntry {
             time: chrono::NaiveDateTime::from_timestamp_opt(1641168000, 0).unwrap(),
             median_price: bigdecimal::BigDecimal::from(46458),
-            source: "source".to_string(),
+            num_sources: 5,
         },
         MedianEntry {
             time: chrono::NaiveDateTime::from_timestamp_opt(1641254400, 0).unwrap(),
             median_price: bigdecimal::BigDecimal::from(45897),
-            source: "source".to_string(),
+            num_sources: 5,
         },
         MedianEntry {
             time: chrono::NaiveDateTime::from_timestamp_opt(1641340800, 0).unwrap(),
             median_price: bigdecimal::BigDecimal::from(43569),
-            source: "source".to_string(),
+            num_sources: 5,
         },
     ];
 
