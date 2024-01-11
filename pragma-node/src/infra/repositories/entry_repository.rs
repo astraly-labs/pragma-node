@@ -96,7 +96,7 @@ pub async fn get_median_price(
         WHERE
             pair_id = $1
         ORDER BY
-            time
+            time DESC
         LIMIT 1;
     "#;
 
