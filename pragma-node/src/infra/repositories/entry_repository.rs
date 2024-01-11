@@ -86,17 +86,15 @@ pub async fn get_median_entries(
     let conn = pool.get().await.map_err(adapt_infra_error)?;
 
     let raw_sql = r#"
-        -- select the latest entry for every publisher,source combination
+        -- query the materialized realtime view
         SELECT
             source,
-            MAX(timestamp) AS time,
-            (approx_percentile(0.5, uddsketch(100, 0.01, price)) WITHIN GROUP (ORDER BY price))::numeric AS median_price
+            MAX(bucket) AS time,
+            approx_percentile(0.5, percentile_agg) AS median_price
         FROM
-            entries
+            price_1_min_agg
         WHERE
             pair_id = $1
-        GROUP BY
-            source
         ORDER BY
             source;
     "#;
