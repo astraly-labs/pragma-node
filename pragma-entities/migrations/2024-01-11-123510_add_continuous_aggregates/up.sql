@@ -4,7 +4,7 @@ WITH (timescaledb.continuous, timescaledb.materialized_only = true)
 AS SELECT 
     pair_id,
     time_bucket('1 min'::interval, timestamp) as bucket,
-    approx_percentile(0.5, percentile_agg(price)) AS median_price,
+    approx_percentile(0.5, percentile_agg(price))::numeric AS median_price,
     COUNT(DISTINCT source) as num_sources
 FROM entries
 GROUP BY bucket, pair_id
@@ -20,7 +20,7 @@ WITH (timescaledb.continuous, timescaledb.materialized_only = true)
 AS SELECT 
     pair_id,
     time_bucket('15 min'::interval, timestamp) as bucket,
-    approx_percentile(0.5, percentile_agg(price)) AS median_price,
+    approx_percentile(0.5, percentile_agg(price))::numeric AS median_price,
     COUNT(DISTINCT source) as num_sources
 FROM entries
 GROUP BY bucket, pair_id
@@ -36,7 +36,7 @@ WITH (timescaledb.continuous, timescaledb.materialized_only = true)
 AS SELECT 
     pair_id,
     time_bucket('1 hour'::interval, timestamp) as bucket,
-    approx_percentile(0.5, percentile_agg(price)) AS median_price,
+    approx_percentile(0.5, percentile_agg(price))::numeric AS median_price,
     COUNT(DISTINCT source) as num_sources
 FROM entries
 GROUP BY bucket, pair_id
