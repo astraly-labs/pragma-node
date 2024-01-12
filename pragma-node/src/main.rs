@@ -37,9 +37,9 @@ async fn main() {
         components(
             schemas(pragma_entities::dto::Entry, pragma_entities::EntryError),
             schemas(pragma_entities::dto::Publisher, pragma_entities::PublisherError),
-            schemas(requests::CreateEntryRequest, requests::CreateEntryResponse, requests::GetEntryResponse, requests::GetVolatilityResponse, , handlers::entries::GetOHLCResponse),
+            schemas(requests::CreateEntryRequest, requests::CreateEntryResponse, requests::GetEntryResponse, requests::GetVolatilityResponse, handlers::entries::GetOHLCResponse),
             schemas(requests::Entry, requests::BaseEntry),
-            schemas(infra::errors::InfraError),
+            schemas(pragma_entities::InfraError),
         ),
         modifiers(&SecurityAddon),
         tags(

@@ -3,11 +3,10 @@ use axum::Json;
 use bigdecimal::num_bigint::ToBigInt;
 
 use crate::requests::{GetQueryParams, GetSpotResponse, SpotTimeStamp};
-use crate::infra::errors::InfraError;
 use crate::infra::repositories::entry_repository::{self, MedianEntry};
 use crate::utils::PathExtractor;
 use crate::AppState;
-use pragma_entities::EntryError;
+use pragma_entities::{EntryError, InfraError};
 
 use crate::utils::{compute_median_price_and_time, currency_pair_to_pair_id};
 
@@ -31,6 +30,14 @@ pub async fn get_spot(
     // Construct pair id
     let pair_id = currency_pair_to_pair_id(&pair.1, &pair.0);
 
+    let now = chrono::Utc::now().naive_utc().timestamp_millis() as u64;
+
+    let timestamp = if let Some(timestamp) = params.timestamp {
+        timestamp
+    } else {
+        now
+    };
+
     // Mock strk/eth pair
     if pair_id == "STRK/ETH" {
         return Ok(Json(GetSpotResponse {
@@ -48,10 +55,10 @@ pub async fn get_spot(
     }
 
     // Get entries from database with given pair id (only the latest one grouped by publisher)
-    let mut entries = entry_repository::get_median_entries(&state.pool, pair_id.clone())
+    let mut entries = entry_repository::get_entries_between(&state.pool, pair_id.clone(), now, timestamp)
         .await
         .map_err(|db_error| match db_error {
-            InfraError::InternalServerError => EntryError::InternalServerError,
+            _ => EntryError::InternalServerError,
             InfraError::NotFound => EntryError::NotFound(pair_id.clone()),
         })?;
 
@@ -63,7 +70,7 @@ pub async fn get_spot(
     let decimals = entry_repository::get_decimals(&state.pool, &pair_id)
         .await
         .map_err(|db_error| match db_error {
-            InfraError::InternalServerError => EntryError::InternalServerError,
+            _ => EntryError::InternalServerError,
             InfraError::NotFound => EntryError::NotFound(pair_id.clone()),
         })?;
 

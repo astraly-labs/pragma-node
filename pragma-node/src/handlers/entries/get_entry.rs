@@ -4,7 +4,6 @@ use bigdecimal::num_bigint::ToBigInt;
 
 use crate::requests::GetEntryResponse;
 use crate::handlers::entries::Interval;
-use crate::infra::errors::InfraError;
 use crate::infra::repositories::entry_repository::{self, MedianEntry};
 use crate::utils::PathExtractor;
 use crate::AppState;

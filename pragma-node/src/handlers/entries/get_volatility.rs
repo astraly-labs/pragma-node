@@ -4,7 +4,6 @@ use serde::Deserialize;
 use utoipa::IntoParams;
 
 use crate::requests::GetVolatilityResponse;
-use crate::infra::errors::InfraError;
 use crate::infra::repositories::entry_repository::{self, MedianEntry};
 use crate::utils::PathExtractor;
 use crate::AppState;

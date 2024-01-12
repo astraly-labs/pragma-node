@@ -101,8 +101,8 @@ pub struct GetVolatilityResponse {
 #[derive(Deserialize)]
 pub struct GetQueryParams {
     aggregation_method: Option<String>,
-    timestamp: Option<u64>,
-    interval: Option<String>,
+    pub(crate) timestamp: Option<u64>,
+    pub(crate) interval: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
