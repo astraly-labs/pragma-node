@@ -1,3 +1,4 @@
+use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 
 use starknet::core::types::FieldElement;
@@ -53,4 +54,33 @@ pub struct GetVolatilityResponse {
     pair_id: String,
     volatility: f64,
     decimals: u32,
+}
+
+/// Query parameters structs
+
+// Define an enum for the allowed intervals
+#[derive(Default, Debug, Deserialize)]
+pub enum Interval {
+    #[serde(rename = "1min")]
+    #[default]
+    OneMinute,
+    #[serde(rename = "15min")]
+    FifteenMinutes,
+    #[serde(rename = "1h")]
+    OneHour,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct GetEntryParams {
+    pub timestamp: NaiveDateTime,
+    pub interval: Interval,
+}
+
+impl Default for GetEntryParams {
+    fn default() -> Self {
+        Self {
+            timestamp: chrono::Utc::now().naive_utc(),
+            interval: Interval::default(),
+        }
+    }
 }

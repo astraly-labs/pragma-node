@@ -1,4 +1,4 @@
-use axum::extract::State;
+use axum::extract::{Query, State};
 use axum::Json;
 use bigdecimal::num_bigint::ToBigInt;
 
@@ -9,6 +9,7 @@ use crate::AppState;
 use pragma_entities::{error::InfraError, EntryError};
 
 use super::utils::currency_pair_to_pair_id;
+use super::GetEntryParams;
 
 #[utoipa::path(
         get,
@@ -24,10 +25,16 @@ use super::utils::currency_pair_to_pair_id;
 pub async fn get_entry(
     State(state): State<AppState>,
     PathExtractor(pair): PathExtractor<(String, String)>,
+    Query(params): Query<GetEntryParams>,
 ) -> Result<Json<GetEntryResponse>, EntryError> {
     tracing::info!("Received get entry request for pair {:?}", pair);
     // Construct pair id
     let pair_id = currency_pair_to_pair_id(&pair.1, &pair.0);
+
+    // Validate given timestamp
+    if params.timestamp > chrono::Utc::now().naive_utc() {
+        return Err(EntryError::InvalidTimestamp);
+    }
 
     // Mock strk/eth pair
     if pair_id == "STRK/ETH" {
@@ -41,13 +48,9 @@ pub async fn get_entry(
     }
 
     // Get entries from database with given pair id (only the latest one grouped by publisher)
-    let entry = entry_repository::get_median_price(&state.pool, pair_id.clone())
+    let entry = entry_repository::get_median_price(&state.pool, pair_id.clone(), params.interval)
         .await
-        .map_err(|db_error| match db_error {
-            InfraError::InternalServerError => EntryError::InternalServerError,
-            InfraError::NotFound => EntryError::NotFound(pair_id.clone()),
-            InfraError::InvalidTimeStamp => EntryError::InvalidTimestamp,
-        })?;
+        .map_err(|db_error| to_entry_error(db_error, pair_id.clone()))?;
 
     let decimals = entry_repository::get_decimals(&state.pool, &pair_id)
         .await
@@ -80,5 +83,13 @@ fn adapt_entry_to_entry_response(
                 .to_str_radix(16)
         ),
         decimals,
+    }
+}
+
+fn to_entry_error(error: InfraError, pair_id: String) -> EntryError {
+    match error {
+        InfraError::InternalServerError => EntryError::InternalServerError,
+        InfraError::NotFound => EntryError::NotFound(pair_id.to_string()),
+        InfraError::InvalidTimeStamp => EntryError::InvalidTimestamp,
     }
 }

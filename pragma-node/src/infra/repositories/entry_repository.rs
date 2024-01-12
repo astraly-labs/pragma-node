@@ -11,6 +11,8 @@ use pragma_entities::{
     Entry, NewEntry,
 };
 
+use crate::handlers::entries::Interval;
+
 #[derive(Deserialize)]
 #[allow(unused)]
 pub struct EntriesFilter {
@@ -82,10 +84,13 @@ pub struct MedianEntryRaw {
 pub async fn get_median_price(
     pool: &deadpool_diesel::postgres::Pool,
     pair_id: String,
+    interval: Interval,
 ) -> Result<MedianEntry, InfraError> {
     let conn = pool.get().await.map_err(adapt_infra_error)?;
 
-    let raw_sql = r#"
+    let raw_sql = match interval {
+        Interval::OneMinute => {
+            r#"
         -- query the materialized realtime view
         SELECT
             bucket AS time,
@@ -98,7 +103,41 @@ pub async fn get_median_price(
         ORDER BY
             time DESC
         LIMIT 1;
-    "#;
+    "#
+        }
+        Interval::FifteenMinutes => {
+            r#"
+        -- query the materialized realtime view
+        SELECT
+            bucket AS time,
+            median_price,
+            num_sources
+        FROM
+            price_15_min_agg
+        WHERE
+            pair_id = $1
+        ORDER BY
+            time DESC
+        LIMIT 1;
+    "#
+        }
+        Interval::OneHour => {
+            r#"
+        -- query the materialized realtime view
+        SELECT
+            bucket AS time,
+            median_price,
+            num_sources
+        FROM
+            price_1_hour_agg
+        WHERE
+            pair_id = $1
+        ORDER BY
+            time DESC
+        LIMIT 1;
+    "#
+        }
+    };
 
     let raw_entry = conn
         .interact(move |conn| {
