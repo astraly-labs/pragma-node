@@ -85,6 +85,7 @@ pub async fn get_median_price(
     pool: &deadpool_diesel::postgres::Pool,
     pair_id: String,
     interval: Interval,
+    time: NaiveDateTime,
 ) -> Result<MedianEntry, InfraError> {
     let conn = pool.get().await.map_err(adapt_infra_error)?;
 
@@ -100,6 +101,8 @@ pub async fn get_median_price(
             price_1_min_agg
         WHERE
             pair_id = $1
+            AND
+            time <= $2
         ORDER BY
             time DESC
         LIMIT 1;
@@ -116,6 +119,8 @@ pub async fn get_median_price(
             price_15_min_agg
         WHERE
             pair_id = $1
+            AND
+            time <= $2
         ORDER BY
             time DESC
         LIMIT 1;
@@ -132,6 +137,8 @@ pub async fn get_median_price(
             price_1_hour_agg
         WHERE
             pair_id = $1
+            AND
+            time <= $2
         ORDER BY
             time DESC
         LIMIT 1;
@@ -143,6 +150,7 @@ pub async fn get_median_price(
         .interact(move |conn| {
             diesel::sql_query(raw_sql)
                 .bind::<diesel::sql_types::Text, _>(pair_id)
+                .bind::<diesel::sql_types::Timestamptz, _>(time)
                 .load::<MedianEntryRaw>(conn)
         })
         .await

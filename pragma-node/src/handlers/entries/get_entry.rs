@@ -47,18 +47,18 @@ pub async fn get_entry(
         }));
     }
 
-    // Get entries from database with given pair id (only the latest one grouped by publisher)
-    let entry = entry_repository::get_median_price(&state.pool, pair_id.clone(), params.interval)
-        .await
-        .map_err(|db_error| to_entry_error(db_error, pair_id.clone()))?;
+    let entry = entry_repository::get_median_price(
+        &state.pool,
+        pair_id.clone(),
+        params.interval,
+        params.timestamp,
+    )
+    .await
+    .map_err(|db_error| to_entry_error(db_error, &pair_id))?;
 
     let decimals = entry_repository::get_decimals(&state.pool, &pair_id)
         .await
-        .map_err(|db_error| match db_error {
-            InfraError::InternalServerError => EntryError::InternalServerError,
-            InfraError::NotFound => EntryError::NotFound(pair_id.clone()),
-            InfraError::InvalidTimeStamp => EntryError::InvalidTimestamp,
-        })?;
+        .map_err(|db_error| to_entry_error(db_error, &pair_id))?;
 
     Ok(Json(adapt_entry_to_entry_response(
         pair_id, &entry, decimals,
@@ -86,7 +86,7 @@ fn adapt_entry_to_entry_response(
     }
 }
 
-fn to_entry_error(error: InfraError, pair_id: String) -> EntryError {
+fn to_entry_error(error: InfraError, pair_id: &String) -> EntryError {
     match error {
         InfraError::InternalServerError => EntryError::InternalServerError,
         InfraError::NotFound => EntryError::NotFound(pair_id.to_string()),
