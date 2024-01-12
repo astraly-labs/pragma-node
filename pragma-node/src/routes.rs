@@ -6,9 +6,9 @@ use axum::Router;
 use utoipa::OpenApi as OpenApiT;
 use utoipa_swagger_ui::SwaggerUi;
 
-use crate::handlers::entries::{create_entries, get_entry, get_volatility};
 use crate::handlers::spots::{create_spots, get_spot};
 use crate::handlers::perp::{create_perps, get_perp};
+use crate::handlers::entries::{create_entries, get_entry, get_ohlc, get_volatility};
 use crate::AppState;
 
 pub fn app_router<T: OpenApiT>(state: AppState) -> Router<AppState> {
@@ -17,6 +17,7 @@ pub fn app_router<T: OpenApiT>(state: AppState) -> Router<AppState> {
         .merge(SwaggerUi::new("/node/swagger-ui").url("/node/api-docs/openapi.json", open_api))
         .route("/node", get(root))
         .nest("/node/v1/data", data_routes(state.clone()))
+        .nest("/node/v1/aggregation", aggregation_routes(state.clone()))
         .nest("/node/v1/volatility", volatility_routes(state.clone()))
         .fallback(handler_404)
 }
@@ -46,5 +47,11 @@ fn data_routes(state: AppState) -> Router<AppState> {
 fn volatility_routes(state: AppState) -> Router<AppState> {
     Router::new()
         .route("/:base/:quote", get(get_volatility))
+        .with_state(state)
+}
+
+fn aggregation_routes(state: AppState) -> Router<AppState> {
+    Router::new()
+        .route("/candlestick/:base/:quote", get(get_ohlc))
         .with_state(state)
 }

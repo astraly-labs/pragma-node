@@ -8,7 +8,7 @@ use crate::infra::errors::InfraError;
 use crate::infra::repositories::entry_repository::{self, MedianEntry};
 use crate::utils::PathExtractor;
 use crate::AppState;
-use pragma_entities::{EntryError, VolatilityError};
+use pragma_entities::{error::InfraError, EntryError, VolatilityError};
 
 use super::utils::{compute_volatility, currency_pair_to_pair_id};
 
@@ -59,6 +59,7 @@ pub async fn get_volatility(
     .map_err(|db_error| match db_error {
         InfraError::InternalServerError => EntryError::InternalServerError,
         InfraError::NotFound => EntryError::NotFound(pair_id.clone()),
+        InfraError::InvalidTimeStamp => EntryError::InvalidTimestamp,
     })?;
 
     if entries.is_empty() {
@@ -70,6 +71,7 @@ pub async fn get_volatility(
         .map_err(|db_error| match db_error {
             InfraError::InternalServerError => EntryError::InternalServerError,
             InfraError::NotFound => EntryError::NotFound(pair_id.clone()),
+            InfraError::InvalidTimeStamp => EntryError::InvalidTimestamp,
         })?;
 
     Ok(Json(adapt_entry_to_entry_response(

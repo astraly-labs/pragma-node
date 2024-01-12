@@ -141,14 +141,22 @@ pub async fn create_entries(
     let new_entries_db = new_entries
         .entries
         .iter()
-        .map(|entry| NewEntry {
-            pair_id: entry.pair_id.clone(),
-            publisher: entry.base.publisher.clone(),
-            source: entry.base.source.clone(),
-            timestamp: NaiveDateTime::from_timestamp_opt(entry.base.timestamp as i64, 0).unwrap(), // TODO: remove unwrap
-            price: entry.price.into(),
+        .map(|entry| {
+            let timestamp = match NaiveDateTime::from_timestamp_opt(entry.base.timestamp as i64, 0)
+            {
+                Some(timestamp) => timestamp,
+                None => return Err(EntryError::InvalidTimestamp),
+            };
+
+            Ok(NewEntry {
+                pair_id: entry.pair_id.clone(),
+                publisher: entry.base.publisher.clone(),
+                source: entry.base.source.clone(),
+                timestamp,
+                price: entry.price.into(),
+            })
         })
-        .collect::<Vec<NewEntry>>();
+        .collect::<Result<Vec<NewEntry>, EntryError>>()?;
 
     let data =
         serde_json::to_vec(&new_entries_db).map_err(|e| EntryError::PublishData(e.to_string()))?;

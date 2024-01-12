@@ -25,6 +25,8 @@ pub enum EntryError {
     InvalidSignature(EcdsaVerifyError),
     #[error("unauthorized request")]
     Unauthorized,
+    #[error("invalid timestamp")]
+    InvalidTimestamp,
     #[error("publisher error: {0}")]
     PublisherError(#[from] PublisherError),
     #[error("pair id invalid: {0}")]

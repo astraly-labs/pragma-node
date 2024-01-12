@@ -31,12 +31,13 @@ async fn main() {
         paths(
             handlers::entries::create_entry::create_entries,
             handlers::entries::get_entry::get_entry,
+            handlers::entries::get_ohlc::get_ohlc,
             handlers::entries::get_volatility::get_volatility,
         ),
         components(
             schemas(pragma_entities::dto::Entry, pragma_entities::EntryError),
             schemas(pragma_entities::dto::Publisher, pragma_entities::PublisherError),
-            schemas(requests::CreateEntryRequest, requests::CreateEntryResponse, requests::GetEntryResponse, requests::GetVolatilityResponse),
+            schemas(requests::CreateEntryRequest, requests::CreateEntryResponse, requests::GetEntryResponse, requests::GetVolatilityResponse, , handlers::entries::GetOHLCResponse),
             schemas(requests::Entry, requests::BaseEntry),
             schemas(infra::errors::InfraError),
         ),

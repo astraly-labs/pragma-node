@@ -4,9 +4,14 @@ use diesel::prelude::QueryableByName;
 use diesel::{ExpressionMethods, QueryDsl, Queryable, RunQueryDsl};
 use serde::{Deserialize, Serialize};
 
-use crate::infra::errors::{adapt_infra_error, InfraError};
 use pragma_entities::dto;
-use pragma_entities::{schema::currencies, Entry, NewEntry};
+use pragma_entities::{
+    error::{adapt_infra_error, InfraError},
+    schema::currencies,
+    Entry, NewEntry,
+};
+
+use crate::handlers::entries::Interval;
 
 #[derive(Deserialize)]
 #[allow(unused)]
@@ -61,63 +66,109 @@ pub async fn _get_all(
 
 #[derive(Debug, Serialize, Queryable)]
 pub struct MedianEntry {
-    pub source: String,
     pub time: NaiveDateTime,
     pub median_price: BigDecimal,
+    pub num_sources: i64,
 }
 
-#[derive(Serialize, QueryableByName)]
+#[derive(Serialize, QueryableByName, Clone, Debug)]
 pub struct MedianEntryRaw {
-    #[diesel(sql_type = diesel::sql_types::Text)]
-    pub source: String,
-    #[diesel(sql_type = diesel::sql_types::Timestamp)]
+    #[diesel(sql_type = diesel::sql_types::Timestamptz)]
     pub time: NaiveDateTime,
     #[diesel(sql_type = diesel::sql_types::Numeric)]
     pub median_price: BigDecimal,
+    #[diesel(sql_type = diesel::sql_types::BigInt)]
+    pub num_sources: i64,
 }
 
-pub async fn get_median_entries(
+pub async fn get_median_price(
     pool: &deadpool_diesel::postgres::Pool,
     pair_id: String,
-) -> Result<Vec<MedianEntry>, InfraError> {
+    interval: Interval,
+    time: u64,
+) -> Result<MedianEntry, InfraError> {
     let conn = pool.get().await.map_err(adapt_infra_error)?;
 
-    let raw_sql = r#"
-        -- select the latest entry for every publisher,source combination
+    let raw_sql = match interval {
+        Interval::OneMinute => {
+            r#"
+        -- query the materialized realtime view
         SELECT
-            source,
-            MAX(timestamp) AS time,
-            (PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price))::numeric AS median_price
+            bucket AS time,
+            median_price,
+            num_sources
         FROM
-            entries
+            price_1_min_agg
         WHERE
             pair_id = $1
-        GROUP BY
-            source
+            AND
+            bucket <= $2
         ORDER BY
-            source;
-    "#;
+            time DESC
+        LIMIT 1;
+    "#
+        }
+        Interval::FifteenMinutes => {
+            r#"
+        -- query the materialized realtime view
+        SELECT
+            bucket AS time,
+            median_price,
+            num_sources
+        FROM
+            price_15_min_agg
+        WHERE
+            pair_id = $1
+            AND
+            bucket <= $2
+        ORDER BY
+            time DESC
+        LIMIT 1;
+    "#
+        }
+        Interval::OneHour => {
+            r#"
+        -- query the materialized realtime view
+        SELECT
+            bucket AS time,
+            median_price,
+            num_sources
+        FROM
+            price_1_h_agg
+        WHERE
+            pair_id = $1
+            AND
+            bucket <= $2
+        ORDER BY
+            time DESC
+        LIMIT 1;
+    "#
+        }
+    };
 
-    let raw_entries: Vec<MedianEntryRaw> = conn
+    let date_time =
+        NaiveDateTime::from_timestamp_millis(time as i64).ok_or(InfraError::InvalidTimeStamp)?;
+
+    let raw_entry = conn
         .interact(move |conn| {
             diesel::sql_query(raw_sql)
                 .bind::<diesel::sql_types::Text, _>(pair_id)
+                .bind::<diesel::sql_types::Timestamptz, _>(date_time)
                 .load::<MedianEntryRaw>(conn)
         })
         .await
         .map_err(adapt_infra_error)?
         .map_err(adapt_infra_error)?;
 
-    let entries: Vec<MedianEntry> = raw_entries
-        .into_iter()
-        .map(|raw_entry| MedianEntry {
-            time: raw_entry.time,
-            median_price: raw_entry.median_price,
-            source: raw_entry.source,
-        })
-        .collect();
+    let raw_entry = raw_entry.first().ok_or(InfraError::NotFound)?;
 
-    Ok(entries)
+    let entry: MedianEntry = MedianEntry {
+        time: raw_entry.time,
+        median_price: raw_entry.median_price.clone(),
+        num_sources: raw_entry.num_sources,
+    };
+
+    Ok(entry)
 }
 
 pub async fn get_entries_between(
@@ -127,19 +178,23 @@ pub async fn get_entries_between(
     end_timestamp: u64,
 ) -> Result<Vec<MedianEntry>, InfraError> {
     let conn = pool.get().await.map_err(adapt_infra_error)?;
-    let start_datetime = NaiveDateTime::from_timestamp_opt(start_timestamp as i64, 0).unwrap();
-    let end_datetime = NaiveDateTime::from_timestamp_opt(end_timestamp as i64, 0).unwrap();
+    let start_datetime = NaiveDateTime::from_timestamp_opt(start_timestamp as i64, 0)
+        .ok_or(InfraError::InvalidTimeStamp)?;
+    let end_datetime = NaiveDateTime::from_timestamp_opt(end_timestamp as i64, 0)
+        .ok_or(InfraError::InvalidTimeStamp)?;
 
     let raw_sql = r#"
         SELECT
-            source,
-            "timestamp" AS "time",
-            PERCENTILE_DISC(0.5) WITHIN GROUP(ORDER BY price) AS "median_price"
-        FROM entries
-        WHERE pair_id = $1
-        AND "timestamp" BETWEEN $2 AND $3
-        GROUP BY (timestamp, source)
-        ORDER BY timestamp ASC;
+            bucket AS time,
+            median_price,
+            num_sources
+        FROM price_1_min_agg
+        WHERE 
+            pair_id = $1
+        AND 
+            time BETWEEN $2 AND $3
+        ORDER BY 
+            time DESC;
     "#;
 
     let raw_entries = conn
@@ -159,7 +214,7 @@ pub async fn get_entries_between(
         .map(|raw_entry| MedianEntry {
             time: raw_entry.time,
             median_price: raw_entry.median_price,
-            source: raw_entry.source,
+            num_sources: raw_entry.num_sources,
         })
         .collect();
 
@@ -187,4 +242,126 @@ pub async fn get_decimals(
         .map_err(adapt_infra_error)?;
 
     Ok(decimals.to_u32().unwrap())
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Queryable)]
+pub struct OHLCEntry {
+    pub time: NaiveDateTime,
+    pub open: BigDecimal,
+    pub low: BigDecimal,
+    pub high: BigDecimal,
+    pub close: BigDecimal,
+}
+
+#[derive(Serialize, QueryableByName, Clone, Debug)]
+pub struct OHLCEntryRaw {
+    #[diesel(sql_type = diesel::sql_types::Timestamptz)]
+    pub time: NaiveDateTime,
+    #[diesel(sql_type = diesel::sql_types::Numeric)]
+    pub open: BigDecimal,
+    #[diesel(sql_type = diesel::sql_types::Numeric)]
+    pub high: BigDecimal,
+    #[diesel(sql_type = diesel::sql_types::Numeric)]
+    pub low: BigDecimal,
+    #[diesel(sql_type = diesel::sql_types::Numeric)]
+    pub close: BigDecimal,
+}
+
+pub async fn get_ohlc(
+    pool: &deadpool_diesel::postgres::Pool,
+    pair_id: String,
+    interval: Interval,
+    time: u64,
+) -> Result<Vec<OHLCEntry>, InfraError> {
+    let conn = pool.get().await.map_err(adapt_infra_error)?;
+
+    let raw_sql = match interval {
+        Interval::OneMinute => {
+            r#"
+        -- query the materialized realtime view
+        SELECT
+            bucket AS time,
+            open,
+            high,
+            low,
+            close
+        FROM
+            one_minute_candle
+        WHERE
+            pair_id = $1
+            AND
+            bucket <= $2
+        ORDER BY
+            time DESC
+        LIMIT 10000;
+    "#
+        }
+        Interval::FifteenMinutes => {
+            r#"
+        -- query the materialized realtime view
+        SELECT
+            bucket AS time,
+            open,
+            high,
+            low,
+            close
+        FROM
+            fifteen_minute_candle
+        WHERE
+            pair_id = $1
+            AND
+            bucket <= $2
+        ORDER BY
+            time DESC
+        LIMIT 10000;
+    "#
+        }
+        Interval::OneHour => {
+            r#"
+        -- query the materialized realtime view
+        SELECT
+            bucket AS time,
+            open,
+            high,
+            low,
+            close
+        FROM
+            one_hour_candle
+        WHERE
+            pair_id = $1
+            AND
+            bucket <= $2
+        ORDER BY
+            time DESC
+        LIMIT 10000;
+    "#
+        }
+    };
+
+    let date_time =
+        NaiveDateTime::from_timestamp_millis(time as i64).ok_or(InfraError::InvalidTimeStamp)?;
+
+    let raw_entries = conn
+        .interact(move |conn| {
+            diesel::sql_query(raw_sql)
+                .bind::<diesel::sql_types::Text, _>(pair_id)
+                .bind::<diesel::sql_types::Timestamptz, _>(date_time)
+                .load::<OHLCEntryRaw>(conn)
+        })
+        .await
+        .map_err(adapt_infra_error)?
+        .map_err(adapt_infra_error)?;
+
+    let entries: Vec<OHLCEntry> = raw_entries
+        .into_iter()
+        .map(|raw_entry| OHLCEntry {
+            time: raw_entry.time,
+            open: raw_entry.open,
+            high: raw_entry.high,
+            low: raw_entry.low,
+            close: raw_entry.close,
+        })
+        .collect();
+
+    Ok(entries)
 }

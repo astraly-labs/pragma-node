@@ -30,6 +30,10 @@ services:
   #         condition: service_healthy
   pragma-node:
     container_name: "pragma-node"
+    environment:
+      - DATABASE_MAX_CONN=5
+      - TOPIC=pragma-data
+      - KAFKA_BROKERS=pragma-kafka:9092
     depends_on:
       pragma-kafka:
         condition: service_healthy
@@ -44,7 +48,7 @@ services:
       dockerfile: infra/pragma-node/Dockerfile
 
   db:
-    image: timescale/timescaledb:1.7.4-pg12
+    image: timescale/timescaledb-ha:pg14-latest
     restart: always
     user: postgres
     secrets:
@@ -61,7 +65,7 @@ services:
     expose:
       - 5432
     healthcheck:
-      test: ["CMD", "pg_isready"]
+      test: [ "CMD", "pg_isready" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -102,7 +106,7 @@ services:
           "kafka-topics",
           "--list",
           "--bootstrap-server",
-          "pragma-kafka:9092",
+          "pragma-kafka:9092"
         ]
     environment:
       KAFKA_BROKER_ID: 1
@@ -119,6 +123,12 @@ services:
 
   pragma-ingestor-1:
     container_name: "pragma-ingestor-1"
+    environment:
+      - DATABASE_URL=postgres://postgres:test-password@db:5432/pragma
+      - DATABASE_MAX_CONN=5
+      - BROKERS=pragma-kafka:9092
+      - TOPIC=pragma-data
+      - GROUP_ID=pragma-data
     depends_on:
       pragma-kafka:
         condition: service_healthy
@@ -129,10 +139,6 @@ services:
       - pragma-db-network
     build:
       dockerfile: infra/pragma-ingestor/Dockerfile
-    environment:
-      BROKERS: pragma-kafka:9092
-      TOPIC: pragma-data
-      GROUP_ID: pragma-data
 
 networks:
   pragma-db-network:
@@ -152,6 +158,7 @@ volumes:
   db-data:
   pragma_zookeeper_data:
   pragma_zookeeper_logs:
+
 
 secrets:
   db-password:

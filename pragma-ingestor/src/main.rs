@@ -9,7 +9,7 @@ mod error;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    dotenv().expect(".env file not found");
+    let _ = dotenv(); // .env file is not present in prod
     pragma_common::tracing::init_tracing();
     info!(
         "kafka configuration : hostname={:?}, group_id={}, topic={}",
