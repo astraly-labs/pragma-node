@@ -2,7 +2,7 @@ use axum::extract::{Query, State};
 use axum::Json;
 use bigdecimal::num_bigint::ToBigInt;
 
-use crate::handlers::entries::GetEntryResponse;
+use crate::handlers::entries::{GetEntryResponse, Interval};
 use crate::infra::repositories::entry_repository::{self, MedianEntry};
 use crate::utils::PathExtractor;
 use crate::AppState;
@@ -31,8 +31,22 @@ pub async fn get_entry(
     // Construct pair id
     let pair_id = currency_pair_to_pair_id(&pair.1, &pair.0);
 
+    let now = chrono::Utc::now().naive_utc().timestamp_millis() as u64;
+
+    let timestamp = if let Some(timestamp) = params.timestamp {
+        timestamp
+    } else {
+        now
+    };
+
+    let interval = if let Some(interval) = params.interval {
+        interval
+    } else {
+        Interval::OneMinute
+    };
+
     // Validate given timestamp
-    if params.timestamp > chrono::Utc::now().naive_utc() {
+    if timestamp > now {
         return Err(EntryError::InvalidTimestamp);
     }
 
@@ -47,14 +61,10 @@ pub async fn get_entry(
         }));
     }
 
-    let entry = entry_repository::get_median_price(
-        &state.pool,
-        pair_id.clone(),
-        params.interval,
-        params.timestamp,
-    )
-    .await
-    .map_err(|db_error| to_entry_error(db_error, &pair_id))?;
+    let entry =
+        entry_repository::get_median_price(&state.pool, pair_id.clone(), interval, timestamp)
+            .await
+            .map_err(|db_error| to_entry_error(db_error, &pair_id))?;
 
     let decimals = entry_repository::get_decimals(&state.pool, &pair_id)
         .await

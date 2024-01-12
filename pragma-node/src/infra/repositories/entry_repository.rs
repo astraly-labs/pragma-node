@@ -85,7 +85,7 @@ pub async fn get_median_price(
     pool: &deadpool_diesel::postgres::Pool,
     pair_id: String,
     interval: Interval,
-    time: NaiveDateTime,
+    time: u64,
 ) -> Result<MedianEntry, InfraError> {
     let conn = pool.get().await.map_err(adapt_infra_error)?;
 
@@ -102,7 +102,7 @@ pub async fn get_median_price(
         WHERE
             pair_id = $1
             AND
-            time <= $2
+            bucket <= $2
         ORDER BY
             time DESC
         LIMIT 1;
@@ -120,7 +120,7 @@ pub async fn get_median_price(
         WHERE
             pair_id = $1
             AND
-            time <= $2
+            bucket <= $2
         ORDER BY
             time DESC
         LIMIT 1;
@@ -134,11 +134,11 @@ pub async fn get_median_price(
             median_price,
             num_sources
         FROM
-            price_1_hour_agg
+            price_1_h_agg
         WHERE
             pair_id = $1
             AND
-            time <= $2
+            bucket <= $2
         ORDER BY
             time DESC
         LIMIT 1;
@@ -146,11 +146,14 @@ pub async fn get_median_price(
         }
     };
 
+    let date_time =
+        NaiveDateTime::from_timestamp_millis(time as i64).ok_or(InfraError::InvalidTimeStamp)?;
+
     let raw_entry = conn
         .interact(move |conn| {
             diesel::sql_query(raw_sql)
                 .bind::<diesel::sql_types::Text, _>(pair_id)
-                .bind::<diesel::sql_types::Timestamptz, _>(time)
+                .bind::<diesel::sql_types::Timestamptz, _>(date_time)
                 .load::<MedianEntryRaw>(conn)
         })
         .await

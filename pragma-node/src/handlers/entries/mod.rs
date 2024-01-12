@@ -1,4 +1,3 @@
-use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 
 use starknet::core::types::FieldElement;
@@ -72,15 +71,15 @@ pub enum Interval {
 
 #[derive(Debug, Deserialize)]
 pub struct GetEntryParams {
-    pub timestamp: NaiveDateTime,
-    pub interval: Interval,
+    pub timestamp: Option<u64>,
+    pub interval: Option<Interval>,
 }
 
 impl Default for GetEntryParams {
     fn default() -> Self {
         Self {
-            timestamp: chrono::Utc::now().naive_utc(),
-            interval: Interval::default(),
+            timestamp: Some(chrono::Utc::now().timestamp_millis() as u64),
+            interval: Some(Interval::default()),
         }
     }
 }
