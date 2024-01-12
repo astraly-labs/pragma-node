@@ -3,7 +3,7 @@ use crate::infra::kafka;
 use crate::infra::repositories::publisher_repository;
 use crate::utils::{JsonExtractor, TypedData};
 use crate::AppState;
-use crate::requests::{CreateSpotRequest, CreateSpotTimestamp ,CreateSpotResponse, Entry};
+use crate::requests::{CreateSpotRequest, SpotTimeStamp, CreateSpotResponse, Entry};
 use axum::extract::State;
 use axum::Json;
 use chrono::NaiveDateTime;
@@ -77,7 +77,7 @@ pub async fn create_spots(
 
     if new_spots.entries.is_empty() {
         return Ok(Json(CreateSpotResponse {
-            data_range: CreateSpotTimestamp {
+            data_range: SpotTimeStamp {
                 start_timestamp: new_spots.data_range.start_timestamp,
                 end_timestamp: new_spots.data_range.end_timestamp,
             },
@@ -167,7 +167,7 @@ pub async fn create_spots(
     Ok(Json(CreateSpotResponse {
         pair_id: new_spots.pair_id,
         price: new_spots.price,
-        data_range: CreateSpotTimestamp {
+        data_range: SpotTimeStamp {
             start_timestamp: new_spots.data_range.start_timestamp,
             end_timestamp: new_spots.data_range.end_timestamp,
         },
