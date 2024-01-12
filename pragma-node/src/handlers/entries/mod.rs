@@ -1,14 +1,18 @@
 use serde::{Deserialize, Serialize};
 
 use starknet::core::types::FieldElement;
-use utoipa::ToSchema;
+use utoipa::{IntoParams, ToSchema};
 
 pub use create_entry::create_entries;
 pub use get_entry::get_entry;
+pub use get_ohlc::get_ohlc;
 pub use get_volatility::get_volatility;
+
+use crate::infra::repositories::entry_repository::OHLCEntry;
 
 pub mod create_entry;
 pub mod get_entry;
+pub mod get_ohlc;
 pub mod get_volatility;
 
 pub mod utils;
@@ -49,6 +53,12 @@ pub struct GetEntryResponse {
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct GetOHLCResponse {
+    pair_id: String,
+    data: Vec<OHLCEntry>,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct GetVolatilityResponse {
     pair_id: String,
     volatility: f64,
@@ -58,7 +68,7 @@ pub struct GetVolatilityResponse {
 /// Query parameters structs
 
 // Define an enum for the allowed intervals
-#[derive(Default, Debug, Deserialize)]
+#[derive(Default, Debug, Deserialize, ToSchema)]
 pub enum Interval {
     #[serde(rename = "1min")]
     #[default]
@@ -69,7 +79,7 @@ pub enum Interval {
     OneHour,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, IntoParams, ToSchema)]
 pub struct GetEntryParams {
     pub timestamp: Option<u64>,
     pub interval: Option<Interval>,

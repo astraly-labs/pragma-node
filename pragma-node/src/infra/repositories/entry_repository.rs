@@ -243,3 +243,125 @@ pub async fn get_decimals(
 
     Ok(decimals.to_u32().unwrap())
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, Queryable)]
+pub struct OHLCEntry {
+    pub time: NaiveDateTime,
+    pub open: BigDecimal,
+    pub low: BigDecimal,
+    pub high: BigDecimal,
+    pub close: BigDecimal,
+}
+
+#[derive(Serialize, QueryableByName, Clone, Debug)]
+pub struct OHLCEntryRaw {
+    #[diesel(sql_type = diesel::sql_types::Timestamptz)]
+    pub time: NaiveDateTime,
+    #[diesel(sql_type = diesel::sql_types::Numeric)]
+    pub open: BigDecimal,
+    #[diesel(sql_type = diesel::sql_types::Numeric)]
+    pub high: BigDecimal,
+    #[diesel(sql_type = diesel::sql_types::Numeric)]
+    pub low: BigDecimal,
+    #[diesel(sql_type = diesel::sql_types::Numeric)]
+    pub close: BigDecimal,
+}
+
+pub async fn get_ohlc(
+    pool: &deadpool_diesel::postgres::Pool,
+    pair_id: String,
+    interval: Interval,
+    time: u64,
+) -> Result<Vec<OHLCEntry>, InfraError> {
+    let conn = pool.get().await.map_err(adapt_infra_error)?;
+
+    let raw_sql = match interval {
+        Interval::OneMinute => {
+            r#"
+        -- query the materialized realtime view
+        SELECT
+            bucket AS time,
+            open,
+            high,
+            low,
+            close
+        FROM
+            one_minute_candle
+        WHERE
+            pair_id = $1
+            AND
+            bucket <= $2
+        ORDER BY
+            time DESC
+        LIMIT 10000;
+    "#
+        }
+        Interval::FifteenMinutes => {
+            r#"
+        -- query the materialized realtime view
+        SELECT
+            bucket AS time,
+            open,
+            high,
+            low,
+            close
+        FROM
+            fifteen_minute_candle
+        WHERE
+            pair_id = $1
+            AND
+            bucket <= $2
+        ORDER BY
+            time DESC
+        LIMIT 10000;
+    "#
+        }
+        Interval::OneHour => {
+            r#"
+        -- query the materialized realtime view
+        SELECT
+            bucket AS time,
+            open,
+            high,
+            low,
+            close
+        FROM
+            one_hour_candle
+        WHERE
+            pair_id = $1
+            AND
+            bucket <= $2
+        ORDER BY
+            time DESC
+        LIMIT 10000;
+    "#
+        }
+    };
+
+    let date_time =
+        NaiveDateTime::from_timestamp_millis(time as i64).ok_or(InfraError::InvalidTimeStamp)?;
+
+    let raw_entries = conn
+        .interact(move |conn| {
+            diesel::sql_query(raw_sql)
+                .bind::<diesel::sql_types::Text, _>(pair_id)
+                .bind::<diesel::sql_types::Timestamptz, _>(date_time)
+                .load::<OHLCEntryRaw>(conn)
+        })
+        .await
+        .map_err(adapt_infra_error)?
+        .map_err(adapt_infra_error)?;
+
+    let entries: Vec<OHLCEntry> = raw_entries
+        .into_iter()
+        .map(|raw_entry| OHLCEntry {
+            time: raw_entry.time,
+            open: raw_entry.open,
+            high: raw_entry.high,
+            low: raw_entry.low,
+            close: raw_entry.close,
+        })
+        .collect();
+
+    Ok(entries)
+}
