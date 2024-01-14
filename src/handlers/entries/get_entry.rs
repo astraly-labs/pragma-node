@@ -36,7 +36,7 @@ pub async fn get_entry(
             pair_id: "ETH/STRK".to_string(),
             timestamp: chrono::Utc::now().timestamp_millis() as u64,
             num_sources_aggregated: 5,
-            price: "0x16345785d8a0000".to_string(), // 0.1 ETH
+            price: "0xc097ce7bc90715b34b9f1000000000".to_string(), // 1 STRK == 1 WEI
             decimals: 18,
         }));
     }
