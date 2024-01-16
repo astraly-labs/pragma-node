@@ -47,6 +47,13 @@ impl Entry {
             .get_results(conn)
     }
 
+    pub fn exists(conn: &mut PgConnection, pair_id: String) -> DieselResult<bool> {
+        diesel::select(diesel::dsl::exists(
+            entries::table.filter(entries::pair_id.eq(pair_id)),
+        ))
+        .get_result(conn)
+    }
+
     pub fn get_by_pair_id(conn: &mut PgConnection, pair_id: String) -> DieselResult<Entry> {
         entries::table
             .filter(entries::pair_id.eq(pair_id))

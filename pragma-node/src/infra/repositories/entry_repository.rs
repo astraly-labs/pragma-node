@@ -81,6 +81,87 @@ pub struct MedianEntryRaw {
     pub num_sources: i64,
 }
 
+pub async fn routing(pool: &deadpool_diesel::postgres::Pool, pair_id: String, interval: Interval, timestamp: u64, is_routing: bool) -> Result<(MedianEntry, u32), InfraError> {
+    if pair_id_exist(pool, pair_id.clone()).await? || is_routing {
+        return get_price_decimals(pool, pair_id, interval, timestamp).await;
+    }
+
+    let pairs = pair_id.split('/').collect::<Vec<_>>();
+    if pairs.len() != 2 {
+        return Err(InfraError::InternalServerError);
+    }
+    let [base, quote]: [&str; 2] = pairs.try_into()
+        .map_err(|_| InfraError::InternalServerError)?;
+
+    let base_pair_id = format!("{}/USD", base);
+    let quote_pair_id = format!("{}/USD", quote);
+
+    let base_result = if pair_id_exist(pool, base_pair_id.clone()).await? {
+        get_price_decimals(pool, base_pair_id, interval, timestamp).await?
+    } else {
+        return Err(InfraError::NotFound);
+    };
+
+    let quote_result = if pair_id_exist(pool, quote_pair_id.clone()).await? {
+        get_price_decimals(pool, quote_pair_id, interval, timestamp).await?
+    } else {
+        return Err(InfraError::NotFound);
+    };
+
+    calculate_rebased_price(base_result, quote_result)
+}
+
+fn calculate_rebased_price(
+    base_result: (MedianEntry, u32),
+    quote_result: (MedianEntry, u32),
+) -> Result<(MedianEntry, u32), InfraError> {
+    let (base_entry, base_decimals) = base_result;
+    let (quote_entry, quote_decimals) = quote_result;
+
+    if quote_entry.median_price == BigDecimal::from(0) {
+        return Err(InfraError::InternalServerError);
+    }
+
+    let rebase_price = base_entry.median_price / quote_entry.median_price;
+    let min_timestamp = std::cmp::min(base_entry.time.timestamp(), quote_entry.time.timestamp());
+    let num_sources = std::cmp::max(base_entry.num_sources, quote_entry.num_sources);
+    let new_timestamp = NaiveDateTime::from_timestamp_opt(min_timestamp, 0)
+        .ok_or(InfraError::InvalidTimeStamp)?;
+    let median_entry = MedianEntry {
+        time: new_timestamp,
+        median_price: rebase_price,
+        num_sources,
+    };
+
+    let decimals = std::cmp::max(base_decimals, quote_decimals);
+
+    Ok((median_entry, decimals))
+}
+
+
+async fn pair_id_exist(pool: &deadpool_diesel::postgres::Pool, pair_id: String) -> Result<bool, InfraError> {
+    let conn = pool.get().await.map_err(adapt_infra_error)?;
+
+    let res = conn
+        .interact(move |conn| Entry::exists(conn, pair_id))
+        .await
+        .map_err(adapt_infra_error)?
+        .map_err(adapt_infra_error)?;
+
+    Ok(res)
+}
+
+async fn get_price_decimals(pool: &deadpool_diesel::postgres::Pool, pair_id: String, interval: Interval, timestamp: u64) -> Result<(MedianEntry, u32), InfraError> {
+    let entry =
+        get_median_price(pool, pair_id.clone(), interval, timestamp)
+            .await?;
+
+    let decimals = get_decimals(pool, &pair_id)
+        .await?;
+
+    return Ok((entry, decimals));
+}
+
 pub async fn get_median_price(
     pool: &deadpool_diesel::postgres::Pool,
     pair_id: String,

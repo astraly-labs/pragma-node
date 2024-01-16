@@ -46,11 +46,12 @@ pub async fn get_entry(
         Interval::OneMinute
     };
 
+    let is_routing = params.routing.unwrap_or(false);
+
     // Validate given timestamp
     if timestamp > now {
         return Err(EntryError::InvalidTimestamp);
     }
-
     // Mock strk/eth pair
     if pair_id == "STRK/ETH" {
         return Ok(Json(GetEntryResponse {
@@ -62,14 +63,8 @@ pub async fn get_entry(
         }));
     }
 
-    let entry =
-        entry_repository::get_median_price(&state.pool, pair_id.clone(), interval, timestamp)
-            .await
-            .map_err(|db_error| to_entry_error(db_error, &pair_id))?;
-
-    let decimals = entry_repository::get_decimals(&state.pool, &pair_id)
-        .await
-        .map_err(|db_error| to_entry_error(db_error, &pair_id))?;
+    let (entry, decimals) = entry_repository::routing(&state.pool, pair_id.clone(), interval, timestamp, is_routing).await
+        .map_err(|e| to_entry_error(e, &pair_id))?;
 
     Ok(Json(adapt_entry_to_entry_response(
         pair_id, &entry, decimals,
@@ -97,7 +92,7 @@ fn adapt_entry_to_entry_response(
     }
 }
 
-fn to_entry_error(error: InfraError, pair_id: &String) -> EntryError {
+pub(crate) fn to_entry_error(error: InfraError, pair_id: &String) -> EntryError {
     match error {
         InfraError::InternalServerError => EntryError::InternalServerError,
         InfraError::NotFound => EntryError::NotFound(pair_id.to_string()),
