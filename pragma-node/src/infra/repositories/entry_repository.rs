@@ -93,7 +93,7 @@ pub async fn routing(
         return get_price_decimals(pool, pair_id, interval, timestamp).await;
     }
 
-    let [base, quote] = pair_id
+    let [base, quote]: [&str; 2] = pair_id
         .split('/')
         .collect::<Vec<_>>()
         .try_into()
