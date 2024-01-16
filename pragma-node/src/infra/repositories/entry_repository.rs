@@ -170,7 +170,7 @@ async fn find_alternative_pair_price(
 
     for alt_currency in alternative_currencies {
         let base_alt_pair = format!("{}/{}", base, alt_currency);
-        let alt_quote_pair = format!("{}/{}", alt_currency, quote);
+        let alt_quote_pair = format!("{}/{}", quote, alt_currency);
 
         if pair_id_exist(pool, base_alt_pair.clone()).await?
             && pair_id_exist(pool, alt_quote_pair.clone()).await?
@@ -361,7 +361,7 @@ pub async fn get_decimals(
 ) -> Result<u32, InfraError> {
     let conn = pool.get().await.map_err(adapt_infra_error)?;
 
-    let quote_currency = pair_id.split('/').next().unwrap().to_uppercase();
+    let quote_currency = pair_id.split('/').last().unwrap().to_uppercase();
 
     // Fetch currency in DB
     let decimals: BigDecimal = conn
