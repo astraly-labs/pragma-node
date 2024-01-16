@@ -63,8 +63,15 @@ pub async fn get_entry(
         }));
     }
 
-    let (entry, decimals) = entry_repository::routing(&state.pool, pair_id.clone(), interval, timestamp, is_routing).await
-        .map_err(|e| to_entry_error(e, &pair_id))?;
+    let (entry, decimals) = entry_repository::routing(
+        &state.pool,
+        pair_id.clone(),
+        interval,
+        timestamp,
+        is_routing,
+    )
+    .await
+    .map_err(|e| to_entry_error(e, &pair_id))?;
 
     Ok(Json(adapt_entry_to_entry_response(
         pair_id, &entry, decimals,

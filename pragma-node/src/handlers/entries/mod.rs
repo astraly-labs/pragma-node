@@ -83,7 +83,7 @@ pub enum Interval {
 pub struct GetEntryParams {
     pub timestamp: Option<u64>,
     pub interval: Option<Interval>,
-    pub routing: Option<bool>
+    pub routing: Option<bool>,
 }
 
 impl Default for GetEntryParams {
@@ -91,7 +91,7 @@ impl Default for GetEntryParams {
         Self {
             timestamp: Some(chrono::Utc::now().timestamp_millis() as u64),
             interval: Some(Interval::default()),
-            routing: Some(false)
+            routing: Some(false),
         }
     }
 }

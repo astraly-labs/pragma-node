@@ -8,10 +8,11 @@ use pragma_entities::dto;
 use pragma_entities::{
     error::{adapt_infra_error, InfraError},
     schema::currencies,
-    Entry, NewEntry, Currency
+    Currency, Entry, NewEntry,
 };
 
 use crate::handlers::entries::Interval;
+use crate::utils::{convert_via_quote, normalize_to_decimals};
 
 #[derive(Deserialize)]
 #[allow(unused)]
@@ -92,11 +93,11 @@ pub async fn routing(
         return get_price_decimals(pool, pair_id, interval, timestamp).await;
     }
 
-    let [base, quote] = pair_id.split('/')
+    let [base, quote] = pair_id
+        .split('/')
         .collect::<Vec<_>>()
         .try_into()
         .map_err(|_| InfraError::InternalServerError)?;
-
 
     match find_alternative_pair_price(pool, base, quote, interval, timestamp).await {
         Ok(result) => Ok(result),
@@ -115,18 +116,39 @@ fn calculate_rebased_price(
         return Err(InfraError::InternalServerError);
     }
 
-    let rebase_price = base_entry.median_price / quote_entry.median_price;
-    let min_timestamp = std::cmp::min(base_entry.time.timestamp(), quote_entry.time.timestamp());
+    let (rebase_price, decimals) = if base_decimals < quote_decimals {
+        let normalized_base_price =
+            normalize_to_decimals(base_entry.median_price, base_decimals, quote_decimals);
+        (
+            convert_via_quote(
+                normalized_base_price,
+                quote_entry.median_price,
+                quote_decimals,
+            )?,
+            quote_decimals,
+        )
+    } else {
+        let normalized_quote_price =
+            normalize_to_decimals(quote_entry.median_price, quote_decimals, base_decimals);
+        (
+            convert_via_quote(
+                base_entry.median_price,
+                normalized_quote_price,
+                base_decimals,
+            )?,
+            base_decimals,
+        )
+    };
+    let min_timestamp = std::cmp::max(base_entry.time.timestamp(), quote_entry.time.timestamp());
     let num_sources = std::cmp::max(base_entry.num_sources, quote_entry.num_sources);
-    let new_timestamp = NaiveDateTime::from_timestamp_opt(min_timestamp, 0)
-        .ok_or(InfraError::InvalidTimeStamp)?;
+    let new_timestamp =
+        NaiveDateTime::from_timestamp_opt(min_timestamp, 0).ok_or(InfraError::InvalidTimeStamp)?;
+
     let median_entry = MedianEntry {
         time: new_timestamp,
         median_price: rebase_price,
         num_sources,
     };
-
-    let decimals = std::cmp::max(base_decimals, quote_decimals);
 
     Ok((median_entry, decimals))
 }
@@ -140,7 +162,8 @@ async fn find_alternative_pair_price(
 ) -> Result<(MedianEntry, u32), InfraError> {
     let conn = pool.get().await.map_err(adapt_infra_error)?;
 
-    let alternative_currencies = conn.interact(move |conn| Currency::get_abstract_all(conn))
+    let alternative_currencies = conn
+        .interact(Currency::get_abstract_all)
         .await
         .map_err(adapt_infra_error)?
         .map_err(adapt_infra_error)?;
@@ -149,10 +172,13 @@ async fn find_alternative_pair_price(
         let base_alt_pair = format!("{}/{}", base, alt_currency);
         let alt_quote_pair = format!("{}/{}", alt_currency, quote);
 
-        if pair_id_exist(pool, base_alt_pair.clone()).await? && pair_id_exist(pool, alt_quote_pair.clone()).await? {
-
-            let base_alt_result = get_price_decimals(pool, base_alt_pair, interval, timestamp).await?;
-            let alt_quote_result = get_price_decimals(pool, alt_quote_pair, interval, timestamp).await?;
+        if pair_id_exist(pool, base_alt_pair.clone()).await?
+            && pair_id_exist(pool, alt_quote_pair.clone()).await?
+        {
+            let base_alt_result =
+                get_price_decimals(pool, base_alt_pair, interval, timestamp).await?;
+            let alt_quote_result =
+                get_price_decimals(pool, alt_quote_pair, interval, timestamp).await?;
 
             return calculate_rebased_price(base_alt_result, alt_quote_result);
         }
@@ -161,8 +187,10 @@ async fn find_alternative_pair_price(
     Err(InfraError::NotFound)
 }
 
-
-async fn pair_id_exist(pool: &deadpool_diesel::postgres::Pool, pair_id: String) -> Result<bool, InfraError> {
+async fn pair_id_exist(
+    pool: &deadpool_diesel::postgres::Pool,
+    pair_id: String,
+) -> Result<bool, InfraError> {
     let conn = pool.get().await.map_err(adapt_infra_error)?;
 
     let res = conn
@@ -174,15 +202,17 @@ async fn pair_id_exist(pool: &deadpool_diesel::postgres::Pool, pair_id: String) 
     Ok(res)
 }
 
-async fn get_price_decimals(pool: &deadpool_diesel::postgres::Pool, pair_id: String, interval: Interval, timestamp: u64) -> Result<(MedianEntry, u32), InfraError> {
-    let entry =
-        get_median_price(pool, pair_id.clone(), interval, timestamp)
-            .await?;
+async fn get_price_decimals(
+    pool: &deadpool_diesel::postgres::Pool,
+    pair_id: String,
+    interval: Interval,
+    timestamp: u64,
+) -> Result<(MedianEntry, u32), InfraError> {
+    let entry = get_median_price(pool, pair_id.clone(), interval, timestamp).await?;
 
-    let decimals = get_decimals(pool, &pair_id)
-        .await?;
+    let decimals = get_decimals(pool, &pair_id).await?;
 
-    return Ok((entry, decimals));
+    Ok((entry, decimals))
 }
 
 pub async fn get_median_price(

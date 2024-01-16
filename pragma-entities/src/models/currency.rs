@@ -1,11 +1,8 @@
+use super::DieselResult;
+use crate::schema::currencies;
+use diesel::{ExpressionMethods, PgConnection, QueryDsl, RunQueryDsl};
 use utoipa::ToSchema;
 use uuid::Uuid;
-use crate::schema::currencies;
-use super::DieselResult;
-use diesel::{
-    ExpressionMethods, PgConnection, QueryDsl,
-    RunQueryDsl,
-};
 
 #[derive(Clone, Debug, PartialEq, ToSchema)]
 pub struct Currency {
@@ -18,9 +15,7 @@ pub struct Currency {
 
 impl Currency {
     pub fn get_all(conn: &mut PgConnection) -> DieselResult<Vec<String>> {
-        currencies::table
-            .select(currencies::name)
-            .get_results(conn)
+        currencies::table.select(currencies::name).get_results(conn)
     }
 
     pub fn get_abstract_all(conn: &mut PgConnection) -> DieselResult<Vec<String>> {
