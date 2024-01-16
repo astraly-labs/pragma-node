@@ -8,7 +8,7 @@ use pragma_entities::dto;
 use pragma_entities::{
     error::{adapt_infra_error, InfraError},
     schema::currencies,
-    Entry, NewEntry,
+    Entry, NewEntry, Currency
 };
 
 use crate::handlers::entries::Interval;
@@ -81,34 +81,27 @@ pub struct MedianEntryRaw {
     pub num_sources: i64,
 }
 
-pub async fn routing(pool: &deadpool_diesel::postgres::Pool, pair_id: String, interval: Interval, timestamp: u64, is_routing: bool) -> Result<(MedianEntry, u32), InfraError> {
+pub async fn routing(
+    pool: &deadpool_diesel::postgres::Pool,
+    pair_id: String,
+    interval: Interval,
+    timestamp: u64,
+    is_routing: bool,
+) -> Result<(MedianEntry, u32), InfraError> {
     if pair_id_exist(pool, pair_id.clone()).await? || is_routing {
         return get_price_decimals(pool, pair_id, interval, timestamp).await;
     }
 
-    let pairs = pair_id.split('/').collect::<Vec<_>>();
-    if pairs.len() != 2 {
-        return Err(InfraError::InternalServerError);
-    }
-    let [base, quote]: [&str; 2] = pairs.try_into()
+    let [base, quote] = pair_id.split('/')
+        .collect::<Vec<_>>()
+        .try_into()
         .map_err(|_| InfraError::InternalServerError)?;
 
-    let base_pair_id = format!("{}/USD", base);
-    let quote_pair_id = format!("{}/USD", quote);
 
-    let base_result = if pair_id_exist(pool, base_pair_id.clone()).await? {
-        get_price_decimals(pool, base_pair_id, interval, timestamp).await?
-    } else {
-        return Err(InfraError::NotFound);
-    };
-
-    let quote_result = if pair_id_exist(pool, quote_pair_id.clone()).await? {
-        get_price_decimals(pool, quote_pair_id, interval, timestamp).await?
-    } else {
-        return Err(InfraError::NotFound);
-    };
-
-    calculate_rebased_price(base_result, quote_result)
+    match find_alternative_pair_price(pool, base, quote, interval, timestamp).await {
+        Ok(result) => Ok(result),
+        Err(_) => Err(InfraError::NotFound),
+    }
 }
 
 fn calculate_rebased_price(
@@ -136,6 +129,36 @@ fn calculate_rebased_price(
     let decimals = std::cmp::max(base_decimals, quote_decimals);
 
     Ok((median_entry, decimals))
+}
+
+async fn find_alternative_pair_price(
+    pool: &deadpool_diesel::postgres::Pool,
+    base: &str,
+    quote: &str,
+    interval: Interval,
+    timestamp: u64,
+) -> Result<(MedianEntry, u32), InfraError> {
+    let conn = pool.get().await.map_err(adapt_infra_error)?;
+
+    let alternative_currencies = conn.interact(move |conn| Currency::get_abstract_all(conn))
+        .await
+        .map_err(adapt_infra_error)?
+        .map_err(adapt_infra_error)?;
+
+    for alt_currency in alternative_currencies {
+        let base_alt_pair = format!("{}/{}", base, alt_currency);
+        let alt_quote_pair = format!("{}/{}", alt_currency, quote);
+
+        if pair_id_exist(pool, base_alt_pair.clone()).await? && pair_id_exist(pool, alt_quote_pair.clone()).await? {
+
+            let base_alt_result = get_price_decimals(pool, base_alt_pair, interval, timestamp).await?;
+            let alt_quote_result = get_price_decimals(pool, alt_quote_pair, interval, timestamp).await?;
+
+            return calculate_rebased_price(base_alt_result, alt_quote_result);
+        }
+    }
+
+    Err(InfraError::NotFound)
 }
 
 
