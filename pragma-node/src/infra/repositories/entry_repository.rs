@@ -89,7 +89,7 @@ pub async fn routing(
     timestamp: u64,
     is_routing: bool,
 ) -> Result<(MedianEntry, u32), InfraError> {
-    if pair_id_exist(pool, pair_id.clone()).await? || is_routing {
+    if pair_id_exist(pool, pair_id.clone()).await? || !is_routing {
         return get_price_decimals(pool, pair_id, interval, timestamp).await;
     }
 
