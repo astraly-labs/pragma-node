@@ -6,8 +6,8 @@ use crate::infra::repositories::entry_repository::MedianEntry;
 /// Converts a currency pair to a pair id.
 ///
 /// e.g "btc" and "usd" to "BTC/USD"
-pub(crate) fn currency_pair_to_pair_id(quote: &str, base: &str) -> String {
-    format!("{}/{}", quote.to_uppercase(), base.to_uppercase())
+pub(crate) fn currency_pair_to_pair_id(base: &str, quote: &str) -> String {
+    format!("{}/{}", base.to_uppercase(), quote.to_uppercase())
 }
 
 /// Computes the median price and time from a list of entries.

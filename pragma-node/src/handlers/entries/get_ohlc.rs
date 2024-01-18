@@ -17,8 +17,8 @@ use super::GetEntryParams;
             (status = 200, description = "Get OHLC data successfuly", body = [GetOHLCResponse])
         ),
         params(
-            ("quote" = String, Path, description = "Quote Asset"),
             ("base" = String, Path, description = "Base Asset"),
+            ("quote" = String, Path, description = "Quote Asset"),
             GetEntryParams,
         ),
     )]
@@ -29,7 +29,7 @@ pub async fn get_ohlc(
 ) -> Result<Json<GetOHLCResponse>, EntryError> {
     tracing::info!("Received get entry request for pair {:?}", pair);
     // Construct pair id
-    let pair_id = currency_pair_to_pair_id(&pair.1, &pair.0);
+    let pair_id = currency_pair_to_pair_id(&pair.0, &pair.1);
 
     let now = chrono::Utc::now().naive_utc().timestamp_millis() as u64;
 
