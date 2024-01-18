@@ -52,16 +52,6 @@ pub async fn get_entry(
     if timestamp > now {
         return Err(EntryError::InvalidTimestamp);
     }
-    // Mock strk/eth pair
-    if pair_id == "STRK/ETH" {
-        return Ok(Json(GetEntryResponse {
-            pair_id: "ETH/STRK".to_string(),
-            timestamp: chrono::Utc::now().timestamp_millis() as u64,
-            num_sources_aggregated: 5,
-            price: "0x8ac7230489e80000".to_string(), // 0.1 wei
-            decimals: 18,
-        }));
-    }
 
     let (entry, decimals) = entry_repository::routing(
         &state.pool,
