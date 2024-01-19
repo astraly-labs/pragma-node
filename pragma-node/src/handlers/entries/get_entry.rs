@@ -2,7 +2,7 @@ use axum::extract::{Query, State};
 use axum::Json;
 use bigdecimal::num_bigint::ToBigInt;
 
-use crate::handlers::entries::{GetEntryResponse, Interval};
+use crate::handlers::entries::{AggregationMode, GetEntryResponse, Interval};
 use crate::infra::repositories::entry_repository::{self, MedianEntry};
 use crate::utils::PathExtractor;
 use crate::AppState;
@@ -46,6 +46,12 @@ pub async fn get_entry(
         Interval::OneMinute
     };
 
+    let aggregation_mode = if let Some(aggregation_mode) = params.aggregation {
+        aggregation_mode
+    } else {
+        AggregationMode::Median
+    };
+
     let is_routing = params.routing.unwrap_or(false);
 
     // Validate given timestamp
@@ -59,6 +65,7 @@ pub async fn get_entry(
         interval,
         timestamp,
         is_routing,
+        aggregation_mode,
     )
     .await
     .map_err(|e| to_entry_error(e, &pair_id))?;
