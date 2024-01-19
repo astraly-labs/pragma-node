@@ -276,7 +276,7 @@ pub async fn get_twap_price(
             price_twap AS median_price,
             num_sources
         FROM
-            twap_1_h_agg
+            twap_1_hour_agg
         WHERE
             pair_id = $1
             AND
