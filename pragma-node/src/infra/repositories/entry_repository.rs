@@ -237,7 +237,7 @@ pub async fn get_twap_price(
         -- query the materialized realtime view
         SELECT
             bucket AS time,
-            price_twap,
+            price_twap AS median_price,
             num_sources
         FROM
             twap_1_min_agg
@@ -255,7 +255,7 @@ pub async fn get_twap_price(
         -- query the materialized realtime view
         SELECT
             bucket AS time,
-            price_twap,
+            price_twap AS median_price,
             num_sources
         FROM
             twap_15_min_agg
@@ -273,7 +273,7 @@ pub async fn get_twap_price(
         -- query the materialized realtime view
         SELECT
             bucket AS time,
-            price_twap,
+            price_twap AS median_price,
             num_sources
         FROM
             twap_1_h_agg
