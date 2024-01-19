@@ -11,7 +11,7 @@ use pragma_entities::{
     Currency, Entry, NewEntry,
 };
 
-use crate::handlers::entries::Interval;
+use crate::handlers::entries::{AggregationMode, Interval};
 use crate::utils::{convert_via_quote, normalize_to_decimals};
 
 #[derive(Deserialize)]
@@ -88,9 +88,10 @@ pub async fn routing(
     interval: Interval,
     timestamp: u64,
     is_routing: bool,
+    agg_mode: AggregationMode,
 ) -> Result<(MedianEntry, u32), InfraError> {
     if pair_id_exist(pool, pair_id.clone()).await? || !is_routing {
-        return get_price_decimals(pool, pair_id, interval, timestamp).await;
+        return get_price_decimals(pool, pair_id, interval, timestamp, agg_mode).await;
     }
 
     let [base, quote]: [&str; 2] = pair_id
@@ -99,7 +100,7 @@ pub async fn routing(
         .try_into()
         .map_err(|_| InfraError::InternalServerError)?;
 
-    match find_alternative_pair_price(pool, base, quote, interval, timestamp).await {
+    match find_alternative_pair_price(pool, base, quote, interval, timestamp, agg_mode).await {
         Ok(result) => Ok(result),
         Err(_) => Err(InfraError::NotFound),
     }
@@ -159,6 +160,7 @@ async fn find_alternative_pair_price(
     quote: &str,
     interval: Interval,
     timestamp: u64,
+    agg_mode: AggregationMode,
 ) -> Result<(MedianEntry, u32), InfraError> {
     let conn = pool.get().await.map_err(adapt_infra_error)?;
 
@@ -176,9 +178,9 @@ async fn find_alternative_pair_price(
             && pair_id_exist(pool, alt_quote_pair.clone()).await?
         {
             let base_alt_result =
-                get_price_decimals(pool, base_alt_pair, interval, timestamp).await?;
+                get_price_decimals(pool, base_alt_pair, interval, timestamp, agg_mode).await?;
             let alt_quote_result =
-                get_price_decimals(pool, alt_quote_pair, interval, timestamp).await?;
+                get_price_decimals(pool, alt_quote_pair, interval, timestamp, agg_mode).await?;
 
             return calculate_rebased_price(base_alt_result, alt_quote_result);
         }
@@ -207,14 +209,109 @@ async fn get_price_decimals(
     pair_id: String,
     interval: Interval,
     timestamp: u64,
+    agg_mode: AggregationMode,
 ) -> Result<(MedianEntry, u32), InfraError> {
-    let entry = get_median_price(pool, pair_id.clone(), interval, timestamp).await?;
+    let entry = match agg_mode {
+        AggregationMode::Median => {
+            get_median_price(pool, pair_id.clone(), interval, timestamp).await?
+        }
+        AggregationMode::Twap => get_twap_price(pool, pair_id.clone(), interval, timestamp).await?,
+    };
 
     let decimals = get_decimals(pool, &pair_id).await?;
 
     Ok((entry, decimals))
 }
 
+pub async fn get_twap_price(
+    pool: &deadpool_diesel::postgres::Pool,
+    pair_id: String,
+    interval: Interval,
+    time: u64,
+) -> Result<MedianEntry, InfraError> {
+    let conn = pool.get().await.map_err(adapt_infra_error)?;
+
+    let raw_sql = match interval {
+        Interval::OneMinute => {
+            r#"
+        -- query the materialized realtime view
+        SELECT
+            bucket AS time,
+            price_twap,
+            num_sources
+        FROM
+            twap_1_min_agg
+        WHERE
+            pair_id = $1
+            AND
+            bucket <= $2
+        ORDER BY
+            time DESC
+        LIMIT 1;
+    "#
+        }
+        Interval::FifteenMinutes => {
+            r#"
+        -- query the materialized realtime view
+        SELECT
+            bucket AS time,
+            price_twap,
+            num_sources
+        FROM
+            twap_15_min_agg
+        WHERE
+            pair_id = $1
+            AND
+            bucket <= $2
+        ORDER BY
+            time DESC
+        LIMIT 1;
+    "#
+        }
+        Interval::OneHour => {
+            r#"
+        -- query the materialized realtime view
+        SELECT
+            bucket AS time,
+            price_twap,
+            num_sources
+        FROM
+            twap_1_h_agg
+        WHERE
+            pair_id = $1
+            AND
+            bucket <= $2
+        ORDER BY
+            time DESC
+        LIMIT 1;
+    "#
+        }
+    };
+
+    let date_time =
+        NaiveDateTime::from_timestamp_millis(time as i64).ok_or(InfraError::InvalidTimeStamp)?;
+
+    let raw_entry = conn
+        .interact(move |conn| {
+            diesel::sql_query(raw_sql)
+                .bind::<diesel::sql_types::Text, _>(pair_id)
+                .bind::<diesel::sql_types::Timestamptz, _>(date_time)
+                .load::<MedianEntryRaw>(conn)
+        })
+        .await
+        .map_err(adapt_infra_error)?
+        .map_err(adapt_infra_error)?;
+
+    let raw_entry = raw_entry.first().ok_or(InfraError::NotFound)?;
+
+    let entry: MedianEntry = MedianEntry {
+        time: raw_entry.time,
+        median_price: raw_entry.median_price.clone(),
+        num_sources: raw_entry.num_sources,
+    };
+
+    Ok(entry)
+}
 pub async fn get_median_price(
     pool: &deadpool_diesel::postgres::Pool,
     pair_id: String,

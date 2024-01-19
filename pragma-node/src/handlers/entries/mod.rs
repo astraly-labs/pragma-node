@@ -67,7 +67,7 @@ pub struct GetVolatilityResponse {
 
 /// Query parameters structs
 
-// Define an enum for the allowed intervals
+// Supported Aggregation Intervals
 #[derive(Default, Debug, Deserialize, ToSchema, Clone, Copy)]
 pub enum Interval {
     #[serde(rename = "1min")]
@@ -79,11 +79,22 @@ pub enum Interval {
     OneHour,
 }
 
+// Supported Aggregation Modes
+#[derive(Default, Debug, Deserialize, ToSchema, Clone, Copy)]
+pub enum AggregationMode {
+    #[serde(rename = "median")]
+    #[default]
+    Median,
+    #[serde(rename = "twap")]
+    Twap,
+}
+
 #[derive(Debug, Deserialize, IntoParams, ToSchema)]
 pub struct GetEntryParams {
     pub timestamp: Option<u64>,
     pub interval: Option<Interval>,
     pub routing: Option<bool>,
+    pub aggregation: Option<AggregationMode>,
 }
 
 impl Default for GetEntryParams {
@@ -92,6 +103,7 @@ impl Default for GetEntryParams {
             timestamp: Some(chrono::Utc::now().timestamp_millis() as u64),
             interval: Some(Interval::default()),
             routing: Some(false),
+            aggregation: Some(AggregationMode::default()),
         }
     }
 }
