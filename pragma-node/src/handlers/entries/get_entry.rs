@@ -43,13 +43,13 @@ pub async fn get_entry(
     let interval = if let Some(interval) = params.interval {
         interval
     } else {
-        Interval::OneMinute
+        Interval::FifteenMinutes
     };
 
     let aggregation_mode = if let Some(aggregation_mode) = params.aggregation {
         aggregation_mode
     } else {
-        AggregationMode::Median
+        AggregationMode::Twap
     };
 
     let is_routing = params.routing.unwrap_or(false);
