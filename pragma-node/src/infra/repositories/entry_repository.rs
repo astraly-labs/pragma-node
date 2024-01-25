@@ -459,9 +459,10 @@ pub async fn get_decimals(
     let conn = pool.get().await.map_err(adapt_infra_error)?;
 
     let quote_currency = pair_id.split('/').last().unwrap().to_uppercase();
+    let base_currency = pair_id.split('/').next().unwrap().to_uppercase();
 
     // Fetch currency in DB
-    let decimals: BigDecimal = conn
+    let quote_decimals: BigDecimal = conn
         .interact(move |conn| {
             currencies::table
                 .filter(currencies::name.eq(quote_currency))
@@ -471,8 +472,24 @@ pub async fn get_decimals(
         .await
         .map_err(adapt_infra_error)?
         .map_err(adapt_infra_error)?;
+    let base_decimals: BigDecimal = conn
+        .interact(move |conn| {
+            currencies::table
+                .filter(currencies::name.eq(base_currency))
+                .select(currencies::decimals)
+                .first::<BigDecimal>(conn)
+        })
+        .await
+        .map_err(adapt_infra_error)?
+        .map_err(adapt_infra_error)?;
 
-    Ok(decimals.to_u32().unwrap())
+    // Take the minimum of the two
+    let decimals = std::cmp::min(
+        quote_decimals.to_u32().unwrap(),
+        base_decimals.to_u32().unwrap(),
+    );
+
+    Ok(decimals)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Queryable)]
