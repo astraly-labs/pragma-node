@@ -58,6 +58,11 @@ impl IntoResponse for EntryError {
                 StatusCode::UNAUTHORIZED,
                 "Unauthorized publisher".to_string(),
             ),
+            Self::InvalidTimestamp => (StatusCode::BAD_REQUEST, "Invalid timestamp".to_string()),
+            Self::PublisherError(err) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Publisher error: {}", err),
+            ),
             _ => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 String::from("Internal server error"),
