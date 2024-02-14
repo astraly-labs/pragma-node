@@ -286,6 +286,24 @@ pub async fn get_twap_price(
         LIMIT 1;
     "#
         }
+        Interval::TwoHours => {
+            r#"
+            -- query the materialized realtime view
+        SELECT
+            bucket AS time,
+            price_twap AS median_price,
+            num_sources
+        FROM
+            twap_2_hours_agg
+        WHERE
+            pair_id = $1
+            AND
+            bucket <= $2
+        ORDER BY
+            time DESC
+        LIMIT 1;
+    "#
+        }
     };
 
     let date_time =
@@ -366,6 +384,24 @@ pub async fn get_median_price(
             num_sources
         FROM
             price_1_h_agg
+        WHERE
+            pair_id = $1
+            AND
+            bucket <= $2
+        ORDER BY
+            time DESC
+        LIMIT 1;
+    "#
+        }
+        Interval::TwoHours => {
+            r#"
+            -- query the materialized realtime view
+        SELECT
+            bucket AS time,
+            median_price,
+            num_sources
+        FROM
+            price_2_h_agg
         WHERE
             pair_id = $1
             AND
@@ -575,6 +611,26 @@ pub async fn get_ohlc(
             close
         FROM
             one_hour_candle
+        WHERE
+            pair_id = $1
+            AND
+            bucket <= $2
+        ORDER BY
+            time DESC
+        LIMIT 10000;
+    "#
+        }
+        Interval::TwoHours => {
+            r#"
+            -- query the materialized realtime view
+        SELECT
+            bucket AS time,
+            open,
+            high,
+            low,
+            close
+        FROM
+            two_hour_candle
         WHERE
             pair_id = $1
             AND

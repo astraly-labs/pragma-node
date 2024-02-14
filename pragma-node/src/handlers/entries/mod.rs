@@ -77,6 +77,8 @@ pub enum Interval {
     FifteenMinutes,
     #[serde(rename = "1h")]
     OneHour,
+    #[serde(rename = "2h")]
+    TwoHours,
 }
 
 // Supported Aggregation Modes
