@@ -43,7 +43,7 @@ pub async fn get_entry(
     let interval = if let Some(interval) = params.interval {
         interval
     } else {
-        Interval::FifteenMinutes
+        Interval::TwoHours
     };
 
     let aggregation_mode = if let Some(aggregation_mode) = params.aggregation {
