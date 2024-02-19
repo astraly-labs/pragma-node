@@ -8,47 +8,158 @@
 # database or a cache. For examples, see the Awesome Compose repository:
 # https://github.com/docker/awesome-compose
 services:
-  server:
+  #  server:
+  #    environment:
+  #      - PORT=3000
+  #      - DATABASE_URL=postgres://postgres:postgres@host.docker.internal:5432/project_f
+  #      - HOST=0.0.0.0
+  #      - RUST_LOG=info
+  #    build:
+  #      context: .
+  #      target: final
+  #    ports:
+  #      - 3000:3000
+  # The commented out section below is an example of how to define a PostgreSQL
+  # database that your application can use. `depends_on` tells Docker Compose to
+  # start the database before your application. The `db-data` volume persists the
+  # database data between container restarts. The `db-password` secret is used
+  # to set the database password. You must create `db/password.txt` and add
+  # a password of your choosing to it before running `docker compose up`.
+  #     depends_on:
+  #       db:
+  #         condition: service_healthy
+  pragma-node:
+    container_name: "pragma-node"
     environment:
-      - PORT=3000
-      - DATABASE_URL=postgres://postgres:postgres@host.docker.internal:5432/project_f
-      - HOST=0.0.0.0
-      - RUST_LOG=info
-    build:
-      context: .
-      target: final
+      - DATABASE_MAX_CONN=5
+      - TOPIC=pragma-data
+      - KAFKA_BROKERS=pragma-kafka:9092
+    depends_on:
+      pragma-kafka:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+    networks:
+      - pragma-kafka-network
+      - pragma-db-network
     ports:
-      - 3000:3000
-# The commented out section below is an example of how to define a PostgreSQL
-# database that your application can use. `depends_on` tells Docker Compose to
-# start the database before your application. The `db-data` volume persists the
-# database data between container restarts. The `db-password` secret is used
-# to set the database password. You must create `db/password.txt` and add
-# a password of your choosing to it before running `docker compose up`.
-#     depends_on:
-#       db:
-#         condition: service_healthy
-#   db:
-#     image: postgres
-#     restart: always
-#     user: postgres
-#     secrets:
-#       - db-password
-#     volumes:
-#       - db-data:/var/lib/postgresql/data
-#     environment:
-#       - POSTGRES_DB=example
-#       - POSTGRES_PASSWORD_FILE=/run/secrets/db-password
-#     expose:
-#       - 5432
-#     healthcheck:
-#       test: [ "CMD", "pg_isready" ]
-#       interval: 10s
-#       timeout: 5s
-#       retries: 5
-# volumes:
-#   db-data:
-# secrets:
-#   db-password:
-#     file: db/password.txt
+      - "3000:3000"
+    build:
+      dockerfile: infra/pragma-node/Dockerfile
 
+  db:
+    image: timescale/timescaledb-ha:pg14-latest
+    restart: always
+    user: postgres
+    secrets:
+      - db-password
+    networks:
+      - pragma-db-network
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=pragma
+      - POSTGRES_PASSWORD_FILE=/run/secrets/db-password
+    ports:
+      - 5432:5432
+    expose:
+      - 5432
+    healthcheck:
+      test: [ "CMD", "pg_isready" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  pragma-zookeeper:
+    container_name: "pragma-zookeeper"
+    image: confluentinc/cp-zookeeper:latest
+    restart: "always"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - pragma-zookeeper-network
+    volumes:
+      - pragma_zookeeper_data:/var/lib/zookeeper/data
+      - pragma_zookeeper_logs:/var/lib/zookeeper/log
+    ports:
+      - "22181:2181"
+
+  pragma-kafka:
+    container_name: "pragma-kafka"
+    image: confluentinc/cp-kafka:latest
+    depends_on:
+      pragma-zookeeper:
+        condition: service_started
+    networks:
+      - pragma-kafka-network
+      - pragma-zookeeper-network
+    ports:
+      - "29092:29092"
+      - "9092:9092"
+    expose:
+      - "29092"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "kafka-topics",
+          "--list",
+          "--bootstrap-server",
+          "pragma-kafka:9092"
+        ]
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: pragma-zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://pragma-kafka:9092,PLAINTEXT_E://pragma-kafka:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,PLAINTEXT_E:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      #KAFKA_SOCKET_REQUEST_MAX_BYTES: "10000000"
+      #KAFKA_MESSAGE_MAX_BYTES: "10000000"
+      #KAFKA_TOPIC_MAX_MESSAGE_BYTES: "15728640"
+      #KAFKA_REPLICA_FETCH_MAX_BYTES: "15728640"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+
+  pragma-ingestor-1:
+    container_name: "pragma-ingestor-1"
+    environment:
+      - DATABASE_URL=postgres://postgres:test-password@db:5432/pragma
+      - DATABASE_MAX_CONN=5
+      - BROKERS=pragma-kafka:9092
+      - TOPIC=pragma-data
+      - GROUP_ID=pragma-data
+    depends_on:
+      pragma-kafka:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+    networks:
+      - pragma-kafka-network
+      - pragma-db-network
+    build:
+      dockerfile: infra/pragma-ingestor/Dockerfile
+
+networks:
+  pragma-db-network:
+    # production
+    #driver: bridge
+    #internal: true
+  pragma-kafka-network:
+    # production
+    #driver: bridge
+    #internal: true
+  pragma-zookeeper-network:
+    # production
+    #driver: bridge
+    #internal: true
+
+volumes:
+  db-data:
+  pragma_zookeeper_data:
+  pragma_zookeeper_logs:
+
+
+secrets:
+  db-password:
+    file: infra/db/password.txt
