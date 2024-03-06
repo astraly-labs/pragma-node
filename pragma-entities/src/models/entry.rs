@@ -3,6 +3,8 @@ use crate::models::DieselResult;
 use crate::schema::entries;
 use bigdecimal::BigDecimal;
 use diesel::internal::derives::multiconnection::chrono::NaiveDateTime;
+use diesel::query_builder::AsChangeset;
+use diesel::upsert::*;
 use diesel::{
     ExpressionMethods, Insertable, PgConnection, PgTextExpressionMethods, QueryDsl, Queryable,
     RunQueryDsl, Selectable, SelectableHelper,
@@ -22,7 +24,7 @@ pub struct Entry {
     pub price: BigDecimal,
 }
 
-#[derive(Serialize, Deserialize, Insertable)]
+#[derive(Serialize, Deserialize, Insertable, AsChangeset)]
 #[diesel(table_name = entries)]
 pub struct NewEntry {
     pub pair_id: String,
@@ -44,6 +46,9 @@ impl Entry {
         diesel::insert_into(entries::table)
             .values(data)
             .returning(Entry::as_returning())
+            .on_conflict((entries::pair_id, entries::source, entries::timestamp))
+            .do_update()
+            .set(data)
             .get_results(conn)
     }
 
