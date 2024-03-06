@@ -3,11 +3,10 @@ use crate::models::DieselResult;
 use crate::schema::entries;
 use bigdecimal::BigDecimal;
 use diesel::internal::derives::multiconnection::chrono::NaiveDateTime;
-use diesel::query_builder::AsChangeset;
-use diesel::upsert::*;
+use diesel::upsert::excluded;
 use diesel::{
-    ExpressionMethods, Insertable, PgConnection, PgTextExpressionMethods, QueryDsl, Queryable,
-    RunQueryDsl, Selectable, SelectableHelper,
+    AsChangeset, ExpressionMethods, Insertable, PgConnection, PgTextExpressionMethods, QueryDsl,
+    Queryable, RunQueryDsl, Selectable, SelectableHelper,
 };
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -48,7 +47,13 @@ impl Entry {
             .returning(Entry::as_returning())
             .on_conflict((entries::pair_id, entries::source, entries::timestamp))
             .do_update()
-            .set(data)
+            .set((
+                entries::pair_id.eq(excluded(entries::pair_id)),
+                entries::publisher.eq(excluded(entries::publisher)),
+                entries::source.eq(excluded(entries::source)),
+                entries::timestamp.eq(excluded(entries::timestamp)),
+                entries::price.eq(excluded(entries::price)),
+            ))
             .get_results(conn)
     }
 
