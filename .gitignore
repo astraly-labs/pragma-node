@@ -3,3 +3,4 @@
 .env
 db/
 infra/db/password.txt
+workspace/
