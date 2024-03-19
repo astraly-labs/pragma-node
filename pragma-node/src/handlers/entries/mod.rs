@@ -67,6 +67,11 @@ pub struct GetVolatilityResponse {
     decimals: u32,
 }
 
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct GetOnchainResponse {
+    todo: String,
+}
+
 /// Query parameters structs
 
 // Supported Aggregation Intervals

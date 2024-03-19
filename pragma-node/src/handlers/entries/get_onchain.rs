@@ -1,27 +1,36 @@
 use axum::Json;
 
 use axum::extract::{Query, State};
-use serde::{Deserialize, Serialize};
-use utoipa::{IntoParams, ToSchema};
+use serde::Deserialize;
+use utoipa::IntoParams;
 
 use crate::utils::PathExtractor;
 use crate::AppState;
 use pragma_entities::EntryError;
 
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
-pub struct GetOnchainResponse {
-    todo: String,
-}
+use crate::handlers::entries::GetOnchainResponse;
 
-/// Volatility query
+/// Onchain query
 #[derive(Deserialize, IntoParams)]
-pub struct GetOnchainQuery {
+pub struct OnchainQuery {
     _todo: u64,
 }
+
+#[utoipa::path(
+    get,
+    path = "/node/v1/onchain/{todo}",
+    responses(
+        (status = 200, description = "Get on chain data", body = [GetOnchainResponse])
+    ),
+    params(
+        ("todo" = String, Path, description = "TODO - not done yet"),
+        OnchainQuery
+    ),
+)]
 pub async fn get_onchain(
     State(_state): State<AppState>,
     PathExtractor(_pair): PathExtractor<(String, String)>,
-    Query(_onchain_query): Query<GetOnchainQuery>,
+    Query(_onchain_query): Query<OnchainQuery>,
 ) -> Result<Json<GetOnchainResponse>, EntryError> {
     let res = GetOnchainResponse {
         todo: "todo".to_string(),
