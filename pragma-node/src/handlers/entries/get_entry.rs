@@ -12,17 +12,17 @@ use super::utils::currency_pair_to_pair_id;
 use super::GetEntryParams;
 
 #[utoipa::path(
-        get,
-        path = "/node/v1/data/{base}/{quote}",
-        responses(
-            (status = 200, description = "Get median entry successfuly", body = [GetEntryResponse])
-        ),
-        params(
-            ("base" = String, Path, description = "Base Asset"),
-            ("quote" = String, Path, description = "Quote Asset"),
-            GetEntryParams,
-        ),
-    )]
+    get,
+    path = "/node/v1/data/{base}/{quote}",
+    responses(
+        (status = 200, description = "Get median entry successfuly", body = [GetEntryResponse])
+    ),
+    params(
+        ("base" = String, Path, description = "Base Asset"),
+        ("quote" = String, Path, description = "Quote Asset"),
+        GetEntryParams,
+    ),
+)]
 pub async fn get_entry(
     State(state): State<AppState>,
     PathExtractor(pair): PathExtractor<(String, String)>,
@@ -32,7 +32,7 @@ pub async fn get_entry(
     // Construct pair id
     let pair_id = currency_pair_to_pair_id(&pair.0, &pair.1);
 
-    let now = chrono::Utc::now().naive_utc().timestamp_millis() as u64;
+    let now = chrono::Utc::now().naive_utc().and_utc().timestamp_millis() as u64;
 
     let timestamp = if let Some(timestamp) = params.timestamp {
         timestamp
@@ -82,7 +82,7 @@ fn adapt_entry_to_entry_response(
 ) -> GetEntryResponse {
     GetEntryResponse {
         pair_id,
-        timestamp: entry.time.timestamp_millis() as u64,
+        timestamp: entry.time.and_utc().timestamp_millis() as u64,
         num_sources_aggregated: entry.num_sources as usize,
         price: format!(
             "0x{}",

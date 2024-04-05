@@ -73,27 +73,37 @@ pub(crate) fn compute_volatility(entries: &Vec<MedianEntry>) -> f64 {
 fn test_volatility() {
     let entries = vec![
         MedianEntry {
-            time: chrono::NaiveDateTime::from_timestamp_opt(1640995200, 0).unwrap(),
+            time: chrono::DateTime::from_timestamp(1640995200, 0)
+                .unwrap()
+                .naive_utc(),
             median_price: bigdecimal::BigDecimal::from(47686),
             num_sources: 5,
         },
         MedianEntry {
-            time: chrono::NaiveDateTime::from_timestamp_opt(1641081600, 0).unwrap(),
+            time: chrono::DateTime::from_timestamp(1641081600, 0)
+                .unwrap()
+                .naive_utc(),
             median_price: bigdecimal::BigDecimal::from(47345),
             num_sources: 5,
         },
         MedianEntry {
-            time: chrono::NaiveDateTime::from_timestamp_opt(1641168000, 0).unwrap(),
+            time: chrono::DateTime::from_timestamp(1641168000, 0)
+                .unwrap()
+                .naive_utc(),
             median_price: bigdecimal::BigDecimal::from(46458),
             num_sources: 5,
         },
         MedianEntry {
-            time: chrono::NaiveDateTime::from_timestamp_opt(1641254400, 0).unwrap(),
+            time: chrono::DateTime::from_timestamp(1641254400, 0)
+                .unwrap()
+                .naive_utc(),
             median_price: bigdecimal::BigDecimal::from(45897),
             num_sources: 5,
         },
         MedianEntry {
-            time: chrono::NaiveDateTime::from_timestamp_opt(1641340800, 0).unwrap(),
+            time: chrono::DateTime::from_timestamp(1641340800, 0)
+                .unwrap()
+                .naive_utc(),
             median_price: bigdecimal::BigDecimal::from(43569),
             num_sources: 5,
         },

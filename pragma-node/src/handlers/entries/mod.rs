@@ -6,7 +6,7 @@ use utoipa::{IntoParams, ToSchema};
 pub use create_entry::create_entries;
 pub use get_entry::get_entry;
 pub use get_ohlc::get_ohlc;
-pub use get_onchain::get_onchain;
+pub use get_onchain_entry::get_onchain_entry;
 pub use get_volatility::get_volatility;
 
 use crate::infra::repositories::entry_repository::OHLCEntry;
@@ -14,7 +14,7 @@ use crate::infra::repositories::entry_repository::OHLCEntry;
 pub mod create_entry;
 pub mod get_entry;
 pub mod get_ohlc;
-pub mod get_onchain;
+pub mod get_onchain_entry;
 pub mod get_volatility;
 
 pub mod utils;
@@ -68,8 +68,14 @@ pub struct GetVolatilityResponse {
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
-pub struct GetOnchainResponse {
-    todo: String,
+pub struct GetOnchainEntryResponse {
+    pair_id: String,
+    price: String,
+    timestamp: u64,
+    decimals: u32,
+    chain: String,
+    publisher: String,
+    source: String,
 }
 
 /// Query parameters structs

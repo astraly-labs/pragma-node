@@ -6,7 +6,7 @@ use crate::utils::{JsonExtractor, TypedData};
 use crate::AppState;
 use axum::extract::State;
 use axum::Json;
-use chrono::NaiveDateTime;
+use chrono::{DateTime, Utc};
 use pragma_entities::{EntryError, NewEntry, PublisherError};
 use serde::{Deserialize, Serialize};
 use starknet::core::crypto::{ecdsa_verify, Signature};
@@ -61,14 +61,14 @@ pub(crate) fn build_publish_message(
 }
 
 #[utoipa::path(
-        post,
-        path = "/node/v1/data/publish",
-        request_body = CreateEntryRequest,
-        responses(
-            (status = 200, description = "Entries published successfuly", body = CreateEntryResponse),
-            (status = 401, description = "Unauthorized Publisher", body = EntryError)
-        )
-    )]
+    post,
+    path = "/node/v1/data/publish",
+    request_body = CreateEntryRequest,
+    responses(
+        (status = 200, description = "Entries published successfuly", body = CreateEntryResponse),
+        (status = 401, description = "Unauthorized Publisher", body = EntryError)
+    )
+)]
 pub async fn create_entries(
     State(state): State<AppState>,
     JsonExtractor(new_entries): JsonExtractor<CreateEntryRequest>,
@@ -144,9 +144,8 @@ pub async fn create_entries(
         .entries
         .iter()
         .map(|entry| {
-            let timestamp = match NaiveDateTime::from_timestamp_opt(entry.base.timestamp as i64, 0)
-            {
-                Some(timestamp) => timestamp,
+            let dt = match DateTime::<Utc>::from_timestamp(entry.base.timestamp as i64, 0) {
+                Some(dt) => dt.naive_utc(),
                 None => return Err(EntryError::InvalidTimestamp),
             };
 
@@ -154,7 +153,7 @@ pub async fn create_entries(
                 pair_id: entry.pair_id.clone(),
                 publisher: entry.base.publisher.clone(),
                 source: entry.base.source.clone(),
-                timestamp,
+                timestamp: dt,
                 price: entry.price.into(),
             })
         })

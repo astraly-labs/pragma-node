@@ -1,5 +1,5 @@
 use bigdecimal::{BigDecimal, ToPrimitive};
-use chrono::NaiveDateTime;
+use chrono::{DateTime, NaiveDateTime};
 use diesel::prelude::QueryableByName;
 use diesel::{ExpressionMethods, QueryDsl, Queryable, RunQueryDsl};
 use serde::{Deserialize, Serialize};
@@ -140,10 +140,14 @@ fn calculate_rebased_price(
             base_decimals,
         )
     };
-    let min_timestamp = std::cmp::max(base_entry.time.timestamp(), quote_entry.time.timestamp());
+    let min_timestamp = std::cmp::max(
+        base_entry.time.and_utc().timestamp(),
+        quote_entry.time.and_utc().timestamp(),
+    );
     let num_sources = std::cmp::max(base_entry.num_sources, quote_entry.num_sources);
-    let new_timestamp =
-        NaiveDateTime::from_timestamp_opt(min_timestamp, 0).ok_or(InfraError::InvalidTimeStamp)?;
+    let new_timestamp = DateTime::from_timestamp(min_timestamp, 0)
+        .ok_or(InfraError::InvalidTimeStamp)?
+        .naive_utc();
 
     let median_entry = MedianEntry {
         time: new_timestamp,
@@ -306,8 +310,7 @@ pub async fn get_twap_price(
         }
     };
 
-    let date_time =
-        NaiveDateTime::from_timestamp_millis(time as i64).ok_or(InfraError::InvalidTimeStamp)?;
+    let date_time = DateTime::from_timestamp(time as i64, 0).ok_or(InfraError::InvalidTimeStamp)?;
 
     let raw_entry = conn
         .interact(move |conn| {
@@ -413,8 +416,7 @@ pub async fn get_median_price(
         }
     };
 
-    let date_time =
-        NaiveDateTime::from_timestamp_millis(time as i64).ok_or(InfraError::InvalidTimeStamp)?;
+    let date_time = DateTime::from_timestamp(time as i64, 0).ok_or(InfraError::InvalidTimeStamp)?;
 
     let raw_entry = conn
         .interact(move |conn| {
@@ -445,10 +447,12 @@ pub async fn get_entries_between(
     end_timestamp: u64,
 ) -> Result<Vec<MedianEntry>, InfraError> {
     let conn = pool.get().await.map_err(adapt_infra_error)?;
-    let start_datetime = NaiveDateTime::from_timestamp_opt(start_timestamp as i64, 0)
-        .ok_or(InfraError::InvalidTimeStamp)?;
-    let end_datetime = NaiveDateTime::from_timestamp_opt(end_timestamp as i64, 0)
-        .ok_or(InfraError::InvalidTimeStamp)?;
+    let start_datetime = DateTime::from_timestamp(start_timestamp as i64, 0)
+        .ok_or(InfraError::InvalidTimeStamp)?
+        .naive_utc();
+    let end_datetime = DateTime::from_timestamp(end_timestamp as i64, 0)
+        .ok_or(InfraError::InvalidTimeStamp)?
+        .naive_utc();
 
     let raw_sql = r#"
         SELECT
@@ -642,8 +646,7 @@ pub async fn get_ohlc(
         }
     };
 
-    let date_time =
-        NaiveDateTime::from_timestamp_millis(time as i64).ok_or(InfraError::InvalidTimeStamp)?;
+    let date_time = DateTime::from_timestamp(time as i64, 0).ok_or(InfraError::InvalidTimeStamp)?;
 
     let raw_entries = conn
         .interact(move |conn| {

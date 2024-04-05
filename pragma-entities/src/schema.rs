@@ -33,4 +33,61 @@ diesel::table! {
     }
 }
 
-diesel::allow_tables_to_appear_in_same_query!(currencies, entries, publishers,);
+diesel::table! {
+    future_entry (data_id) {
+        #[max_length = 255]
+        network -> Varchar,
+        #[max_length = 255]
+        pair_id -> Varchar,
+        #[max_length = 255]
+        data_id -> Varchar,
+        #[max_length = 255]
+        block_hash -> Varchar,
+        block_number -> Int8,
+        block_timestamp -> Timestamp,
+        #[max_length = 255]
+        transaction_hash -> Varchar,
+        price -> Numeric,
+        timestamp -> Timestamp,
+        #[max_length = 255]
+        publisher -> Varchar,
+        #[max_length = 255]
+        source -> Varchar,
+        volume -> Numeric,
+        expiration_timestamp -> Nullable<Timestamp>,
+        _cursor -> Int8,
+    }
+}
+
+diesel::table! {
+    spot_entry (timestamp) {
+        #[max_length = 255]
+        network -> Varchar,
+        #[max_length = 255]
+        pair_id -> Varchar,
+        #[max_length = 255]
+        data_id -> Varchar,
+        #[max_length = 255]
+        block_hash -> Varchar,
+        block_number -> Int8,
+        block_timestamp -> Timestamp,
+        #[max_length = 255]
+        transaction_hash -> Varchar,
+        price -> Numeric,
+        timestamp -> Timestamp,
+        #[max_length = 255]
+        publisher -> Varchar,
+        #[max_length = 255]
+        source -> Varchar,
+        volume -> Numeric,
+        _cursor -> Int8,
+    }
+}
+
+diesel::allow_tables_to_appear_in_same_query!(
+    currencies,
+    spot_entry,
+    future_entry,
+    entries,
+    publishers,
+);
