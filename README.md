@@ -34,6 +34,43 @@ Follow these steps to get started with your Rust backend project based on this t
 
 The Pragma Node service allows querying and storing data within the Pragma database. It retrieves, verifies, and sends data to the Kafka service. It also provides the ability to query data stored in the database.
 
+#### How to run
+
+#### Requirements
+
+1. Create a network for the services to communicate:
+
+```bash
+docker network create pragma-network
+```
+
+2. Set up a Timescale database. You can use the following Docker command to run it inside a container:
+
+```bash
+docker pull timescale/timescaledb-ha:pg16
+docker run --name postgres -e POSTGRES_PASSWORD=pragma -p 5432:5432 -d --network pragma-network timescale/timescaledb-ha:pg16
+```
+
+3. Set up a Kafka service. You can use the following Docker command to run a Kafka container:
+
+```bash
+docker run --name zookeeper --network pragma-network -e ALLOW_ANONYMOUS_LOGIN=yes -p 2181:2181 -d bitnami/zookeeper:latest
+
+docker run --name pragma-kafka --network pragma-network -e KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181 -e KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://pragma-kafka:9092 -e ALLOW_PLAINTEXT_LISTENER=yes -p 9092:9092 -d bitnami/kafka:latest
+```
+
+4. Set up the environments variables in the `infra/pragma-node/config/.env` file.
+   You can use the `.env.example` file as a template (located in `infra/pragma-node/config`).
+
+#### Running the service
+
+Move to the root of the repository & build + run the Docker image using the Dockerfiles in the `infra` directory:
+
+```bash
+docker build -t pragma-node -f infra/pragma-node/Dockerfile .
+docker run --network pragma-network -p 3000:3000 pragma-node:latest
+```
+
 ### Pragma Ingestor
 
 This service listens on the Kafka service and stores the retrieved data in the database. It performs certain checks on the collected data.
