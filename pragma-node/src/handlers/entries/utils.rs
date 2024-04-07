@@ -119,6 +119,17 @@ mod tests {
     }
 
     #[test]
+    fn test_compute_volatility_zero_price() {
+        let entries = vec![
+            new_entry(47686, 1640995200),
+            new_entry(0, 1641081600),
+            new_entry(46458, 1641168000),
+        ];
+        // TODO: Shall this really return NaN?
+        assert!(f64::is_nan(compute_volatility(&entries)));
+    }
+
+    #[test]
     fn test_compute_volatility_constant_prices() {
         let entries = vec![
             new_entry(47686, 1640995200),
