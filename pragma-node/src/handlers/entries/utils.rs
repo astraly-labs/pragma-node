@@ -3,6 +3,8 @@ use chrono::NaiveDateTime;
 
 use crate::infra::repositories::entry_repository::MedianEntry;
 
+const ONE_YEAR_IN_SECONDS: f64 = 3153600_f64;
+
 /// Converts a currency pair to a pair id.
 ///
 /// e.g "btc" and "usd" to "BTC/USD"
@@ -43,6 +45,9 @@ pub(crate) fn compute_median_price_and_time(
 /// The log returns are computed as the natural logarithm of the ratio between two consecutive median prices.
 /// The annualized standard deviation is computed as the square root of the variance multiplied by 10^8.
 pub(crate) fn compute_volatility(entries: &Vec<MedianEntry>) -> f64 {
+    if entries.len() < 2 {
+        return 0.0;
+    }
     let mut values = Vec::new();
     for i in 1..entries.len() {
         if entries[i].median_price.to_f64().unwrap_or(0.0) > 0.0
@@ -58,62 +63,94 @@ pub(crate) fn compute_volatility(entries: &Vec<MedianEntry>) -> f64 {
                 .num_seconds()
                 .to_f64()
                 .unwrap()
-                / 3153600_f64; // One year in seconds
+                / ONE_YEAR_IN_SECONDS;
 
             values.push((log_return, time));
         }
     }
 
     let variance: f64 = values.iter().map(|v| v.0 / v.1).sum::<f64>() / values.len() as f64;
-
     variance.sqrt() * 10_f64.powi(8)
 }
 
-#[test]
-fn test_volatility() {
-    let entries = vec![
-        MedianEntry {
-            time: chrono::DateTime::from_timestamp(1640995200, 0)
-                .unwrap()
-                .naive_utc(),
-            median_price: bigdecimal::BigDecimal::from(47686),
-            num_sources: 5,
-        },
-        MedianEntry {
-            time: chrono::DateTime::from_timestamp(1641081600, 0)
-                .unwrap()
-                .naive_utc(),
-            median_price: bigdecimal::BigDecimal::from(47345),
-            num_sources: 5,
-        },
-        MedianEntry {
-            time: chrono::DateTime::from_timestamp(1641168000, 0)
-                .unwrap()
-                .naive_utc(),
-            median_price: bigdecimal::BigDecimal::from(46458),
-            num_sources: 5,
-        },
-        MedianEntry {
-            time: chrono::DateTime::from_timestamp(1641254400, 0)
-                .unwrap()
-                .naive_utc(),
-            median_price: bigdecimal::BigDecimal::from(45897),
-            num_sources: 5,
-        },
-        MedianEntry {
-            time: chrono::DateTime::from_timestamp(1641340800, 0)
-                .unwrap()
-                .naive_utc(),
-            median_price: bigdecimal::BigDecimal::from(43569),
-            num_sources: 5,
-        },
-    ];
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::DateTime;
 
-    // TODO: add more tests
-    // This value was computed using a python script
-    assert_eq!(
-        compute_volatility(&entries),
-        54594693.50567423,
-        "wrong volatility"
-    );
+    fn new_entry(median_price: u32, timestamp: i64) -> MedianEntry {
+        MedianEntry {
+            time: DateTime::from_timestamp(timestamp, 0).unwrap().naive_utc(),
+            median_price: median_price.into(),
+            num_sources: 5,
+        }
+    }
+
+    #[test]
+    fn test_compute_volatility_no_entries() {
+        let entries = vec![];
+        assert_eq!(compute_volatility(&entries), 0.0);
+    }
+
+    #[test]
+    fn test_compute_volatility_simple() {
+        let entries = vec![new_entry(100, 1640995200), new_entry(110, 1641081600)];
+
+        let expected_log_return = (110 as f64 / 100 as f64).ln().powi(2);
+        let expected_time = ((1641081600 - 1640995200) as f64) / ONE_YEAR_IN_SECONDS as f64;
+        let expected_variance = expected_log_return / expected_time;
+        let expected_volatility = expected_variance.sqrt() * 10_f64.powi(8);
+        let computed_volatility = compute_volatility(&entries);
+
+        const EPSILON: f64 = 1e-6;
+        assert!((computed_volatility - expected_volatility).abs() < EPSILON);
+    }
+
+    #[test]
+    fn test_compute_volatility() {
+        let entries = vec![
+            new_entry(47686, 1640995200),
+            new_entry(47345, 1641081600),
+            new_entry(46458, 1641168000),
+            new_entry(45897, 1641254400),
+            new_entry(43569, 1641340800),
+        ];
+        assert_eq!(compute_volatility(&entries), 17264357.96367333);
+    }
+
+    #[test]
+    fn test_compute_volatility_constant_prices() {
+        let entries = vec![
+            new_entry(47686, 1640995200),
+            new_entry(47686, 1641081600),
+            new_entry(47686, 1641168000),
+            new_entry(47686, 1641254400),
+            new_entry(47686, 1641340800),
+        ];
+        assert_eq!(compute_volatility(&entries), 0.0);
+    }
+
+    #[test]
+    fn test_compute_volatility_increasing_prices() {
+        let entries = vec![
+            new_entry(13569, 1640995200),
+            new_entry(15897, 1641081600),
+            new_entry(16458, 1641168000),
+            new_entry(17345, 1641254400),
+            new_entry(47686, 1641340800),
+        ];
+        assert_eq!(compute_volatility(&entries), 309805011.67283577);
+    }
+
+    #[test]
+    fn test_compute_volatility_decreasing_prices() {
+        let entries = vec![
+            new_entry(27686, 1640995200),
+            new_entry(27345, 1641081600),
+            new_entry(26458, 1641168000),
+            new_entry(25897, 1641254400),
+            new_entry(23569, 1641340800),
+        ];
+        assert_eq!(compute_volatility(&entries), 31060897.84391914);
+    }
 }
