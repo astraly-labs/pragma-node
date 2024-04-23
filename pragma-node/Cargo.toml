@@ -33,6 +33,8 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 utoipa = "4"
 utoipa-swagger-ui = { version = "4", features = ["axum"] }
 uuid = { version = "1.4", features = ["fast-rng", "v4", "serde"] }
+# github dep
+monitoring = { git = "https://github.com/akhercha/pragma-monitoring", branch = "main" }
 
 [dev-dependencies]
 rstest = "0.18.2"

@@ -37,7 +37,7 @@ services:
     depends_on:
       pragma-kafka:
         condition: service_healthy
-      db:
+      timescale-db:
         condition: service_healthy
     networks:
       - pragma-kafka-network
@@ -47,7 +47,15 @@ services:
     build:
       dockerfile: infra/pragma-node/Dockerfile
 
-  db:
+  postgre-db:
+    image: postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: test-password
+      POSTGRES_DB: pragma
+
+  timescale-db:
     image: timescale/timescaledb-ha:pg14-latest
     restart: always
     user: postgres
@@ -56,7 +64,7 @@ services:
     networks:
       - pragma-db-network
     volumes:
-      - db-data:/var/lib/postgresql/data
+      - timescale-db-data:/var/lib/postgresql/data
     environment:
       - POSTGRES_DB=pragma
       - POSTGRES_PASSWORD_FILE=/run/secrets/db-password
@@ -132,7 +140,7 @@ services:
     depends_on:
       pragma-kafka:
         condition: service_healthy
-      db:
+      timescale-db:
         condition: service_healthy
     networks:
       - pragma-kafka-network
@@ -155,7 +163,8 @@ networks:
     #internal: true
 
 volumes:
-  db-data:
+  timescale-db-data:
+  postgre-db-data:
   pragma_zookeeper_data:
   pragma_zookeeper_logs:
 
