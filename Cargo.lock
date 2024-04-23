@@ -1441,39 +1441,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "monitoring"
-version = "0.1.0"
-source = "git+https://github.com/akhercha/pragma-monitoring?branch=main#289e0ac22edbbea8c295b34956a1b54bdb108aef"
-dependencies = [
- "arc-swap",
- "axum",
- "axum-macros",
- "bigdecimal 0.4.3",
- "chrono",
- "deadpool",
- "diesel",
- "diesel-async",
- "diesel_derives 1.4.1",
- "diesel_migrations",
- "dotenv",
- "env_logger",
- "futures",
- "hyper",
- "lazy_static",
- "log",
- "num-bigint",
- "phf",
- "prometheus",
- "reqwest",
- "serde",
- "starknet",
- "strum",
- "tokio",
- "url",
- "uuid 1.8.0",
-]
-
-[[package]]
 name = "multer"
 version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1903,6 +1870,39 @@ dependencies = [
 ]
 
 [[package]]
+name = "pragma-monitoring"
+version = "0.1.0"
+source = "git+https://github.com/akhercha/pragma-monitoring?branch=feat/exportable_members#48fab5891425735726399339fde1f0da90fe6f15"
+dependencies = [
+ "arc-swap",
+ "axum",
+ "axum-macros",
+ "bigdecimal 0.4.3",
+ "chrono",
+ "deadpool",
+ "diesel",
+ "diesel-async",
+ "diesel_derives 1.4.1",
+ "diesel_migrations",
+ "dotenv",
+ "env_logger",
+ "futures",
+ "hyper",
+ "lazy_static",
+ "log",
+ "num-bigint",
+ "phf",
+ "prometheus",
+ "reqwest",
+ "serde",
+ "starknet",
+ "strum",
+ "tokio",
+ "url",
+ "uuid 1.8.0",
+]
+
+[[package]]
 name = "pragma-node"
 version = "0.1.0"
 dependencies = [
@@ -1916,9 +1916,9 @@ dependencies = [
  "dotenvy",
  "envy",
  "lazy_static",
- "monitoring",
  "pragma-common",
  "pragma-entities",
+ "pragma-monitoring",
  "rdkafka",
  "rstest",
  "serde",
