@@ -1,12 +1,12 @@
 use crate::dto::entry as dto;
 use crate::models::DieselResult;
-use crate::schema::{entries, future_entry, spot_entry};
+use crate::schema::entries;
 use bigdecimal::BigDecimal;
 use diesel::internal::derives::multiconnection::chrono::NaiveDateTime;
 use diesel::upsert::excluded;
 use diesel::{
     AsChangeset, ExpressionMethods, Insertable, PgConnection, PgTextExpressionMethods, QueryDsl,
-    Queryable, QueryableByName, RunQueryDsl, Selectable, SelectableHelper,
+    Queryable, RunQueryDsl, Selectable, SelectableHelper,
 };
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
