@@ -60,7 +60,7 @@ pub async fn get_entry(
     }
 
     let (entry, decimals) = entry_repository::routing(
-        &state.offchain_pool,
+        &state.timescale_pool,
         pair_id.clone(),
         interval,
         timestamp,

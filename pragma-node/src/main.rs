@@ -19,9 +19,8 @@ mod utils;
 
 #[derive(Clone)]
 pub struct AppState {
-    offchain_pool: Pool,
-    #[allow(dead_code)]
-    onchain_pool: Pool,
+    timescale_pool: Pool,
+    postegres_pool: Pool,
 }
 
 #[tokio::main]
@@ -76,18 +75,18 @@ async fn main() {
 
     let config = config().await;
 
-    let offchain_pool =
+    let timescale_pool =
         pragma_entities::connection::init_pool("pragma-node-api", ENV_TS_DATABASE_URL)
             .expect("can't init timescale (offchain db) pool");
-    pragma_entities::db::run_migrations(&offchain_pool).await;
+    pragma_entities::db::run_migrations(&timescale_pool).await;
 
-    let onchain_pool =
+    let postegres_pool =
         pragma_entities::connection::init_pool("pragma-node-api", ENV_POSTGRES_DATABASE_URL)
             .expect("can't init postgres (onchain db) pool");
 
     let state = AppState {
-        offchain_pool,
-        onchain_pool,
+        timescale_pool,
+        postegres_pool,
     };
 
     let app = app_router::<ApiDoc>(state.clone()).with_state(state);

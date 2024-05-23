@@ -1872,7 +1872,7 @@ dependencies = [
 [[package]]
 name = "pragma-monitoring"
 version = "0.1.0"
-source = "git+https://github.com/akhercha/pragma-monitoring?rev=c18777e#c18777e443a54362330d92deadbf092b24254003"
+source = "git+https://github.com/astraly-labs/pragma-monitoring?rev=5536301#5536301ccac1f5aca23ed86471cf3518388a72c1"
 dependencies = [
  "arc-swap",
  "axum",
@@ -1924,11 +1924,13 @@ dependencies = [
  "serde",
  "serde_json",
  "starknet",
+ "strum",
  "thiserror",
  "time",
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "url",
  "utoipa",
  "utoipa-swagger-ui",
  "uuid 1.8.0",

@@ -86,7 +86,8 @@ pub struct GetOnchainEntryResponse {
     decimals: u32,
     nb_sources_aggregated: u32,
     asset_type: String,
-    components: Vec<OnchainEntry>,
+    // TODO: query the onchain repository for the components
+    // components: Vec<OnchainEntry>,
 }
 
 /// Query parameters structs
