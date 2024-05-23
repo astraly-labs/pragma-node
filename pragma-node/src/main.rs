@@ -1,6 +1,7 @@
 use std::net::SocketAddr;
 
 use deadpool_diesel::postgres::Pool;
+use pragma_entities::connection::{ENV_POSTGRES_DATABASE_URL, ENV_TS_DATABASE_URL};
 use utoipa::openapi::security::{ApiKey, ApiKeyValue, SecurityScheme};
 use utoipa::Modify;
 use utoipa::OpenApi;
@@ -18,7 +19,9 @@ mod utils;
 
 #[derive(Clone)]
 pub struct AppState {
-    pool: Pool,
+    offchain_pool: Pool,
+    #[allow(dead_code)]
+    onchain_pool: Pool,
 }
 
 #[tokio::main]
@@ -32,7 +35,7 @@ async fn main() {
             handlers::entries::get_entry::get_entry,
             handlers::entries::get_ohlc::get_ohlc,
             handlers::entries::get_volatility::get_volatility,
-            handlers::entries::get_onchain_entry::get_onchain_entry,
+            handlers::entries::get_onchain::get_onchain,
         ),
         components(
             schemas(pragma_entities::dto::Entry, pragma_entities::EntryError),
@@ -73,11 +76,20 @@ async fn main() {
 
     let config = config().await;
 
-    let pool = pragma_entities::connection::init_pool("pragma-node-api").expect("can't init pool");
+    let offchain_pool =
+        pragma_entities::connection::init_pool("pragma-node-api", ENV_TS_DATABASE_URL)
+            .expect("can't init ts pool");
+    pragma_entities::db::run_migrations(&offchain_pool).await;
 
-    pragma_entities::db::run_migrations(&pool).await;
+    let onchain_pool =
+        pragma_entities::connection::init_pool("pragma-node-api", ENV_POSTGRES_DATABASE_URL)
+            .expect("can't init pg pool");
+    // TODO: run migrations for pg
 
-    let state = AppState { pool };
+    let state = AppState {
+        offchain_pool,
+        onchain_pool,
+    };
 
     let app = app_router::<ApiDoc>(state.clone()).with_state(state);
 

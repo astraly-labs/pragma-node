@@ -1872,7 +1872,7 @@ dependencies = [
 [[package]]
 name = "pragma-monitoring"
 version = "0.1.0"
-source = "git+https://github.com/akhercha/pragma-monitoring?branch=feat/exportable_members#48fab5891425735726399339fde1f0da90fe6f15"
+source = "git+https://github.com/akhercha/pragma-monitoring?rev=c18777e#c18777e443a54362330d92deadbf092b24254003"
 dependencies = [
  "arc-swap",
  "axum",

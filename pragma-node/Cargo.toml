@@ -34,7 +34,7 @@ utoipa = "4"
 utoipa-swagger-ui = { version = "4", features = ["axum"] }
 uuid = { version = "1.4", features = ["fast-rng", "v4", "serde"] }
 # github dep
-pragma-monitoring = { git = "https://github.com/akhercha/pragma-monitoring", branch = "feat/exportable_members" }
+pragma-monitoring = { git = "https://github.com/akhercha/pragma-monitoring", rev = "c18777e" }
 
 [dev-dependencies]
 rstest = "0.18.2"

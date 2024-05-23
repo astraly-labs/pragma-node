@@ -49,7 +49,7 @@ pub async fn get_volatility(
 
     // Fetch entries between start and end timestamps
     let entries = entry_repository::get_entries_between(
-        &state.pool,
+        &state.offchain_pool,
         pair_id.clone(),
         volatility_query.start,
         volatility_query.end,
@@ -65,7 +65,7 @@ pub async fn get_volatility(
         return Err(EntryError::UnknownPairId(pair_id));
     }
 
-    let decimals = entry_repository::get_decimals(&state.pool, &pair_id)
+    let decimals = entry_repository::get_decimals(&state.offchain_pool, &pair_id)
         .await
         .map_err(|db_error| match db_error {
             InfraError::InternalServerError => EntryError::InternalServerError,

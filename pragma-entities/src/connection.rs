@@ -1,12 +1,20 @@
 use crate::error::ErrorKind;
 use deadpool_diesel::postgres::{Manager, Pool};
 
-const ENV_DATABASE_URL: &str = "TIMESCALE_DATABASE_URL";
+pub const ENV_POSTGRES_DATABASE_URL: &str = "POSTGRE_DATABASE_URL";
+pub const ENV_TS_DATABASE_URL: &str = "TIMESCALE_DATABASE_URL";
 const ENV_DATABASE_MAX_CONN: &str = "DATABASE_MAX_CONN";
 
-pub fn init_pool(app_name: &str) -> Result<Pool, ErrorKind> {
-    let database_url = std::env::var(ENV_DATABASE_URL)
-        .map_err(|_| ErrorKind::VariableDatabase(ENV_DATABASE_URL.to_string()))?;
+pub fn init_pool(app_name: &str, database_url_env: &str) -> Result<Pool, ErrorKind> {
+    if database_url_env != ENV_TS_DATABASE_URL && database_url_env != ENV_POSTGRES_DATABASE_URL {
+        return Err(ErrorKind::GenericInitDatabase(format!(
+            "invalid database URL environment variable: {}",
+            database_url_env
+        )));
+    }
+
+    let database_url = std::env::var(database_url_env)
+        .map_err(|_| ErrorKind::VariableDatabase(database_url_env.to_string()))?;
 
     let database_max_conn = std::env::var(ENV_DATABASE_MAX_CONN)
         .map_err(|_| ErrorKind::VariableDatabase(ENV_DATABASE_MAX_CONN.to_string()))?

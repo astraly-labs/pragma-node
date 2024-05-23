@@ -6,15 +6,17 @@ use utoipa::{IntoParams, ToSchema};
 pub use create_entry::create_entries;
 pub use get_entry::get_entry;
 pub use get_ohlc::get_ohlc;
-pub use get_onchain_entry::get_onchain_entry;
+pub use get_onchain::get_onchain;
 pub use get_volatility::get_volatility;
+
+pub use pragma_monitoring::models::SpotEntry;
 
 use crate::infra::repositories::entry_repository::OHLCEntry;
 
 pub mod create_entry;
 pub mod get_entry;
 pub mod get_ohlc;
-pub mod get_onchain_entry;
+pub mod get_onchain;
 pub mod get_volatility;
 
 pub mod utils;
@@ -68,14 +70,23 @@ pub struct GetVolatilityResponse {
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
-pub struct GetOnchainEntryResponse {
-    pair_id: String,
-    price: String,
-    timestamp: u64,
-    decimals: u32,
-    chain: String,
+pub struct OnchainEntry {
     publisher: String,
     source: String,
+    price: String,
+    tx_hash: String,
+    timestamp: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct GetOnchainEntryResponse {
+    pair_id: String,
+    last_updated_timestamp: u64,
+    price: String,
+    decimals: u32,
+    nb_sources_aggregated: u32,
+    asset_type: String,
+    components: Vec<OnchainEntry>,
 }
 
 /// Query parameters structs
@@ -119,6 +130,21 @@ impl Default for GetEntryParams {
             interval: Some(Interval::default()),
             routing: Some(false),
             aggregation: Some(AggregationMode::default()),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, IntoParams, ToSchema)]
+pub struct GetOnchainParams {
+    pub aggregation: Option<AggregationMode>,
+    pub timestamp: Option<u64>,
+}
+
+impl Default for GetOnchainParams {
+    fn default() -> Self {
+        Self {
+            aggregation: Some(AggregationMode::default()),
+            timestamp: Some(chrono::Utc::now().timestamp_millis() as u64),
         }
     }
 }

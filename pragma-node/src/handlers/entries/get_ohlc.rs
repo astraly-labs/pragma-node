@@ -50,9 +50,10 @@ pub async fn get_ohlc(
         return Err(EntryError::InvalidTimestamp);
     }
 
-    let entries = entry_repository::get_ohlc(&state.pool, pair_id.clone(), interval, timestamp)
-        .await
-        .map_err(|db_error| to_entry_error(db_error, &pair_id))?;
+    let entries =
+        entry_repository::get_ohlc(&state.offchain_pool, pair_id.clone(), interval, timestamp)
+            .await
+            .map_err(|db_error| to_entry_error(db_error, &pair_id))?;
 
     Ok(Json(adapt_entry_to_entry_response(pair_id, &entries)))
 }
