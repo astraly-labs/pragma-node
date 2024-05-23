@@ -84,7 +84,6 @@ async fn main() {
     let onchain_pool =
         pragma_entities::connection::init_pool("pragma-node-api", ENV_POSTGRES_DATABASE_URL)
             .expect("can't init pg pool");
-    // TODO: run migrations for pg
 
     let state = AppState {
         offchain_pool,

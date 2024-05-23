@@ -1,4 +1,4 @@
-FROM rust:1.72 as builder
+FROM rust:1.75 as builder
 
 WORKDIR /home/pragma-ingestor
 

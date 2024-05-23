@@ -2,10 +2,12 @@ use axum::Json;
 
 use axum::extract::{Query, State};
 
+use crate::handlers::entries::OnchainEntry;
 use crate::handlers::entries::{AggregationMode, GetOnchainEntryResponse};
+use crate::infra::repositories::onchain_repository;
 use crate::utils::PathExtractor;
 use crate::AppState;
-use pragma_entities::EntryError;
+use pragma_entities::{error::InfraError, EntryError};
 
 use super::utils::currency_pair_to_pair_id;
 use super::GetOnchainParams;
@@ -23,7 +25,7 @@ use super::GetOnchainParams;
     ),
 )]
 pub async fn get_onchain(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     PathExtractor(pair): PathExtractor<(String, String)>,
     Query(params): Query<GetOnchainParams>,
 ) -> Result<Json<GetOnchainEntryResponse>, EntryError> {
@@ -43,14 +45,32 @@ pub async fn get_onchain(
         AggregationMode::Twap
     };
 
-    let res = GetOnchainEntryResponse {
-        pair_id,
-        last_updated_timestamp: now,
-        price: "0".to_string(),
+    let latest_spot_entry =
+        onchain_repository::get_latest_spot(&state.onchain_pool, pair_id.clone())
+            .await
+            .map_err(|e: InfraError| to_entry_error(e, &pair_id))?;
+    let res: GetOnchainEntryResponse = GetOnchainEntryResponse {
+        pair_id: latest_spot_entry.pair_id,
+        last_updated_timestamp: latest_spot_entry.timestamp.and_utc().timestamp() as u64,
+        price: latest_spot_entry.price.to_string(),
         decimals: 8,
         nb_sources_aggregated: 1,
         asset_type: "Crypto".to_string(),
-        components: vec![],
+        components: vec![OnchainEntry {
+            publisher: latest_spot_entry.publisher,
+            source: latest_spot_entry.source,
+            price: latest_spot_entry.price.to_string(),
+            tx_hash: latest_spot_entry.transaction_hash,
+            timestamp: latest_spot_entry.timestamp.and_utc().timestamp() as u64,
+        }],
     };
     Ok(Json(res))
+}
+
+pub(crate) fn to_entry_error(error: InfraError, pair_id: &String) -> EntryError {
+    match error {
+        InfraError::InternalServerError => EntryError::InternalServerError,
+        InfraError::NotFound => EntryError::NotFound(pair_id.to_string()),
+        InfraError::InvalidTimeStamp => EntryError::InvalidTimestamp,
+    }
 }

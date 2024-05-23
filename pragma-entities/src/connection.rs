@@ -1,7 +1,7 @@
 use crate::error::ErrorKind;
 use deadpool_diesel::postgres::{Manager, Pool};
 
-pub const ENV_POSTGRES_DATABASE_URL: &str = "POSTGRE_DATABASE_URL";
+pub const ENV_POSTGRES_DATABASE_URL: &str = "POSTGRES_DATABASE_URL";
 pub const ENV_TS_DATABASE_URL: &str = "TIMESCALE_DATABASE_URL";
 const ENV_DATABASE_MAX_CONN: &str = "DATABASE_MAX_CONN";
 
