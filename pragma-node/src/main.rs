@@ -78,12 +78,12 @@ async fn main() {
 
     let offchain_pool =
         pragma_entities::connection::init_pool("pragma-node-api", ENV_TS_DATABASE_URL)
-            .expect("can't init ts pool");
+            .expect("can't init timescale (offchain db) pool");
     pragma_entities::db::run_migrations(&offchain_pool).await;
 
     let onchain_pool =
         pragma_entities::connection::init_pool("pragma-node-api", ENV_POSTGRES_DATABASE_URL)
-            .expect("can't init pg pool");
+            .expect("can't init postgres (onchain db) pool");
 
     let state = AppState {
         offchain_pool,
