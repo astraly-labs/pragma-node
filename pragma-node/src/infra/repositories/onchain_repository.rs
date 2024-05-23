@@ -3,7 +3,8 @@ use pragma_monitoring::models::SpotEntry;
 
 use diesel::RunQueryDsl;
 
-pub async fn get_latest_spot(
+// TODO(akhercha): Created for testing purposes - remove when not needed
+pub async fn _get_latest_spot(
     pool: &deadpool_diesel::postgres::Pool,
     pair_id: String,
 ) -> Result<SpotEntry, InfraError> {

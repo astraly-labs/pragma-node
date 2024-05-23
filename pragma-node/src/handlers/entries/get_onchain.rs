@@ -1,12 +1,12 @@
+use axum::extract::{Query, State};
 use axum::Json;
 
-use axum::extract::{Query, State};
+use pragma_entities::EntryError;
 
 use crate::handlers::entries::{AggregationMode, GetOnchainEntryResponse};
-use crate::infra::repositories::onchain_repository;
+use crate::infra::onchain::get_data_median;
 use crate::utils::PathExtractor;
 use crate::AppState;
-use pragma_entities::{error::InfraError, EntryError};
 
 use super::utils::currency_pair_to_pair_id;
 use super::GetOnchainParams;
@@ -38,35 +38,30 @@ pub async fn get_onchain(
         now
     };
 
+    // TODO(akhercha): Currently only agg_mode used is Median
     let _agg_mode = if let Some(aggregation_mode) = params.aggregation {
         aggregation_mode
     } else {
-        AggregationMode::Twap
+        AggregationMode::Median
     };
 
-    // TODO: Call `get_data` with correct parameters
-
-    let latest_spot_entry =
-        onchain_repository::get_latest_spot(&state.postegres_pool, pair_id.clone())
+    // TODO(akhercha): Call `get_data` with correct parameters
+    let onchain_pair_median: crate::infra::onchain::GetDataMedianResponse =
+        get_data_median(state.network.clone(), pair_id.clone())
             .await
-            .map_err(|e: InfraError| to_entry_error(e, &pair_id))?;
+            .map_err(|e| {
+                tracing::error!("Failed to get onchain data: {:?}", e);
+                EntryError::InternalServerError
+            })?;
 
     let res: GetOnchainEntryResponse = GetOnchainEntryResponse {
-        pair_id: latest_spot_entry.pair_id,
-        last_updated_timestamp: latest_spot_entry.timestamp.and_utc().timestamp() as u64,
-        price: latest_spot_entry.price.to_string(),
-        decimals: 8,
-        nb_sources_aggregated: 1,
+        pair_id: pair_id,
+        last_updated_timestamp: onchain_pair_median.last_updated_timestamp,
+        price: onchain_pair_median.price.to_string(),
+        decimals: onchain_pair_median.decimals as u32,
+        nb_sources_aggregated: onchain_pair_median.num_sources_aggregated,
         // The only asset handled is Crypto for now
         asset_type: "Crypto".to_string(),
     };
     Ok(Json(res))
-}
-
-pub(crate) fn to_entry_error(error: InfraError, pair_id: &String) -> EntryError {
-    match error {
-        InfraError::InternalServerError => EntryError::InternalServerError,
-        InfraError::NotFound => EntryError::NotFound(pair_id.to_string()),
-        InfraError::InvalidTimeStamp => EntryError::InvalidTimestamp,
-    }
 }

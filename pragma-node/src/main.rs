@@ -1,7 +1,7 @@
-use std::net::SocketAddr;
-
+use config::network::NetworkConfig;
 use deadpool_diesel::postgres::Pool;
 use pragma_entities::connection::{ENV_POSTGRES_DATABASE_URL, ENV_TS_DATABASE_URL};
+use std::net::SocketAddr;
 use utoipa::openapi::security::{ApiKey, ApiKeyValue, SecurityScheme};
 use utoipa::Modify;
 use utoipa::OpenApi;
@@ -21,6 +21,8 @@ mod utils;
 pub struct AppState {
     timescale_pool: Pool,
     postegres_pool: Pool,
+    #[allow(dead_code)]
+    network: NetworkConfig,
 }
 
 #[tokio::main]
@@ -72,7 +74,6 @@ async fn main() {
     }
 
     println!("{}", ApiDoc::openapi().to_pretty_json().unwrap());
-
     let config = config().await;
 
     let timescale_pool =
@@ -84,9 +85,12 @@ async fn main() {
         pragma_entities::connection::init_pool("pragma-node-api", ENV_POSTGRES_DATABASE_URL)
             .expect("can't init postgres (onchain db) pool");
 
+    let network = config.network();
+
     let state = AppState {
         timescale_pool,
         postegres_pool,
+        network,
     };
 
     let app = app_router::<ApiDoc>(state.clone()).with_state(state);

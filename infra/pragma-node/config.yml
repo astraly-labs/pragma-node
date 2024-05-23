@@ -11,3 +11,5 @@ container_environment:
       - HOST
       - PORT
       - KAFKA_BROKERS
+      - RPC_URL
+      - NETWORK

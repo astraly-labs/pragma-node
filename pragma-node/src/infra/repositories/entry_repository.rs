@@ -1,8 +1,9 @@
 use bigdecimal::{BigDecimal, ToPrimitive};
 use chrono::{DateTime, NaiveDateTime};
+use serde::{Deserialize, Serialize};
+
 use diesel::prelude::QueryableByName;
 use diesel::{ExpressionMethods, QueryDsl, Queryable, RunQueryDsl};
-use serde::{Deserialize, Serialize};
 
 use pragma_entities::dto;
 use pragma_entities::{

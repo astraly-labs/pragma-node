@@ -2,9 +2,10 @@ pub mod network;
 pub mod settings;
 
 use dotenvy::dotenv;
+use tokio::sync::OnceCell;
+
 use network::NetworkConfig;
 use settings::{KafkaConfig, ServerConfig};
-use tokio::sync::OnceCell;
 
 #[derive(Debug)]
 pub struct Config {
@@ -25,6 +26,10 @@ impl Config {
 
     pub fn kafka_topic(&self) -> &str {
         &self.kafka.topic
+    }
+
+    pub fn network(&self) -> NetworkConfig {
+        self.network.clone()
     }
 }
 
@@ -67,6 +72,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_config_values() {
+        std::env::set_var("RPC_URL", "http://my-super-cool-test-rpc");
         let config = init_config().await;
         assert_eq!(config.server_host(), "0.0.0.0");
         assert_eq!(config.server_port(), 3000);
