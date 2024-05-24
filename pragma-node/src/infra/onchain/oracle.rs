@@ -34,6 +34,7 @@ pub async fn get_data_median(
         .call(
             FunctionCall {
                 contract_address: config.oracle_address,
+                // TODO(akhercha): call get_data & pass aggregation as a parameter
                 entry_point_selector: selector!("get_data_median"),
                 calldata,
             },
