@@ -25,6 +25,7 @@ pub enum NetworkName {
 
 #[derive(Debug, Clone)]
 pub struct NetworkConfig {
+    // TODO(akhercha): network name is probably not needed
     pub name: NetworkName,
     pub oracle_address: FieldElement,
     pub provider: Arc<JsonRpcClient<HttpTransport>>,
