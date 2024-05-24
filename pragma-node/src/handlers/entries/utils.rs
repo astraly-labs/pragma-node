@@ -96,8 +96,8 @@ mod tests {
     fn test_compute_volatility_simple() {
         let entries = vec![new_entry(100, 1640995200), new_entry(110, 1641081600)];
 
-        let expected_log_return = (110 as f64 / 100 as f64).ln().powi(2);
-        let expected_time = ((1641081600 - 1640995200) as f64) / ONE_YEAR_IN_SECONDS as f64;
+        let expected_log_return = (110_f64 / 100_f64).ln().powi(2);
+        let expected_time = ((1641081600 - 1640995200) as f64) / ONE_YEAR_IN_SECONDS;
         let expected_variance = expected_log_return / expected_time;
         let expected_volatility = expected_variance.sqrt() * 10_f64.powi(8);
         let computed_volatility = compute_volatility(&entries);

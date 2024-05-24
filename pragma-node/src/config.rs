@@ -1,18 +1,39 @@
-pub mod network;
-pub mod settings;
-
 use dotenvy::dotenv;
+use serde::Deserialize;
 use tokio::sync::OnceCell;
 
-use network::NetworkConfig;
-use settings::{KafkaConfig, ServerConfig};
+#[derive(Debug, Deserialize)]
+pub struct ServerConfig {
+    pub host: String,
+    pub port: u16,
+}
+
+impl Default for ServerConfig {
+    fn default() -> Self {
+        Self {
+            host: "0.0.0.0".to_string(),
+            port: 3000,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct KafkaConfig {
+    pub topic: String,
+}
+
+impl Default for KafkaConfig {
+    fn default() -> Self {
+        Self {
+            topic: "pragma-data".to_string(),
+        }
+    }
+}
 
 #[derive(Debug)]
 pub struct Config {
     server: ServerConfig,
     kafka: KafkaConfig,
-    #[allow(dead_code)]
-    network: NetworkConfig,
 }
 
 impl Config {
@@ -27,10 +48,6 @@ impl Config {
     pub fn kafka_topic(&self) -> &str {
         &self.kafka.topic
     }
-
-    pub fn network(&self) -> NetworkConfig {
-        self.network.clone()
-    }
 }
 
 pub static CONFIG: OnceCell<Config> = OnceCell::const_new();
@@ -40,12 +57,10 @@ async fn init_config() -> Config {
 
     let server_config = envy::from_env::<ServerConfig>().unwrap_or_default();
     let kafka_config = envy::from_env::<KafkaConfig>().unwrap_or_default();
-    let network_config = NetworkConfig::from_env();
 
     Config {
         server: server_config,
         kafka: kafka_config,
-        network: network_config,
     }
 }
 
@@ -78,6 +93,4 @@ mod tests {
         assert_eq!(config.server_port(), 3000);
         assert_eq!(config.kafka_topic(), "pragma-data");
     }
-
-    // TODO(akhercha): Add tests for network config
 }

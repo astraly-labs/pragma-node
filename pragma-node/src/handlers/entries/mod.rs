@@ -18,7 +18,6 @@ pub mod get_entry;
 pub mod get_ohlc;
 pub mod get_onchain;
 pub mod get_volatility;
-
 pub mod utils;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, ToSchema)]

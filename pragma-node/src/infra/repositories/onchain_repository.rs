@@ -11,7 +11,6 @@ pub async fn get_components_for_pair(
     timestamp: u64,
 ) -> Result<Vec<OnchainEntry>, InfraError> {
     let conn = pool.get().await.map_err(adapt_infra_error)?;
-    // TODO(akhercha): simpler request ?
     let raw_sql = r#"
         WITH RankedEntries AS (
             SELECT 
@@ -24,19 +23,7 @@ pub async fn get_components_for_pair(
                 AND timestamp > to_timestamp($2) - INTERVAL '1 hour'
         )
         SELECT 
-            network,
-            pair_id,
-            data_id,
-            block_hash,
-            block_number,
-            block_timestamp,
-            transaction_hash,
-            price,
-            timestamp,
-            publisher,
-            source,
-            volume,
-            _cursor
+            *
         FROM 
             RankedEntries
         WHERE 

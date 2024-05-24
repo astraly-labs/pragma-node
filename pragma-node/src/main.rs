@@ -1,4 +1,3 @@
-use config::network::NetworkConfig;
 use deadpool_diesel::postgres::Pool;
 use pragma_entities::connection::{ENV_POSTGRES_DATABASE_URL, ENV_TS_DATABASE_URL};
 use std::net::SocketAddr;
@@ -21,7 +20,6 @@ mod utils;
 pub struct AppState {
     timescale_pool: Pool,
     postgres_pool: Pool,
-    network: NetworkConfig,
 }
 
 #[tokio::main]
@@ -84,12 +82,9 @@ async fn main() {
         pragma_entities::connection::init_pool("pragma-node-api", ENV_POSTGRES_DATABASE_URL)
             .expect("can't init postgres (onchain db) pool");
 
-    let network = config.network();
-
     let state = AppState {
         timescale_pool,
         postgres_pool,
-        network,
     };
 
     let app = app_router::<ApiDoc>(state.clone()).with_state(state);
