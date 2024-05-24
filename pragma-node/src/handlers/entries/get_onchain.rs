@@ -5,7 +5,7 @@ use utoipa::{IntoParams, ToSchema};
 
 use pragma_entities::EntryError;
 
-use crate::handlers::entries::{AggregationMode, GetOnchainEntryResponse};
+use crate::handlers::entries::{AggregationMode, GetOnchainResponse};
 use crate::infra::onchain::oracle::{get_data_median, GetDataMedianResponse};
 use crate::infra::repositories::onchain_repository::get_components_for_pair;
 use crate::utils::PathExtractor;
@@ -35,6 +35,7 @@ impl Default for GetOnchainParams {
     params(
         ("base" = String, Path, description = "Base Asset"),
         ("quote" = String, Path, description = "Quote Asset"),
+        // TODO(akhercha): re-add the timestamp parameter when JsonRpcClient isn't used anymore
         GetOnchainParams,
     ),
 )]
@@ -42,13 +43,16 @@ pub async fn get_onchain(
     State(state): State<AppState>,
     PathExtractor(pair): PathExtractor<(String, String)>,
     Query(params): Query<GetOnchainParams>,
-) -> Result<Json<GetOnchainEntryResponse>, EntryError> {
+) -> Result<Json<GetOnchainResponse>, EntryError> {
     tracing::info!("Received get onchain entry request for pair {:?}", pair);
     let pair_id = currency_pair_to_pair_id(&pair.0, &pair.1);
 
-    let now = chrono::Utc::now().naive_utc().and_utc().timestamp_millis() as u64;
+    // TODO(akhercha): debug only - set timestamp to last db block
+    // see timestamp here: https://sepolia.starkscan.co/block/24741
+    let now = 1706078361;
+    //let now = chrono::Utc::now().naive_utc().and_utc().timestamp_millis() as u64;
 
-    // TODO(akhercha): Currently only agg_mode used is Median
+    // TODO(akhercha): Currently unused
     let _agg_mode = if let Some(aggregation_mode) = params.aggregation {
         aggregation_mode
     } else {
@@ -65,7 +69,7 @@ pub async fn get_onchain(
         .await
         .map_err(|_| EntryError::InternalServerError)?;
 
-    let res: GetOnchainEntryResponse = GetOnchainEntryResponse {
+    let res: GetOnchainResponse = GetOnchainResponse {
         pair_id,
         last_updated_timestamp: onchain_pair_median.last_updated_timestamp,
         price: onchain_pair_median.price.to_string(),

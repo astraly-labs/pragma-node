@@ -79,7 +79,7 @@ pub struct OnchainEntry {
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
-pub struct GetOnchainEntryResponse {
+pub struct GetOnchainResponse {
     pair_id: String,
     last_updated_timestamp: u64,
     price: String,

@@ -46,7 +46,7 @@ async fn main() {
                 handlers::entries::GetEntryResponse,
                 handlers::entries::GetVolatilityResponse,
                 handlers::entries::GetOHLCResponse,
-                handlers::entries::GetOnchainEntryResponse,
+                handlers::entries::GetOnchainResponse,
             ),
             schemas(handlers::entries::GetEntryParams, handlers::entries::Interval),
             schemas(handlers::entries::Entry, handlers::entries::BaseEntry),

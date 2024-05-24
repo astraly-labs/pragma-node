@@ -38,11 +38,17 @@ pub async fn get_data_median(
                 entry_point_selector: selector!("get_data_median"),
                 calldata,
             },
-            BlockId::Tag(BlockTag::Latest),
+            // TODO(akhercha): Remove this one - debug only (latest block for db)
+            // https://sepolia.starkscan.co/block/24741
+            BlockId::Number(24741),
+            // BlockId::Tag(BlockTag::Latest),
         )
         .await
         // TODO(akhercha): Handle error properly
-        .map_err(|_| InfraError::InternalServerError)?;
+        .map_err(|e| {
+            tracing::error!("{:?}", e);
+            InfraError::InternalServerError
+        })?;
 
     // TODO(akhercha): Parse the response way better + handle on chain errors
     let price = res

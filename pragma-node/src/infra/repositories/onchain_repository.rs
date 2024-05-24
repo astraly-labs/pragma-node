@@ -8,21 +8,41 @@ use diesel::RunQueryDsl;
 pub async fn get_components_for_pair(
     pool: &deadpool_diesel::postgres::Pool,
     pair_id: String,
-    mut timestamp: u64,
+    timestamp: u64,
 ) -> Result<Vec<OnchainEntry>, InfraError> {
     let conn = pool.get().await.map_err(adapt_infra_error)?;
-
-    // substract one hour from the timestamp
-    // TODO(akhercha): do this directly in the SQL request?
-    timestamp -= 3600;
-
+    // TODO(akhercha): simpler request ?
     let raw_sql = r#"
-        SELECT DISTINCT * 
-        FROM spot_entry 
-        WHERE pair_id = $1 
-        -- Only consider entries from the last hour
-        AND timestamp >= to_timestamp($2)
-        ORDER BY timestamp DESC;
+        WITH RankedEntries AS (
+            SELECT 
+                *,
+                ROW_NUMBER() OVER (PARTITION BY publisher, source ORDER BY timestamp DESC) as rn
+            FROM 
+                spot_entry
+            WHERE 
+                pair_id = $1 
+                AND timestamp > to_timestamp($2) - INTERVAL '1 hour'
+        )
+        SELECT 
+            network,
+            pair_id,
+            data_id,
+            block_hash,
+            block_number,
+            block_timestamp,
+            transaction_hash,
+            price,
+            timestamp,
+            publisher,
+            source,
+            volume,
+            _cursor
+        FROM 
+            RankedEntries
+        WHERE 
+            rn = 1
+        ORDER BY 
+            timestamp DESC;
     "#;
 
     let raw_entries = conn
@@ -37,7 +57,11 @@ pub async fn get_components_for_pair(
         .map_err(adapt_infra_error)?;
 
     // Raise an error if no entries are found - shouldn't happen
-    raw_entries.first().ok_or(InfraError::NotFound)?;
+    if raw_entries.is_empty() {
+        tracing::error!("No components found - should not happen");
+        // TODO(akhercha): better error
+        return Err(InfraError::NotFound);
+    }
 
     // Adapt SpotEntry to OnchainEntry
     let entries: Vec<OnchainEntry> = raw_entries
