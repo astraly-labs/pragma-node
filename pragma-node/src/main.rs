@@ -20,8 +20,7 @@ mod utils;
 #[derive(Clone)]
 pub struct AppState {
     timescale_pool: Pool,
-    postegres_pool: Pool,
-    #[allow(dead_code)]
+    postgres_pool: Pool,
     network: NetworkConfig,
 }
 
@@ -81,7 +80,7 @@ async fn main() {
             .expect("can't init timescale (offchain db) pool");
     pragma_entities::db::run_migrations(&timescale_pool).await;
 
-    let postegres_pool =
+    let postgres_pool =
         pragma_entities::connection::init_pool("pragma-node-api", ENV_POSTGRES_DATABASE_URL)
             .expect("can't init postgres (onchain db) pool");
 
@@ -89,7 +88,7 @@ async fn main() {
 
     let state = AppState {
         timescale_pool,
-        postegres_pool,
+        postgres_pool,
         network,
     };
 

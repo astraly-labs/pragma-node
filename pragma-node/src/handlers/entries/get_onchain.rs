@@ -1,15 +1,30 @@
 use axum::extract::{Query, State};
 use axum::Json;
+use serde::Deserialize;
+use utoipa::{IntoParams, ToSchema};
 
 use pragma_entities::EntryError;
 
 use crate::handlers::entries::{AggregationMode, GetOnchainEntryResponse};
-use crate::infra::onchain::get_data_median;
+use crate::infra::onchain::oracle::{get_data_median, GetDataMedianResponse};
+use crate::infra::repositories::onchain_repository::get_components_for_pair;
 use crate::utils::PathExtractor;
 use crate::AppState;
 
 use super::utils::currency_pair_to_pair_id;
-use super::GetOnchainParams;
+
+#[derive(Debug, Deserialize, IntoParams, ToSchema)]
+pub struct GetOnchainParams {
+    pub aggregation: Option<AggregationMode>,
+}
+
+impl Default for GetOnchainParams {
+    fn default() -> Self {
+        Self {
+            aggregation: Some(AggregationMode::default()),
+        }
+    }
+}
 
 #[utoipa::path(
     get,
@@ -32,11 +47,6 @@ pub async fn get_onchain(
     let pair_id = currency_pair_to_pair_id(&pair.0, &pair.1);
 
     let now = chrono::Utc::now().naive_utc().and_utc().timestamp_millis() as u64;
-    let _timestamp = if let Some(timestamp) = params.timestamp {
-        timestamp
-    } else {
-        now
-    };
 
     // TODO(akhercha): Currently only agg_mode used is Median
     let _agg_mode = if let Some(aggregation_mode) = params.aggregation {
@@ -46,22 +56,24 @@ pub async fn get_onchain(
     };
 
     // TODO(akhercha): Call `get_data` with correct parameters
-    let onchain_pair_median: crate::infra::onchain::GetDataMedianResponse =
-        get_data_median(state.network.clone(), pair_id.clone())
+    let onchain_pair_median: GetDataMedianResponse =
+        get_data_median(&state.network, pair_id.clone())
             .await
-            .map_err(|e| {
-                tracing::error!("Failed to get onchain data: {:?}", e);
-                EntryError::InternalServerError
-            })?;
+            .map_err(|_| EntryError::InternalServerError)?;
+
+    let pair_components = get_components_for_pair(&state.postgres_pool, pair_id.clone(), now)
+        .await
+        .map_err(|_| EntryError::InternalServerError)?;
 
     let res: GetOnchainEntryResponse = GetOnchainEntryResponse {
-        pair_id: pair_id,
+        pair_id,
         last_updated_timestamp: onchain_pair_median.last_updated_timestamp,
         price: onchain_pair_median.price.to_string(),
         decimals: onchain_pair_median.decimals as u32,
         nb_sources_aggregated: onchain_pair_median.num_sources_aggregated,
-        // The only asset handled is Crypto for now
+        // TODO(akhercha): Only asset type used for now is Crypto
         asset_type: "Crypto".to_string(),
+        components: pair_components,
     };
     Ok(Json(res))
 }

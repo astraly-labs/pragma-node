@@ -1,6 +1,5 @@
-use std::fmt::{self, Debug};
-
 use deadpool_diesel::InteractError;
+use std::fmt::{self, Debug};
 use thiserror::Error;
 use utoipa::ToSchema;
 
