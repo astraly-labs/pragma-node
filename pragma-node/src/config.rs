@@ -87,7 +87,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_config_values() {
-        std::env::set_var("RPC_URL", "http://my-super-cool-test-rpc");
         let config = init_config().await;
         assert_eq!(config.server_host(), "0.0.0.0");
         assert_eq!(config.server_port(), 3000);

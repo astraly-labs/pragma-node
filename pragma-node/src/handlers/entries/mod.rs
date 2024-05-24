@@ -9,8 +9,6 @@ pub use get_ohlc::get_ohlc;
 pub use get_onchain::get_onchain;
 pub use get_volatility::get_volatility;
 
-pub use pragma_monitoring::models::SpotEntry;
-
 use crate::infra::repositories::entry_repository::OHLCEntry;
 
 pub mod create_entry;
