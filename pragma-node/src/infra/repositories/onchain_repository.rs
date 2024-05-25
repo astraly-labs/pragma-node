@@ -1,10 +1,143 @@
 use bigdecimal::BigDecimal;
-use diesel::RunQueryDsl;
+use diesel::{Queryable, RunQueryDsl};
 
 use pragma_entities::error::{adapt_infra_error, InfraError};
 use pragma_monitoring::models::SpotEntry;
 
 use crate::handlers::entries::{AggregationMode, Network, OnchainEntry};
+
+use chrono::NaiveDateTime;
+use diesel::sql_types::{BigInt, Numeric, Text, Timestamp};
+use diesel::QueryableByName;
+
+
+// TODO(akhercha): lot of unused fields
+#[derive(Queryable, QueryableByName)]
+struct SpotEntryWithAggregatedPrice {
+    #[sql_type = "Text"]
+    pub network: String,
+    #[sql_type = "Text"]
+    pub pair_id: String,
+    #[sql_type = "Text"]
+    pub data_id: String,
+    #[sql_type = "Text"]
+    pub block_hash: String,
+    #[sql_type = "BigInt"]
+    pub block_number: i64,
+    #[sql_type = "Timestamp"]
+    pub block_timestamp: NaiveDateTime,
+    #[sql_type = "Text"]
+    pub transaction_hash: String,
+    #[sql_type = "Numeric"]
+    pub price: BigDecimal,
+    #[sql_type = "Timestamp"]
+    pub timestamp: NaiveDateTime,
+    #[sql_type = "Text"]
+    pub publisher: String,
+    #[sql_type = "Text"]
+    pub source: String,
+    #[sql_type = "Numeric"]
+    pub volume: BigDecimal,
+    #[sql_type = "BigInt"]
+    pub _cursor: i64,
+    #[sql_type = "Numeric"]
+    pub aggregated_price: BigDecimal,
+}
+
+pub async fn get_sources_and_aggregate(
+    pool: &deadpool_diesel::postgres::Pool,
+    network: Network,
+    pair_id: String,
+    timestamp: u64,
+    aggregation_mode: AggregationMode,
+) -> Result<(BigDecimal, Vec<OnchainEntry>), InfraError> {
+    let conn = pool.get().await.map_err(adapt_infra_error)?;
+
+    let table_name = match network {
+        Network::Mainnet => "mainnet_spot_entry",
+        Network::Testnet => "spot_entry",
+    };
+
+    let aggregated_price_sql = match aggregation_mode {
+        AggregationMode::Mean => "AVG(price) AS aggregated_price",
+        AggregationMode::Median => {
+            "(
+            SELECT AVG(price)
+            FROM (
+                SELECT price
+                FROM FilteredEntries
+                ORDER BY price
+                LIMIT 2 - (SELECT COUNT(*) FROM FilteredEntries) % 2
+                OFFSET (SELECT (COUNT(*) - 1) / 2 FROM FilteredEntries)
+            ) AS MedianPrices
+        ) AS aggregated_price"
+        }
+        AggregationMode::Twap => Err(InfraError::InternalServerError)?,
+    };
+
+    let raw_sql = format!(
+        r#"
+            WITH RankedEntries AS (
+                SELECT 
+                    *,
+                    ROW_NUMBER() OVER (PARTITION BY publisher, source ORDER BY timestamp DESC) as rn
+                FROM 
+                    {}
+                WHERE 
+                    pair_id = $1 
+                    AND timestamp BETWEEN (to_timestamp($2) - INTERVAL '1 hour') AND to_timestamp($2)
+            ),
+            FilteredEntries AS (
+                SELECT *
+                FROM RankedEntries
+                WHERE rn = 1
+            ),
+            AggregatedPrice AS (
+                SELECT {aggregated_price_sql}
+                FROM FilteredEntries
+            )
+            SELECT DISTINCT 
+                FE.*,
+                AP.aggregated_price
+            FROM 
+                FilteredEntries FE,
+                AggregatedPrice AP
+            ORDER BY 
+                FE.timestamp DESC;
+        "#,
+        table_name,
+        aggregated_price_sql = aggregated_price_sql
+    );
+
+    let raw_entries = conn
+        .interact(move |conn| {
+            diesel::sql_query(raw_sql)
+                .bind::<diesel::sql_types::Text, _>(pair_id)
+                .bind::<diesel::sql_types::BigInt, _>(timestamp as i64)
+                .load::<SpotEntryWithAggregatedPrice>(conn)
+        })
+        .await
+        .map_err(adapt_infra_error)?
+        .map_err(adapt_infra_error)?;
+
+    if raw_entries.is_empty() {
+        return Ok((BigDecimal::from(0), vec![]));
+    }
+
+    // Adapt SpotEntryWithAggregatedPrice to OnchainEntry
+    let aggregated_price = raw_entries.first().unwrap().aggregated_price.clone();
+    let entries: Vec<OnchainEntry> = raw_entries
+        .iter()
+        .map(|raw_entry: &SpotEntryWithAggregatedPrice| OnchainEntry {
+            publisher: raw_entry.publisher.clone(),
+            source: raw_entry.source.clone(),
+            price: raw_entry.price.to_string(),
+            tx_hash: raw_entry.transaction_hash.clone(),
+            timestamp: raw_entry.timestamp.and_utc().timestamp() as u64,
+        })
+        .collect();
+    Ok((aggregated_price, entries))
+}
 
 pub async fn get_last_updated_timestamp(
     pool: &deadpool_diesel::postgres::Pool,
@@ -33,111 +166,4 @@ pub async fn get_last_updated_timestamp(
     let most_recent_entry = raw_entry.first().ok_or(InfraError::NotFound)?;
 
     Ok(most_recent_entry.timestamp.and_utc().timestamp() as u64)
-}
-
-pub async fn get_sources_for_pair(
-    pool: &deadpool_diesel::postgres::Pool,
-    network: Network,
-    pair_id: String,
-    timestamp: u64,
-) -> Result<Vec<OnchainEntry>, InfraError> {
-    let conn = pool.get().await.map_err(adapt_infra_error)?;
-
-    let table_name = match network {
-        Network::Mainnet => "mainnet_spot_entry",
-        Network::Testnet => "spot_entry",
-    };
-
-    let raw_sql = format!(
-        r#"
-            WITH RankedEntries AS (
-                SELECT 
-                    *,
-                    ROW_NUMBER() OVER (PARTITION BY publisher, source ORDER BY timestamp DESC) as rn
-                FROM 
-                    {}
-                WHERE 
-                    pair_id = $1 
-                    AND timestamp BETWEEN (to_timestamp($2) - INTERVAL '1 hour') AND to_timestamp($2)
-            )
-            SELECT 
-                *
-            FROM 
-                RankedEntries
-            WHERE 
-                rn = 1
-            ORDER BY 
-                timestamp DESC;
-        "#,
-        table_name
-    );
-
-    let raw_entries = conn
-        .interact(move |conn| {
-            diesel::sql_query(raw_sql)
-                .bind::<diesel::sql_types::Text, _>(pair_id)
-                .bind::<diesel::sql_types::BigInt, _>(timestamp as i64)
-                .load::<SpotEntry>(conn)
-        })
-        .await
-        .map_err(adapt_infra_error)?
-        .map_err(adapt_infra_error)?;
-
-    if raw_entries.is_empty() {
-        return Ok(vec![]);
-    }
-
-    // Adapt SpotEntry to OnchainEntry
-    // TODO(akhercha): better way to handle this
-    let entries: Vec<OnchainEntry> = raw_entries
-        .iter()
-        .map(|raw_entry: &SpotEntry| OnchainEntry {
-            publisher: raw_entry.publisher.clone(),
-            source: raw_entry.source.clone(),
-            price: raw_entry.price.to_string(),
-            tx_hash: raw_entry.transaction_hash.clone(),
-            timestamp: raw_entry.timestamp.and_utc().timestamp() as u64,
-        })
-        .collect();
-    Ok(entries)
-}
-
-pub fn compute_price(
-    components: &[OnchainEntry],
-    aggregation_mode: AggregationMode,
-) -> Result<String, InfraError> {
-    let price = match aggregation_mode {
-        AggregationMode::Median => compute_median_price(components),
-        AggregationMode::Mean => compute_mean_price(components),
-        AggregationMode::Twap => Err(InfraError::InternalServerError)?,
-    };
-    // TODO(akhercha): format the string
-    Ok(price)
-}
-fn compute_median_price(components: &[OnchainEntry]) -> String {
-    let mut prices: Vec<BigDecimal> = components
-        .iter()
-        .map(|entry| entry.price.parse::<BigDecimal>().unwrap())
-        .collect();
-    prices.sort();
-
-    let n = prices.len();
-    let median = if n % 2 == 0 {
-        let mid1 = &prices[n / 2];
-        let mid2 = &prices[n / 2 - 1];
-        (mid1 + mid2) / 2
-    } else {
-        prices[n / 2].clone()
-    };
-    median.to_string()
-}
-
-fn compute_mean_price(components: &[OnchainEntry]) -> String {
-    let sum: BigDecimal = components
-        .iter()
-        .map(|entry| entry.price.parse::<BigDecimal>().unwrap())
-        .sum();
-    let n = BigDecimal::from(components.len() as u32);
-    let mean = sum / n;
-    mean.to_string()
 }
