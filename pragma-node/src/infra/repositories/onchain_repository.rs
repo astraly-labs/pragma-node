@@ -54,17 +54,18 @@ fn get_table_name_from_network(network: Network) -> &'static str {
     }
 }
 
-fn build_sql_query() -> String {
-    r#"
+fn build_sql_query(network: Network, aggregation_mode: AggregationMode) -> String {
+    format!(
+        r#"
         WITH RankedEntries AS (
             SELECT 
                 *,
                 ROW_NUMBER() OVER (PARTITION BY publisher, source ORDER BY timestamp DESC) as rn
             FROM 
-                $1
+                {table_name}
             WHERE 
-                pair_id = $2 
-                AND timestamp BETWEEN (to_timestamp($3) - INTERVAL '1 hour') AND to_timestamp($3)
+                pair_id = $1 
+                AND timestamp BETWEEN (to_timestamp($2) - INTERVAL '30 minutes') AND to_timestamp($2)
         ),
         FilteredEntries AS (
             SELECT *
@@ -72,7 +73,7 @@ fn build_sql_query() -> String {
             WHERE rn = 1
         ),
         AggregatedPrice AS (
-            SELECT $4
+            SELECT {aggregation_subquery}
             FROM FilteredEntries
         )
         SELECT DISTINCT 
@@ -83,8 +84,10 @@ fn build_sql_query() -> String {
             AggregatedPrice AP
         ORDER BY 
             FE.timestamp DESC;
-    "#
-    .to_string()
+    "#,
+        table_name = get_table_name_from_network(network),
+        aggregation_subquery = get_aggregation_query(aggregation_mode).unwrap()
+    )
 }
 
 // TODO(akhercha): Only works for Spot entries
@@ -95,18 +98,14 @@ pub async fn get_sources_and_aggregate(
     timestamp: u64,
     aggregation_mode: AggregationMode,
 ) -> Result<(BigDecimal, Vec<OnchainEntry>), InfraError> {
-    let table_name = get_table_name_from_network(network);
-    let aggregation_query = get_aggregation_query(aggregation_mode)?;
-    let raw_sql = build_sql_query();
+    let raw_sql = build_sql_query(network, aggregation_mode);
 
     let conn = pool.get().await.map_err(adapt_infra_error)?;
     let raw_entries = conn
         .interact(move |conn| {
             diesel::sql_query(raw_sql)
-                .bind::<diesel::sql_types::Text, _>(table_name)
                 .bind::<diesel::sql_types::Text, _>(pair_id)
                 .bind::<diesel::sql_types::BigInt, _>(timestamp as i64)
-                .bind::<diesel::sql_types::Text, _>(aggregation_query)
                 .load::<SpotEntryWithAggregatedPrice>(conn)
         })
         .await
