@@ -108,6 +108,8 @@ pub enum AggregationMode {
     #[serde(rename = "median")]
     #[default]
     Median,
+    #[serde(rename = "mean")]
+    Mean,
     #[serde(rename = "twap")]
     Twap,
 }

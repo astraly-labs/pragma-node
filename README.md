@@ -120,7 +120,6 @@ export TOPIC="pragma-data"
 export HOST="0.0.0.0"
 export PORT=3000
 export KAFKA_BROKERS="0.0.0.0:9092"
-
 ```
 
 4. Start the Pragma Node service:
