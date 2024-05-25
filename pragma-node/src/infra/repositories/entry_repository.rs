@@ -221,8 +221,7 @@ async fn get_price_decimals(
             get_median_price(pool, pair_id.clone(), interval, timestamp).await?
         }
         AggregationMode::Twap => get_twap_price(pool, pair_id.clone(), interval, timestamp).await?,
-        // TODO(akhercha): Bad panic - update this
-        AggregationMode::Mean => panic!("not implemented"),
+        AggregationMode::Mean => Err(InfraError::InternalServerError)?,
     };
 
     let decimals = get_decimals(pool, &pair_id).await?;

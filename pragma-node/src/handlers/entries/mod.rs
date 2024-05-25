@@ -75,6 +75,32 @@ pub struct OnchainEntry {
     pub timestamp: u64,
 }
 
+#[derive(Default, Debug, Deserialize, ToSchema, Clone, Copy)]
+pub enum Network {
+    #[serde(rename = "mainnet")]
+    #[default]
+    Mainnet,
+    #[serde(rename = "testnet")]
+    Testnet,
+}
+
+#[derive(Debug, Deserialize, IntoParams, ToSchema)]
+pub struct GetOnchainParams {
+    pub network: Network,
+    pub aggregation: AggregationMode,
+    pub timestamp: Option<u64>,
+}
+
+impl Default for GetOnchainParams {
+    fn default() -> Self {
+        Self {
+            network: Network::default(),
+            aggregation: AggregationMode::default(),
+            timestamp: Some(chrono::Utc::now().naive_utc().and_utc().timestamp() as u64),
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct GetOnchainResponse {
     pair_id: String,
