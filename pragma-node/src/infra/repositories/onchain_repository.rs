@@ -53,11 +53,13 @@ pub async fn get_sources_and_aggregate(
 ) -> Result<(BigDecimal, Vec<OnchainEntry>), InfraError> {
     let conn = pool.get().await.map_err(adapt_infra_error)?;
 
+    // TODO(akhercha): put this somewhere else
     let table_name = match network {
         Network::Testnet => "spot_entry",
         Network::Mainnet => "mainnet_spot_entry",
     };
 
+    // TODO(akhercha): Make this big SQL block more maintainable
     let aggregated_price_sql = match aggregation_mode {
         AggregationMode::Mean => "AVG(price) AS aggregated_price",
         AggregationMode::Median => {
@@ -74,7 +76,6 @@ pub async fn get_sources_and_aggregate(
         }
         AggregationMode::Twap => Err(InfraError::InternalServerError)?,
     };
-
     let raw_sql = format!(
         r#"
             WITH RankedEntries AS (
