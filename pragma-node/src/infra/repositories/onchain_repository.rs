@@ -27,6 +27,66 @@ impl From<SpotEntryWithAggregatedPrice> for OnchainEntry {
     }
 }
 
+fn get_aggregation_query(aggregation_mode: AggregationMode) -> Result<&'static str, InfraError> {
+    let query = match aggregation_mode {
+        AggregationMode::Mean => "AVG(price) AS aggregated_price",
+        AggregationMode::Median => {
+            "(
+                SELECT AVG(price)
+                FROM (
+                    SELECT price
+                    FROM FilteredEntries
+                    ORDER BY price
+                    LIMIT 2 - (SELECT COUNT(*) FROM FilteredEntries) % 2
+                    OFFSET (SELECT (COUNT(*) - 1) / 2 FROM FilteredEntries)
+                ) AS MedianPrices
+            ) AS aggregated_price"
+        }
+        AggregationMode::Twap => Err(InfraError::InternalServerError)?,
+    };
+    Ok(query)
+}
+
+fn get_table_name_from_network(network: Network) -> &'static str {
+    match network {
+        Network::Testnet => "spot_entry",
+        Network::Mainnet => "mainnet_spot_entry",
+    }
+}
+
+fn build_sql_query() -> String {
+    r#"
+        WITH RankedEntries AS (
+            SELECT 
+                *,
+                ROW_NUMBER() OVER (PARTITION BY publisher, source ORDER BY timestamp DESC) as rn
+            FROM 
+                $1
+            WHERE 
+                pair_id = $2 
+                AND timestamp BETWEEN (to_timestamp($3) - INTERVAL '1 hour') AND to_timestamp($3)
+        ),
+        FilteredEntries AS (
+            SELECT *
+            FROM RankedEntries
+            WHERE rn = 1
+        ),
+        AggregatedPrice AS (
+            SELECT $4
+            FROM FilteredEntries
+        )
+        SELECT DISTINCT 
+            FE.*,
+            AP.aggregated_price
+        FROM 
+            FilteredEntries FE,
+            AggregatedPrice AP
+        ORDER BY 
+            FE.timestamp DESC;
+    "#
+    .to_string()
+}
+
 // TODO(akhercha): Only works for Spot entries
 pub async fn get_sources_and_aggregate(
     pool: &deadpool_diesel::postgres::Pool,
@@ -35,70 +95,18 @@ pub async fn get_sources_and_aggregate(
     timestamp: u64,
     aggregation_mode: AggregationMode,
 ) -> Result<(BigDecimal, Vec<OnchainEntry>), InfraError> {
+    let table_name = get_table_name_from_network(network);
+    let aggregation_query = get_aggregation_query(aggregation_mode)?;
+    let raw_sql = build_sql_query();
+
     let conn = pool.get().await.map_err(adapt_infra_error)?;
-
-    // TODO(akhercha): put this somewhere else
-    let table_name = match network {
-        Network::Testnet => "spot_entry",
-        Network::Mainnet => "mainnet_spot_entry",
-    };
-
-    // TODO(akhercha): Make this big SQL block more maintainable
-    let aggregated_price_sql = match aggregation_mode {
-        AggregationMode::Mean => "AVG(price) AS aggregated_price",
-        AggregationMode::Median => {
-            "(
-            SELECT AVG(price)
-            FROM (
-                SELECT price
-                FROM FilteredEntries
-                ORDER BY price
-                LIMIT 2 - (SELECT COUNT(*) FROM FilteredEntries) % 2
-                OFFSET (SELECT (COUNT(*) - 1) / 2 FROM FilteredEntries)
-            ) AS MedianPrices
-        ) AS aggregated_price"
-        }
-        AggregationMode::Twap => Err(InfraError::InternalServerError)?,
-    };
-    let raw_sql = format!(
-        r#"
-            WITH RankedEntries AS (
-                SELECT 
-                    *,
-                    ROW_NUMBER() OVER (PARTITION BY publisher, source ORDER BY timestamp DESC) as rn
-                FROM 
-                    {}
-                WHERE 
-                    pair_id = $1 
-                    AND timestamp BETWEEN (to_timestamp($2) - INTERVAL '1 hour') AND to_timestamp($2)
-            ),
-            FilteredEntries AS (
-                SELECT *
-                FROM RankedEntries
-                WHERE rn = 1
-            ),
-            AggregatedPrice AS (
-                SELECT {aggregated_price_sql}
-                FROM FilteredEntries
-            )
-            SELECT DISTINCT 
-                FE.*,
-                AP.aggregated_price
-            FROM 
-                FilteredEntries FE,
-                AggregatedPrice AP
-            ORDER BY 
-                FE.timestamp DESC;
-        "#,
-        table_name,
-        aggregated_price_sql = aggregated_price_sql
-    );
-
     let raw_entries = conn
         .interact(move |conn| {
             diesel::sql_query(raw_sql)
+                .bind::<diesel::sql_types::Text, _>(table_name)
                 .bind::<diesel::sql_types::Text, _>(pair_id)
                 .bind::<diesel::sql_types::BigInt, _>(timestamp as i64)
+                .bind::<diesel::sql_types::Text, _>(aggregation_query)
                 .load::<SpotEntryWithAggregatedPrice>(conn)
         })
         .await
@@ -118,7 +126,6 @@ pub async fn get_last_updated_timestamp(
     pool: &deadpool_diesel::postgres::Pool,
     pair_id: String,
 ) -> Result<u64, InfraError> {
-    let conn = pool.get().await.map_err(adapt_infra_error)?;
     let raw_sql = r#"
         SELECT 
             *
@@ -128,6 +135,7 @@ pub async fn get_last_updated_timestamp(
         LIMIT 1;
     "#;
 
+    let conn = pool.get().await.map_err(adapt_infra_error)?;
     let raw_entry = conn
         .interact(move |conn| {
             diesel::sql_query(raw_sql)
