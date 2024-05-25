@@ -62,6 +62,7 @@ pub async fn get_onchain(
         pair_id,
         last_updated_timestamp,
         price: aggregated_price.to_string(),
+        // TODO(akhercha): fetch decimals in currency table
         decimals: 8,
         nb_sources_aggregated: sources.len() as u32,
         // Only asset type used for now is Crypto

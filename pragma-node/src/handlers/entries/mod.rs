@@ -77,11 +77,11 @@ pub struct OnchainEntry {
 
 #[derive(Default, Debug, Deserialize, ToSchema, Clone, Copy)]
 pub enum Network {
-    #[serde(rename = "mainnet")]
-    #[default]
-    Mainnet,
     #[serde(rename = "testnet")]
+    #[default]
     Testnet,
+    #[serde(rename = "mainnet")]
+    Mainnet,
 }
 
 #[derive(Debug, Deserialize, IntoParams, ToSchema)]

@@ -10,37 +10,37 @@ use chrono::NaiveDateTime;
 use diesel::sql_types::{BigInt, Numeric, Text, Timestamp};
 use diesel::QueryableByName;
 
-
 // TODO(akhercha): lot of unused fields
 #[derive(Queryable, QueryableByName)]
+#[allow(dead_code)]
 struct SpotEntryWithAggregatedPrice {
-    #[sql_type = "Text"]
+    #[diesel(sql_type = Text)]
     pub network: String,
-    #[sql_type = "Text"]
+    #[diesel(sql_type = Text)]
     pub pair_id: String,
-    #[sql_type = "Text"]
+    #[diesel(sql_type = Text)]
     pub data_id: String,
-    #[sql_type = "Text"]
+    #[diesel(sql_type = Text)]
     pub block_hash: String,
-    #[sql_type = "BigInt"]
+    #[diesel(sql_type = BigInt)]
     pub block_number: i64,
-    #[sql_type = "Timestamp"]
+    #[diesel(sql_type = Timestamp)]
     pub block_timestamp: NaiveDateTime,
-    #[sql_type = "Text"]
+    #[diesel(sql_type = Text)]
     pub transaction_hash: String,
-    #[sql_type = "Numeric"]
+    #[diesel(sql_type = Numeric)]
     pub price: BigDecimal,
-    #[sql_type = "Timestamp"]
+    #[diesel(sql_type = Timestamp)]
     pub timestamp: NaiveDateTime,
-    #[sql_type = "Text"]
+    #[diesel(sql_type = Text)]
     pub publisher: String,
-    #[sql_type = "Text"]
+    #[diesel(sql_type = Text)]
     pub source: String,
-    #[sql_type = "Numeric"]
+    #[diesel(sql_type = Numeric)]
     pub volume: BigDecimal,
-    #[sql_type = "BigInt"]
+    #[diesel(sql_type = BigInt)]
     pub _cursor: i64,
-    #[sql_type = "Numeric"]
+    #[diesel(sql_type = Numeric)]
     pub aggregated_price: BigDecimal,
 }
 
@@ -54,8 +54,8 @@ pub async fn get_sources_and_aggregate(
     let conn = pool.get().await.map_err(adapt_infra_error)?;
 
     let table_name = match network {
-        Network::Mainnet => "mainnet_spot_entry",
         Network::Testnet => "spot_entry",
+        Network::Mainnet => "mainnet_spot_entry",
     };
 
     let aggregated_price_sql = match aggregation_mode {
