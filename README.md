@@ -88,3 +88,46 @@ The project follows a modular structure to keep the code organized and maintaina
 - `src/`: Contains the main source code of the application.
   - `lib.rs`: Defines the library's entry point.
   - `tracing.rs`: Defines common tracing logic.
+
+## Development
+
+For faster iterations, you can deploy every needed services required by `pragma-node` using `compose.dev.yaml` & Docker compose:
+
+1. Start the services:
+
+```bash
+docker compose -f compose.dev.yaml up -d --build
+```
+
+2. Fill the postgres database with the backup (ask for a file):
+
+```bash
+# copy the backup file to the container
+docker cp ~/Programming/pragma/backup_onchain.sql pragma-node-postgre-db-1:/backup_onchain.sql
+# connect to the container
+docker exec -it pragma-node-postgre-db-1 bash
+# execute the backup
+PGPASSWORD=test-password pg_restore -h postgre-db -U postgres -d pragma /backup_onchain.sql
+```
+
+3. Export the required environment variables:
+
+```bash
+export TIMESCALE_DATABASE_URL="postgres://postgres:test-password@0.0.0.0:5432/pragma"
+export POSTGRES_DATABASE_URL="postgres://postgres:test-password@0.0.0.0:5433/pragma"
+export DATABASE_MAX_CONN=5
+export TOPIC="pragma-data"
+export HOST="0.0.0.0"
+export PORT=3000
+export KAFKA_BROKERS="0.0.0.0:9092"
+
+```
+
+4. Start the Pragma Node service:
+
+```bash
+cd pragma-node
+cargo run # or debug or anything
+```
+
+The pragma-node swagger documentation is available at `http://localhost:3000/node/swagger-ui`.
