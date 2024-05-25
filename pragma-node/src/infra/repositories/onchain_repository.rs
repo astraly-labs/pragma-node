@@ -111,6 +111,7 @@ pub fn compute_price(
         AggregationMode::Mean => compute_mean_price(components),
         AggregationMode::Twap => Err(InfraError::InternalServerError)?,
     };
+    // TODO(akhercha): format the string
     Ok(price)
 }
 fn compute_median_price(components: &[OnchainEntry]) -> String {
