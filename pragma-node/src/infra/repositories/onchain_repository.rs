@@ -1,5 +1,7 @@
 use bigdecimal::BigDecimal;
-use diesel::sql_types::Numeric;
+
+use deadpool_diesel::postgres::Pool;
+use diesel::sql_types::{BigInt, Numeric, Text};
 use diesel::{Queryable, QueryableByName, RunQueryDsl};
 
 use pragma_entities::error::{adapt_infra_error, InfraError};
@@ -65,7 +67,7 @@ fn build_sql_query(network: Network, aggregation_mode: AggregationMode) -> Strin
                 {table_name}
             WHERE 
                 pair_id = $1 
-                AND timestamp BETWEEN (to_timestamp($2) - INTERVAL '30 minutes') AND to_timestamp($2)
+                AND timestamp BETWEEN (to_timestamp($2) - INTERVAL '1 hour') AND to_timestamp($2)
         ),
         FilteredEntries AS (
             SELECT *
@@ -92,7 +94,7 @@ fn build_sql_query(network: Network, aggregation_mode: AggregationMode) -> Strin
 
 // TODO(akhercha): Only works for Spot entries
 pub async fn get_sources_and_aggregate(
-    pool: &deadpool_diesel::postgres::Pool,
+    pool: &Pool,
     network: Network,
     pair_id: String,
     timestamp: u64,
@@ -104,8 +106,8 @@ pub async fn get_sources_and_aggregate(
     let raw_entries = conn
         .interact(move |conn| {
             diesel::sql_query(raw_sql)
-                .bind::<diesel::sql_types::Text, _>(pair_id)
-                .bind::<diesel::sql_types::BigInt, _>(timestamp as i64)
+                .bind::<Text, _>(pair_id)
+                .bind::<BigInt, _>(timestamp as i64)
                 .load::<SpotEntryWithAggregatedPrice>(conn)
         })
         .await
@@ -121,10 +123,7 @@ pub async fn get_sources_and_aggregate(
     Ok((aggregated_price, entries))
 }
 
-pub async fn get_last_updated_timestamp(
-    pool: &deadpool_diesel::postgres::Pool,
-    pair_id: String,
-) -> Result<u64, InfraError> {
+pub async fn get_last_updated_timestamp(pool: &Pool, pair_id: String) -> Result<u64, InfraError> {
     let raw_sql = r#"
         SELECT 
             *
