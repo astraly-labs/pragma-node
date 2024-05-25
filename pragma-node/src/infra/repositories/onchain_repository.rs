@@ -6,40 +6,13 @@ use pragma_monitoring::models::SpotEntry;
 
 use crate::handlers::entries::{AggregationMode, Network, OnchainEntry};
 
-use chrono::NaiveDateTime;
-use diesel::sql_types::{BigInt, Numeric, Text, Timestamp};
+use diesel::sql_types::Numeric;
 use diesel::QueryableByName;
 
-// TODO(akhercha): lot of unused fields
 #[derive(Queryable, QueryableByName)]
-#[allow(dead_code)]
 struct SpotEntryWithAggregatedPrice {
-    #[diesel(sql_type = Text)]
-    pub network: String,
-    #[diesel(sql_type = Text)]
-    pub pair_id: String,
-    #[diesel(sql_type = Text)]
-    pub data_id: String,
-    #[diesel(sql_type = Text)]
-    pub block_hash: String,
-    #[diesel(sql_type = BigInt)]
-    pub block_number: i64,
-    #[diesel(sql_type = Timestamp)]
-    pub block_timestamp: NaiveDateTime,
-    #[diesel(sql_type = Text)]
-    pub transaction_hash: String,
-    #[diesel(sql_type = Numeric)]
-    pub price: BigDecimal,
-    #[diesel(sql_type = Timestamp)]
-    pub timestamp: NaiveDateTime,
-    #[diesel(sql_type = Text)]
-    pub publisher: String,
-    #[diesel(sql_type = Text)]
-    pub source: String,
-    #[diesel(sql_type = Numeric)]
-    pub volume: BigDecimal,
-    #[diesel(sql_type = BigInt)]
-    pub _cursor: i64,
+    #[diesel(embed)]
+    pub spot_entry: SpotEntry,
     #[diesel(sql_type = Numeric)]
     pub aggregated_price: BigDecimal,
 }
@@ -130,11 +103,11 @@ pub async fn get_sources_and_aggregate(
     let entries: Vec<OnchainEntry> = raw_entries
         .iter()
         .map(|raw_entry: &SpotEntryWithAggregatedPrice| OnchainEntry {
-            publisher: raw_entry.publisher.clone(),
-            source: raw_entry.source.clone(),
-            price: raw_entry.price.to_string(),
-            tx_hash: raw_entry.transaction_hash.clone(),
-            timestamp: raw_entry.timestamp.and_utc().timestamp() as u64,
+            publisher: raw_entry.spot_entry.publisher.clone(),
+            source: raw_entry.spot_entry.source.clone(),
+            price: raw_entry.spot_entry.price.to_string(),
+            tx_hash: raw_entry.spot_entry.transaction_hash.clone(),
+            timestamp: raw_entry.spot_entry.timestamp.and_utc().timestamp() as u64,
         })
         .collect();
     Ok((aggregated_price, entries))
