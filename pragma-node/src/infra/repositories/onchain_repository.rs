@@ -1,13 +1,11 @@
 use bigdecimal::BigDecimal;
-use diesel::{Queryable, RunQueryDsl};
+use diesel::sql_types::Numeric;
+use diesel::{Queryable, QueryableByName, RunQueryDsl};
 
 use pragma_entities::error::{adapt_infra_error, InfraError};
 use pragma_monitoring::models::SpotEntry;
 
 use crate::handlers::entries::{AggregationMode, Network, OnchainEntry};
-
-use diesel::sql_types::Numeric;
-use diesel::QueryableByName;
 
 #[derive(Queryable, QueryableByName)]
 struct SpotEntryWithAggregatedPrice {
@@ -17,6 +15,19 @@ struct SpotEntryWithAggregatedPrice {
     pub aggregated_price: BigDecimal,
 }
 
+impl From<SpotEntryWithAggregatedPrice> for OnchainEntry {
+    fn from(entry: SpotEntryWithAggregatedPrice) -> Self {
+        OnchainEntry {
+            publisher: entry.spot_entry.publisher,
+            source: entry.spot_entry.source,
+            price: entry.spot_entry.price.to_string(),
+            tx_hash: entry.spot_entry.transaction_hash,
+            timestamp: entry.spot_entry.timestamp.and_utc().timestamp() as u64,
+        }
+    }
+}
+
+// TODO(akhercha): Only works for Spot entries
 pub async fn get_sources_and_aggregate(
     pool: &deadpool_diesel::postgres::Pool,
     network: Network,
@@ -98,18 +109,8 @@ pub async fn get_sources_and_aggregate(
         return Ok((BigDecimal::from(0), vec![]));
     }
 
-    // Adapt SpotEntryWithAggregatedPrice to OnchainEntry
     let aggregated_price = raw_entries.first().unwrap().aggregated_price.clone();
-    let entries: Vec<OnchainEntry> = raw_entries
-        .iter()
-        .map(|raw_entry: &SpotEntryWithAggregatedPrice| OnchainEntry {
-            publisher: raw_entry.spot_entry.publisher.clone(),
-            source: raw_entry.spot_entry.source.clone(),
-            price: raw_entry.spot_entry.price.to_string(),
-            tx_hash: raw_entry.spot_entry.transaction_hash.clone(),
-            timestamp: raw_entry.spot_entry.timestamp.and_utc().timestamp() as u64,
-        })
-        .collect();
+    let entries: Vec<OnchainEntry> = raw_entries.into_iter().map(From::from).collect();
     Ok((aggregated_price, entries))
 }
 
