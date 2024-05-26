@@ -42,6 +42,9 @@ pub async fn get_onchain(
     let pair_id: String = currency_pair_to_pair_id(&pair.0, &pair.1);
     let now = chrono::Utc::now().naive_utc().and_utc().timestamp() as u64;
     let timestamp = if let Some(timestamp) = params.timestamp {
+        if timestamp > now {
+            return Err(EntryError::InvalidTimestamp);
+        }
         timestamp
     } else {
         now
@@ -55,14 +58,14 @@ pub async fn get_onchain(
         params.aggregation,
     )
     .await
-    .map_err(|_| EntryError::InternalServerError)?;
+    .map_err(|db_error| db_error.to_entry_error(&pair_id))?;
 
     // TODO(akhercha): ⚠ gives different result than onchain oracle
     // let last_updated_timestamp = sources[0].timestamp;
     let last_updated_timestamp =
         get_last_updated_timestamp(&state.postgres_pool, params.network, pair_id.clone())
             .await
-            .map_err(|_| EntryError::InternalServerError)?;
+            .map_err(|db_error| db_error.to_entry_error(&pair_id))?;
 
     Ok(Json(adapt_entries_to_onchain_response(
         pair_id,

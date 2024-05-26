@@ -6,7 +6,7 @@ use crate::handlers::entries::{AggregationMode, GetEntryResponse, Interval};
 use crate::infra::repositories::entry_repository::{self, MedianEntry};
 use crate::utils::PathExtractor;
 use crate::AppState;
-use pragma_entities::{error::InfraError, EntryError};
+use pragma_entities::EntryError;
 
 use super::utils::currency_pair_to_pair_id;
 use super::GetEntryParams;
@@ -68,7 +68,7 @@ pub async fn get_entry(
         aggregation_mode,
     )
     .await
-    .map_err(|e| to_entry_error(e, &pair_id))?;
+    .map_err(|e| e.to_entry_error(&pair_id))?;
 
     Ok(Json(adapt_entry_to_entry_response(
         pair_id, &entry, decimals,
@@ -93,13 +93,5 @@ fn adapt_entry_to_entry_response(
                 .to_str_radix(16)
         ),
         decimals,
-    }
-}
-
-pub(crate) fn to_entry_error(error: InfraError, pair_id: &String) -> EntryError {
-    match error {
-        InfraError::InternalServerError => EntryError::InternalServerError,
-        InfraError::NotFound => EntryError::NotFound(pair_id.to_string()),
-        InfraError::InvalidTimeStamp => EntryError::InvalidTimestamp,
     }
 }
