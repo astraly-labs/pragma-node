@@ -1,3 +1,7 @@
+pub mod checkpoints;
+pub mod ohlc;
+pub mod publishers;
+
 use axum::extract::{Query, State};
 use axum::Json;
 
@@ -34,7 +38,6 @@ pub async fn get_onchain(
     tracing::info!("Received get onchain entry request for pair {:?}", pair);
 
     let pair_id: String = currency_pair_to_pair_id(&pair.0, &pair.1);
-
     let now = chrono::Utc::now().naive_utc().and_utc().timestamp() as u64;
     let timestamp = if let Some(timestamp) = params.timestamp {
         timestamp
@@ -42,7 +45,6 @@ pub async fn get_onchain(
         now
     };
 
-    // TODO(akhercha): Format the price
     let (aggregated_price, sources) = get_sources_and_aggregate(
         &state.postgres_pool,
         params.network,
@@ -54,15 +56,18 @@ pub async fn get_onchain(
     .map_err(|_| EntryError::InternalServerError)?;
 
     // TODO(akhercha): ⚠ gives different result than onchain oracle
-    let last_updated_timestamp = get_last_updated_timestamp(&state.postgres_pool, pair_id.clone())
-        .await
-        .map_err(|_| EntryError::InternalServerError)?;
+    // let last_updated_timestamp = sources[0].timestamp;
+    let last_updated_timestamp =
+        get_last_updated_timestamp(&state.postgres_pool, params.network, pair_id.clone())
+            .await
+            .map_err(|_| EntryError::InternalServerError)?;
 
     let res = GetOnchainResponse {
         pair_id,
         last_updated_timestamp,
+        // TODO(akhercha): Format the price
         price: aggregated_price.to_string(),
-        // TODO(akhercha): fetch decimals in currency table
+        // TODO(akhercha): fetch decimals in currencies table
         decimals: 8,
         nb_sources_aggregated: sources.len() as u32,
         // Only asset type used for now is Crypto

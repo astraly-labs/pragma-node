@@ -9,6 +9,8 @@ use pragma_monitoring::models::SpotEntry;
 
 use crate::handlers::entries::{AggregationMode, Network, OnchainEntry};
 
+const BACKWARD_TIMESTAMP_INTERVAL: &str = "1 hour";
+
 #[derive(Queryable, QueryableByName)]
 struct SpotEntryWithAggregatedPrice {
     #[diesel(embed)]
@@ -67,7 +69,7 @@ fn build_sql_query(network: Network, aggregation_mode: AggregationMode) -> Strin
                 {table_name}
             WHERE 
                 pair_id = $1 
-                AND timestamp BETWEEN (to_timestamp($2) - INTERVAL '1 hour') AND to_timestamp($2)
+                AND timestamp BETWEEN (to_timestamp($2) - INTERVAL '{backward_interval}') AND to_timestamp($2)
         ),
         FilteredEntries AS (
             SELECT *
@@ -88,6 +90,7 @@ fn build_sql_query(network: Network, aggregation_mode: AggregationMode) -> Strin
             FE.timestamp DESC;
     "#,
         table_name = get_table_name_from_network(network),
+        backward_interval = BACKWARD_TIMESTAMP_INTERVAL,
         aggregation_subquery = get_aggregation_query(aggregation_mode).unwrap()
     )
 }
@@ -123,15 +126,26 @@ pub async fn get_sources_and_aggregate(
     Ok((aggregated_price, entries))
 }
 
-pub async fn get_last_updated_timestamp(pool: &Pool, pair_id: String) -> Result<u64, InfraError> {
-    let raw_sql = r#"
+// TODO(akhercha): Only works for Spot entries
+// TODO(akhercha): Does not give the same result than onchain call
+pub async fn get_last_updated_timestamp(
+    pool: &Pool,
+    network: Network,
+    pair_id: String,
+) -> Result<u64, InfraError> {
+    let raw_sql = format!(
+        r#"
         SELECT 
             *
         FROM 
-            spot_entry
+            {table_name}
+        WHERE 
+            pair_id = $1
         ORDER BY timestamp DESC
         LIMIT 1;
-    "#;
+    "#,
+        table_name = get_table_name_from_network(network)
+    );
 
     let conn = pool.get().await.map_err(adapt_infra_error)?;
     let raw_entry = conn
@@ -145,6 +159,5 @@ pub async fn get_last_updated_timestamp(pool: &Pool, pair_id: String) -> Result<
         .map_err(adapt_infra_error)?;
 
     let most_recent_entry = raw_entry.first().ok_or(InfraError::NotFound)?;
-
     Ok(most_recent_entry.timestamp.and_utc().timestamp() as u64)
 }
