@@ -4,6 +4,7 @@ pub mod publishers;
 
 use axum::extract::{Query, State};
 use axum::Json;
+use bigdecimal::BigDecimal;
 
 use pragma_entities::EntryError;
 
@@ -15,6 +16,7 @@ use crate::utils::PathExtractor;
 use crate::AppState;
 
 use super::utils::currency_pair_to_pair_id;
+use super::OnchainEntry;
 
 #[utoipa::path(
     get,
@@ -62,17 +64,32 @@ pub async fn get_onchain(
             .await
             .map_err(|_| EntryError::InternalServerError)?;
 
-    let res = GetOnchainResponse {
+    Ok(Json(adapt_entries_to_onchain_response(
+        pair_id,
+        // TODO(akhercha): fetch decimals in currencies table
+        8,
+        sources,
+        aggregated_price,
+        last_updated_timestamp,
+    )))
+}
+
+fn adapt_entries_to_onchain_response(
+    pair_id: String,
+    decimals: u32,
+    sources: Vec<OnchainEntry>,
+    aggregated_price: BigDecimal,
+    last_updated_timestamp: u64,
+) -> GetOnchainResponse {
+    GetOnchainResponse {
         pair_id,
         last_updated_timestamp,
         // TODO(akhercha): Format the price
         price: aggregated_price.to_string(),
-        // TODO(akhercha): fetch decimals in currencies table
-        decimals: 8,
+        decimals,
         nb_sources_aggregated: sources.len() as u32,
         // Only asset type used for now is Crypto
         asset_type: "Crypto".to_string(),
         components: sources,
-    };
-    Ok(Json(res))
+    }
 }
