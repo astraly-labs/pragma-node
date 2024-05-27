@@ -58,8 +58,12 @@ fn get_table_name_from_network(network: Network) -> &'static str {
     }
 }
 
-fn build_sql_query(network: Network, aggregation_mode: AggregationMode) -> String {
-    format!(
+fn build_sql_query(
+    network: Network,
+    aggregation_mode: AggregationMode,
+) -> Result<String, InfraError> {
+    let aggregation_query = get_aggregation_query(aggregation_mode)?;
+    let complete_sql_query = format!(
         r#"
         WITH RankedEntries AS (
             SELECT 
@@ -91,8 +95,9 @@ fn build_sql_query(network: Network, aggregation_mode: AggregationMode) -> Strin
     "#,
         table_name = get_table_name_from_network(network),
         backward_interval = BACKWARD_TIMESTAMP_INTERVAL,
-        aggregation_subquery = get_aggregation_query(aggregation_mode).unwrap()
-    )
+        aggregation_subquery = aggregation_query
+    );
+    Ok(complete_sql_query)
 }
 
 // TODO(akhercha): Only works for Spot entries
@@ -103,7 +108,7 @@ pub async fn get_sources_and_aggregate(
     timestamp: u64,
     aggregation_mode: AggregationMode,
 ) -> Result<(BigDecimal, Vec<OnchainEntry>), InfraError> {
-    let raw_sql = build_sql_query(network, aggregation_mode);
+    let raw_sql = build_sql_query(network, aggregation_mode)?;
 
     let conn = pool.get().await.map_err(adapt_infra_error)?;
     let raw_entries = conn

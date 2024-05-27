@@ -26,7 +26,7 @@ USER node:pragma
 WORKDIR /home/pragma-node
 
 COPY --from=builder --chown=node:pragma  /home/pragma-node/bin/pragma-node /usr/local/bin/pragma-node
-COPY infra/pragma-node/config/.env .env
+# COPY infra/pragma-node/config/.env.example .env
 
 EXPOSE 3000
 

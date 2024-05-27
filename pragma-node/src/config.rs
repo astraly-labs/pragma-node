@@ -4,8 +4,8 @@ use tokio::sync::OnceCell;
 
 #[derive(Debug, Deserialize)]
 pub struct ServerConfig {
-    pub host: String,
-    pub port: u16,
+    host: String,
+    port: u16,
 }
 
 impl Default for ServerConfig {
