@@ -46,7 +46,7 @@ fn get_aggregation_query(aggregation_mode: AggregationMode) -> Result<&'static s
                 ) AS MedianPrices
             ) AS aggregated_price"
         }
-        AggregationMode::Twap => Err(InfraError::InternalServerError)?,
+        _ => Err(InfraError::InternalServerError)?,
     };
     Ok(query)
 }
@@ -126,38 +126,36 @@ pub async fn get_sources_and_aggregate(
     Ok((aggregated_price, entries))
 }
 
-// TODO(akhercha): Only works for Spot entries
-// TODO(akhercha): Does not give the same result than onchain call
-pub async fn get_last_updated_timestamp(
-    pool: &Pool,
-    network: Network,
-    pair_id: String,
-) -> Result<u64, InfraError> {
-    let raw_sql = format!(
-        r#"
-        SELECT 
-            *
-        FROM 
-            {table_name}
-        WHERE 
-            pair_id = $1
-        ORDER BY timestamp DESC
-        LIMIT 1;
-    "#,
-        table_name = get_table_name_from_network(network)
-    );
+// pub async fn get_last_updated_timestamp(
+//     pool: &Pool,
+//     network: Network,
+//     pair_id: String,
+// ) -> Result<u64, InfraError> {
+//     let raw_sql = format!(
+//         r#"
+//         SELECT
+//             *
+//         FROM
+//             {table_name}
+//         WHERE
+//             pair_id = $1
+//         ORDER BY timestamp DESC
+//         LIMIT 1;
+//     "#,
+//         table_name = get_table_name_from_network(network)
+//     );
 
-    let conn = pool.get().await.map_err(adapt_infra_error)?;
-    let raw_entry = conn
-        .interact(move |conn| {
-            diesel::sql_query(raw_sql)
-                .bind::<diesel::sql_types::Text, _>(pair_id)
-                .load::<SpotEntry>(conn)
-        })
-        .await
-        .map_err(adapt_infra_error)?
-        .map_err(adapt_infra_error)?;
+//     let conn = pool.get().await.map_err(adapt_infra_error)?;
+//     let raw_entry = conn
+//         .interact(move |conn| {
+//             diesel::sql_query(raw_sql)
+//                 .bind::<diesel::sql_types::Text, _>(pair_id)
+//                 .load::<SpotEntry>(conn)
+//         })
+//         .await
+//         .map_err(adapt_infra_error)?
+//         .map_err(adapt_infra_error)?;
 
-    let most_recent_entry = raw_entry.first().ok_or(InfraError::NotFound)?;
-    Ok(most_recent_entry.timestamp.and_utc().timestamp() as u64)
-}
+//     let most_recent_entry = raw_entry.first().ok_or(InfraError::NotFound)?;
+//     Ok(most_recent_entry.timestamp.and_utc().timestamp() as u64)
+// }

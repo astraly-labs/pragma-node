@@ -5,14 +5,12 @@ pub mod publishers;
 use axum::extract::{Query, State};
 use axum::Json;
 use bigdecimal::BigDecimal;
-
 use pragma_entities::EntryError;
 
 use crate::handlers::entries::{GetOnchainParams, GetOnchainResponse};
-use crate::infra::repositories::onchain_repository::{
-    get_last_updated_timestamp, get_sources_and_aggregate,
-};
-use crate::utils::PathExtractor;
+use crate::infra::repositories::entry_repository::get_decimals;
+use crate::infra::repositories::onchain_repository::get_sources_and_aggregate;
+use crate::utils::{format_bigdecimal_price, PathExtractor};
 use crate::AppState;
 
 use super::utils::currency_pair_to_pair_id;
@@ -60,17 +58,16 @@ pub async fn get_onchain(
     .await
     .map_err(|db_error| db_error.to_entry_error(&pair_id))?;
 
-    // TODO(akhercha): ⚠ gives different result than onchain oracle
-    // let last_updated_timestamp = sources[0].timestamp;
-    let last_updated_timestamp =
-        get_last_updated_timestamp(&state.postgres_pool, params.network, pair_id.clone())
-            .await
-            .map_err(|db_error| db_error.to_entry_error(&pair_id))?;
+    // TODO(akhercha): ⚠ gives different result than onchain oracle sometimes
+    let last_updated_timestamp = sources[0].timestamp;
+
+    let decimals = get_decimals(&state.timescale_pool, &pair_id)
+        .await
+        .map_err(|db_error| db_error.to_entry_error(&pair_id))?;
 
     Ok(Json(adapt_entries_to_onchain_response(
         pair_id,
-        // TODO(akhercha): fetch decimals in currencies table
-        8,
+        decimals,
         sources,
         aggregated_price,
         last_updated_timestamp,
@@ -87,8 +84,7 @@ fn adapt_entries_to_onchain_response(
     GetOnchainResponse {
         pair_id,
         last_updated_timestamp,
-        // TODO(akhercha): Format the price
-        price: aggregated_price.to_string(),
+        price: format_bigdecimal_price(aggregated_price, decimals),
         decimals,
         nb_sources_aggregated: sources.len() as u32,
         // Only asset type used for now is Crypto

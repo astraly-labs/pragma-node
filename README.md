@@ -93,24 +93,35 @@ The project follows a modular structure to keep the code organized and maintaina
 
 For faster iterations, you can deploy every needed services required by `pragma-node` using `compose.dev.yaml` & Docker compose:
 
-1. Start the services:
+### 1. Start the services:
 
 ```bash
 docker compose -f compose.dev.yaml up -d --build
 ```
 
-2. Fill the postgres database with the backup (ask for a file):
+### 2. Fill the database
+
+#### A. Use the backup (ask for a file):
 
 ```bash
 # copy the backup file to the container
-docker cp ~/Programming/pragma/backup_onchain.sql pragma-node-postgre-db-1:/backup_onchain.sql
+docker cp /path/to/the/backup.sql pragma-node-postgre-db-1:/backup.sql
 # connect to the container
 docker exec -it pragma-node-postgre-db-1 bash
 # execute the backup
-PGPASSWORD=test-password pg_restore -h postgre-db -U postgres -d pragma /backup_onchain.sql
+PGPASSWORD=test-password pg_restore -h postgre-db -U postgres -d pragma /backup.sql
 ```
 
-3. Export the required environment variables:
+#### B. Run the indexer:
+
+```bash
+git clone git@github.com:astraly-labs/indexer-service.git
+cd indexer-service
+# Index & fill the spot_entry (testnet) table
+apibara run examples/pragma/testnet/sepolia-script-spot.js -A [YOUR_APIBARA_API_KEY] --connection-string postgres://postgres:test-password@localhost:5433/pragma --table-name spot_entry --timeout-duration-seconds=240 
+```
+
+### 3. Export the required environment variables:
 
 ```bash
 export TIMESCALE_DATABASE_URL="postgres://postgres:test-password@0.0.0.0:5432/pragma"
@@ -122,11 +133,10 @@ export PORT=3000
 export KAFKA_BROKERS="0.0.0.0:9092"
 ```
 
-4. Start the Pragma Node service:
+### 4. Start the Pragma Node service:
 
 ```bash
-cd pragma-node
-cargo run # or debug or anything
+cargo run --bin pragma-node
 ```
 
 The pragma-node swagger documentation is available at `http://localhost:3000/node/swagger-ui`.
