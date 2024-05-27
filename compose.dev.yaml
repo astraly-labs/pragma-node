@@ -34,13 +34,13 @@ services:
       - POSTGRES_DB=pragma
       - POSTGRES_PASSWORD_FILE=/run/secrets/db-password
       - POSTGRES_LISTEN_ADDRESSES=*
-    
+
     ports:
       - "5432:5432"
     expose:
       - 5432
     healthcheck:
-      test: [ "CMD", "pg_isready" ]
+      test: ["CMD", "pg_isready"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -81,7 +81,7 @@ services:
           "kafka-topics",
           "--list",
           "--bootstrap-server",
-          "pragma-kafka:9092"
+          "pragma-kafka:9092",
         ]
     environment:
       KAFKA_BROKER_ID: 1

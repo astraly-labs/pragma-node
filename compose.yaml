@@ -82,7 +82,7 @@ services:
     expose:
       - 5432
     healthcheck:
-      test: [ "CMD", "pg_isready" ]
+      test: ["CMD", "pg_isready"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -123,7 +123,7 @@ services:
           "kafka-topics",
           "--list",
           "--bootstrap-server",
-          "pragma-kafka:9092"
+          "pragma-kafka:9092",
         ]
     environment:
       KAFKA_BROKER_ID: 1
@@ -176,7 +176,6 @@ volumes:
   postgre-db-data:
   pragma_zookeeper_data:
   pragma_zookeeper_logs:
-
 
 secrets:
   db-password:
