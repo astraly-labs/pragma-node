@@ -101,6 +101,8 @@ docker compose -f compose.dev.yaml up -d --build
 
 ### 2. Fill the database
 
+To do so, you can either use a backup or run the indexer (or both):
+
 #### A. Use the backup (ask for a file):
 
 ```bash
@@ -118,7 +120,7 @@ PGPASSWORD=test-password pg_restore -h postgre-db -U postgres -d pragma /backup.
 git clone git@github.com:astraly-labs/indexer-service.git
 cd indexer-service
 # Index & fill the spot_entry (testnet) table
-apibara run examples/pragma/testnet/sepolia-script-spot.js -A [YOUR_APIBARA_API_KEY] --connection-string postgres://postgres:test-password@localhost:5433/pragma --table-name spot_entry --timeout-duration-seconds=240 
+apibara run examples/pragma/testnet/sepolia-script-spot.js -A [YOUR_APIBARA_API_KEY] --connection-string postgres://postgres:test-password@localhost:5433/pragma --table-name spot_entry --timeout-duration-seconds=240
 ```
 
 ### 3. Export the required environment variables:
