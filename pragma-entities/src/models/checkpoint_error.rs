@@ -28,10 +28,9 @@ impl From<InfraError> for CheckpointError {
 impl IntoResponse for CheckpointError {
     fn into_response(self) -> axum::response::Response {
         let (status, err_msg) = match self {
-            Self::InvalidLimit(limit) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Invalid Limit {}", limit),
-            ),
+            Self::InvalidLimit(limit) => {
+                (StatusCode::BAD_REQUEST, format!("Invalid Limit {}", limit))
+            }
             Self::NotFound() => (
                 StatusCode::NOT_FOUND,
                 String::from("No checkpoints found for requested pair"),
