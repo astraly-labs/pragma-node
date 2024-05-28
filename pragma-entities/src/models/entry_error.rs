@@ -37,6 +37,8 @@ pub enum EntryError {
     PublishData(String),
     #[error("can't build publish message: {0}")]
     BuildPublish(String),
+    #[error("limit maximum is 1000, current is: {0}")]
+    InvalidLimit(u64),
 }
 
 impl IntoResponse for EntryError {

@@ -101,9 +101,19 @@ docker compose -f compose.dev.yaml up -d --build
 
 ### 2. Fill the database
 
-To do so, you can either use a backup or run the indexer (or both):
+The database tables are created automatically using the migrations in the `infra/pragma-node/postgres_migrations` folder.
+However, you need to fill the tables with data. To do so, you can either run the indexer or use a backup:
 
-#### A. Use the backup (ask for a file):
+#### Run the indexer:
+
+```bash
+git clone git@github.com:astraly-labs/indexer-service.git
+cd indexer-service
+# Index & fill the spot_entry (testnet) table
+apibara run examples/pragma/testnet/sepolia-script-spot.js -A [YOUR_APIBARA_API_KEY] --connection-string postgres://postgres:test-password@localhost:5433/pragma --table-name spot_entry --timeout-duration-seconds=240
+```
+
+#### Use the backup (ask for a file):
 
 ```bash
 # copy the backup file to the container
@@ -112,15 +122,6 @@ docker cp /path/to/the/backup.sql pragma-node-postgre-db-1:/backup.sql
 docker exec -it pragma-node-postgre-db-1 bash
 # execute the backup
 PGPASSWORD=test-password pg_restore -h postgre-db -U postgres -d pragma /backup.sql
-```
-
-#### B. Run the indexer:
-
-```bash
-git clone git@github.com:astraly-labs/indexer-service.git
-cd indexer-service
-# Index & fill the spot_entry (testnet) table
-apibara run examples/pragma/testnet/sepolia-script-spot.js -A [YOUR_APIBARA_API_KEY] --connection-string postgres://postgres:test-password@localhost:5433/pragma --table-name spot_entry --timeout-duration-seconds=240
 ```
 
 ### 3. Export the required environment variables:

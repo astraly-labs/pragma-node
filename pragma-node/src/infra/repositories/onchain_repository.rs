@@ -1,15 +1,35 @@
 use bigdecimal::BigDecimal;
 
 use deadpool_diesel::postgres::Pool;
-use diesel::sql_types::{BigInt, Numeric, Text, Timestamptz};
+use diesel::sql_types::{BigInt, Numeric, Text, Timestamp, VarChar};
 use diesel::{Queryable, QueryableByName, RunQueryDsl};
 
 use pragma_entities::error::{adapt_infra_error, InfraError};
 use pragma_monitoring::models::SpotEntry;
 
-use crate::handlers::entries::{AggregationMode, Network, OnchainEntry};
+use crate::handlers::entries::{AggregationMode, Checkpoint, Network, OnchainEntry};
+use crate::utils::format_bigdecimal_price;
 
 const BACKWARD_TIMESTAMP_INTERVAL: &str = "1 hour";
+
+#[allow(dead_code)]
+enum TableType {
+    SpotEntry,
+    SpotCheckpoint,
+    FutureEntry,
+}
+
+fn get_table_name(network: Network, table_type: TableType) -> &'static str {
+    match (network, table_type) {
+        (Network::Testnet, TableType::SpotEntry) => "spot_entry",
+        (Network::Mainnet, TableType::SpotEntry) => "mainnet_spot_entry",
+        (Network::Testnet, TableType::SpotCheckpoint) => "spot_checkpoints",
+        (Network::Mainnet, TableType::SpotCheckpoint) => "mainnet_spot_checkpoints",
+        // TODO(akhercha): Future tables not used yet
+        (Network::Testnet, TableType::FutureEntry) => "future_entry",
+        (Network::Mainnet, TableType::FutureEntry) => "mainnet_future_entry",
+    }
+}
 
 #[derive(Queryable, QueryableByName)]
 struct SpotEntryWithAggregatedPrice {
@@ -51,13 +71,6 @@ fn get_aggregation_query(aggregation_mode: AggregationMode) -> Result<&'static s
     Ok(query)
 }
 
-fn get_table_name_from_network(network: Network) -> &'static str {
-    match network {
-        Network::Testnet => "spot_entry",
-        Network::Mainnet => "mainnet_spot_entry",
-    }
-}
-
 fn build_sql_query(
     network: Network,
     aggregation_mode: AggregationMode,
@@ -93,7 +106,7 @@ fn build_sql_query(
         ORDER BY 
             FE.timestamp DESC;
     "#,
-        table_name = get_table_name_from_network(network),
+        table_name = get_table_name(network, TableType::SpotEntry),
         backward_interval = BACKWARD_TIMESTAMP_INTERVAL,
         aggregation_subquery = aggregation_query
     );
@@ -133,7 +146,7 @@ pub async fn get_sources_and_aggregate(
 
 #[derive(Queryable, QueryableByName)]
 struct EntryTimestamp {
-    #[diesel(sql_type = Timestamptz)]
+    #[diesel(sql_type = Timestamp)]
     pub timestamp: chrono::NaiveDateTime,
 }
 
@@ -155,7 +168,7 @@ pub async fn get_last_updated_timestamp(
         ORDER BY timestamp DESC
         LIMIT 1;
     "#,
-        table_name = get_table_name_from_network(network)
+        table_name = get_table_name(network, TableType::SpotEntry)
     );
 
     let conn = pool.get().await.map_err(adapt_infra_error)?;
@@ -171,4 +184,70 @@ pub async fn get_last_updated_timestamp(
 
     let most_recent_entry = raw_entry.first().ok_or(InfraError::NotFound)?;
     Ok(most_recent_entry.timestamp.and_utc().timestamp() as u64)
+}
+
+#[derive(Queryable, QueryableByName)]
+struct RawCheckpoint {
+    #[diesel(sql_type = VarChar)]
+    pub transaction_hash: String,
+    #[diesel(sql_type = Numeric)]
+    pub price: BigDecimal,
+    #[diesel(sql_type = Timestamp)]
+    pub timestamp: chrono::NaiveDateTime,
+    #[diesel(sql_type = VarChar)]
+    pub sender_address: String,
+}
+
+impl RawCheckpoint {
+    pub fn to_checkpoint(&self, decimals: u32) -> Checkpoint {
+        Checkpoint {
+            tx_hash: self.transaction_hash.clone(),
+            price: format_bigdecimal_price(self.price.clone(), decimals),
+            timestamp: self.timestamp.and_utc().timestamp() as u64,
+            sender_address: self.sender_address.clone(),
+        }
+    }
+}
+
+pub async fn get_checkpoints(
+    pool: &Pool,
+    network: Network,
+    pair_id: String,
+    decimals: u32,
+    limit: u64,
+) -> Result<Vec<Checkpoint>, InfraError> {
+    let raw_sql = format!(
+        r#"
+        SELECT
+            transaction_hash,
+            price,
+            timestamp,
+            sender_address
+        FROM
+            {table_name}
+        WHERE
+            pair_id = $1
+        ORDER BY timestamp DESC
+        LIMIT $2;
+    "#,
+        table_name = get_table_name(network, TableType::SpotCheckpoint)
+    );
+
+    let conn = pool.get().await.map_err(adapt_infra_error)?;
+    let raw_checkpoints = conn
+        .interact(move |conn| {
+            diesel::sql_query(raw_sql)
+                .bind::<diesel::sql_types::Text, _>(pair_id)
+                .bind::<diesel::sql_types::BigInt, _>(limit as i64)
+                .load::<RawCheckpoint>(conn)
+        })
+        .await
+        .map_err(adapt_infra_error)?
+        .map_err(adapt_infra_error)?;
+
+    let checkpoints: Vec<Checkpoint> = raw_checkpoints
+        .into_iter()
+        .map(|raw_checkpoint| raw_checkpoint.to_checkpoint(decimals))
+        .collect();
+    Ok(checkpoints)
 }

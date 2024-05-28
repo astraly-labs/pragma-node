@@ -8,6 +8,9 @@ services:
       - POSTGRES_DB=pragma
       - POSTGRES_LISTEN_ADDRESSES=*
       - PGPORT=5433
+    # Automatically run the migrations on the database
+    volumes:
+      - ./infra/pragma-node/postgres_migrations:/docker-entrypoint-initdb.d
     networks:
       - pragma-db-network
     ports:

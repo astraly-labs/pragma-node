@@ -112,6 +112,32 @@ pub struct GetOnchainResponse {
     components: Vec<OnchainEntry>,
 }
 
+#[derive(Debug, Deserialize, IntoParams, ToSchema)]
+pub struct GetOnchainCheckpointsParams {
+    pub network: Network,
+    pub limit: Option<u64>,
+}
+
+impl Default for GetOnchainCheckpointsParams {
+    fn default() -> Self {
+        Self {
+            network: Network::default(),
+            limit: Some(100),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct Checkpoint {
+    pub tx_hash: String,
+    pub price: String,
+    pub timestamp: u64,
+    pub sender_address: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct GetOnchainCheckpointsResponse(pub Vec<Checkpoint>);
+
 /// Query parameters structs
 
 // Supported Aggregation Intervals

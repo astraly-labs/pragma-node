@@ -34,6 +34,7 @@ async fn main() {
             handlers::entries::get_ohlc::get_ohlc,
             handlers::entries::get_volatility::get_volatility,
             handlers::entries::get_onchain::get_onchain,
+            handlers::entries::get_onchain::checkpoints::get_onchain_checkpoints,
         ),
         components(
             schemas(pragma_entities::dto::Entry, pragma_entities::EntryError),
@@ -45,11 +46,16 @@ async fn main() {
                 handlers::entries::GetVolatilityResponse,
                 handlers::entries::GetOHLCResponse,
                 handlers::entries::GetOnchainResponse,
+                handlers::entries::GetOnchainCheckpointsResponse,
             ),
-            schemas(handlers::entries::GetOnchainParams),
+            schemas(
+                handlers::entries::OnchainEntry,
+                handlers::entries::Checkpoint,
+                handlers::entries::GetOnchainParams,
+                handlers::entries::GetOnchainCheckpointsParams
+            ),
             schemas(handlers::entries::Network),
             schemas(handlers::entries::AggregationMode),
-            schemas(handlers::entries::OnchainEntry),
             schemas(handlers::entries::GetEntryParams, handlers::entries::Interval),
             schemas(handlers::entries::Entry, handlers::entries::BaseEntry),
             schemas(pragma_entities::error::InfraError),
