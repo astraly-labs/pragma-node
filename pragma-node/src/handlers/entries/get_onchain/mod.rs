@@ -9,7 +9,9 @@ use pragma_entities::EntryError;
 
 use crate::handlers::entries::{GetOnchainParams, GetOnchainResponse};
 use crate::infra::repositories::entry_repository::get_decimals;
-use crate::infra::repositories::onchain_repository::get_sources_and_aggregate;
+use crate::infra::repositories::onchain_repository::{
+    get_last_updated_timestamp, get_sources_and_aggregate,
+};
 use crate::utils::{format_bigdecimal_price, PathExtractor};
 use crate::AppState;
 
@@ -58,8 +60,11 @@ pub async fn get_onchain(
     .await
     .map_err(|db_error| db_error.to_entry_error(&pair_id))?;
 
-    // TODO(akhercha): ⚠ gives different result than onchain oracle sometimes
-    let last_updated_timestamp = sources[0].timestamp;
+    // TODO(akhercha): ⚠ gives different result than onchain oracle sometime
+    let last_updated_timestamp =
+        get_last_updated_timestamp(&state.postgres_pool, params.network, pair_id.clone())
+            .await
+            .map_err(|db_error| db_error.to_entry_error(&pair_id))?;
 
     let decimals = get_decimals(&state.timescale_pool, &pair_id)
         .await

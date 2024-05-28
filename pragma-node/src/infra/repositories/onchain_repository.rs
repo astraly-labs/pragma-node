@@ -1,7 +1,7 @@
 use bigdecimal::BigDecimal;
 
 use deadpool_diesel::postgres::Pool;
-use diesel::sql_types::{BigInt, Numeric, Text};
+use diesel::sql_types::{BigInt, Numeric, Text, Timestamptz};
 use diesel::{Queryable, QueryableByName, RunQueryDsl};
 
 use pragma_entities::error::{adapt_infra_error, InfraError};
@@ -131,36 +131,44 @@ pub async fn get_sources_and_aggregate(
     Ok((aggregated_price, entries))
 }
 
-// pub async fn get_last_updated_timestamp(
-//     pool: &Pool,
-//     network: Network,
-//     pair_id: String,
-// ) -> Result<u64, InfraError> {
-//     let raw_sql = format!(
-//         r#"
-//         SELECT
-//             *
-//         FROM
-//             {table_name}
-//         WHERE
-//             pair_id = $1
-//         ORDER BY timestamp DESC
-//         LIMIT 1;
-//     "#,
-//         table_name = get_table_name_from_network(network)
-//     );
+#[derive(Queryable, QueryableByName)]
+struct EntryTimestamp {
+    #[diesel(sql_type = Timestamptz)]
+    pub timestamp: chrono::NaiveDateTime,
+}
 
-//     let conn = pool.get().await.map_err(adapt_infra_error)?;
-//     let raw_entry = conn
-//         .interact(move |conn| {
-//             diesel::sql_query(raw_sql)
-//                 .bind::<diesel::sql_types::Text, _>(pair_id)
-//                 .load::<SpotEntry>(conn)
-//         })
-//         .await
-//         .map_err(adapt_infra_error)?
-//         .map_err(adapt_infra_error)?;
+// TODO(akhercha): Only works for Spot entries
+// TODO(akhercha): Give different result than onchain oracle sometimes
+pub async fn get_last_updated_timestamp(
+    pool: &Pool,
+    network: Network,
+    pair_id: String,
+) -> Result<u64, InfraError> {
+    let raw_sql = format!(
+        r#"
+        SELECT
+            timestamp
+        FROM
+            {table_name}
+        WHERE
+            pair_id = $1
+        ORDER BY timestamp DESC
+        LIMIT 1;
+    "#,
+        table_name = get_table_name_from_network(network)
+    );
 
-//     let most_recent_entry = raw_entry.first().ok_or(InfraError::NotFound)?;
-//     Ok(most_recent_entry.timestamp.and_utc().timestamp() as u64)
-// }
+    let conn = pool.get().await.map_err(adapt_infra_error)?;
+    let raw_entry = conn
+        .interact(move |conn| {
+            diesel::sql_query(raw_sql)
+                .bind::<diesel::sql_types::Text, _>(pair_id)
+                .load::<EntryTimestamp>(conn)
+        })
+        .await
+        .map_err(adapt_infra_error)?
+        .map_err(adapt_infra_error)?;
+
+    let most_recent_entry = raw_entry.first().ok_or(InfraError::NotFound)?;
+    Ok(most_recent_entry.timestamp.and_utc().timestamp() as u64)
+}
