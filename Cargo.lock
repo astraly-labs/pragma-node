@@ -1827,8 +1827,10 @@ dependencies = [
 name = "pragma-common"
 version = "1.0.0"
 dependencies = [
+ "serde",
  "tracing",
  "tracing-subscriber",
+ "utoipa",
 ]
 
 [[package]]

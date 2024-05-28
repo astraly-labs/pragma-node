@@ -1,7 +1,8 @@
 use serde::{Deserialize, Serialize};
-
 use starknet::core::types::FieldElement;
 use utoipa::{IntoParams, ToSchema};
+
+use pragma_common::types::{AggregationMode, Interval, Network};
 
 pub use create_entry::create_entries;
 pub use get_entry::get_entry;
@@ -75,15 +76,6 @@ pub struct OnchainEntry {
     pub timestamp: u64,
 }
 
-#[derive(Default, Debug, Deserialize, ToSchema, Clone, Copy)]
-pub enum Network {
-    #[serde(rename = "testnet")]
-    #[default]
-    Testnet,
-    #[serde(rename = "mainnet")]
-    Mainnet,
-}
-
 #[derive(Debug, Deserialize, IntoParams, ToSchema)]
 pub struct GetOnchainParams {
     pub network: Network,
@@ -112,33 +104,33 @@ pub struct GetOnchainResponse {
     components: Vec<OnchainEntry>,
 }
 
+#[derive(Debug, Deserialize, IntoParams, ToSchema)]
+pub struct GetOnchainCheckpointsParams {
+    pub network: Network,
+    pub limit: Option<u64>,
+}
+
+impl Default for GetOnchainCheckpointsParams {
+    fn default() -> Self {
+        Self {
+            network: Network::default(),
+            limit: Some(100),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct Checkpoint {
+    pub tx_hash: String,
+    pub price: String,
+    pub timestamp: u64,
+    pub sender_address: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct GetOnchainCheckpointsResponse(pub Vec<Checkpoint>);
+
 /// Query parameters structs
-
-// Supported Aggregation Intervals
-#[derive(Default, Debug, Deserialize, ToSchema, Clone, Copy)]
-pub enum Interval {
-    #[serde(rename = "1min")]
-    #[default]
-    OneMinute,
-    #[serde(rename = "15min")]
-    FifteenMinutes,
-    #[serde(rename = "1h")]
-    OneHour,
-    #[serde(rename = "2h")]
-    TwoHours,
-}
-
-// Supported Aggregation Modes
-#[derive(Default, Debug, Deserialize, ToSchema, Clone, Copy)]
-pub enum AggregationMode {
-    #[serde(rename = "median")]
-    #[default]
-    Median,
-    #[serde(rename = "mean")]
-    Mean,
-    #[serde(rename = "twap")]
-    Twap,
-}
 
 #[derive(Debug, Deserialize, IntoParams, ToSchema)]
 pub struct GetEntryParams {
