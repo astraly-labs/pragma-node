@@ -1,13 +1,13 @@
 use bigdecimal::BigDecimal;
-
 use deadpool_diesel::postgres::Pool;
 use diesel::sql_types::{BigInt, Numeric, Text, Timestamp, VarChar};
 use diesel::{Queryable, QueryableByName, RunQueryDsl};
 
+use pragma_common::types::{AggregationMode, Network};
 use pragma_entities::error::{adapt_infra_error, InfraError};
 use pragma_monitoring::models::SpotEntry;
 
-use crate::handlers::entries::{AggregationMode, Checkpoint, Network, OnchainEntry};
+use crate::handlers::entries::{Checkpoint, OnchainEntry};
 use crate::utils::format_bigdecimal_price;
 
 const BACKWARD_TIMESTAMP_INTERVAL: &str = "1 hour";

@@ -1,10 +1,10 @@
 use bigdecimal::{BigDecimal, ToPrimitive};
 use chrono::{DateTime, NaiveDateTime};
-use serde::{Deserialize, Serialize};
-
 use diesel::prelude::QueryableByName;
 use diesel::{ExpressionMethods, QueryDsl, Queryable, RunQueryDsl};
+use serde::{Deserialize, Serialize};
 
+use pragma_common::types::{AggregationMode, Interval};
 use pragma_entities::dto;
 use pragma_entities::{
     error::{adapt_infra_error, InfraError},
@@ -12,7 +12,6 @@ use pragma_entities::{
     Currency, Entry, NewEntry,
 };
 
-use crate::handlers::entries::{AggregationMode, Interval};
 use crate::utils::{convert_via_quote, normalize_to_decimals};
 
 #[derive(Deserialize)]

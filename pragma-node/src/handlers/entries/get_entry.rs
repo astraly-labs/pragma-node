@@ -2,11 +2,13 @@ use axum::extract::{Query, State};
 use axum::Json;
 use bigdecimal::num_bigint::ToBigInt;
 
-use crate::handlers::entries::{AggregationMode, GetEntryResponse, Interval};
+use pragma_common::types::{AggregationMode, Interval};
+use pragma_entities::EntryError;
+
+use crate::handlers::entries::GetEntryResponse;
 use crate::infra::repositories::entry_repository::{self, MedianEntry};
 use crate::utils::PathExtractor;
 use crate::AppState;
-use pragma_entities::EntryError;
 
 use super::utils::currency_pair_to_pair_id;
 use super::GetEntryParams;

@@ -57,10 +57,12 @@ async fn main() {
                 handlers::entries::BaseEntry,
                 handlers::entries::OnchainEntry,
             ),
+            schemas(
+                pragma_common::types::AggregationMode,
+                pragma_common::types::Interval,
+                pragma_common::types::Network,
+            ),
             schemas(handlers::entries::Checkpoint),
-            schemas(handlers::entries::Network),
-            schemas(handlers::entries::AggregationMode),
-            schemas(handlers::entries::Interval),
         ),
         modifiers(&SecurityAddon),
         tags(
