@@ -6,6 +6,7 @@ use utoipa::{IntoParams, ToSchema};
 pub use create_entry::create_entries;
 pub use get_entry::get_entry;
 pub use get_ohlc::get_ohlc;
+pub use get_onchain::get_onchain;
 pub use get_volatility::get_volatility;
 
 use crate::infra::repositories::entry_repository::OHLCEntry;
@@ -13,8 +14,8 @@ use crate::infra::repositories::entry_repository::OHLCEntry;
 pub mod create_entry;
 pub mod get_entry;
 pub mod get_ohlc;
+pub mod get_onchain;
 pub mod get_volatility;
-
 pub mod utils;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, ToSchema)]
@@ -65,6 +66,52 @@ pub struct GetVolatilityResponse {
     decimals: u32,
 }
 
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct OnchainEntry {
+    pub publisher: String,
+    pub source: String,
+    pub price: String,
+    pub tx_hash: String,
+    pub timestamp: u64,
+}
+
+#[derive(Default, Debug, Deserialize, ToSchema, Clone, Copy)]
+pub enum Network {
+    #[serde(rename = "testnet")]
+    #[default]
+    Testnet,
+    #[serde(rename = "mainnet")]
+    Mainnet,
+}
+
+#[derive(Debug, Deserialize, IntoParams, ToSchema)]
+pub struct GetOnchainParams {
+    pub network: Network,
+    pub aggregation: AggregationMode,
+    pub timestamp: Option<u64>,
+}
+
+impl Default for GetOnchainParams {
+    fn default() -> Self {
+        Self {
+            network: Network::default(),
+            aggregation: AggregationMode::default(),
+            timestamp: Some(chrono::Utc::now().naive_utc().and_utc().timestamp() as u64),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct GetOnchainResponse {
+    pair_id: String,
+    last_updated_timestamp: u64,
+    price: String,
+    decimals: u32,
+    nb_sources_aggregated: u32,
+    asset_type: String,
+    components: Vec<OnchainEntry>,
+}
+
 /// Query parameters structs
 
 // Supported Aggregation Intervals
@@ -87,6 +134,8 @@ pub enum AggregationMode {
     #[serde(rename = "median")]
     #[default]
     Median,
+    #[serde(rename = "mean")]
+    Mean,
     #[serde(rename = "twap")]
     Twap,
 }

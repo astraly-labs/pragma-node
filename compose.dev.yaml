@@ -1,63 +1,19 @@
-# Comments are provided throughout this file to help you get started.
-# If you need more help, visit the Docker compose reference guide at
-# https://docs.docker.com/compose/compose-file/
-
-# Here the instructions define your application as a service called "server".
-# This service is built from the Dockerfile in the current directory.
-# You can add other services your application may depend on here, such as a
-# database or a cache. For examples, see the Awesome Compose repository:
-# https://github.com/docker/awesome-compose
 services:
-  #  server:
-  #    environment:
-  #      - PORT=3000
-  #      - POSTGRES_DATABASE_URL=postgres://postgres:postgres@host.docker.internal:5432/project_f
-  #      - HOST=0.0.0.0
-  #      - RUST_LOG=info
-  #    build:
-  #      context: .
-  #      target: final
-  #    ports:
-  #      - 3000:3000
-  # The commented out section below is an example of how to define a PostgreSQL
-  # database that your application can use. `depends_on` tells Docker Compose to
-  # start the database before your application. The `db-data` volume persists the
-  # database data between container restarts. The `db-password` secret is used
-  # to set the database password. You must create `db/password.txt` and add
-  # a password of your choosing to it before running `docker compose up`.
-  #     depends_on:
-  #       db:
-  #         condition: service_healthy
-  pragma-node:
-    container_name: "pragma-node"
-    environment:
-      - DATABASE_MAX_CONN=5
-      - TOPIC=pragma-data
-      - KAFKA_BROKERS=pragma-kafka:9092
-    depends_on:
-      pragma-kafka:
-        condition: service_healthy
-      timescale-db:
-        condition: service_healthy
-      postgre-db:
-        condition: service_healthy
-    networks:
-      - pragma-kafka-network
-      - pragma-db-network
-    ports:
-      - "3000:3000"
-    build:
-      dockerfile: infra/pragma-node/Dockerfile
-
   postgre-db:
     image: postgres
     restart: always
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: test-password
-      POSTGRES_DB: pragma
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=test-password
+      - POSTGRES_DB=pragma
+      - POSTGRES_LISTEN_ADDRESSES=*
+      - PGPORT=5433
     networks:
       - pragma-db-network
+    ports:
+      - "5433:5433"
+    expose:
+      - 5433
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
@@ -77,8 +33,10 @@ services:
     environment:
       - POSTGRES_DB=pragma
       - POSTGRES_PASSWORD_FILE=/run/secrets/db-password
+      - POSTGRES_LISTEN_ADDRESSES=*
+
     ports:
-      - 5432:5432
+      - "5432:5432"
     expose:
       - 5432
     healthcheck:
@@ -100,7 +58,7 @@ services:
       - pragma_zookeeper_data:/var/lib/zookeeper/data
       - pragma_zookeeper_logs:/var/lib/zookeeper/log
     ports:
-      - "22181:2181"
+      - "2181:2181"
 
   pragma-kafka:
     container_name: "pragma-kafka"
@@ -128,13 +86,9 @@ services:
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: pragma-zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://pragma-kafka:9092,PLAINTEXT_E://pragma-kafka:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://pragma-kafka:9092,PLAINTEXT_E://localhost:29092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,PLAINTEXT_E:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-      #KAFKA_SOCKET_REQUEST_MAX_BYTES: "10000000"
-      #KAFKA_MESSAGE_MAX_BYTES: "10000000"
-      #KAFKA_TOPIC_MAX_MESSAGE_BYTES: "15728640"
-      #KAFKA_REPLICA_FETCH_MAX_BYTES: "15728640"
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
 
@@ -159,17 +113,8 @@ services:
 
 networks:
   pragma-db-network:
-    # production
-    #driver: bridge
-    #internal: true
   pragma-kafka-network:
-    # production
-    #driver: bridge
-    #internal: true
   pragma-zookeeper-network:
-    # production
-    #driver: bridge
-    #internal: true
 
 volumes:
   timescale-db-data:

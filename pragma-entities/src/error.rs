@@ -1,14 +1,25 @@
-use std::fmt::{self, Debug};
-
 use deadpool_diesel::InteractError;
+use std::fmt::{self, Debug};
 use thiserror::Error;
 use utoipa::ToSchema;
+
+use crate::models::entry_error::EntryError;
 
 #[derive(Debug, ToSchema)]
 pub enum InfraError {
     InternalServerError,
     NotFound,
     InvalidTimeStamp,
+}
+
+impl InfraError {
+    pub fn to_entry_error(&self, pair_id: &String) -> EntryError {
+        match self {
+            InfraError::InternalServerError => EntryError::InternalServerError,
+            InfraError::NotFound => EntryError::NotFound(pair_id.to_string()),
+            InfraError::InvalidTimeStamp => EntryError::InvalidTimestamp,
+        }
+    }
 }
 
 #[derive(Debug, Error)]

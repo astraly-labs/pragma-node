@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use bigdecimal::BigDecimal;
 use pragma_entities::InfraError;
 
@@ -27,4 +29,20 @@ pub fn normalize_to_decimals(
         let power = BigDecimal::from(10_i64.pow(original_decimals - target_decimals));
         value / power
     }
+}
+
+pub fn format_bigdecimal_price(price: BigDecimal, decimals: u32) -> String {
+    let price_decimal = BigDecimal::from_str(&price.to_string()).unwrap();
+    let scale_factor = BigDecimal::from(10u64.pow(decimals));
+    let adjusted_price = &price_decimal / &scale_factor;
+    let mut formatted_price = adjusted_price.to_string();
+    if formatted_price.contains('.') {
+        while formatted_price.ends_with('0') {
+            formatted_price.pop();
+        }
+        if formatted_price.ends_with('.') {
+            formatted_price.pop();
+        }
+    }
+    formatted_price
 }

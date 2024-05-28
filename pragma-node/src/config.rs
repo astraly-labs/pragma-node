@@ -3,20 +3,23 @@ use serde::Deserialize;
 use tokio::sync::OnceCell;
 
 #[derive(Debug, Deserialize)]
-struct ServerConfig {
+pub struct ServerConfig {
     host: String,
     port: u16,
 }
 
-#[derive(Debug, Deserialize)]
-struct KafkaConfig {
-    topic: String,
+impl Default for ServerConfig {
+    fn default() -> Self {
+        Self {
+            host: "0.0.0.0".to_string(),
+            port: 3000,
+        }
+    }
 }
 
-#[derive(Debug)]
-pub struct Config {
-    server: ServerConfig,
-    kafka: KafkaConfig,
+#[derive(Debug, Deserialize)]
+pub struct KafkaConfig {
+    pub topic: String,
 }
 
 impl Default for KafkaConfig {
@@ -27,13 +30,10 @@ impl Default for KafkaConfig {
     }
 }
 
-impl Default for ServerConfig {
-    fn default() -> Self {
-        Self {
-            host: "0.0.0.0".to_string(),
-            port: 3000,
-        }
-    }
+#[derive(Debug)]
+pub struct Config {
+    server: ServerConfig,
+    kafka: KafkaConfig,
 }
 
 impl Config {
@@ -56,7 +56,6 @@ async fn init_config() -> Config {
     dotenv().ok();
 
     let server_config = envy::from_env::<ServerConfig>().unwrap_or_default();
-
     let kafka_config = envy::from_env::<KafkaConfig>().unwrap_or_default();
 
     Config {

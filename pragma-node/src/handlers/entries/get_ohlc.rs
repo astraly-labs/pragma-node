@@ -5,7 +5,7 @@ use crate::handlers::entries::{GetOHLCResponse, Interval};
 use crate::infra::repositories::entry_repository::{self, OHLCEntry};
 use crate::utils::PathExtractor;
 use crate::AppState;
-use pragma_entities::{error::InfraError, EntryError};
+use pragma_entities::EntryError;
 
 use super::utils::currency_pair_to_pair_id;
 use super::GetEntryParams;
@@ -31,7 +31,7 @@ pub async fn get_ohlc(
     // Construct pair id
     let pair_id = currency_pair_to_pair_id(&pair.0, &pair.1);
 
-    let now = chrono::Utc::now().naive_utc().timestamp_millis() as u64;
+    let now = chrono::Utc::now().naive_utc().and_utc().timestamp_millis() as u64;
 
     let timestamp = if let Some(timestamp) = params.timestamp {
         timestamp
@@ -50,9 +50,10 @@ pub async fn get_ohlc(
         return Err(EntryError::InvalidTimestamp);
     }
 
-    let entries = entry_repository::get_ohlc(&state.pool, pair_id.clone(), interval, timestamp)
-        .await
-        .map_err(|db_error| to_entry_error(db_error, &pair_id))?;
+    let entries =
+        entry_repository::get_ohlc(&state.timescale_pool, pair_id.clone(), interval, timestamp)
+            .await
+            .map_err(|db_error| db_error.to_entry_error(&pair_id))?;
 
     Ok(Json(adapt_entry_to_entry_response(pair_id, &entries)))
 }
@@ -61,13 +62,5 @@ fn adapt_entry_to_entry_response(pair_id: String, entries: &[OHLCEntry]) -> GetO
     GetOHLCResponse {
         pair_id,
         data: entries.to_vec(),
-    }
-}
-
-fn to_entry_error(error: InfraError, pair_id: &String) -> EntryError {
-    match error {
-        InfraError::InternalServerError => EntryError::InternalServerError,
-        InfraError::NotFound => EntryError::NotFound(pair_id.to_string()),
-        InfraError::InvalidTimeStamp => EntryError::InvalidTimestamp,
     }
 }

@@ -1,6 +1,6 @@
-use std::net::SocketAddr;
-
 use deadpool_diesel::postgres::Pool;
+use pragma_entities::connection::{ENV_POSTGRES_DATABASE_URL, ENV_TS_DATABASE_URL};
+use std::net::SocketAddr;
 use utoipa::openapi::security::{ApiKey, ApiKeyValue, SecurityScheme};
 use utoipa::Modify;
 use utoipa::OpenApi;
@@ -18,7 +18,8 @@ mod utils;
 
 #[derive(Clone)]
 pub struct AppState {
-    pool: Pool,
+    timescale_pool: Pool,
+    postgres_pool: Pool,
 }
 
 #[tokio::main]
@@ -32,11 +33,23 @@ async fn main() {
             handlers::entries::get_entry::get_entry,
             handlers::entries::get_ohlc::get_ohlc,
             handlers::entries::get_volatility::get_volatility,
+            handlers::entries::get_onchain::get_onchain,
         ),
         components(
             schemas(pragma_entities::dto::Entry, pragma_entities::EntryError),
             schemas(pragma_entities::dto::Publisher, pragma_entities::PublisherError),
-            schemas(handlers::entries::CreateEntryRequest, handlers::entries::CreateEntryResponse, handlers::entries::GetEntryResponse, handlers::entries::GetVolatilityResponse, handlers::entries::GetOHLCResponse),
+            schemas(
+                handlers::entries::CreateEntryRequest,
+                handlers::entries::CreateEntryResponse,
+                handlers::entries::GetEntryResponse,
+                handlers::entries::GetVolatilityResponse,
+                handlers::entries::GetOHLCResponse,
+                handlers::entries::GetOnchainResponse,
+            ),
+            schemas(handlers::entries::GetOnchainParams),
+            schemas(handlers::entries::Network),
+            schemas(handlers::entries::AggregationMode),
+            schemas(handlers::entries::OnchainEntry),
             schemas(handlers::entries::GetEntryParams, handlers::entries::Interval),
             schemas(handlers::entries::Entry, handlers::entries::BaseEntry),
             schemas(pragma_entities::error::InfraError),
@@ -62,14 +75,21 @@ async fn main() {
     }
 
     println!("{}", ApiDoc::openapi().to_pretty_json().unwrap());
-
     let config = config().await;
 
-    let pool = pragma_entities::connection::init_pool("pragma-node-api").expect("can't init pool");
+    let timescale_pool =
+        pragma_entities::connection::init_pool("pragma-node-api", ENV_TS_DATABASE_URL)
+            .expect("can't init timescale (offchain db) pool");
+    pragma_entities::db::run_migrations(&timescale_pool).await;
 
-    pragma_entities::db::run_migrations(&pool).await;
+    let postgres_pool =
+        pragma_entities::connection::init_pool("pragma-node-api", ENV_POSTGRES_DATABASE_URL)
+            .expect("can't init postgres (onchain db) pool");
 
-    let state = AppState { pool };
+    let state = AppState {
+        timescale_pool,
+        postgres_pool,
+    };
 
     let app = app_router::<ApiDoc>(state.clone()).with_state(state);
 

@@ -1,8 +1,8 @@
 use dotenvy::dotenv;
+use pragma_entities::connection::ENV_TS_DATABASE_URL;
 use pragma_entities::{adapt_infra_error, Entry, InfraError, NewEntry};
 use tokio::sync::mpsc;
 use tracing::{error, info};
-
 mod config;
 mod consumer;
 mod error;
@@ -36,7 +36,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 // TODO: move this to a service
 pub async fn insert_entries(new_entries: Vec<NewEntry>) -> Result<(), InfraError> {
-    let conn = pragma_entities::connection::init_pool("pragma-ingestor")
+    let conn = pragma_entities::connection::init_pool("pragma-ingestor", ENV_TS_DATABASE_URL)
         .expect("cannot connect to database")
         .get()
         .await

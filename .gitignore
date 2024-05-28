@@ -3,3 +3,6 @@
 .env
 db/
 infra/db/password.txt
+
+# Vscode workspaces
+*.code-workspace
