@@ -13,21 +13,21 @@ use crate::utils::format_bigdecimal_price;
 const BACKWARD_TIMESTAMP_INTERVAL: &str = "1 hour";
 
 #[allow(dead_code)]
-enum TableType {
+enum DataType {
     SpotEntry,
     SpotCheckpoint,
     FutureEntry,
 }
 
-fn get_table_name(network: Network, table_type: TableType) -> &'static str {
+fn get_table_name(network: Network, table_type: DataType) -> &'static str {
     match (network, table_type) {
-        (Network::Testnet, TableType::SpotEntry) => "spot_entry",
-        (Network::Mainnet, TableType::SpotEntry) => "mainnet_spot_entry",
-        (Network::Testnet, TableType::SpotCheckpoint) => "spot_checkpoints",
-        (Network::Mainnet, TableType::SpotCheckpoint) => "mainnet_spot_checkpoints",
+        (Network::Testnet, DataType::SpotEntry) => "spot_entry",
+        (Network::Mainnet, DataType::SpotEntry) => "mainnet_spot_entry",
+        (Network::Testnet, DataType::SpotCheckpoint) => "spot_checkpoints",
+        (Network::Mainnet, DataType::SpotCheckpoint) => "mainnet_spot_checkpoints",
         // TODO(akhercha): Future tables not used yet
-        (Network::Testnet, TableType::FutureEntry) => "future_entry",
-        (Network::Mainnet, TableType::FutureEntry) => "mainnet_future_entry",
+        (Network::Testnet, DataType::FutureEntry) => "future_entry",
+        (Network::Mainnet, DataType::FutureEntry) => "mainnet_future_entry",
     }
 }
 
@@ -106,7 +106,7 @@ fn build_sql_query(
         ORDER BY 
             FE.timestamp DESC;
     "#,
-        table_name = get_table_name(network, TableType::SpotEntry),
+        table_name = get_table_name(network, DataType::SpotEntry),
         backward_interval = BACKWARD_TIMESTAMP_INTERVAL,
         aggregation_subquery = aggregation_query
     );
@@ -168,7 +168,7 @@ pub async fn get_last_updated_timestamp(
         ORDER BY timestamp DESC
         LIMIT 1;
     "#,
-        table_name = get_table_name(network, TableType::SpotEntry)
+        table_name = get_table_name(network, DataType::SpotEntry)
     );
 
     let conn = pool.get().await.map_err(adapt_infra_error)?;
@@ -230,7 +230,7 @@ pub async fn get_checkpoints(
         ORDER BY timestamp DESC
         LIMIT $2;
     "#,
-        table_name = get_table_name(network, TableType::SpotCheckpoint)
+        table_name = get_table_name(network, DataType::SpotCheckpoint)
     );
 
     let conn = pool.get().await.map_err(adapt_infra_error)?;
