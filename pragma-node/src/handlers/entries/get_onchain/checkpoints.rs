@@ -54,7 +54,7 @@ pub async fn get_onchain_checkpoints(
     .map_err(CheckpointError::from)?;
 
     if checkpoints.is_empty() {
-        return Err(CheckpointError::NotFound());
+        return Err(CheckpointError::NotFound);
     }
     Ok(Json(GetOnchainCheckpointsResponse(checkpoints)))
 }

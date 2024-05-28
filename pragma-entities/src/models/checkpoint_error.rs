@@ -12,14 +12,14 @@ pub enum CheckpointError {
     #[error("invalid limit : {0}")]
     InvalidLimit(u64),
     #[error("no checkpoints found for requested pair")]
-    NotFound(),
+    NotFound,
 }
 
 impl From<InfraError> for CheckpointError {
     fn from(error: InfraError) -> Self {
         match error {
             InfraError::InternalServerError => Self::InternalServerError,
-            InfraError::NotFound => Self::NotFound(),
+            InfraError::NotFound => Self::NotFound,
             InfraError::InvalidTimeStamp => Self::InternalServerError,
         }
     }
@@ -31,7 +31,7 @@ impl IntoResponse for CheckpointError {
             Self::InvalidLimit(limit) => {
                 (StatusCode::BAD_REQUEST, format!("Invalid Limit {}", limit))
             }
-            Self::NotFound() => (
+            Self::NotFound => (
                 StatusCode::NOT_FOUND,
                 String::from("No checkpoints found for requested pair"),
             ),
