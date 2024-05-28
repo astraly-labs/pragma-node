@@ -1,6 +1,6 @@
 use axum::extract::{Query, State};
 use axum::Json;
-use pragma_entities::EntryError;
+use pragma_entities::CheckpointError;
 
 use crate::handlers::entries::utils::currency_pair_to_pair_id;
 use crate::handlers::entries::{GetOnchainCheckpointsParams, GetOnchainCheckpointsResponse};
@@ -29,23 +29,19 @@ pub async fn get_onchain_checkpoints(
     State(state): State<AppState>,
     PathExtractor(pair): PathExtractor<(String, String)>,
     Query(params): Query<GetOnchainCheckpointsParams>,
-) -> Result<Json<GetOnchainCheckpointsResponse>, EntryError> {
+) -> Result<Json<GetOnchainCheckpointsResponse>, CheckpointError> {
     tracing::info!("Received get onchain entry request for pair {:?}", pair);
 
     let pair_id: String = currency_pair_to_pair_id(&pair.0, &pair.1);
-    let limit = if let Some(limit) = params.limit {
-        if (limit == 0) || (limit > MAX_LIMIT) {
-            // TODO(akhercha): not so great error kind
-            return Err(EntryError::InvalidLimit(limit));
-        }
-        limit
-    } else {
-        DEFAULT_LIMIT
-    };
+
+    let limit = params.limit.unwrap_or(DEFAULT_LIMIT);
+    if !(1..=MAX_LIMIT).contains(&limit) {
+        return Err(CheckpointError::InvalidLimit(limit));
+    }
 
     let decimals = get_decimals(&state.timescale_pool, &pair_id)
         .await
-        .map_err(|db_error| db_error.to_entry_error(&pair_id))?;
+        .map_err(CheckpointError::from)?;
 
     let checkpoints = get_checkpoints(
         &state.postgres_pool,
@@ -55,8 +51,10 @@ pub async fn get_onchain_checkpoints(
         limit,
     )
     .await
-    .map_err(|db_error| db_error.to_entry_error(&pair_id))?;
+    .map_err(CheckpointError::from)?;
 
-    // TODO(akhercha): Return error if checkpoints length == 0
+    if checkpoints.is_empty() {
+        return Err(CheckpointError::NotFound());
+    }
     Ok(Json(GetOnchainCheckpointsResponse(checkpoints)))
 }

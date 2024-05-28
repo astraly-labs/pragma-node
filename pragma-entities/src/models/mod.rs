@@ -1,3 +1,4 @@
+pub mod checkpoint_error;
 pub mod currency;
 pub mod currency_error;
 pub mod entry;
