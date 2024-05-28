@@ -57,5 +57,6 @@ pub async fn get_onchain_checkpoints(
     .await
     .map_err(|db_error| db_error.to_entry_error(&pair_id))?;
 
+    // TODO(akhercha): Return error if checkpoints length == 0
     Ok(Json(GetOnchainCheckpointsResponse(checkpoints)))
 }
