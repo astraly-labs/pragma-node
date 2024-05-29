@@ -4,6 +4,7 @@ use axum::Json;
 use pragma_entities::EntryError;
 
 use crate::handlers::entries::{GetOnchainPublishersParams, GetOnchainPublishersResponse};
+use crate::infra::repositories::entry_repository::get_all_currencies_decimals;
 use crate::infra::repositories::onchain_repository::{
     get_publishers, get_publishers_with_components,
 };
@@ -27,10 +28,18 @@ pub async fn get_onchain_publishers(
         .await
         .map_err(|e| e.to_entry_error(&"".to_string()))?;
 
-    let publishers_with_components =
-        get_publishers_with_components(&state.postgres_pool, publishers, params.network)
-            .await
-            .map_err(|e| e.to_entry_error(&"".to_string()))?;
+    let currencies_decimals = get_all_currencies_decimals(&state.timescale_pool)
+        .await
+        .map_err(|e| e.to_entry_error(&"".to_string()))?;
+
+    let publishers_with_components = get_publishers_with_components(
+        &state.postgres_pool,
+        publishers,
+        params.network,
+        currencies_decimals,
+    )
+    .await
+    .map_err(|e| e.to_entry_error(&"".to_string()))?;
 
     Ok(Json(GetOnchainPublishersResponse(
         publishers_with_components,

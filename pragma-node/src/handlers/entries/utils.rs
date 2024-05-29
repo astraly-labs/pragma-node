@@ -12,6 +12,14 @@ pub(crate) fn currency_pair_to_pair_id(base: &str, quote: &str) -> String {
     format!("{}/{}", base.to_uppercase(), quote.to_uppercase())
 }
 
+/// Converts a pair_id to a currency pair.
+/// e.g "BTC/USD" to ("BTC", "USD")
+/// TODO: handle possible errors
+pub(crate) fn pair_id_to_currency_pair(pair_id: &str) -> (String, String) {
+    let parts: Vec<&str> = pair_id.split('/').collect();
+    (parts[0].to_string(), parts[1].to_string())
+}
+
 /// Computes the median price and time from a list of entries.
 /// The median price is computed as the median of the median prices of each entry.
 /// The median time is computed as the median of the times of each entry.

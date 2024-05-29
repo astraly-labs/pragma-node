@@ -3,6 +3,7 @@ use chrono::{DateTime, NaiveDateTime};
 use diesel::prelude::QueryableByName;
 use diesel::{ExpressionMethods, QueryDsl, Queryable, RunQueryDsl};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 use pragma_common::types::{AggregationMode, Interval};
 use pragma_entities::dto;
@@ -226,6 +227,24 @@ async fn get_price_decimals(
     let decimals = get_decimals(pool, &pair_id).await?;
 
     Ok((entry, decimals))
+}
+
+pub async fn get_all_currencies_decimals(
+    pool: &deadpool_diesel::postgres::Pool,
+) -> Result<HashMap<String, BigDecimal>, InfraError> {
+    let conn = pool.get().await.map_err(adapt_infra_error)?;
+    let result_vec = conn
+        .interact(Currency::get_decimals_all)
+        .await
+        .map_err(adapt_infra_error)?
+        .map_err(adapt_infra_error)?;
+
+    let mut currencies_decimals_map = HashMap::new();
+    for (name, decimals) in result_vec {
+        currencies_decimals_map.insert(name, decimals);
+    }
+
+    Ok(currencies_decimals_map)
 }
 
 pub async fn get_twap_price(

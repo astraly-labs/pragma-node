@@ -1,5 +1,6 @@
-use bigdecimal::num_bigint::ToBigInt;
-use bigdecimal::BigDecimal;
+use std::collections::HashMap;
+
+use bigdecimal::{BigDecimal, ToPrimitive};
 use deadpool_diesel::postgres::Pool;
 use diesel::sql_types::{BigInt, Integer, Numeric, Text, Timestamp, VarChar};
 use diesel::{Queryable, QueryableByName, RunQueryDsl};
@@ -8,6 +9,7 @@ use pragma_common::types::{AggregationMode, Network};
 use pragma_entities::error::{adapt_infra_error, InfraError};
 use pragma_monitoring::models::SpotEntry;
 
+use crate::handlers::entries::utils::pair_id_to_currency_pair;
 use crate::handlers::entries::{Checkpoint, OnchainEntry, Publisher, PublisherEntry};
 use crate::utils::format_bigdecimal_price;
 
@@ -285,6 +287,19 @@ pub async fn get_publishers(pool: &Pool) -> Result<Vec<RawPublisher>, InfraError
     Ok(raw_publishers)
 }
 
+fn get_decimals_for_pair(pair_id: &str, currencies: &HashMap<String, BigDecimal>) -> u32 {
+    let (base, quote) = pair_id_to_currency_pair(pair_id);
+    let base_decimals = match currencies.get(&base) {
+        Some(decimals) => decimals.to_u32().unwrap_or_default(),
+        None => 8,
+    };
+    let quote_decimals = match currencies.get(&quote) {
+        Some(decimals) => decimals.to_u32().unwrap_or_default(),
+        None => 8,
+    };
+    std::cmp::min(base_decimals, quote_decimals)
+}
+
 #[derive(Debug, Queryable, QueryableByName)]
 pub struct RawLastPublisherEntryForPair {
     #[diesel(sql_type = VarChar)]
@@ -297,18 +312,15 @@ pub struct RawLastPublisherEntryForPair {
     pub last_updated_timestamp: chrono::NaiveDateTime,
 }
 
-impl From<RawLastPublisherEntryForPair> for PublisherEntry {
-    fn from(entry: RawLastPublisherEntryForPair) -> Self {
+impl RawLastPublisherEntryForPair {
+    pub fn to_publisher_entry(&self, currencies: &HashMap<String, BigDecimal>) -> PublisherEntry {
+        let decimals = get_decimals_for_pair(&self.pair_id, currencies);
         PublisherEntry {
-            pair_id: entry.pair_id.clone(),
-            last_updated_timestamp: entry.last_updated_timestamp.and_utc().timestamp() as u64,
-            price: format!(
-                "0x{}",
-                entry.price.to_bigint().unwrap_or_default().to_str_radix(16)
-            ),
-            source: entry.source.clone(),
-            // TODO(akhercha): fetch the decimals for the pair
-            decimals: 8,
+            pair_id: self.pair_id.clone(),
+            last_updated_timestamp: self.last_updated_timestamp.and_utc().timestamp() as u64,
+            price: format_bigdecimal_price(self.price.clone(), decimals),
+            source: self.source.clone(),
+            decimals,
         }
     }
 }
@@ -362,6 +374,7 @@ async fn get_publisher_with_components(
     table_name: &str,
     publisher: &RawPublisher,
     publisher_updates: &RawPublisherUpdates,
+    currencies: &HashMap<String, BigDecimal>,
 ) -> Result<Publisher, InfraError> {
     let raw_sql_entries = format!(
         r#"
@@ -414,7 +427,10 @@ async fn get_publisher_with_components(
         nb_feeds: publisher_updates.nb_feeds as u32,
         daily_updates: publisher_updates.daily_updates as u32,
         total_updates: publisher_updates.total_updates as u32,
-        components: components.into_iter().map(From::from).collect(),
+        components: components
+            .into_iter()
+            .map(|component| component.to_publisher_entry(currencies))
+            .collect(),
     };
     Ok(publisher)
 }
@@ -423,6 +439,7 @@ pub async fn get_publishers_with_components(
     pool: &Pool,
     publishers: Vec<RawPublisher>,
     network: Network,
+    currencies: HashMap<String, BigDecimal>,
 ) -> Result<Vec<Publisher>, InfraError> {
     let table_name = get_table_name(network, DataType::SpotEntry);
     let publisher_names = publishers.iter().map(|p| p.name.clone()).collect();
@@ -431,8 +448,14 @@ pub async fn get_publishers_with_components(
 
     let mut publishers_response = Vec::with_capacity(publishers.len());
     for (publisher, publisher_updates) in publishers.iter().zip(updates.iter()) {
-        let publisher_with_components =
-            get_publisher_with_components(pool, table_name, publisher, publisher_updates).await?;
+        let publisher_with_components = get_publisher_with_components(
+            pool,
+            table_name,
+            publisher,
+            publisher_updates,
+            &currencies,
+        )
+        .await?;
         publishers_response.push(publisher_with_components);
     }
 
