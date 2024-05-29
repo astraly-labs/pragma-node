@@ -35,6 +35,7 @@ async fn main() {
             handlers::entries::get_volatility::get_volatility,
             handlers::entries::get_onchain::get_onchain,
             handlers::entries::get_onchain::checkpoints::get_onchain_checkpoints,
+            handlers::entries::get_onchain::publishers::get_onchain_publishers,
         ),
         components(
             schemas(pragma_entities::dto::Entry, pragma_entities::EntryError),
@@ -51,18 +52,22 @@ async fn main() {
                 handlers::entries::GetOnchainResponse,
                 handlers::entries::GetOnchainCheckpointsParams,
                 handlers::entries::GetOnchainCheckpointsResponse,
+                handlers::entries::GetOnchainPublishersParams,
+                handlers::entries::GetOnchainPublishersResponse,
             ),
             schemas(
                 handlers::entries::Entry,
                 handlers::entries::BaseEntry,
                 handlers::entries::OnchainEntry,
+                handlers::entries::Checkpoint,
+                handlers::entries::Publisher,
+                handlers::entries::PublisherEntry,
             ),
             schemas(
                 pragma_common::types::AggregationMode,
                 pragma_common::types::Interval,
                 pragma_common::types::Network,
             ),
-            schemas(handlers::entries::Checkpoint),
         ),
         modifiers(&SecurityAddon),
         tags(

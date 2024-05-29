@@ -1,13 +1,14 @@
+use bigdecimal::num_bigint::ToBigInt;
 use bigdecimal::BigDecimal;
 use deadpool_diesel::postgres::Pool;
-use diesel::sql_types::{BigInt, Numeric, Text, Timestamp, VarChar};
+use diesel::sql_types::{BigInt, Integer, Numeric, Text, Timestamp, VarChar};
 use diesel::{Queryable, QueryableByName, RunQueryDsl};
 
 use pragma_common::types::{AggregationMode, Network};
 use pragma_entities::error::{adapt_infra_error, InfraError};
 use pragma_monitoring::models::SpotEntry;
 
-use crate::handlers::entries::{Checkpoint, OnchainEntry};
+use crate::handlers::entries::{Checkpoint, OnchainEntry, Publisher, PublisherEntry};
 use crate::utils::format_bigdecimal_price;
 
 const BACKWARD_TIMESTAMP_INTERVAL: &str = "1 hour";
@@ -19,8 +20,8 @@ enum DataType {
     FutureEntry,
 }
 
-fn get_table_name(network: Network, table_type: DataType) -> &'static str {
-    match (network, table_type) {
+fn get_table_name(network: Network, data_type: DataType) -> &'static str {
+    match (network, data_type) {
         (Network::Testnet, DataType::SpotEntry) => "spot_entry",
         (Network::Mainnet, DataType::SpotEntry) => "mainnet_spot_entry",
         (Network::Testnet, DataType::SpotCheckpoint) => "spot_checkpoints",
@@ -250,4 +251,171 @@ pub async fn get_checkpoints(
         .map(|raw_checkpoint| raw_checkpoint.to_checkpoint(decimals))
         .collect();
     Ok(checkpoints)
+}
+
+#[derive(Debug, Queryable, QueryableByName)]
+pub struct RawPublisher {
+    #[diesel(sql_type = VarChar)]
+    pub name: String,
+    #[diesel(sql_type = VarChar)]
+    pub website_url: String,
+    #[diesel(sql_type = Integer)]
+    pub publisher_type: i32,
+}
+
+pub async fn get_publishers(pool: &Pool) -> Result<Vec<RawPublisher>, InfraError> {
+    let raw_sql = r#"
+        SELECT DISTINCT
+            name,
+            website_url,
+            publisher_type
+        FROM
+            publishers
+        ORDER BY
+            name ASC;
+    "#;
+
+    let conn = pool.get().await.map_err(adapt_infra_error)?;
+    let raw_publishers = conn
+        .interact(move |conn| diesel::sql_query(raw_sql).load::<RawPublisher>(conn))
+        .await
+        .map_err(adapt_infra_error)?
+        .map_err(adapt_infra_error)?;
+
+    Ok(raw_publishers)
+}
+
+#[derive(Debug, Queryable, QueryableByName)]
+pub struct RawLastPublisherEntryForPair {
+    #[diesel(sql_type = VarChar)]
+    pub pair_id: String,
+    #[diesel(sql_type = Numeric)]
+    pub price: BigDecimal,
+    #[diesel(sql_type = VarChar)]
+    pub source: String,
+    #[diesel(sql_type = Timestamp)]
+    pub last_updated_timestamp: chrono::NaiveDateTime,
+}
+
+impl From<RawLastPublisherEntryForPair> for PublisherEntry {
+    fn from(entry: RawLastPublisherEntryForPair) -> Self {
+        PublisherEntry {
+            pair_id: entry.pair_id.clone(),
+            last_updated_timestamp: entry.last_updated_timestamp.and_utc().timestamp() as u64,
+            price: format!(
+                "0x{}",
+                entry.price.to_bigint().unwrap_or_default().to_str_radix(16)
+            ),
+            source: entry.source.clone(),
+            decimals: 8,
+        }
+    }
+}
+
+#[derive(Debug, Queryable, QueryableByName)]
+pub struct RawPublisherUpdates {
+    #[diesel(sql_type = BigInt)]
+    pub daily_updates: i64,
+    #[diesel(sql_type = BigInt)]
+    pub total_updates: i64,
+    #[diesel(sql_type = BigInt)]
+    pub nb_feeds: i64,
+}
+
+pub async fn get_publishers_updates(
+    pool: &Pool,
+    publishers: Vec<RawPublisher>,
+    network: Network,
+) -> Result<Vec<Publisher>, InfraError> {
+    let table_name = get_table_name(network, DataType::SpotEntry);
+    let publishers_names = publishers
+        .iter()
+        .map(|publisher| publisher.name.clone())
+        .collect::<Vec<_>>();
+
+    let publishers_list = publishers_names.join("','");
+    let raw_sql = format!(
+        r#"
+        SELECT 
+            publisher,
+            COUNT(*) FILTER (WHERE block_timestamp >= NOW() - INTERVAL '1 day') AS daily_updates,
+            COUNT(*) AS total_updates,
+            COUNT(DISTINCT pair_id) AS nb_feeds
+        FROM 
+            {table_name}
+        WHERE 
+            publisher IN ('{publishers_list}')
+        GROUP BY 
+            publisher;
+        "#,
+        table_name = table_name,
+        publishers_list = publishers_list,
+    );
+
+    let conn = pool.get().await.map_err(adapt_infra_error)?;
+    let updates = conn
+        .interact(move |conn| diesel::sql_query(raw_sql).load::<RawPublisherUpdates>(conn))
+        .await
+        .map_err(adapt_infra_error)?
+        .map_err(adapt_infra_error)?;
+
+    let mut publishers_response: Vec<Publisher> = vec![];
+    for (i, publisher) in publishers.iter().enumerate() {
+        let raw_sql_entries = format!(
+            r#"
+            SELECT
+                entries.pair_id,
+                entries.price,
+                entries.source,
+                entries.timestamp as last_updated_timestamp
+            FROM
+                {table_name} entries
+            INNER JOIN (
+                SELECT
+                    pair_id,
+                    MAX(timestamp) AS max_timestamp
+                FROM
+                    {table_name}
+                WHERE
+                    publisher = '{publisher_name}'
+                GROUP BY
+                    pair_id
+            ) AS latest ON entries.pair_id = latest.pair_id AND entries.timestamp = latest.max_timestamp
+            WHERE
+                entries.publisher = '{publisher_name}'
+            ORDER BY
+                entries.pair_id ASC;
+            "#,
+            table_name = table_name,
+            publisher_name = publisher.name
+        );
+
+        let components = conn
+            .interact(move |conn| {
+                diesel::sql_query(raw_sql_entries).load::<RawLastPublisherEntryForPair>(conn)
+            })
+            .await
+            .map_err(adapt_infra_error)?
+            .map_err(adapt_infra_error)?;
+
+        let publisher_updates = updates.get(i).unwrap();
+        let publisher = Publisher {
+            publisher: publisher.name.clone(),
+            website_url: publisher.website_url.clone(),
+            last_updated_timestamp: components
+                .first()
+                .unwrap()
+                .last_updated_timestamp
+                .and_utc()
+                .timestamp() as u64,
+            r#type: publisher.publisher_type as u32,
+            nb_feeds: publisher_updates.nb_feeds as u32,
+            daily_updates: publisher_updates.daily_updates as u32,
+            total_updates: publisher_updates.total_updates as u32,
+            components: components.into_iter().map(From::from).collect(),
+        };
+        publishers_response.push(publisher);
+    }
+
+    Ok(publishers_response)
 }
