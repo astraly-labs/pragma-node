@@ -322,6 +322,8 @@ pub struct RawPublisherUpdates {
     pub nb_feeds: i64,
 }
 
+// TODO(akhercha): probably rename this function
+// TODO(akhercha): Cut this function in smaller functions - doing too much
 pub async fn get_publishers_updates(
     pool: &Pool,
     publishers: Vec<RawPublisher>,
@@ -359,6 +361,7 @@ pub async fn get_publishers_updates(
         .map_err(adapt_infra_error)?
         .map_err(adapt_infra_error)?;
 
+    // TODO(akhercha): Not the best to do N query for N publishers - can be optimized
     let mut publishers_response: Vec<Publisher> = vec![];
     for (i, publisher) in publishers.iter().enumerate() {
         let raw_sql_entries = format!(
@@ -384,7 +387,7 @@ pub async fn get_publishers_updates(
             WHERE
                 entries.publisher = '{publisher_name}'
             ORDER BY
-                entries.pair_id ASC;
+                entries.pair_id, entries.source ASC;
             "#,
             table_name = table_name,
             publisher_name = publisher.name
