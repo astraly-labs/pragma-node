@@ -27,9 +27,12 @@ pub async fn get_onchain_publishers(
         .await
         .map_err(|e| e.to_entry_error(&"".to_string()))?;
 
-    let updates = get_publishers_with_components(&state.postgres_pool, publishers, params.network)
-        .await
-        .map_err(|e| e.to_entry_error(&"".to_string()))?;
+    let publishers_with_components =
+        get_publishers_with_components(&state.postgres_pool, publishers, params.network)
+            .await
+            .map_err(|e| e.to_entry_error(&"".to_string()))?;
 
-    Ok(Json(GetOnchainPublishersResponse(updates)))
+    Ok(Json(GetOnchainPublishersResponse(
+        publishers_with_components,
+    )))
 }
