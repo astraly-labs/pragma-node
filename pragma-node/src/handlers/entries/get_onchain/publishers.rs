@@ -24,7 +24,7 @@ pub async fn get_onchain_publishers(
     State(state): State<AppState>,
     Query(params): Query<GetOnchainPublishersParams>,
 ) -> Result<Json<GetOnchainPublishersResponse>, EntryError> {
-    let publishers = get_publishers(&state.timescale_pool)
+    let publishers = get_publishers(&state.postgres_pool)
         .await
         .map_err(|e| e.to_entry_error(&"".to_string()))?;
 
