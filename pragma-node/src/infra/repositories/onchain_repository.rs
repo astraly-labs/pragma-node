@@ -406,7 +406,8 @@ async fn get_publisher_with_components(
     );
 
     let conn = pool.get().await.map_err(adapt_infra_error)?;
-    let components = conn
+
+    let raw_components = conn
         .interact(move |conn| {
             diesel::sql_query(raw_sql_entries).load::<RawLastPublisherEntryForPair>(conn)
         })
@@ -414,23 +415,26 @@ async fn get_publisher_with_components(
         .map_err(adapt_infra_error)?
         .map_err(adapt_infra_error)?;
 
+    let components: Vec<PublisherEntry> = raw_components
+        .into_iter()
+        .map(|component| component.to_publisher_entry(currencies))
+        .collect();
+
+    let last_updated_timestamp = components
+        .iter()
+        .map(|component| component.last_updated_timestamp)
+        .max()
+        .unwrap_or_default();
+
     let publisher = Publisher {
         publisher: publisher.name.clone(),
         website_url: publisher.website_url.clone(),
-        last_updated_timestamp: components
-            .first()
-            .unwrap()
-            .last_updated_timestamp
-            .and_utc()
-            .timestamp() as u64,
+        last_updated_timestamp,
         r#type: publisher.publisher_type as u32,
         nb_feeds: publisher_updates.nb_feeds as u32,
         daily_updates: publisher_updates.daily_updates as u32,
         total_updates: publisher_updates.total_updates as u32,
-        components: components
-            .into_iter()
-            .map(|component| component.to_publisher_entry(currencies))
-            .collect(),
+        components,
     };
     Ok(publisher)
 }
