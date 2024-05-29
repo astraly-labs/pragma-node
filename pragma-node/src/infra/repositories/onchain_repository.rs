@@ -322,19 +322,11 @@ pub struct RawPublisherUpdates {
     pub nb_feeds: i64,
 }
 
-// TODO(akhercha): probably rename this function
-// TODO(akhercha): Cut this function in smaller functions - doing too much
-pub async fn get_publishers_updates(
+async fn get_all_publishers_updates(
     pool: &Pool,
-    publishers: Vec<RawPublisher>,
-    network: Network,
-) -> Result<Vec<Publisher>, InfraError> {
-    let table_name = get_table_name(network, DataType::SpotEntry);
-    let publishers_names = publishers
-        .iter()
-        .map(|publisher| publisher.name.clone())
-        .collect::<Vec<_>>();
-
+    table_name: &str,
+    publishers_names: Vec<String>,
+) -> Result<Vec<RawPublisherUpdates>, InfraError> {
     let publishers_list = publishers_names.join("','");
     let raw_sql = format!(
         r#"
@@ -361,63 +353,86 @@ pub async fn get_publishers_updates(
         .map_err(adapt_infra_error)?
         .map_err(adapt_infra_error)?;
 
-    // TODO(akhercha): Not the best to do N query for N publishers - can be optimized
-    let mut publishers_response: Vec<Publisher> = vec![];
-    for (i, publisher) in publishers.iter().enumerate() {
-        let raw_sql_entries = format!(
-            r#"
+    Ok(updates)
+}
+
+async fn get_publisher_with_components(
+    pool: &Pool,
+    table_name: &str,
+    publisher: &RawPublisher,
+    publisher_updates: &RawPublisherUpdates,
+) -> Result<Publisher, InfraError> {
+    let raw_sql_entries = format!(
+        r#"
+        SELECT
+            entries.pair_id,
+            entries.price,
+            entries.source,
+            entries.timestamp as last_updated_timestamp
+        FROM
+            {table_name} entries
+        INNER JOIN (
             SELECT
-                entries.pair_id,
-                entries.price,
-                entries.source,
-                entries.timestamp as last_updated_timestamp
+                pair_id,
+                MAX(timestamp) AS max_timestamp
             FROM
-                {table_name} entries
-            INNER JOIN (
-                SELECT
-                    pair_id,
-                    MAX(timestamp) AS max_timestamp
-                FROM
-                    {table_name}
-                WHERE
-                    publisher = '{publisher_name}'
-                GROUP BY
-                    pair_id
-            ) AS latest ON entries.pair_id = latest.pair_id AND entries.timestamp = latest.max_timestamp
+                {table_name}
             WHERE
-                entries.publisher = '{publisher_name}'
-            ORDER BY
-                entries.pair_id, entries.source ASC;
-            "#,
-            table_name = table_name,
-            publisher_name = publisher.name
-        );
+                publisher = '{publisher_name}'
+            GROUP BY
+                pair_id
+        ) AS latest ON entries.pair_id = latest.pair_id AND entries.timestamp = latest.max_timestamp
+        WHERE
+            entries.publisher = '{publisher_name}'
+        ORDER BY
+            entries.pair_id, entries.source ASC;
+        "#,
+        table_name = table_name,
+        publisher_name = publisher.name
+    );
 
-        let components = conn
-            .interact(move |conn| {
-                diesel::sql_query(raw_sql_entries).load::<RawLastPublisherEntryForPair>(conn)
-            })
-            .await
-            .map_err(adapt_infra_error)?
-            .map_err(adapt_infra_error)?;
+    let conn = pool.get().await.map_err(adapt_infra_error)?;
+    let components = conn
+        .interact(move |conn| {
+            diesel::sql_query(raw_sql_entries).load::<RawLastPublisherEntryForPair>(conn)
+        })
+        .await
+        .map_err(adapt_infra_error)?
+        .map_err(adapt_infra_error)?;
 
-        let publisher_updates = updates.get(i).unwrap();
-        let publisher = Publisher {
-            publisher: publisher.name.clone(),
-            website_url: publisher.website_url.clone(),
-            last_updated_timestamp: components
-                .first()
-                .unwrap()
-                .last_updated_timestamp
-                .and_utc()
-                .timestamp() as u64,
-            r#type: publisher.publisher_type as u32,
-            nb_feeds: publisher_updates.nb_feeds as u32,
-            daily_updates: publisher_updates.daily_updates as u32,
-            total_updates: publisher_updates.total_updates as u32,
-            components: components.into_iter().map(From::from).collect(),
-        };
-        publishers_response.push(publisher);
+    let publisher = Publisher {
+        publisher: publisher.name.clone(),
+        website_url: publisher.website_url.clone(),
+        last_updated_timestamp: components
+            .first()
+            .unwrap()
+            .last_updated_timestamp
+            .and_utc()
+            .timestamp() as u64,
+        r#type: publisher.publisher_type as u32,
+        nb_feeds: publisher_updates.nb_feeds as u32,
+        daily_updates: publisher_updates.daily_updates as u32,
+        total_updates: publisher_updates.total_updates as u32,
+        components: components.into_iter().map(From::from).collect(),
+    };
+    Ok(publisher)
+}
+
+pub async fn get_publishers_with_components(
+    pool: &Pool,
+    publishers: Vec<RawPublisher>,
+    network: Network,
+) -> Result<Vec<Publisher>, InfraError> {
+    let table_name = get_table_name(network, DataType::SpotEntry);
+    let publisher_names = publishers.iter().map(|p| p.name.clone()).collect();
+
+    let updates = get_all_publishers_updates(pool, table_name, publisher_names).await?;
+
+    let mut publishers_response = Vec::with_capacity(publishers.len());
+    for (publisher, publisher_updates) in publishers.iter().zip(updates.iter()) {
+        let publisher_with_components =
+            get_publisher_with_components(pool, table_name, publisher, publisher_updates).await?;
+        publishers_response.push(publisher_with_components);
     }
 
     Ok(publishers_response)
