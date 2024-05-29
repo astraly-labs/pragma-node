@@ -34,3 +34,12 @@ pub enum Network {
     #[serde(rename = "mainnet")]
     Mainnet,
 }
+
+#[derive(Default, Debug, Deserialize, ToSchema, Clone, Copy)]
+pub enum DataType {
+    #[serde(rename = "spot_entry")]
+    #[default]
+    SpotEntry,
+    #[serde(rename = "future_entry")]
+    FutureEntry,
+}
