@@ -452,6 +452,9 @@ pub async fn get_publishers_with_components(
 
     let mut publishers_response = Vec::with_capacity(publishers.len());
     for (publisher, publisher_updates) in publishers.iter().zip(updates.iter()) {
+        if publisher_updates.total_updates == 0 {
+            continue;
+        }
         let publisher_with_components = get_publisher_with_components(
             pool,
             table_name,
