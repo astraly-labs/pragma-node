@@ -307,6 +307,7 @@ impl From<RawLastPublisherEntryForPair> for PublisherEntry {
                 entry.price.to_bigint().unwrap_or_default().to_str_radix(16)
             ),
             source: entry.source.clone(),
+            // TODO(akhercha): fetch the decimals for the pair
             decimals: 8,
         }
     }
