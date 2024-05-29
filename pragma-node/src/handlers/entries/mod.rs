@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use starknet::core::types::FieldElement;
 use utoipa::{IntoParams, ToSchema};
 
-use pragma_common::types::{AggregationMode, Interval, Network};
+use pragma_common::types::{AggregationMode, DataType, Interval, Network};
 
 pub use create_entry::create_entries;
 pub use get_entry::get_entry;
@@ -140,9 +140,10 @@ pub struct GetEntryParams {
     pub aggregation: Option<AggregationMode>,
 }
 
-#[derive(Debug, Deserialize, IntoParams, ToSchema)]
+#[derive(Debug, Default, Deserialize, IntoParams, ToSchema)]
 pub struct GetOnchainPublishersParams {
     pub network: Network,
+    pub data_type: DataType,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]

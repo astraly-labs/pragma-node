@@ -1,5 +1,6 @@
 use bigdecimal::{BigDecimal, ToPrimitive};
 use chrono::NaiveDateTime;
+use std::collections::HashMap;
 
 use crate::infra::repositories::entry_repository::MedianEntry;
 
@@ -13,11 +14,30 @@ pub(crate) fn currency_pair_to_pair_id(base: &str, quote: &str) -> String {
 }
 
 /// Converts a pair_id to a currency pair.
+///
 /// e.g "BTC/USD" to ("BTC", "USD")
 /// TODO: handle possible errors
 pub(crate) fn pair_id_to_currency_pair(pair_id: &str) -> (String, String) {
     let parts: Vec<&str> = pair_id.split('/').collect();
     (parts[0].to_string(), parts[1].to_string())
+}
+
+/// From a map of currencies and their decimals, returns the number of decimals for a given pair.
+/// If the currency is not found in the map, the default value is 8.
+pub(crate) fn get_decimals_for_pair(
+    currencies: &HashMap<String, BigDecimal>,
+    pair_id: &str,
+) -> u32 {
+    let (base, quote) = pair_id_to_currency_pair(pair_id);
+    let base_decimals = match currencies.get(&base) {
+        Some(decimals) => decimals.to_u32().unwrap_or_default(),
+        None => 8,
+    };
+    let quote_decimals = match currencies.get(&quote) {
+        Some(decimals) => decimals.to_u32().unwrap_or_default(),
+        None => 8,
+    };
+    std::cmp::min(base_decimals, quote_decimals)
 }
 
 /// Computes the median price and time from a list of entries.

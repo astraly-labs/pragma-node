@@ -67,6 +67,7 @@ async fn main() {
                 pragma_common::types::AggregationMode,
                 pragma_common::types::Interval,
                 pragma_common::types::Network,
+                pragma_common::types::DataType,
             ),
         ),
         modifiers(&SecurityAddon),

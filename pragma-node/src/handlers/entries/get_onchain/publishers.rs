@@ -18,13 +18,14 @@ use crate::AppState;
     ),
     params(
         ("network" = Network, Query, description = "Network"),
+        ("data_type" = DataType, Query, description = "Data type"),
     ),
 )]
 pub async fn get_onchain_publishers(
     State(state): State<AppState>,
     Query(params): Query<GetOnchainPublishersParams>,
 ) -> Result<Json<GetOnchainPublishersResponse>, EntryError> {
-    let publishers = get_publishers(&state.postgres_pool)
+    let publishers = get_publishers(&state.postgres_pool, params.network)
         .await
         .map_err(|e| e.to_entry_error(&"".to_string()))?;
 
@@ -34,9 +35,10 @@ pub async fn get_onchain_publishers(
 
     let publishers_with_components = get_publishers_with_components(
         &state.postgres_pool,
-        publishers,
         params.network,
+        params.data_type,
         currencies_decimals,
+        publishers,
     )
     .await
     .map_err(|e| e.to_entry_error(&"".to_string()))?;

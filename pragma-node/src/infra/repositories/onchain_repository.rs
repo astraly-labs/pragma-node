@@ -1,33 +1,26 @@
 use std::collections::HashMap;
 
-use bigdecimal::{BigDecimal, ToPrimitive};
+use bigdecimal::BigDecimal;
 use deadpool_diesel::postgres::Pool;
 use diesel::sql_types::{BigInt, Integer, Numeric, Text, Timestamp, VarChar};
 use diesel::{Queryable, QueryableByName, RunQueryDsl};
 
-use pragma_common::types::{AggregationMode, Network};
+use pragma_common::types::{AggregationMode, DataType, Network};
 use pragma_entities::error::{adapt_infra_error, InfraError};
 use pragma_monitoring::models::SpotEntry;
 
-use crate::handlers::entries::utils::pair_id_to_currency_pair;
+use crate::handlers::entries::utils::get_decimals_for_pair;
 use crate::handlers::entries::{Checkpoint, OnchainEntry, Publisher, PublisherEntry};
 use crate::utils::format_bigdecimal_price;
 
 const BACKWARD_TIMESTAMP_INTERVAL: &str = "1 hour";
 
 #[allow(dead_code)]
-enum DataType {
-    SpotEntry,
-    SpotCheckpoint,
-    FutureEntry,
-}
 
 fn get_table_name(network: Network, data_type: DataType) -> &'static str {
     match (network, data_type) {
         (Network::Testnet, DataType::SpotEntry) => "spot_entry",
         (Network::Mainnet, DataType::SpotEntry) => "mainnet_spot_entry",
-        (Network::Testnet, DataType::SpotCheckpoint) => "spot_checkpoints",
-        (Network::Mainnet, DataType::SpotCheckpoint) => "mainnet_spot_checkpoints",
         // TODO(akhercha): Future tables not used yet
         (Network::Testnet, DataType::FutureEntry) => "future_entry",
         (Network::Mainnet, DataType::FutureEntry) => "mainnet_future_entry",
@@ -219,6 +212,10 @@ pub async fn get_checkpoints(
     decimals: u32,
     limit: u64,
 ) -> Result<Vec<Checkpoint>, InfraError> {
+    let table_name = match network {
+        Network::Mainnet => "mainnet_spot_checkpoints",
+        Network::Testnet => "spot_checkpoints",
+    };
     let raw_sql = format!(
         r#"
         SELECT
@@ -233,7 +230,7 @@ pub async fn get_checkpoints(
         ORDER BY timestamp DESC
         LIMIT $2;
     "#,
-        table_name = get_table_name(network, DataType::SpotCheckpoint)
+        table_name = table_name
     );
 
     let conn = pool.get().await.map_err(adapt_infra_error)?;
@@ -265,17 +262,29 @@ pub struct RawPublisher {
     pub publisher_type: i32,
 }
 
-pub async fn get_publishers(pool: &Pool) -> Result<Vec<RawPublisher>, InfraError> {
-    let raw_sql = r#"
-        SELECT DISTINCT
+pub async fn get_publishers(
+    pool: &Pool,
+    network: Network,
+) -> Result<Vec<RawPublisher>, InfraError> {
+    let address_column = match network {
+        Network::Mainnet => "mainnet_address",
+        Network::Testnet => "testnet_address",
+    };
+    let raw_sql = format!(
+        r#"
+        SELECT
             name,
             website_url,
             publisher_type
         FROM
             publishers
+        WHERE
+            {address_column} IS NOT NULL
         ORDER BY
             name ASC;
-    "#;
+    "#,
+        address_column = address_column,
+    );
 
     let conn = pool.get().await.map_err(adapt_infra_error)?;
     let raw_publishers = conn
@@ -285,19 +294,6 @@ pub async fn get_publishers(pool: &Pool) -> Result<Vec<RawPublisher>, InfraError
         .map_err(adapt_infra_error)?;
 
     Ok(raw_publishers)
-}
-
-fn get_decimals_for_pair(pair_id: &str, currencies: &HashMap<String, BigDecimal>) -> u32 {
-    let (base, quote) = pair_id_to_currency_pair(pair_id);
-    let base_decimals = match currencies.get(&base) {
-        Some(decimals) => decimals.to_u32().unwrap_or_default(),
-        None => 8,
-    };
-    let quote_decimals = match currencies.get(&quote) {
-        Some(decimals) => decimals.to_u32().unwrap_or_default(),
-        None => 8,
-    };
-    std::cmp::min(base_decimals, quote_decimals)
 }
 
 #[derive(Debug, Queryable, QueryableByName)]
@@ -314,7 +310,7 @@ pub struct RawLastPublisherEntryForPair {
 
 impl RawLastPublisherEntryForPair {
     pub fn to_publisher_entry(&self, currencies: &HashMap<String, BigDecimal>) -> PublisherEntry {
-        let decimals = get_decimals_for_pair(&self.pair_id, currencies);
+        let decimals = get_decimals_for_pair(currencies, &self.pair_id);
         PublisherEntry {
             pair_id: self.pair_id.clone(),
             last_updated_timestamp: self.last_updated_timestamp.and_utc().timestamp() as u64,
@@ -327,6 +323,8 @@ impl RawLastPublisherEntryForPair {
 
 #[derive(Debug, Queryable, QueryableByName)]
 pub struct RawPublisherUpdates {
+    #[diesel(sql_type = VarChar)]
+    pub publisher: String,
     #[diesel(sql_type = BigInt)]
     pub daily_updates: i64,
     #[diesel(sql_type = BigInt)]
@@ -339,7 +337,7 @@ async fn get_all_publishers_updates(
     pool: &Pool,
     table_name: &str,
     publishers_names: Vec<String>,
-) -> Result<Vec<RawPublisherUpdates>, InfraError> {
+) -> Result<HashMap<String, RawPublisherUpdates>, InfraError> {
     let publishers_list = publishers_names.join("','");
     let raw_sql = format!(
         r#"
@@ -365,6 +363,11 @@ async fn get_all_publishers_updates(
         .await
         .map_err(adapt_infra_error)?
         .map_err(adapt_infra_error)?;
+
+    let updates = updates
+        .into_iter()
+        .map(|update| (update.publisher.clone(), update))
+        .collect();
 
     Ok(updates)
 }
@@ -424,7 +427,7 @@ async fn get_publisher_with_components(
         .iter()
         .map(|component| component.last_updated_timestamp)
         .max()
-        .unwrap_or_default();
+        .ok_or(InfraError::NotFound)?;
 
     let publisher = Publisher {
         publisher: publisher.name.clone(),
@@ -441,17 +444,22 @@ async fn get_publisher_with_components(
 
 pub async fn get_publishers_with_components(
     pool: &Pool,
-    publishers: Vec<RawPublisher>,
     network: Network,
+    data_type: DataType,
     currencies: HashMap<String, BigDecimal>,
+    publishers: Vec<RawPublisher>,
 ) -> Result<Vec<Publisher>, InfraError> {
-    let table_name = get_table_name(network, DataType::SpotEntry);
+    let table_name = get_table_name(network, data_type);
     let publisher_names = publishers.iter().map(|p| p.name.clone()).collect();
 
     let updates = get_all_publishers_updates(pool, table_name, publisher_names).await?;
-
     let mut publishers_response = Vec::with_capacity(publishers.len());
-    for (publisher, publisher_updates) in publishers.iter().zip(updates.iter()) {
+
+    for publisher in publishers.iter() {
+        let publisher_updates = match updates.get(&publisher.name) {
+            Some(updates) => updates,
+            None => continue,
+        };
         if publisher_updates.total_updates == 0 {
             continue;
         }
