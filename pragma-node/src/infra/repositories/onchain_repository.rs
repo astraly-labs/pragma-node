@@ -549,6 +549,7 @@ fn compute_ohlc(
     // to see the current OHLC getting updated in real-time
     let mut entries: Vec<OHLCEntry> = Vec::new();
     if let Some(latest_entry) = raw_entries.last() {
+        // TODO(akhercha): compute the OHLC with data available in current interval
         entries.push(OHLCEntry {
             time: current_time,
             open: latest_entry.price.clone(),
