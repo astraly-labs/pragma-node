@@ -140,6 +140,17 @@ pub struct GetEntryParams {
     pub aggregation: Option<AggregationMode>,
 }
 
+impl Default for GetEntryParams {
+    fn default() -> Self {
+        Self {
+            timestamp: Some(chrono::Utc::now().timestamp_millis() as u64),
+            interval: Some(Interval::default()),
+            routing: Some(false),
+            aggregation: Some(AggregationMode::default()),
+        }
+    }
+}
+
 #[derive(Debug, Default, Deserialize, IntoParams, ToSchema)]
 pub struct GetOnchainPublishersParams {
     pub network: Network,
@@ -167,16 +178,17 @@ pub struct Publisher {
     pub components: Vec<PublisherEntry>,
 }
 
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct GetOnchainPublishersResponse(pub Vec<Publisher>);
 
-impl Default for GetEntryParams {
-    fn default() -> Self {
-        Self {
-            timestamp: Some(chrono::Utc::now().timestamp_millis() as u64),
-            interval: Some(Interval::default()),
-            routing: Some(false),
-            aggregation: Some(AggregationMode::default()),
-        }
-    }
+#[derive(Debug, Default, Deserialize, IntoParams, ToSchema)]
+pub struct GetOnchainOHLCParams {
+    pub network: Network,
+    pub interval: Interval,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize, ToSchema)]
+pub struct GetOnchainOHLCResponse {
+    pub pair_id: String,
+    pub data: Vec<OHLCEntry>,
 }

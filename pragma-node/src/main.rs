@@ -36,6 +36,7 @@ async fn main() {
             handlers::entries::get_onchain::get_onchain,
             handlers::entries::get_onchain::checkpoints::get_onchain_checkpoints,
             handlers::entries::get_onchain::publishers::get_onchain_publishers,
+            handlers::entries::get_onchain::ohlc::get_onchain_ohlc,
         ),
         components(
             schemas(pragma_entities::dto::Entry, pragma_entities::EntryError),
@@ -54,6 +55,8 @@ async fn main() {
                 handlers::entries::GetOnchainCheckpointsResponse,
                 handlers::entries::GetOnchainPublishersParams,
                 handlers::entries::GetOnchainPublishersResponse,
+                handlers::entries::GetOnchainOHLCParams,
+                handlers::entries::GetOnchainOHLCResponse,
             ),
             schemas(
                 handlers::entries::Entry,

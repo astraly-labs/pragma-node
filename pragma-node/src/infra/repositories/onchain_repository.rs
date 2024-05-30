@@ -15,13 +15,10 @@ use crate::utils::format_bigdecimal_price;
 
 const BACKWARD_TIMESTAMP_INTERVAL: &str = "1 hour";
 
-#[allow(dead_code)]
-
 fn get_table_name(network: Network, data_type: DataType) -> &'static str {
     match (network, data_type) {
         (Network::Testnet, DataType::SpotEntry) => "spot_entry",
         (Network::Mainnet, DataType::SpotEntry) => "mainnet_spot_entry",
-        // TODO(akhercha): Future tables not used yet
         (Network::Testnet, DataType::FutureEntry) => "future_entry",
         (Network::Mainnet, DataType::FutureEntry) => "mainnet_future_entry",
     }
