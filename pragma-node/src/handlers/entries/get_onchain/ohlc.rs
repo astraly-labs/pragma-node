@@ -44,6 +44,7 @@ pub async fn get_onchain_ohlc(
         params.network,
         pair_id.clone(),
         params.interval,
+        limit,
     )
     .await
     .map_err(|db_err| db_err.to_entry_error(&pair_id))?;

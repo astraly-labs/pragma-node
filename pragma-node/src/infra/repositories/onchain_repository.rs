@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use bigdecimal::BigDecimal;
-use chrono::{Duration, NaiveDateTime, Timelike};
+use chrono::{Duration, NaiveDateTime, Timelike, Utc};
 use deadpool_diesel::postgres::Pool;
 use diesel::sql_types::{BigInt, Integer, Numeric, Text, Timestamp, VarChar};
 use diesel::{Queryable, QueryableByName, RunQueryDsl};
@@ -489,21 +489,28 @@ pub async fn get_ohlc(
     network: Network,
     pair_id: String,
     interval: Interval,
+    limit: u64,
 ) -> Result<Vec<OHLCEntry>, InfraError> {
     let interval_in_minutes = interval.to_minutes() as i64;
-    let table_name = get_table_name(network, DataType::SpotEntry);
+    let raw_sql = format!(
+        r#"
+        SELECT
+            price,
+            timestamp
+        FROM
+            {table_name}
+        WHERE
+            pair_id = '{pair_id}'
+        ORDER BY
+            timestamp;
+        "#,
+        table_name = get_table_name(network, DataType::SpotEntry),
+        pair_id = pair_id
+    );
 
-    // Use prepared statements with parameters
     let conn = pool.get().await.map_err(adapt_infra_error)?;
     let raw_entries: Vec<RawEntryPriceWithTimestamp> = conn
-        .interact(move |conn| {
-            diesel::sql_query(format!(
-                "SELECT price, timestamp FROM {} WHERE pair_id = $1 ORDER BY timestamp;",
-                table_name
-            ))
-            .bind::<diesel::sql_types::Text, _>(&pair_id)
-            .load::<RawEntryPriceWithTimestamp>(conn)
-        })
+        .interact(move |conn| diesel::sql_query(raw_sql).load::<RawEntryPriceWithTimestamp>(conn))
         .await
         .map_err(adapt_infra_error)?
         .map_err(adapt_infra_error)?;
@@ -512,25 +519,49 @@ pub async fn get_ohlc(
         return Err(InfraError::NotFound);
     }
 
-    let ohlc_entries = compute_ohlc(raw_entries, interval_in_minutes);
+    let ohlc_entries = compute_ohlc(raw_entries, interval_in_minutes, limit);
+
     Ok(ohlc_entries)
 }
 
 fn compute_ohlc(
     raw_entries: Vec<RawEntryPriceWithTimestamp>,
     interval_in_minutes: i64,
+    limit: u64,
 ) -> Vec<OHLCEntry> {
     let mut ohlc_map: HashMap<NaiveDateTime, OHLCEntry> = HashMap::new();
+    let current_time = Utc::now().naive_utc();
 
-    for entry in raw_entries {
-        let interval_key = entry
-            .timestamp
-            .date()
-            .and_hms_opt(entry.timestamp.hour(), 0, 0)
-            .unwrap()
-            + Duration::minutes(
-                (entry.timestamp.minute() as i64 / interval_in_minutes) * interval_in_minutes,
-            );
+    let mut interval_start = current_time
+        .date()
+        .and_hms_opt(
+            current_time.hour(),
+            current_time.minute() - (current_time.minute() % interval_in_minutes as u32),
+            0,
+        )
+        .unwrap();
+
+    if current_time.minute() % (interval_in_minutes as u32) != 0 {
+        interval_start += Duration::minutes(interval_in_minutes);
+    }
+
+    // We add the current_time as the first entry - allows us
+    // to see the current OHLC getting updated in real-time
+    let mut entries: Vec<OHLCEntry> = Vec::new();
+    if let Some(latest_entry) = raw_entries.last() {
+        entries.push(OHLCEntry {
+            time: current_time,
+            open: latest_entry.price.clone(),
+            high: latest_entry.price.clone(),
+            low: latest_entry.price.clone(),
+            close: latest_entry.price.clone(),
+        });
+    }
+
+    for entry in raw_entries.iter().rev() {
+        let minutes_since_start = (entry.timestamp - interval_start).num_minutes();
+        let interval_index = minutes_since_start / interval_in_minutes;
+        let interval_key = interval_start + Duration::minutes(interval_index * interval_in_minutes);
 
         let ohlc = ohlc_map.entry(interval_key).or_insert_with(|| OHLCEntry {
             time: interval_key,
@@ -540,12 +571,36 @@ fn compute_ohlc(
             close: entry.price.clone(),
         });
 
-        ohlc.high = std::cmp::max(ohlc.high.clone(), entry.price.clone());
-        ohlc.low = std::cmp::min(ohlc.low.clone(), entry.price.clone());
+        if entry.price > ohlc.high {
+            ohlc.high = entry.price.clone();
+        }
+        if entry.price < ohlc.low {
+            ohlc.low = entry.price.clone();
+        }
         ohlc.close = entry.price.clone();
     }
 
-    let mut ohlc_entries: Vec<OHLCEntry> = ohlc_map.into_values().collect();
-    ohlc_entries.sort_by(|a, b| b.time.cmp(&a.time));
-    ohlc_entries
+    let mut last_known_ohlc = entries.first().cloned().unwrap();
+    let mut interval_time: NaiveDateTime = interval_start;
+    while entries.len() < limit as usize {
+        if let Some(ohlc) = ohlc_map.get(&interval_time) {
+            last_known_ohlc = ohlc.clone();
+        } else {
+            last_known_ohlc = OHLCEntry {
+                time: interval_time,
+                open: last_known_ohlc.open.clone(),
+                high: last_known_ohlc.high.clone(),
+                low: last_known_ohlc.low.clone(),
+                close: last_known_ohlc.close.clone(),
+            };
+        }
+        if current_time >= last_known_ohlc.time {
+            entries.push(last_known_ohlc.clone());
+        }
+        interval_time -= Duration::minutes(interval_in_minutes);
+    }
+
+    entries.sort_by(|a, b| b.time.cmp(&a.time));
+    entries.truncate(limit as usize);
+    entries
 }
