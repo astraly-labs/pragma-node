@@ -144,7 +144,6 @@ struct EntryTimestamp {
 }
 
 // TODO(akhercha): Only works for Spot entries
-// TODO(akhercha): Give different result than onchain oracle sometimes
 pub async fn get_last_updated_timestamp(
     pool: &Pool,
     network: Network,
