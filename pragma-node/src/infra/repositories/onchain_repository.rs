@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use bigdecimal::BigDecimal;
-use chrono::{Datelike, Timelike, Utc};
+use chrono::{Timelike, Utc};
 use deadpool_diesel::postgres::Pool;
 use diesel::sql_types::{BigInt, Integer, Numeric, Text, Timestamp, VarChar};
 use diesel::{Queryable, QueryableByName, RunQueryDsl};
@@ -486,96 +486,93 @@ pub async fn get_ohlc(
     let interval_in_minutes = interval.to_minutes();
     let now = Utc::now().naive_utc();
     let current_time = now - chrono::Duration::minutes((now.minute() % interval_in_minutes) as i64);
-    let current_interval_start =
-        chrono::NaiveDate::from_ymd_opt(now.year(), now.month(), now.day())
-            .unwrap()
-            .and_hms_opt(0, 0, 0)
-            .unwrap();
 
     let raw_sql = format!(
         r#"
-        WITH raw_data AS (
-            SELECT
-                pair_id,
-                price,
-                timestamp,
-                (date_trunc('minute', timestamp) + interval '{interval_in_minutes} min' * floor(date_part('minute', timestamp) / {interval_in_minutes})) as interval_start
-            FROM
-                {table_name}
-            WHERE
-                pair_id = '{pair_id}'
-            ORDER BY
-                timestamp DESC
-        ),
-        ohlc AS (
-            SELECT
-                pair_id,
-                interval_start,
-                FIRST_VALUE(price) OVER w as "open",
-                MAX(price) OVER w as "high",
-                MIN(price) OVER w as "low",
-                LAST_VALUE(price) OVER w as "close"
-            FROM
-                raw_data
-            WINDOW w AS (
-                PARTITION BY pair_id, interval_start
-                ORDER BY timestamp
-                ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
+            WITH raw_data AS (
+                SELECT
+                    pair_id,
+                    price,
+                    timestamp,
+                    (date_trunc('minute', timestamp) + interval '{interval_in_minutes} min' * floor(date_part('minute', timestamp) / {interval_in_minutes})) as interval_start
+                FROM
+                    {table_name}
+                WHERE
+                    pair_id = '{pair_id}'
+                ORDER BY
+                    timestamp DESC
+            ),
+            earliest_data AS (
+                SELECT MIN(timestamp) AS earliest_timestamp FROM raw_data
+            ),
+            ohlc AS (
+                SELECT
+                    pair_id,
+                    interval_start,
+                    FIRST_VALUE(price) OVER w as "open",
+                    MAX(price) OVER w as "high",
+                    MIN(price) OVER w as "low",
+                    LAST_VALUE(price) OVER w as "close"
+                FROM
+                    raw_data
+                WINDOW w AS (
+                    PARTITION BY pair_id, interval_start
+                    ORDER BY timestamp
+                    ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
+                )
+            ),
+            all_intervals AS (
+                SELECT generate_series(
+                    date_trunc('hour', (SELECT earliest_timestamp FROM earliest_data)) + interval '1 hour',
+                    '{current_time}'::timestamp,
+                    interval '{interval_in_minutes} minutes'
+                ) as interval
+            ),
+            filled_intervals AS (
+                SELECT
+                    ai.interval as "time",
+                    COALESCE(
+                        (SELECT o.open FROM ohlc o WHERE o.interval_start <= ai.interval ORDER BY o.interval_start DESC LIMIT 1),
+                        lag((SELECT o.open FROM ohlc o WHERE o.interval_start <= ai.interval ORDER BY o.interval_start DESC LIMIT 1)) over (order by ai.interval)
+                    ) as "open",
+                    COALESCE(
+                        (SELECT o.high FROM ohlc o WHERE o.interval_start <= ai.interval ORDER BY o.interval_start DESC LIMIT 1),
+                        lag((SELECT o.high FROM ohlc o WHERE o.interval_start <= ai.interval ORDER BY o.interval_start DESC LIMIT 1)) over (order by ai.interval)
+                    ) as "high",
+                    COALESCE(
+                        (SELECT o.low FROM ohlc o WHERE o.interval_start <= ai.interval ORDER BY o.interval_start DESC LIMIT 1),
+                        lag((SELECT o.low FROM ohlc o WHERE o.interval_start <= ai.interval ORDER BY o.interval_start DESC LIMIT 1)) over (order by ai.interval)
+                    ) as "low",
+                    COALESCE(
+                        (SELECT o.close FROM ohlc o WHERE o.interval_start <= ai.interval ORDER BY o.interval_start DESC LIMIT 1),
+                        lag((SELECT o.close FROM ohlc o WHERE o.interval_start <= ai.interval ORDER BY o.interval_start DESC LIMIT 1)) over (order by ai.interval)
+                    ) as "close"
+                FROM
+                    all_intervals ai
+                LEFT JOIN
+                    ohlc o ON ai.interval = o.interval_start
+            ),
+            current_interval AS (
+                SELECT
+                    '{now}'::timestamp as time,
+                    o.open,
+                    o.high,
+                    o.low,
+                    o.close
+                FROM ohlc o
+                ORDER BY o.interval_start DESC
+                LIMIT 1
             )
-        ),
-        all_intervals AS (
-            SELECT generate_series(
-                date_trunc('day', '{current_interval_start}'::timestamp),
-                '{current_time}'::timestamp,
-                interval '{interval_in_minutes} minutes'
-            ) as interval
-        ),
-        filled_intervals AS (
-            SELECT
-                ai.interval as "time",
-                coalesce(
-                    (SELECT o.open FROM ohlc o WHERE o.interval_start <= ai.interval ORDER BY o.interval_start DESC LIMIT 1),
-                    lag((SELECT o.open FROM ohlc o WHERE o.interval_start <= ai.interval ORDER BY o.interval_start DESC LIMIT 1)) over (order by ai.interval)
-                ) as "open",
-                coalesce(
-                    (SELECT o.high FROM ohlc o WHERE o.interval_start <= ai.interval ORDER BY o.interval_start DESC LIMIT 1),
-                    lag((SELECT o.high FROM ohlc o WHERE o.interval_start <= ai.interval ORDER BY o.interval_start DESC LIMIT 1)) over (order by ai.interval)
-                ) as "high",
-                coalesce(
-                    (SELECT o.low FROM ohlc o WHERE o.interval_start <= ai.interval ORDER BY o.interval_start DESC LIMIT 1),
-                    lag((SELECT o.low FROM ohlc o WHERE o.interval_start <= ai.interval ORDER BY o.interval_start DESC LIMIT 1)) over (order by ai.interval)
-                ) as "low",
-                coalesce(
-                    (SELECT o.close FROM ohlc o WHERE o.interval_start <= ai.interval ORDER BY o.interval_start DESC LIMIT 1),
-                    lag((SELECT o.close FROM ohlc o WHERE o.interval_start <= ai.interval ORDER BY o.interval_start DESC LIMIT 1)) over (order by ai.interval)
-                ) as "close"
-            FROM
-                all_intervals ai
-            LEFT JOIN
-                ohlc o ON ai.interval = o.interval_start
-        ),
-        current_interval AS (
-            SELECT
-                '{now}'::timestamp as time,
-                o.open,
-                o.high,
-                o.low,
-                o.close
-            FROM ohlc o
-            ORDER BY o.interval_start DESC
-            LIMIT 1
-        )
-        SELECT DISTINCT * FROM filled_intervals
-        UNION ALL
-        SELECT * FROM current_interval
-        ORDER BY time DESC
-        LIMIT {limit};
-        "#,
+            SELECT DISTINCT * FROM filled_intervals
+            UNION ALL
+            SELECT * FROM current_interval
+            ORDER BY time DESC
+            LIMIT {limit};
+            "#,
         table_name = get_table_name(network, DataType::SpotEntry),
         pair_id = pair_id,
         interval_in_minutes = interval_in_minutes,
         limit = limit,
-        current_interval_start = current_interval_start,
         current_time = current_time,
         now = now
     );
