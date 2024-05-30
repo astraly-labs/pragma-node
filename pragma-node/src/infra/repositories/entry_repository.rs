@@ -575,6 +575,18 @@ pub struct OHLCEntryRaw {
     pub close: BigDecimal,
 }
 
+impl From<OHLCEntryRaw> for OHLCEntry {
+    fn from(raw: OHLCEntryRaw) -> Self {
+        OHLCEntry {
+            time: raw.time,
+            open: raw.open,
+            high: raw.high,
+            low: raw.low,
+            close: raw.close,
+        }
+    }
+}
+
 pub async fn get_ohlc(
     pool: &deadpool_diesel::postgres::Pool,
     pair_id: String,

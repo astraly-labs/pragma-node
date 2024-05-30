@@ -185,6 +185,7 @@ pub struct GetOnchainPublishersResponse(pub Vec<Publisher>);
 pub struct GetOnchainOHLCParams {
     pub network: Network,
     pub interval: Interval,
+    pub limit: Option<u64>,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize, ToSchema)]

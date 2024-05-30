@@ -26,6 +26,17 @@ pub enum Interval {
     TwoHours,
 }
 
+impl Interval {
+    pub fn to_minutes(&self) -> u32 {
+        match self {
+            Interval::OneMinute => 1,
+            Interval::FifteenMinutes => 15,
+            Interval::OneHour => 60,
+            Interval::TwoHours => 120,
+        }
+    }
+}
+
 #[derive(Default, Debug, Deserialize, ToSchema, Clone, Copy)]
 pub enum Network {
     #[serde(rename = "testnet")]
