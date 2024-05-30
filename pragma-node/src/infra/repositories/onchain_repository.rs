@@ -587,7 +587,7 @@ pub async fn get_ohlc(
         .map_err(adapt_infra_error)?
         .map_err(adapt_infra_error)?;
 
-    let ohlc_entries: Vec<OHLCEntry> = ohlc_entries.into_iter().map(From::from).collect();
+    let ohlc_entries: Vec<OHLCEntry> = ohlc_entries.into_iter().collect();
 
     Ok(ohlc_entries)
 }

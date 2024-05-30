@@ -587,6 +587,12 @@ impl From<OHLCEntryRaw> for OHLCEntry {
     }
 }
 
+impl FromIterator<OHLCEntryRaw> for Vec<OHLCEntry> {
+    fn from_iter<T: IntoIterator<Item = OHLCEntryRaw>>(iter: T) -> Self {
+        iter.into_iter().map(OHLCEntry::from).collect()
+    }
+}
+
 pub async fn get_ohlc(
     pool: &deadpool_diesel::postgres::Pool,
     pair_id: String,
