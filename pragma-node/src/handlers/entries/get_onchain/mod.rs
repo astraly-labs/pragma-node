@@ -5,6 +5,7 @@ pub mod publishers;
 use axum::extract::{Query, State};
 use axum::Json;
 use bigdecimal::BigDecimal;
+use pragma_common::types::AggregationMode;
 use pragma_entities::EntryError;
 
 use crate::handlers::entries::{GetOnchainParams, GetOnchainResponse};
@@ -28,7 +29,7 @@ use super::OnchainEntry;
         ("base" = String, Path, description = "Base Asset"),
         ("quote" = String, Path, description = "Quote Asset"),
         ("network" = Network, Query, description = "Network"),
-        ("aggregation" = AggregationMode, Query, description = "Aggregation Mode"),
+        ("aggregation" = Option<AggregationMode>, Query, description = "Aggregation Mode"),
         ("timestamp" = Option<u64>, Query, description = "Timestamp")
     ),
 )]
@@ -50,12 +51,14 @@ pub async fn get_onchain(
         now
     };
 
+    let aggregation_mode = params.aggregation.unwrap_or_default();
+
     let (aggregated_price, sources) = get_sources_and_aggregate(
         &state.postgres_pool,
         params.network,
         pair_id.clone(),
         timestamp,
-        params.aggregation,
+        aggregation_mode,
     )
     .await
     .map_err(|db_error| db_error.to_entry_error(&pair_id))?;
