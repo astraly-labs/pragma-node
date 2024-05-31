@@ -5,7 +5,6 @@ pub mod publishers;
 use axum::extract::{Query, State};
 use axum::Json;
 use bigdecimal::BigDecimal;
-use pragma_common::types::AggregationMode;
 use pragma_entities::EntryError;
 
 use crate::handlers::entries::{GetOnchainParams, GetOnchainResponse};
