@@ -27,11 +27,11 @@ pub async fn get_onchain_publishers(
 ) -> Result<Json<GetOnchainPublishersResponse>, EntryError> {
     let publishers = get_publishers(&state.postgres_pool, params.network)
         .await
-        .map_err(|e| e.to_entry_error(&"".to_string()))?;
+        .map_err(EntryError::from)?;
 
     let currencies_decimals = get_all_currencies_decimals(&state.timescale_pool)
         .await
-        .map_err(|e| e.to_entry_error(&"".to_string()))?;
+        .map_err(EntryError::from)?;
 
     let publishers_with_components = get_publishers_with_components(
         &state.postgres_pool,
@@ -41,7 +41,7 @@ pub async fn get_onchain_publishers(
         publishers,
     )
     .await
-    .map_err(|e| e.to_entry_error(&"".to_string()))?;
+    .map_err(EntryError::from)?;
 
     Ok(Json(GetOnchainPublishersResponse(
         publishers_with_components,

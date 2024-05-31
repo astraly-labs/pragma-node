@@ -39,6 +39,16 @@ pub enum EntryError {
     BuildPublish(String),
 }
 
+impl From<InfraError> for EntryError {
+    fn from(error: InfraError) -> Self {
+        match error {
+            InfraError::InternalServerError => Self::InternalServerError,
+            InfraError::NotFound => Self::NotFound("Unknown".to_string()),
+            InfraError::InvalidTimeStamp => Self::InternalServerError,
+        }
+    }
+}
+
 impl IntoResponse for EntryError {
     fn into_response(self) -> axum::response::Response {
         let (status, err_msg) = match self {
