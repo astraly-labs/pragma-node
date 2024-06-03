@@ -1,5 +1,5 @@
 use bigdecimal::{BigDecimal, ToPrimitive};
-use chrono::NaiveDateTime;
+use chrono::{DateTime, Utc};
 use std::collections::HashMap;
 
 use crate::infra::repositories::entry_repository::MedianEntry;
@@ -49,7 +49,7 @@ pub(crate) fn get_decimals_for_pair(
 #[allow(dead_code)]
 pub(crate) fn compute_median_price_and_time(
     entries: &mut Vec<MedianEntry>,
-) -> Option<(BigDecimal, NaiveDateTime)> {
+) -> Option<(BigDecimal, DateTime<Utc>)> {
     if entries.is_empty() {
         return None;
     }
@@ -108,7 +108,7 @@ mod tests {
 
     fn new_entry(median_price: u32, timestamp: i64) -> MedianEntry {
         MedianEntry {
-            time: DateTime::from_timestamp(timestamp, 0).unwrap().naive_utc(),
+            time: DateTime::from_timestamp(timestamp, 0).unwrap(),
             median_price: median_price.into(),
             num_sources: 5,
         }

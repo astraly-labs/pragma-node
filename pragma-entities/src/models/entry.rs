@@ -2,7 +2,7 @@ use crate::dto::entry as dto;
 use crate::models::DieselResult;
 use crate::schema::entries;
 use bigdecimal::BigDecimal;
-use diesel::internal::derives::multiconnection::chrono::NaiveDateTime;
+use chrono::{DateTime, Utc};
 use diesel::upsert::excluded;
 use diesel::{
     AsChangeset, ExpressionMethods, Insertable, PgConnection, PgTextExpressionMethods, QueryDsl,
@@ -19,7 +19,7 @@ pub struct Entry {
     pub pair_id: String,
     pub publisher: String,
     pub source: String,
-    pub timestamp: NaiveDateTime,
+    pub timestamp: DateTime<Utc>,
     pub price: BigDecimal,
 }
 
@@ -29,7 +29,7 @@ pub struct NewEntry {
     pub pair_id: String,
     pub publisher: String,
     pub source: String,
-    pub timestamp: NaiveDateTime,
+    pub timestamp: DateTime<Utc>,
     pub price: BigDecimal,
 }
 
