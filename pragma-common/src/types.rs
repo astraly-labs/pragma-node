@@ -27,13 +27,17 @@ pub enum Interval {
 }
 
 impl Interval {
-    pub fn to_minutes(&self) -> u32 {
+    pub fn to_minutes(&self) -> u64 {
         match self {
             Interval::OneMinute => 1,
             Interval::FifteenMinutes => 15,
             Interval::OneHour => 60,
             Interval::TwoHours => 120,
         }
+    }
+
+    pub fn to_seconds(&self) -> u64 {
+        self.to_minutes() * 60
     }
 }
 
