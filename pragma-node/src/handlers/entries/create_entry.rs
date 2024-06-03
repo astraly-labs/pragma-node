@@ -145,7 +145,7 @@ pub async fn create_entries(
         .iter()
         .map(|entry| {
             let dt = match DateTime::<Utc>::from_timestamp(entry.base.timestamp as i64, 0) {
-                Some(dt) => dt.naive_utc(),
+                Some(dt) => dt,
                 None => return Err(EntryError::InvalidTimestamp),
             };
 

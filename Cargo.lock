@@ -1874,7 +1874,7 @@ dependencies = [
 [[package]]
 name = "pragma-monitoring"
 version = "0.1.0"
-source = "git+https://github.com/astraly-labs/pragma-monitoring?rev=5536301#5536301ccac1f5aca23ed86471cf3518388a72c1"
+source = "git+https://github.com/akhercha/pragma-monitoring?branch=dev/naive_datetime_to_utc#b6fee94f191fd8e44daec6160b6852d716c4a9fd"
 dependencies = [
  "arc-swap",
  "axum",
