@@ -34,7 +34,7 @@ pub async fn get_entry(
     // Construct pair id
     let pair_id = currency_pair_to_pair_id(&pair.0, &pair.1);
 
-    let now = chrono::Utc::now().naive_utc().and_utc().timestamp_millis() as u64;
+    let now = chrono::Utc::now().timestamp_millis() as u64;
 
     let timestamp = if let Some(timestamp) = params.timestamp {
         timestamp
@@ -84,7 +84,7 @@ fn adapt_entry_to_entry_response(
 ) -> GetEntryResponse {
     GetEntryResponse {
         pair_id,
-        timestamp: entry.time.and_utc().timestamp_millis() as u64,
+        timestamp: entry.time.timestamp_millis() as u64,
         num_sources_aggregated: entry.num_sources as usize,
         price: format!(
             "0x{}",

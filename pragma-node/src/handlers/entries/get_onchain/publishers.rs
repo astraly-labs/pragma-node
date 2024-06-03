@@ -1,7 +1,7 @@
 use axum::extract::{Query, State};
 use axum::Json;
 
-use pragma_entities::PublisherError;
+use pragma_entities::EntryError;
 
 use crate::handlers::entries::{GetOnchainPublishersParams, GetOnchainPublishersResponse};
 use crate::infra::repositories::entry_repository::get_all_currencies_decimals;
@@ -24,14 +24,14 @@ use crate::AppState;
 pub async fn get_onchain_publishers(
     State(state): State<AppState>,
     Query(params): Query<GetOnchainPublishersParams>,
-) -> Result<Json<GetOnchainPublishersResponse>, PublisherError> {
+) -> Result<Json<GetOnchainPublishersResponse>, EntryError> {
     let publishers = get_publishers(&state.postgres_pool, params.network)
         .await
-        .map_err(PublisherError::from)?;
+        .map_err(EntryError::from)?;
 
     let currencies_decimals = get_all_currencies_decimals(&state.timescale_pool)
         .await
-        .map_err(PublisherError::from)?;
+        .map_err(EntryError::from)?;
 
     let publishers_with_components = get_publishers_with_components(
         &state.postgres_pool,
@@ -41,7 +41,7 @@ pub async fn get_onchain_publishers(
         publishers,
     )
     .await
-    .map_err(PublisherError::from)?;
+    .map_err(EntryError::from)?;
 
     Ok(Json(GetOnchainPublishersResponse(
         publishers_with_components,

@@ -1,5 +1,5 @@
 use bigdecimal::{BigDecimal, ToPrimitive};
-use chrono::{DateTime, NaiveDateTime};
+use chrono::{DateTime, Utc};
 use diesel::prelude::QueryableByName;
 use diesel::{ExpressionMethods, QueryDsl, Queryable, RunQueryDsl};
 use serde::{Deserialize, Serialize};
@@ -68,7 +68,7 @@ pub async fn _get_all(
 
 #[derive(Debug, Serialize, Queryable)]
 pub struct MedianEntry {
-    pub time: NaiveDateTime,
+    pub time: DateTime<Utc>,
     pub median_price: BigDecimal,
     pub num_sources: i64,
 }
@@ -76,7 +76,7 @@ pub struct MedianEntry {
 #[derive(Serialize, QueryableByName, Clone, Debug)]
 pub struct MedianEntryRaw {
     #[diesel(sql_type = diesel::sql_types::Timestamptz)]
-    pub time: NaiveDateTime,
+    pub time: DateTime<Utc>,
     #[diesel(sql_type = diesel::sql_types::Numeric)]
     pub median_price: BigDecimal,
     #[diesel(sql_type = diesel::sql_types::BigInt)]
@@ -141,14 +141,10 @@ fn calculate_rebased_price(
             base_decimals,
         )
     };
-    let min_timestamp = std::cmp::max(
-        base_entry.time.and_utc().timestamp(),
-        quote_entry.time.and_utc().timestamp(),
-    );
+    let min_timestamp = std::cmp::max(base_entry.time.timestamp(), quote_entry.time.timestamp());
     let num_sources = std::cmp::max(base_entry.num_sources, quote_entry.num_sources);
-    let new_timestamp = DateTime::from_timestamp(min_timestamp, 0)
-        .ok_or(InfraError::InvalidTimeStamp)?
-        .naive_utc();
+    let new_timestamp =
+        DateTime::from_timestamp(min_timestamp, 0).ok_or(InfraError::InvalidTimeStamp)?;
 
     let median_entry = MedianEntry {
         time: new_timestamp,
@@ -467,12 +463,10 @@ pub async fn get_entries_between(
     end_timestamp: u64,
 ) -> Result<Vec<MedianEntry>, InfraError> {
     let conn = pool.get().await.map_err(adapt_infra_error)?;
-    let start_datetime = DateTime::from_timestamp(start_timestamp as i64, 0)
-        .ok_or(InfraError::InvalidTimeStamp)?
-        .naive_utc();
-    let end_datetime = DateTime::from_timestamp(end_timestamp as i64, 0)
-        .ok_or(InfraError::InvalidTimeStamp)?
-        .naive_utc();
+    let start_datetime =
+        DateTime::from_timestamp(start_timestamp as i64, 0).ok_or(InfraError::InvalidTimeStamp)?;
+    let end_datetime =
+        DateTime::from_timestamp(end_timestamp as i64, 0).ok_or(InfraError::InvalidTimeStamp)?;
 
     let raw_sql = r#"
         SELECT
@@ -492,8 +486,8 @@ pub async fn get_entries_between(
         .interact(move |conn| {
             diesel::sql_query(raw_sql)
                 .bind::<diesel::sql_types::Text, _>(pair_id)
-                .bind::<diesel::sql_types::Timestamp, _>(start_datetime)
-                .bind::<diesel::sql_types::Timestamp, _>(end_datetime)
+                .bind::<diesel::sql_types::Timestamptz, _>(start_datetime)
+                .bind::<diesel::sql_types::Timestamptz, _>(end_datetime)
                 .load::<MedianEntryRaw>(conn)
         })
         .await
@@ -554,7 +548,7 @@ pub async fn get_decimals(
 
 #[derive(Debug, Clone, Serialize, Deserialize, Queryable)]
 pub struct OHLCEntry {
-    pub time: NaiveDateTime,
+    pub time: DateTime<Utc>,
     pub open: BigDecimal,
     pub low: BigDecimal,
     pub high: BigDecimal,
@@ -564,7 +558,7 @@ pub struct OHLCEntry {
 #[derive(Serialize, QueryableByName, Clone, Debug)]
 pub struct OHLCEntryRaw {
     #[diesel(sql_type = diesel::sql_types::Timestamptz)]
-    pub time: NaiveDateTime,
+    pub time: DateTime<Utc>,
     #[diesel(sql_type = diesel::sql_types::Numeric)]
     pub open: BigDecimal,
     #[diesel(sql_type = diesel::sql_types::Numeric)]

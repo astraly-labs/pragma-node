@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
 use bigdecimal::BigDecimal;
-use chrono::{Timelike, Utc};
+use chrono::{DateTime, Timelike, Utc};
 use deadpool_diesel::postgres::Pool;
-use diesel::sql_types::{BigInt, Integer, Numeric, Text, Timestamp, VarChar};
+use diesel::sql_types::{BigInt, Integer, Numeric, Text, Timestamptz, VarChar};
 use diesel::{Queryable, QueryableByName, RunQueryDsl};
 
 use pragma_common::types::{AggregationMode, DataType, Interval, Network};
@@ -42,7 +42,7 @@ impl From<SpotEntryWithAggregatedPrice> for OnchainEntry {
             source: entry.spot_entry.source,
             price: entry.spot_entry.price.to_string(),
             tx_hash: entry.spot_entry.transaction_hash,
-            timestamp: entry.spot_entry.timestamp.and_utc().timestamp() as u64,
+            timestamp: entry.spot_entry.timestamp.timestamp() as u64,
         }
     }
 }
@@ -142,8 +142,8 @@ pub async fn get_sources_and_aggregate(
 
 #[derive(Queryable, QueryableByName)]
 struct EntryTimestamp {
-    #[diesel(sql_type = Timestamp)]
-    pub timestamp: chrono::NaiveDateTime,
+    #[diesel(sql_type = Timestamptz)]
+    pub timestamp: DateTime<Utc>,
 }
 
 // TODO(akhercha): Only works for Spot entries
@@ -178,7 +178,7 @@ pub async fn get_last_updated_timestamp(
         .map_err(adapt_infra_error)?;
 
     let most_recent_entry = raw_entry.first().ok_or(InfraError::NotFound)?;
-    Ok(most_recent_entry.timestamp.and_utc().timestamp() as u64)
+    Ok(most_recent_entry.timestamp.timestamp() as u64)
 }
 
 #[derive(Queryable, QueryableByName)]
@@ -187,8 +187,8 @@ struct RawCheckpoint {
     pub transaction_hash: String,
     #[diesel(sql_type = Numeric)]
     pub price: BigDecimal,
-    #[diesel(sql_type = Timestamp)]
-    pub timestamp: chrono::NaiveDateTime,
+    #[diesel(sql_type = Timestamptz)]
+    pub timestamp: DateTime<Utc>,
     #[diesel(sql_type = VarChar)]
     pub sender_address: String,
 }
@@ -198,7 +198,7 @@ impl RawCheckpoint {
         Checkpoint {
             tx_hash: self.transaction_hash.clone(),
             price: format_bigdecimal_price(self.price.clone(), decimals),
-            timestamp: self.timestamp.and_utc().timestamp() as u64,
+            timestamp: self.timestamp.timestamp() as u64,
             sender_address: self.sender_address.clone(),
         }
     }
@@ -303,8 +303,8 @@ pub struct RawLastPublisherEntryForPair {
     pub price: BigDecimal,
     #[diesel(sql_type = VarChar)]
     pub source: String,
-    #[diesel(sql_type = Timestamp)]
-    pub last_updated_timestamp: chrono::NaiveDateTime,
+    #[diesel(sql_type = Timestamptz)]
+    pub last_updated_timestamp: DateTime<Utc>,
 }
 
 impl RawLastPublisherEntryForPair {
@@ -312,7 +312,7 @@ impl RawLastPublisherEntryForPair {
         let decimals = get_decimals_for_pair(currencies, &self.pair_id);
         PublisherEntry {
             pair_id: self.pair_id.clone(),
-            last_updated_timestamp: self.last_updated_timestamp.and_utc().timestamp() as u64,
+            last_updated_timestamp: self.last_updated_timestamp.timestamp() as u64,
             price: format_bigdecimal_price(self.price.clone(), decimals),
             source: self.source.clone(),
             decimals,
@@ -484,7 +484,7 @@ pub async fn get_ohlc(
     limit: u64,
 ) -> Result<Vec<OHLCEntry>, InfraError> {
     let interval_in_minutes = interval.to_minutes();
-    let now = Utc::now().naive_utc();
+    let now = Utc::now();
     let current_time = now - chrono::Duration::minutes((now.minute() % interval_in_minutes) as i64);
 
     let raw_sql = format!(

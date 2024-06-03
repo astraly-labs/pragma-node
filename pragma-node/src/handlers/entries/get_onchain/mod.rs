@@ -28,7 +28,7 @@ use super::OnchainEntry;
         ("base" = String, Path, description = "Base Asset"),
         ("quote" = String, Path, description = "Quote Asset"),
         ("network" = Network, Query, description = "Network"),
-        ("aggregation" = AggregationMode, Query, description = "Aggregation Mode"),
+        ("aggregation" = Option<AggregationMode>, Query, description = "Aggregation Mode"),
         ("timestamp" = Option<u64>, Query, description = "Timestamp")
     ),
 )]
@@ -40,7 +40,7 @@ pub async fn get_onchain(
     tracing::info!("Received get onchain entry request for pair {:?}", pair);
 
     let pair_id: String = currency_pair_to_pair_id(&pair.0, &pair.1);
-    let now = chrono::Utc::now().naive_utc().and_utc().timestamp() as u64;
+    let now = chrono::Utc::now().timestamp() as u64;
     let timestamp = if let Some(timestamp) = params.timestamp {
         if timestamp > now {
             return Err(EntryError::InvalidTimestamp);
@@ -50,12 +50,14 @@ pub async fn get_onchain(
         now
     };
 
+    let aggregation_mode = params.aggregation.unwrap_or_default();
+
     let (aggregated_price, sources) = get_sources_and_aggregate(
         &state.postgres_pool,
         params.network,
         pair_id.clone(),
         timestamp,
-        params.aggregation,
+        aggregation_mode,
     )
     .await
     .map_err(|db_error| db_error.to_entry_error(&pair_id))?;

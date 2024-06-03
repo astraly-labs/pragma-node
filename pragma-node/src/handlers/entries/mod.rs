@@ -70,7 +70,7 @@ pub struct GetVolatilityResponse {
 #[derive(Debug, Deserialize, IntoParams, ToSchema)]
 pub struct GetOnchainParams {
     pub network: Network,
-    pub aggregation: AggregationMode,
+    pub aggregation: Option<AggregationMode>,
     pub timestamp: Option<u64>,
 }
 
@@ -78,8 +78,8 @@ impl Default for GetOnchainParams {
     fn default() -> Self {
         Self {
             network: Network::default(),
-            aggregation: AggregationMode::default(),
-            timestamp: Some(chrono::Utc::now().naive_utc().and_utc().timestamp() as u64),
+            aggregation: None,
+            timestamp: Some(chrono::Utc::now().timestamp() as u64),
         }
     }
 }
