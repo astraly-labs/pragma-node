@@ -8,13 +8,14 @@ use pragma_common::types::{Interval, Network};
 
 use crate::handlers::entries::utils::currency_pair_to_pair_id;
 use crate::handlers::entries::GetOnchainOHLCParams;
+use crate::infra::repositories::entry_repository::OHLCEntry;
 use crate::infra::repositories::onchain_repository::get_ohlc;
 use crate::utils::PathExtractor;
 use crate::AppState;
 
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 
-pub const WS_UPDATING_INTERVAL: u64 = 10;
+pub const WS_UPDATING_INTERVAL_IN_SECONDS: u64 = 10;
 
 #[utoipa::path(
     get,
@@ -52,13 +53,28 @@ async fn handle_ohlc_ws(
     network: Network,
     interval: Interval,
 ) {
-    let mut update_interval = tokio::time::interval(Duration::from_secs(WS_UPDATING_INTERVAL));
+    // Initial OHLC to compute
+    let mut ohlc_to_compute = 10;
+    let mut update_interval =
+        tokio::time::interval(Duration::from_secs(WS_UPDATING_INTERVAL_IN_SECONDS));
+
+    let mut ohlc_data: Vec<OHLCEntry> = Vec::new();
+
     loop {
         update_interval.tick().await;
-        match get_ohlc(&state.postgres_pool, network, pair_id.clone(), interval).await {
-            Ok(response) => {
+        match get_ohlc(
+            &mut ohlc_data,
+            &state.postgres_pool,
+            network,
+            pair_id.clone(),
+            interval,
+            ohlc_to_compute,
+        )
+        .await
+        {
+            Ok(()) => {
                 if socket
-                    .send(Message::Text(serde_json::to_string(&response).unwrap()))
+                    .send(Message::Text(serde_json::to_string(&ohlc_data).unwrap()))
                     .await
                     .is_err()
                 {
@@ -75,5 +91,11 @@ async fn handle_ohlc_ws(
                 }
             }
         }
+        // After the first request, we only get the latest interval
+        ohlc_to_compute = 1;
     }
 }
+
+// 22:40:00
+// 22:41:57
+// 22:42:07

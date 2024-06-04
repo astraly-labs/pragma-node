@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use bigdecimal::BigDecimal;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Duration, Utc};
 use deadpool_diesel::postgres::Pool;
 use diesel::sql_types::{BigInt, Integer, Numeric, Text, Timestamptz, VarChar};
 use diesel::{Queryable, QueryableByName, RunQueryDsl};
@@ -14,7 +14,7 @@ use crate::handlers::entries::utils::get_decimals_for_pair;
 use crate::handlers::entries::{Checkpoint, OnchainEntry, Publisher, PublisherEntry};
 use crate::utils::format_bigdecimal_price;
 
-use super::entry_repository::{OHLCEntry, OHLCEntryRaw};
+use super::entry_repository::OHLCEntry;
 
 const BACKWARD_TIMESTAMP_INTERVAL: &str = "1 hour";
 
@@ -342,7 +342,7 @@ async fn get_all_publishers_updates(
         r#"
         SELECT 
             publisher,
-            COUNT(*) FILTER (WHERE block_timestamp >= NOW() - INTERVAL '1 day') AS daily_updates,
+            COUNT(*) FILTER (WHERE timestamp >= NOW() - INTERVAL '1 day') AS daily_updates,
             COUNT(*) AS total_updates,
             COUNT(DISTINCT pair_id) AS nb_feeds
         FROM 
@@ -476,20 +476,168 @@ pub async fn get_publishers_with_components(
     Ok(publishers_response)
 }
 
+// --- onchain OHLC ---
+
 pub async fn get_ohlc(
-    _pool: &Pool,
-    _network: Network,
-    _pair_id: String,
-    _interval: Interval,
-) -> Result<Vec<OHLCEntry>, InfraError> {
-    let entry = OHLCEntryRaw {
-        time: Utc::now(),
-        open: BigDecimal::from(0),
-        high: BigDecimal::from(0),
-        low: BigDecimal::from(0),
-        close: BigDecimal::from(0),
+    ohlc_data: &mut Vec<OHLCEntry>,
+    pool: &Pool,
+    network: Network,
+    pair_id: String,
+    interval: Interval,
+    data_to_retrieve: i64,
+) -> Result<(), InfraError> {
+    let now = Utc::now();
+    let aligned_current_timestamp = interval.align_timestamp(now);
+    let start_timestamp = if data_to_retrieve > 1 {
+        aligned_current_timestamp
+            - Duration::minutes(interval.to_minutes() * (data_to_retrieve * 10))
+    } else {
+        aligned_current_timestamp
     };
 
-    let response: Vec<OHLCEntry> = vec![entry].into_iter().collect();
-    Ok(response)
+    let entries = get_entries_from_timestamp(pool, network, &pair_id, start_timestamp).await?;
+    update_ohlc_data(
+        ohlc_data,
+        entries,
+        interval,
+        now,
+        start_timestamp,
+        data_to_retrieve == 1,
+    );
+
+    Ok(())
+}
+
+async fn get_entries_from_timestamp(
+    pool: &Pool,
+    network: Network,
+    pair_id: &str,
+    start_timestamp: DateTime<Utc>,
+) -> Result<Vec<SpotEntry>, InfraError> {
+    let raw_sql = format!(
+        r#"
+            SELECT
+                *
+            FROM
+                {table_name}
+            WHERE
+                pair_id = '{pair_id}'
+                AND timestamp >= '{start_timestamp}'
+            ORDER BY
+                timestamp
+            ASC
+        "#,
+        table_name = get_table_name(network, DataType::SpotEntry),
+        pair_id = pair_id,
+        start_timestamp = start_timestamp
+    );
+
+    let conn = pool.get().await.map_err(adapt_infra_error)?;
+    let entries: Vec<SpotEntry> = conn
+        .interact(move |conn| diesel::sql_query(raw_sql).load::<SpotEntry>(conn))
+        .await
+        .map_err(adapt_infra_error)?
+        .map_err(adapt_infra_error)?;
+    Ok(entries)
+}
+
+fn update_ohlc_data(
+    ohlc_data: &mut Vec<OHLCEntry>,
+    entries: Vec<SpotEntry>,
+    interval: Interval,
+    now: DateTime<Utc>,
+    mut start_timestamp: DateTime<Utc>,
+    only_update_last: bool,
+) {
+    let minutes_in_interval = Duration::minutes(interval.to_minutes());
+
+    // Remove the last not complete interval to update it
+    if only_update_last {
+        ohlc_data.pop();
+    }
+
+    while start_timestamp < now {
+        let mut end_current_interval = start_timestamp + minutes_in_interval;
+        let mut ohlc_end_interval = std::cmp::min(end_current_interval, now);
+
+        let last_ohlc_entry: Option<&OHLCEntry> = ohlc_data.last();
+
+        // If the current time slipped into a new interval, we move
+        // start_timestamp to the previous interval - so that we
+        // don't miss the last complete interval
+        if let Some(last_ohlc_entry) = last_ohlc_entry {
+            if only_update_last && (ohlc_end_interval - last_ohlc_entry.time) > minutes_in_interval
+            {
+                start_timestamp = last_ohlc_entry.time;
+                ohlc_end_interval = interval.align_timestamp(ohlc_end_interval);
+                end_current_interval = start_timestamp + minutes_in_interval;
+            }
+        }
+
+        // get all price entries for the delimited interval
+        let entries_for_interval =
+            get_entries_for_interval(&entries, start_timestamp, ohlc_end_interval);
+
+        // & compute ohlc from either price entries / last OHLC computed
+        let maybe_ohlc =
+            compute_ohlc_from_entries(&entries_for_interval, ohlc_end_interval, last_ohlc_entry);
+        if let Some(ohlc) = maybe_ohlc {
+            ohlc_data.push(ohlc);
+        }
+
+        // & increase the timestamp for the next interval
+        start_timestamp = end_current_interval;
+    }
+}
+
+fn compute_ohlc_from_entries(
+    entries: &[&SpotEntry],
+    end_interval: DateTime<Utc>,
+    last_ohlc_computed: Option<&OHLCEntry>,
+) -> Option<OHLCEntry> {
+    if entries.is_empty() && last_ohlc_computed.is_none() {
+        return None;
+    }
+
+    if !entries.is_empty() {
+        Some(OHLCEntry {
+            open: entries.first().unwrap().price.clone(),
+            high: entries
+                .iter()
+                .map(|entry| entry.price.clone())
+                .max()
+                .unwrap(),
+            low: entries
+                .iter()
+                .map(|entry| entry.price.clone())
+                .min()
+                .unwrap(),
+            close: entries.last().unwrap().price.clone(),
+            time: end_interval,
+        })
+    } else if last_ohlc_computed.is_some() {
+        let last_ohlc_computed = last_ohlc_computed.unwrap();
+        Some(OHLCEntry {
+            open: last_ohlc_computed.close.clone(),
+            high: last_ohlc_computed.close.clone(),
+            low: last_ohlc_computed.close.clone(),
+            close: last_ohlc_computed.close.clone(),
+            time: end_interval,
+        })
+    } else {
+        None
+    }
+}
+
+fn get_entries_for_interval(
+    entries: &[SpotEntry],
+    start_timestamp: DateTime<Utc>,
+    end_current_interval: DateTime<Utc>,
+) -> Vec<&SpotEntry> {
+    entries
+        .iter()
+        .filter(|entry| {
+            (entry.timestamp >= start_timestamp) && (entry.timestamp <= end_current_interval)
+        })
+        .collect::<Vec<&SpotEntry>>()
 }
