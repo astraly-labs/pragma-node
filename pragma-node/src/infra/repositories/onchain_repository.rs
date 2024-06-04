@@ -600,6 +600,7 @@ fn compute_ohlc_from_entries(
     }
 
     if !entries.is_empty() {
+        // Safe to unwrap since we checked that entries is not empty
         Some(OHLCEntry {
             open: entries.first().unwrap().price.clone(),
             high: entries
@@ -629,6 +630,8 @@ fn compute_ohlc_from_entries(
     }
 }
 
+/// Get all entries for a given interval.
+/// The interval is defined by the start_timestamp and the end_current_interval.
 fn get_entries_for_interval(
     entries: &[SpotEntry],
     start_timestamp: DateTime<Utc>,

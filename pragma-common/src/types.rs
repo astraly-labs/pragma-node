@@ -59,6 +59,11 @@ impl Interval {
         self.to_minutes() * 60
     }
 
+    /// Align a datetime to the nearest interval boundary.
+    ///
+    /// This function ensures that the given datetime is aligned to the self interval.
+    /// For example, if the interval is 15 minutes, a datetime like 20:17 will be
+    /// adjusted to 20:15, so that it falls on the boundary of the interval.
     pub fn align_timestamp(&self, dt: DateTime<Utc>) -> DateTime<Utc> {
         let interval_minutes = self.to_minutes();
         let dt_minutes = dt.minute() as i64;
@@ -124,8 +129,8 @@ mod tests {
                 ],
             ),
         ];
-        for (interval, inputs) in test_inputs.iter() {
-            for (input, expected) in inputs.iter() {
+        for (interval, test_case) in test_inputs.iter() {
+            for (input, expected) in test_case.iter() {
                 let dt: DateTime<Utc> = DateTime::parse_from_rfc3339(input).unwrap().to_utc();
                 let aligned_dt = interval.align_timestamp(dt);
                 assert_eq!(aligned_dt.to_string(), *expected);

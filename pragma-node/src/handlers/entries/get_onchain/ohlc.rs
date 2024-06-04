@@ -92,10 +92,8 @@ async fn handle_ohlc_ws(
             }
         }
         // After the first request, we only get the latest interval
-        ohlc_to_compute = 1;
+        if !ohlc_data.is_empty() {
+            ohlc_to_compute = 1;
+        }
     }
 }
-
-// 22:40:00
-// 22:41:57
-// 22:42:07
