@@ -541,6 +541,20 @@ async fn get_entries_from_timestamp(
     Ok(entries)
 }
 
+/// Compute the OHLC data from the entries for the given interval.
+///
+/// The function updates the `ohlc_data` vector with the computed OHLC entries
+/// between the `start_timestamp` and the current timestamp.
+/// - for the first call, the olhc_data vector is empty and will be populated
+///   by multiple OHLC entries - depending on start_timestamp.
+/// - for the next calls, the function will update the last OHLC entry in the vector
+///   until it closes the current interval. (for example, current timetamp is
+///   23h17 and interval is 15mn: we will update this last non finished interval
+///   between 23h15 & 23h17).
+/// - at some point, current timestamp will close the current interval and
+///   we will lock this last interval, for example in our last example 23h15
+///   to 23h30, if it's 23h30m03s now, we close the 23h15->23h30 interval
+///   and start a new one from 23h30 to 23h30m03s (current time).
 fn update_ohlc_data(
     ohlc_data: &mut Vec<OHLCEntry>,
     entries: Vec<SpotEntry>,
@@ -549,15 +563,17 @@ fn update_ohlc_data(
     mut start_timestamp: DateTime<Utc>,
     only_update_last: bool,
 ) {
-    let minutes_in_interval = Duration::minutes(interval.to_minutes());
+    let interval_duration = Duration::minutes(interval.to_minutes());
 
-    // Remove the last not complete interval to update it
+    // Remove the last not complete interval to update it.
+    // This is because the last entry correspond to the interval
+    // closing with current timestamp (so not complete yet).
     if only_update_last {
         ohlc_data.pop();
     }
 
     while start_timestamp < now {
-        let mut end_current_interval = start_timestamp + minutes_in_interval;
+        let mut end_current_interval = start_timestamp + interval_duration;
         let mut ohlc_end_interval = std::cmp::min(end_current_interval, now);
 
         let last_ohlc_entry: Option<&OHLCEntry> = ohlc_data.last();
@@ -566,11 +582,10 @@ fn update_ohlc_data(
         // start_timestamp to the previous interval - so that we
         // don't miss the last complete interval
         if let Some(last_ohlc_entry) = last_ohlc_entry {
-            if only_update_last && (ohlc_end_interval - last_ohlc_entry.time) > minutes_in_interval
-            {
+            if only_update_last && (ohlc_end_interval - last_ohlc_entry.time) > interval_duration {
                 start_timestamp = last_ohlc_entry.time;
                 ohlc_end_interval = interval.align_timestamp(ohlc_end_interval);
-                end_current_interval = start_timestamp + minutes_in_interval;
+                end_current_interval = start_timestamp + interval_duration;
             }
         }
 
@@ -578,7 +593,8 @@ fn update_ohlc_data(
         let entries_for_interval =
             get_entries_for_interval(&entries, start_timestamp, ohlc_end_interval);
 
-        // & compute ohlc from either price entries / last OHLC computed
+        // & compute ohlc from either price entries / last OHLC computed if no entries
+        // are available for the current interval
         let maybe_ohlc =
             compute_ohlc_from_entries(&entries_for_interval, ohlc_end_interval, last_ohlc_entry);
         if let Some(ohlc) = maybe_ohlc {
@@ -617,6 +633,9 @@ fn compute_ohlc_from_entries(
             time: end_interval,
         })
     } else if last_ohlc_computed.is_some() {
+        // If no data is available for the current interval and we have
+        // a last OHLC computed, we use the last close price as the
+        // OHLC values for the current interval.
         let last_ohlc_computed = last_ohlc_computed.unwrap();
         Some(OHLCEntry {
             open: last_ohlc_computed.close.clone(),
