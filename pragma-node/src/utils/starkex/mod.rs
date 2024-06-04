@@ -15,6 +15,7 @@ pub fn get_price_message(
     _timestamp: u64,
     _price: BigDecimal,
 ) -> FieldElement {
+    // TODO(akhercha): Build number A & B from the input data.
     // 1. Build number A from oracle_name & pair_id
     let a = FieldElement::from_hex_be("425443555344000000000000000000004d616b6572").unwrap();
     // 2. Build number B from price & timestamp
@@ -25,7 +26,8 @@ pub fn get_price_message(
 /// Sign the hashed_data using the private_key.
 /// See get_price_message for hashed_data context.
 ///
-/// TODO: Assumes we already have a private key registered.g
+/// TODO: Assumes we already have a private key registered -somewhere-
+/// and passed here as a FieldElement.
 ///
 /// E.g:
 /// key = 178047D3869489C055D7EA54C014FFB834A069C9595186ABE04EA4D1223A03F
