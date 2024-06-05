@@ -1,4 +1,4 @@
-use chrono::{DateTime, Timelike, Utc};
+use chrono::{NaiveDateTime, Timelike};
 use serde::Deserialize;
 use utoipa::ToSchema;
 
@@ -64,7 +64,7 @@ impl Interval {
     /// This function ensures that the given datetime is aligned to the self interval.
     /// For example, if the interval is 15 minutes, a datetime like 20:17 will be
     /// adjusted to 20:15, so that it falls on the boundary of the interval.
-    pub fn align_timestamp(&self, dt: DateTime<Utc>) -> DateTime<Utc> {
+    pub fn align_timestamp(&self, dt: NaiveDateTime) -> NaiveDateTime {
         let interval_minutes = self.to_minutes();
         let dt_minutes = dt.minute() as i64;
         let total_minutes = dt.hour() as i64 * 60 + dt_minutes;
@@ -85,7 +85,7 @@ impl Interval {
 #[cfg(test)]
 mod tests {
     use super::Interval;
-    use chrono::{DateTime, Utc};
+    use chrono::{DateTime, NaiveDateTime};
 
     #[test]
     fn test_align_timestamp() {
@@ -93,45 +93,45 @@ mod tests {
             (
                 Interval::OneMinute,
                 vec![
-                    ("2021-01-01T00:00:00Z", "2021-01-01 00:00:00 UTC"),
-                    ("2021-01-01T00:00:30Z", "2021-01-01 00:00:00 UTC"),
-                    ("2021-01-01T00:01:00Z", "2021-01-01 00:01:00 UTC"),
-                    ("2021-01-01T00:01:30Z", "2021-01-01 00:01:00 UTC"),
+                    ("2021-01-01T00:00:00Z", "2021-01-01 00:00:00"),
+                    ("2021-01-01T00:00:30Z", "2021-01-01 00:00:00"),
+                    ("2021-01-01T00:01:00Z", "2021-01-01 00:01:00"),
+                    ("2021-01-01T00:01:30Z", "2021-01-01 00:01:00"),
                 ],
             ),
             (
                 Interval::FifteenMinutes,
                 vec![
-                    ("2021-01-01T00:00:00Z", "2021-01-01 00:00:00 UTC"),
-                    ("2021-01-01T00:00:30Z", "2021-01-01 00:00:00 UTC"),
-                    ("2021-01-01T00:01:30Z", "2021-01-01 00:00:00 UTC"),
-                    ("2021-01-01T00:00:30Z", "2021-01-01 00:00:00 UTC"),
-                    ("2021-01-01T00:15:00Z", "2021-01-01 00:15:00 UTC"),
-                    ("2021-01-01T00:22:30Z", "2021-01-01 00:15:00 UTC"),
+                    ("2021-01-01T00:00:00Z", "2021-01-01 00:00:00"),
+                    ("2021-01-01T00:00:30Z", "2021-01-01 00:00:00"),
+                    ("2021-01-01T00:01:30Z", "2021-01-01 00:00:00"),
+                    ("2021-01-01T00:00:30Z", "2021-01-01 00:00:00"),
+                    ("2021-01-01T00:15:00Z", "2021-01-01 00:15:00"),
+                    ("2021-01-01T00:22:30Z", "2021-01-01 00:15:00"),
                 ],
             ),
             (
                 Interval::OneHour,
                 vec![
-                    ("2021-01-01T00:00:00Z", "2021-01-01 00:00:00 UTC"),
-                    ("2021-01-01T00:30:00Z", "2021-01-01 00:00:00 UTC"),
-                    ("2021-01-01T01:00:00Z", "2021-01-01 01:00:00 UTC"),
-                    ("2021-01-01T01:30:00Z", "2021-01-01 01:00:00 UTC"),
+                    ("2021-01-01T00:00:00Z", "2021-01-01 00:00:00"),
+                    ("2021-01-01T00:30:00Z", "2021-01-01 00:00:00"),
+                    ("2021-01-01T01:00:00Z", "2021-01-01 01:00:00"),
+                    ("2021-01-01T01:30:00Z", "2021-01-01 01:00:00"),
                 ],
             ),
             (
                 Interval::TwoHours,
                 vec![
-                    ("2021-01-01T00:00:00Z", "2021-01-01 00:00:00 UTC"),
-                    ("2021-01-01T01:30:00Z", "2021-01-01 00:00:00 UTC"),
-                    ("2021-01-01T02:00:00Z", "2021-01-01 02:00:00 UTC"),
-                    ("2021-01-01T02:30:00Z", "2021-01-01 02:00:00 UTC"),
+                    ("2021-01-01T00:00:00Z", "2021-01-01 00:00:00"),
+                    ("2021-01-01T01:30:00Z", "2021-01-01 00:00:00"),
+                    ("2021-01-01T02:00:00Z", "2021-01-01 02:00:00"),
+                    ("2021-01-01T02:30:00Z", "2021-01-01 02:00:00"),
                 ],
             ),
         ];
         for (interval, test_case) in test_inputs.iter() {
             for (input, expected) in test_case.iter() {
-                let dt: DateTime<Utc> = DateTime::parse_from_rfc3339(input).unwrap().to_utc();
+                let dt: NaiveDateTime = DateTime::parse_from_rfc3339(input).unwrap().naive_utc();
                 let aligned_dt = interval.align_timestamp(dt);
                 assert_eq!(aligned_dt.to_string(), *expected);
             }

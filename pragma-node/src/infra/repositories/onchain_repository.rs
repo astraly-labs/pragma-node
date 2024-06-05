@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
 use bigdecimal::BigDecimal;
-use chrono::{DateTime, Duration, Utc};
+use chrono::{Duration, NaiveDateTime, Utc};
 use deadpool_diesel::postgres::Pool;
-use diesel::sql_types::{BigInt, Integer, Numeric, Text, Timestamptz, VarChar};
+use diesel::sql_types::{BigInt, Integer, Numeric, Text, Timestamp, VarChar};
 use diesel::{Queryable, QueryableByName, RunQueryDsl};
 
 use pragma_common::types::{AggregationMode, DataType, Interval, Network};
@@ -42,7 +42,7 @@ impl From<SpotEntryWithAggregatedPrice> for OnchainEntry {
             source: entry.spot_entry.source,
             price: entry.spot_entry.price.to_string(),
             tx_hash: entry.spot_entry.transaction_hash,
-            timestamp: entry.spot_entry.timestamp.timestamp() as u64,
+            timestamp: entry.spot_entry.timestamp.and_utc().timestamp() as u64,
         }
     }
 }
@@ -142,8 +142,8 @@ pub async fn get_sources_and_aggregate(
 
 #[derive(Queryable, QueryableByName)]
 struct EntryTimestamp {
-    #[diesel(sql_type = Timestamptz)]
-    pub timestamp: DateTime<Utc>,
+    #[diesel(sql_type = Timestamp)]
+    pub timestamp: chrono::NaiveDateTime,
 }
 
 // TODO(akhercha): Only works for Spot entries
@@ -178,7 +178,7 @@ pub async fn get_last_updated_timestamp(
         .map_err(adapt_infra_error)?;
 
     let most_recent_entry = raw_entry.first().ok_or(InfraError::NotFound)?;
-    Ok(most_recent_entry.timestamp.timestamp() as u64)
+    Ok(most_recent_entry.timestamp.and_utc().timestamp() as u64)
 }
 
 #[derive(Queryable, QueryableByName)]
@@ -187,8 +187,8 @@ struct RawCheckpoint {
     pub transaction_hash: String,
     #[diesel(sql_type = Numeric)]
     pub price: BigDecimal,
-    #[diesel(sql_type = Timestamptz)]
-    pub timestamp: DateTime<Utc>,
+    #[diesel(sql_type = Timestamp)]
+    pub timestamp: chrono::NaiveDateTime,
     #[diesel(sql_type = VarChar)]
     pub sender_address: String,
 }
@@ -198,7 +198,7 @@ impl RawCheckpoint {
         Checkpoint {
             tx_hash: self.transaction_hash.clone(),
             price: format_bigdecimal_price(self.price.clone(), decimals),
-            timestamp: self.timestamp.timestamp() as u64,
+            timestamp: self.timestamp.and_utc().timestamp() as u64,
             sender_address: self.sender_address.clone(),
         }
     }
@@ -303,8 +303,8 @@ pub struct RawLastPublisherEntryForPair {
     pub price: BigDecimal,
     #[diesel(sql_type = VarChar)]
     pub source: String,
-    #[diesel(sql_type = Timestamptz)]
-    pub last_updated_timestamp: DateTime<Utc>,
+    #[diesel(sql_type = Timestamp)]
+    pub last_updated_timestamp: chrono::NaiveDateTime,
 }
 
 impl RawLastPublisherEntryForPair {
@@ -312,7 +312,7 @@ impl RawLastPublisherEntryForPair {
         let decimals = get_decimals_for_pair(currencies, &self.pair_id);
         PublisherEntry {
             pair_id: self.pair_id.clone(),
-            last_updated_timestamp: self.last_updated_timestamp.timestamp() as u64,
+            last_updated_timestamp: self.last_updated_timestamp.and_utc().timestamp() as u64,
             price: format_bigdecimal_price(self.price.clone(), decimals),
             source: self.source.clone(),
             decimals,
@@ -497,7 +497,7 @@ pub async fn get_ohlc(
     interval: Interval,
     data_to_retrieve: i64,
 ) -> Result<(), InfraError> {
-    let now = Utc::now();
+    let now = Utc::now().naive_utc();
     let aligned_current_timestamp = interval.align_timestamp(now);
     let start_timestamp = if data_to_retrieve > 1 {
         aligned_current_timestamp
@@ -523,7 +523,7 @@ async fn get_entries_from_timestamp(
     pool: &Pool,
     network: Network,
     pair_id: &str,
-    start_timestamp: DateTime<Utc>,
+    start_timestamp: NaiveDateTime,
 ) -> Result<Vec<SpotEntry>, InfraError> {
     let raw_sql = format!(
         r#"
@@ -570,8 +570,8 @@ fn update_ohlc_data(
     ohlc_data: &mut Vec<OHLCEntry>,
     entries: Vec<SpotEntry>,
     interval: Interval,
-    now: DateTime<Utc>,
-    mut start_timestamp: DateTime<Utc>,
+    now: NaiveDateTime,
+    mut start_timestamp: NaiveDateTime,
     only_update_last: bool,
 ) {
     let interval_duration = Duration::minutes(interval.to_minutes());
@@ -619,7 +619,7 @@ fn update_ohlc_data(
 
 fn compute_ohlc_from_entries(
     entries: &[&SpotEntry],
-    end_interval: DateTime<Utc>,
+    end_interval: NaiveDateTime,
     last_ohlc_computed: Option<&OHLCEntry>,
 ) -> Option<OHLCEntry> {
     if entries.is_empty() && last_ohlc_computed.is_none() {
@@ -664,8 +664,8 @@ fn compute_ohlc_from_entries(
 /// The interval is defined by the start_timestamp and the end_current_interval.
 fn get_entries_for_interval(
     entries: &[SpotEntry],
-    start_timestamp: DateTime<Utc>,
-    end_current_interval: DateTime<Utc>,
+    start_timestamp: NaiveDateTime,
+    end_current_interval: NaiveDateTime,
 ) -> Vec<&SpotEntry> {
     entries
         .iter()
