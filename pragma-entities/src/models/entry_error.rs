@@ -17,6 +17,8 @@ pub enum VolatilityError {
 pub enum EntryError {
     #[error("internal server error")]
     InternalServerError,
+    #[error("bad request")]
+    BadRequest,
     #[error("entry not found: {0}")]
     NotFound(String),
     #[error("infra error: {0}")]
@@ -73,6 +75,7 @@ impl IntoResponse for EntryError {
                 StatusCode::INTERNAL_SERVER_ERROR,
                 format!("Publisher error: {}", err),
             ),
+            Self::BadRequest => (StatusCode::BAD_REQUEST, "Bad request".to_string()),
             _ => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 String::from("Internal server error"),

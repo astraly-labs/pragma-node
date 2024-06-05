@@ -4,14 +4,30 @@ use axum::Json;
 use serde_json::json;
 use utoipa::ToSchema;
 
+use crate::error::InfraError;
+
 #[derive(Debug, thiserror::Error, ToSchema)]
 pub enum PublisherError {
+    #[error("internal server error")]
+    InternalServerError,
     #[error("invalid key : {0}")]
     InvalidKey(String),
     #[error("invalid address : {0}")]
     InvalidAddress(String),
     #[error("inactive publisher : {0}")]
     InactivePublisher(String),
+    #[error("no publishers found")]
+    NotFound,
+}
+
+impl From<InfraError> for PublisherError {
+    fn from(error: InfraError) -> Self {
+        match error {
+            InfraError::InternalServerError => Self::InternalServerError,
+            InfraError::NotFound => Self::NotFound,
+            _ => Self::InternalServerError,
+        }
+    }
 }
 
 impl IntoResponse for PublisherError {
@@ -28,6 +44,11 @@ impl IntoResponse for PublisherError {
             Self::InactivePublisher(publisher_name) => (
                 StatusCode::FORBIDDEN,
                 format!("Inactive Publisher: {}", publisher_name),
+            ),
+            Self::NotFound => (StatusCode::NOT_FOUND, "No publishers found".to_string()),
+            _ => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Internal Server Error".to_string(),
             ),
         };
         (
