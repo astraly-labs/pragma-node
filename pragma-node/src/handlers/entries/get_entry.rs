@@ -84,7 +84,7 @@ fn adapt_entry_to_entry_response(
 ) -> GetEntryResponse {
     GetEntryResponse {
         pair_id,
-        timestamp: entry.time.timestamp_millis() as u64,
+        timestamp: entry.time.and_utc().timestamp_millis() as u64,
         num_sources_aggregated: entry.num_sources as usize,
         price: format!(
             "0x{}",

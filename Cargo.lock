@@ -1884,7 +1884,7 @@ dependencies = [
 [[package]]
 name = "pragma-monitoring"
 version = "0.1.0"
-source = "git+https://github.com/astraly-labs/pragma-monitoring?rev=c475da8#c475da8fa2c49f9057f6c3dfa493f26c648f6d49"
+source = "git+https://github.com/astraly-labs/pragma-monitoring?rev=fab5233#fab52331b4f13bdab47fa16c0e6c9a2be5a5fd99"
 dependencies = [
  "arc-swap",
  "axum",

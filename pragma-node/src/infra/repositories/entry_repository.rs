@@ -1,5 +1,5 @@
 use bigdecimal::{BigDecimal, ToPrimitive};
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDateTime};
 use diesel::prelude::QueryableByName;
 use diesel::{ExpressionMethods, QueryDsl, Queryable, RunQueryDsl};
 use serde::{Deserialize, Serialize};
@@ -68,7 +68,7 @@ pub async fn _get_all(
 
 #[derive(Debug, Serialize, Queryable)]
 pub struct MedianEntry {
-    pub time: DateTime<Utc>,
+    pub time: NaiveDateTime,
     pub median_price: BigDecimal,
     pub num_sources: i64,
 }
@@ -76,7 +76,7 @@ pub struct MedianEntry {
 #[derive(Serialize, QueryableByName, Clone, Debug)]
 pub struct MedianEntryRaw {
     #[diesel(sql_type = diesel::sql_types::Timestamptz)]
-    pub time: DateTime<Utc>,
+    pub time: NaiveDateTime,
     #[diesel(sql_type = diesel::sql_types::Numeric)]
     pub median_price: BigDecimal,
     #[diesel(sql_type = diesel::sql_types::BigInt)]
@@ -141,10 +141,14 @@ fn calculate_rebased_price(
             base_decimals,
         )
     };
-    let min_timestamp = std::cmp::max(base_entry.time.timestamp(), quote_entry.time.timestamp());
+    let min_timestamp = std::cmp::max(
+        base_entry.time.and_utc().timestamp(),
+        quote_entry.time.and_utc().timestamp(),
+    );
     let num_sources = std::cmp::max(base_entry.num_sources, quote_entry.num_sources);
-    let new_timestamp =
-        DateTime::from_timestamp(min_timestamp, 0).ok_or(InfraError::InvalidTimeStamp)?;
+    let new_timestamp = DateTime::from_timestamp(min_timestamp, 0)
+        .ok_or(InfraError::InvalidTimeStamp)?
+        .naive_utc();
 
     let median_entry = MedianEntry {
         time: new_timestamp,
@@ -548,7 +552,7 @@ pub async fn get_decimals(
 
 #[derive(Debug, Clone, Serialize, Deserialize, Queryable)]
 pub struct OHLCEntry {
-    pub time: DateTime<Utc>,
+    pub time: NaiveDateTime,
     pub open: BigDecimal,
     pub low: BigDecimal,
     pub high: BigDecimal,
@@ -558,7 +562,7 @@ pub struct OHLCEntry {
 #[derive(Serialize, QueryableByName, Clone, Debug)]
 pub struct OHLCEntryRaw {
     #[diesel(sql_type = diesel::sql_types::Timestamptz)]
-    pub time: DateTime<Utc>,
+    pub time: NaiveDateTime,
     #[diesel(sql_type = diesel::sql_types::Numeric)]
     pub open: BigDecimal,
     #[diesel(sql_type = diesel::sql_types::Numeric)]
