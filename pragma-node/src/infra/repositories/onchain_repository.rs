@@ -459,7 +459,7 @@ pub async fn get_publishers_with_components(
             Some(updates) => updates,
             None => continue,
         };
-        if publisher_updates.total_updates == 0 {
+        if publisher_updates.daily_updates == 0 {
             continue;
         }
         let publisher_with_components = get_publisher_with_components(
