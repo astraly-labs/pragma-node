@@ -40,7 +40,7 @@ pub async fn get_onchain(
     tracing::info!("Received get onchain entry request for pair {:?}", pair);
 
     let pair_id: String = currency_pair_to_pair_id(&pair.0, &pair.1);
-    let now = chrono::Utc::now().naive_utc().and_utc().timestamp() as u64;
+    let now = chrono::Utc::now().timestamp() as u64;
     let timestamp = if let Some(timestamp) = params.timestamp {
         if timestamp > now {
             return Err(EntryError::InvalidTimestamp);

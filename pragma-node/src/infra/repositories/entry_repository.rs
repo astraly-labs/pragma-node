@@ -463,12 +463,10 @@ pub async fn get_entries_between(
     end_timestamp: u64,
 ) -> Result<Vec<MedianEntry>, InfraError> {
     let conn = pool.get().await.map_err(adapt_infra_error)?;
-    let start_datetime = DateTime::from_timestamp(start_timestamp as i64, 0)
-        .ok_or(InfraError::InvalidTimeStamp)?
-        .naive_utc();
-    let end_datetime = DateTime::from_timestamp(end_timestamp as i64, 0)
-        .ok_or(InfraError::InvalidTimeStamp)?
-        .naive_utc();
+    let start_datetime =
+        DateTime::from_timestamp(start_timestamp as i64, 0).ok_or(InfraError::InvalidTimeStamp)?;
+    let end_datetime =
+        DateTime::from_timestamp(end_timestamp as i64, 0).ok_or(InfraError::InvalidTimeStamp)?;
 
     let raw_sql = r#"
         SELECT
@@ -488,8 +486,8 @@ pub async fn get_entries_between(
         .interact(move |conn| {
             diesel::sql_query(raw_sql)
                 .bind::<diesel::sql_types::Text, _>(pair_id)
-                .bind::<diesel::sql_types::Timestamp, _>(start_datetime)
-                .bind::<diesel::sql_types::Timestamp, _>(end_datetime)
+                .bind::<diesel::sql_types::Timestamptz, _>(start_datetime)
+                .bind::<diesel::sql_types::Timestamptz, _>(end_datetime)
                 .load::<MedianEntryRaw>(conn)
         })
         .await
@@ -569,6 +567,24 @@ pub struct OHLCEntryRaw {
     pub low: BigDecimal,
     #[diesel(sql_type = diesel::sql_types::Numeric)]
     pub close: BigDecimal,
+}
+
+impl From<OHLCEntryRaw> for OHLCEntry {
+    fn from(raw: OHLCEntryRaw) -> Self {
+        OHLCEntry {
+            time: raw.time,
+            open: raw.open,
+            high: raw.high,
+            low: raw.low,
+            close: raw.close,
+        }
+    }
+}
+
+impl FromIterator<OHLCEntryRaw> for Vec<OHLCEntry> {
+    fn from_iter<T: IntoIterator<Item = OHLCEntryRaw>>(iter: T) -> Self {
+        iter.into_iter().map(OHLCEntry::from).collect()
+    }
 }
 
 pub async fn get_ohlc(
