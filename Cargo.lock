@@ -1884,7 +1884,7 @@ dependencies = [
 [[package]]
 name = "pragma-monitoring"
 version = "0.1.0"
-source = "git+https://github.com/akhercha/pragma-monitoring?branch=fix/revert_datetime_update#e9791babf85c1c67616ca1295992cc4180ff948e"
+source = "git+https://github.com/astraly-labs/pragma-monitoring?rev=fab5233#fab52331b4f13bdab47fa16c0e6c9a2be5a5fd99"
 dependencies = [
  "arc-swap",
  "axum",

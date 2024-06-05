@@ -21,7 +21,7 @@ envy = "0.4.2"
 lazy_static = "1.4.0"
 pragma-common = { path = "../pragma-common", version = "1.0.0" }
 pragma-entities = { path = "../pragma-entities", version = "1.0.0" }
-pragma-monitoring = { git = "https://github.com/akhercha/pragma-monitoring", branch = "fix/revert_datetime_update" }
+pragma-monitoring = { git = "https://github.com/astraly-labs/pragma-monitoring", rev = "fab5233" }
 rdkafka = "0.36.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", features = ["arbitrary_precision"] }
