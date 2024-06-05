@@ -11,6 +11,7 @@ pub use get_entry::get_entry;
 pub use get_ohlc::get_ohlc;
 pub use get_onchain::get_onchain;
 pub use get_volatility::get_volatility;
+pub use subscribe_to_entry::subscribe_to_entry;
 
 use crate::infra::repositories::entry_repository::OHLCEntry;
 
@@ -206,7 +207,7 @@ pub struct SubscribeToEntryParams {
 // https://docs.starkware.co/starkex/api/perpetual/objects.html
 
 #[derive(Debug, Default, Serialize, Deserialize, ToSchema)]
-pub struct SignatureResponse {
+pub struct StarkSignature {
     pub r: String,
     pub s: String,
 }
@@ -214,7 +215,7 @@ pub struct SignatureResponse {
 #[derive(Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct SignedOraclePrice {
     pub price: String,
-    pub timestamped_signature: SignatureResponse,
+    pub timestamped_signature: StarkSignature,
     pub external_asset_id: String,
 }
 
