@@ -14,6 +14,7 @@ fn build_first_number(oracle_name: &str, pair_id: &str) -> FieldElement {
     let oracle_as_hex = format!("{:x}", oracle_name);
     let pair_id = cairo_short_string_to_felt(pair_id).unwrap();
     let pair_id: u128 = pair_id.try_into().unwrap();
+    // 32 bytes padding corresponding to 128 bits
     let pair_as_hex = format!("{:0<width$x}", pair_id, width = 32);
     let v = format!("{}{}", pair_as_hex, oracle_as_hex);
     FieldElement::from_hex_be(&v).unwrap()
@@ -28,11 +29,24 @@ fn build_second_number(timestamp: u64, price: BigDecimal) -> FieldElement {
     let price_as_hex = format!("{:x}", price);
     let timestamp: u128 = timestamp.into();
     let timestamp_as_hex = format!("{:x}", timestamp);
-    println!("{}", timestamp_as_hex);
     let v = format!("{}{}", price_as_hex, timestamp_as_hex);
     FieldElement::from_hex_be(&v).unwrap()
 }
 
+/// Computes a signature-ready message based on oracle, asset, timestamp
+/// and price.
+/// The signature is the pedersen hash of two FieldElements:
+///
+/// first number:
+///  ---------------------------------------------------------------------------------
+///  | asset_name (rest of the number)  - 211 bits       |   oracle_name (40 bits)   |
+///  ---------------------------------------------------------------------------------
+///
+/// second number:
+///  ---------------------------------------------------------------------------------
+///  | 0 (92 bits)         | price (120 bits)              |   timestamp (32 bits)   |
+///  ---------------------------------------------------------------------------------
+///
 #[allow(dead_code)]
 pub fn get_price_message(
     // TODO(akhercha): oracle name should be a constant "Pragma"
@@ -41,10 +55,7 @@ pub fn get_price_message(
     timestamp: u64,
     price: BigDecimal,
 ) -> FieldElement {
-    // TODO(akhercha): Build number A & B from the input data.
-    // 1. Build number A from oracle_name & pair_id
     let first_number = build_first_number(oracle_name, pair_id);
-    // 2. Build number B from price & timestamp
     let second_number = build_second_number(timestamp, price);
     pedersen_hash(&first_number, &second_number)
 }
@@ -63,6 +74,7 @@ mod tests {
     use super::*;
     use bigdecimal::{BigDecimal, FromPrimitive};
 
+    // TODO(akhercha): generate more tests with the CLI
     #[test]
     fn test_get_price_message_with_example() {
         // 1. Setup
