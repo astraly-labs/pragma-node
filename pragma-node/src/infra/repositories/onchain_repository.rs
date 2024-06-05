@@ -380,28 +380,39 @@ async fn get_publisher_with_components(
 ) -> Result<Publisher, InfraError> {
     let raw_sql_entries = format!(
         r#"
-        SELECT
-            entries.pair_id,
-            entries.price,
-            entries.source,
-            entries.timestamp as last_updated_timestamp
-        FROM
-            {table_name} entries
-        INNER JOIN (
-            SELECT
+        WITH recent_entries AS (
+            SELECT 
                 pair_id,
-                MAX(timestamp) AS max_timestamp
-            FROM
+                price,
+                source,
+                timestamp AS last_updated_timestamp
+            FROM 
                 {table_name}
             WHERE
                 publisher = '{publisher_name}'
-            GROUP BY
-                pair_id
-        ) AS latest ON entries.pair_id = latest.pair_id AND entries.timestamp = latest.max_timestamp
-        WHERE
-            entries.publisher = '{publisher_name}'
-        ORDER BY
-            entries.pair_id, entries.source ASC;
+                AND timestamp >= NOW() - INTERVAL '1 day'
+        ),
+        ranked_entries AS (
+            SELECT 
+                pair_id,
+                price,
+                source,
+                last_updated_timestamp,
+                ROW_NUMBER() OVER (PARTITION BY pair_id, source ORDER BY last_updated_timestamp DESC) as rn
+            FROM 
+                recent_entries
+        )
+        SELECT 
+            pair_id,
+            price,
+            source,
+            last_updated_timestamp
+        FROM 
+            ranked_entries
+        WHERE 
+            rn = 1
+        ORDER BY 
+            pair_id, source ASC;
         "#,
         table_name = table_name,
         publisher_name = publisher.name
