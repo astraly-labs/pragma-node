@@ -54,7 +54,8 @@ async fn handle_subscription(mut socket: WebSocket, _state: AppState) {
     let waiting_duration = Duration::from_millis(UPDATE_INTERVAL_IN_MS);
     let mut update_interval = interval(waiting_duration);
 
-    let mut subscriptions: Vec<String> = Vec::new();
+    // Contains the pairs that the client is subscribed to
+    let mut subscribed_pairs: Vec<String> = Vec::new();
 
     // TODO(akhercha): refinements for readability
     loop {
@@ -65,16 +66,17 @@ async fn handle_subscription(mut socket: WebSocket, _state: AppState) {
                     if let Ok(subscription_msg) = serde_json::from_str::<SubscriptionMessage>(&text) {
                         match subscription_msg.msg_type {
                             SubscriptionType::Subscribe => {
-                                subscriptions.extend(subscription_msg.pairs.clone());
+                                subscribed_pairs.extend(subscription_msg.pairs.clone());
+                                subscribed_pairs.dedup();
                             },
                             SubscriptionType::Unsubscribe => {
-                                subscriptions.retain(|pair| !subscription_msg.pairs.contains(pair));
+                                subscribed_pairs.retain(|pair| !subscription_msg.pairs.contains(pair));
                             },
                         };
                         // Acknowledge subscription/unsubscription
                         let ack_message = serde_json::to_string(&SubscriptionAck {
                             msg_type: subscription_msg.msg_type,
-                            pairs: subscriptions.clone(),
+                            pairs: subscription_msg.pairs,
                         }).unwrap();
                         if socket.send(Message::Text(ack_message)).await.is_err() {
                             // Exit if there is an error sending message
@@ -88,7 +90,11 @@ async fn handle_subscription(mut socket: WebSocket, _state: AppState) {
             },
             // Update entries logic every X milliseconds
             _ = update_interval.tick() => {
-                // TODO(akhercha): Implement the logic to fetch entries for the given subscriptions
+                // Break channel if there's no more subscriptions
+                if subscribed_pairs.is_empty() {
+                    break;
+                }
+                // TODO(akhercha): Fetch entries for subscribed pairs
                 let entries = SubscribeToEntryResponse::default();
                 let json_response = serde_json::to_string(&entries).unwrap();
                 if socket.send(Message::Text(json_response)).await.is_err() {
