@@ -305,6 +305,8 @@ pub struct RawLastPublisherEntryForPair {
     pub source: String,
     #[diesel(sql_type = Timestamp)]
     pub last_updated_timestamp: chrono::NaiveDateTime,
+    #[diesel(sql_type = BigInt)]
+    pub daily_updates: i64,
 }
 
 impl RawLastPublisherEntryForPair {
@@ -316,6 +318,7 @@ impl RawLastPublisherEntryForPair {
             price: format_bigdecimal_price(self.price.clone(), decimals),
             source: self.source.clone(),
             decimals,
+            daily_updates: self.daily_updates as u32,
         }
     }
 }
