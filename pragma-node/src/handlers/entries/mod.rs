@@ -198,11 +198,6 @@ pub struct GetOnchainOHLCResponse {
     pub data: Vec<OHLCEntry>,
 }
 
-#[derive(Debug, Default, Deserialize, IntoParams, ToSchema)]
-pub struct SubscribeToEntryParams {
-    pub pairs: Vec<String>,
-}
-
 // StarkEx objects
 // https://docs.starkware.co/starkex/api/perpetual/objects.html
 
@@ -225,9 +220,21 @@ pub struct AssetOraclePrice {
     pub signed_prices: HashMap<String, SignedOraclePrice>,
 }
 
-#[derive(Debug, Default, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct SubscribeToEntryResponse {
     pub oracle_prices: HashMap<String, AssetOraclePrice>,
     pub timestamp: String,
     pub r#type: String,
+}
+
+pub const ORACLE_PRICES_TICK_TYPE: &str = "ORACLE_PRICES_TICK";
+
+impl Default for SubscribeToEntryResponse {
+    fn default() -> Self {
+        Self {
+            oracle_prices: HashMap::new(),
+            timestamp: chrono::Utc::now().to_rfc3339(),
+            r#type: ORACLE_PRICES_TICK_TYPE.to_string(),
+        }
+    }
 }

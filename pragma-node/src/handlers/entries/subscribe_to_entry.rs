@@ -1,21 +1,36 @@
 use std::time::Duration;
 
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
-use axum::extract::{Query, State};
-use axum::http::StatusCode;
+use axum::extract::State;
 use axum::response::IntoResponse;
-use axum::Json;
+use serde::{Deserialize, Serialize};
 use tokio::time::interval;
 
-use pragma_entities::Entry;
-
-use crate::handlers::entries::{SubscribeToEntryParams, SubscribeToEntryResponse};
+use crate::handlers::entries::SubscribeToEntryResponse;
 use crate::AppState;
 
-use super::SignedOraclePrice;
-
-const _ORACLE_PRICES_TICK_TYPE: &str = "ORACLE_PRICES_TICK";
 const UPDATE_INTERVAL_IN_MS: u64 = 500;
+
+#[derive(Default, Debug, Serialize, Deserialize)]
+enum SubscriptionType {
+    #[serde(rename = "subscribe")]
+    #[default]
+    Subscribe,
+    #[serde(rename = "unsubscribe")]
+    Unsubscribe,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct SubscriptionMessage {
+    msg_type: SubscriptionType,
+    pairs: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct SubscriptionAck {
+    msg_type: SubscriptionType,
+    pairs: Vec<String>,
+}
 
 #[utoipa::path(
     get,
@@ -26,42 +41,60 @@ const UPDATE_INTERVAL_IN_MS: u64 = 500;
             description = "Subscribe to a list of entries",
             body = [SubscribeToEntryResponse]
         )
-    ),
-    params(
-        SubscribeToEntryParams,
-    ),
+    )
 )]
 pub async fn subscribe_to_entry(
     ws: WebSocketUpgrade,
     State(state): State<AppState>,
-    Query(params): Query<SubscribeToEntryParams>,
 ) -> impl IntoResponse {
-    tracing::info!("New subscription for entries");
-    if params.pairs.is_empty() {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            Json(serde_json::json!({"error": "No pairs specified for subscription"})),
-        ));
-    }
-    Ok(ws.on_upgrade(move |socket| handle_subscription(socket, state, params.pairs)))
+    ws.on_upgrade(move |socket| handle_subscription(socket, state))
 }
 
-async fn handle_subscription(mut socket: WebSocket, _state: AppState, _pairs: Vec<String>) {
+async fn handle_subscription(mut socket: WebSocket, _state: AppState) {
     let waiting_duration = Duration::from_millis(UPDATE_INTERVAL_IN_MS);
     let mut update_interval = interval(waiting_duration);
-    let entries = SubscribeToEntryResponse::default();
-    // TODO(akhercha): trigger an update when new data is published
+
+    let mut subscriptions: Vec<String> = Vec::new();
+
+    // TODO(akhercha): refinements for readability
     loop {
-        // TODO(akhercha): update the entries for every pairs
-        let _: Vec<Entry> = vec![];
-        // TODO(akhercha): convert Vec<Entry> to Vec<SignedOraclePrice>
-        let _: Vec<SignedOraclePrice> = vec![];
-        // TODO(akhercha): update the response with the new entries
-        let json_response = serde_json::to_string(&entries).unwrap();
-        let response_status = socket.send(Message::Text(json_response)).await;
-        if response_status.is_err() {
-            break;
+        tokio::select! {
+            Some(msg) = socket.recv() => {
+                if let Ok(Message::Text(text)) = msg {
+                    // Handle subscription/unsubscription messages
+                    if let Ok(subscription_msg) = serde_json::from_str::<SubscriptionMessage>(&text) {
+                        match subscription_msg.msg_type {
+                            SubscriptionType::Subscribe => {
+                                subscriptions.extend(subscription_msg.pairs.clone());
+                            },
+                            SubscriptionType::Unsubscribe => {
+                                subscriptions.retain(|pair| !subscription_msg.pairs.contains(pair));
+                            },
+                        };
+                        // Acknowledge subscription/unsubscription
+                        let ack_message = serde_json::to_string(&SubscriptionAck {
+                            msg_type: subscription_msg.msg_type,
+                            pairs: subscriptions.clone(),
+                        }).unwrap();
+                        if socket.send(Message::Text(ack_message)).await.is_err() {
+                            // Exit if there is an error sending message
+                            break;
+                        }
+                    }
+                // Break channel if there's an error receiving messages
+                } else if msg.is_err() {
+                    break;
+                }
+            },
+            // Update entries logic every X milliseconds
+            _ = update_interval.tick() => {
+                // TODO(akhercha): Implement the logic to fetch entries for the given subscriptions
+                let entries = SubscribeToEntryResponse::default();
+                let json_response = serde_json::to_string(&entries).unwrap();
+                if socket.send(Message::Text(json_response)).await.is_err() {
+                    break;
+                }
+            }
         }
-        update_interval.tick().await;
     }
 }
