@@ -164,6 +164,7 @@ pub struct PublisherEntry {
     pub price: String,
     pub source: String,
     pub decimals: u32,
+    pub daily_updates: u32,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]

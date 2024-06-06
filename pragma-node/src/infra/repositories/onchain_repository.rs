@@ -305,6 +305,8 @@ pub struct RawLastPublisherEntryForPair {
     pub source: String,
     #[diesel(sql_type = Timestamp)]
     pub last_updated_timestamp: chrono::NaiveDateTime,
+    #[diesel(sql_type = BigInt)]
+    pub daily_updates: i64,
 }
 
 impl RawLastPublisherEntryForPair {
@@ -316,6 +318,7 @@ impl RawLastPublisherEntryForPair {
             price: format_bigdecimal_price(self.price.clone(), decimals),
             source: self.source.clone(),
             decimals,
+            daily_updates: self.daily_updates as u32,
         }
     }
 }
@@ -380,40 +383,42 @@ async fn get_publisher_with_components(
 ) -> Result<Publisher, InfraError> {
     let raw_sql_entries = format!(
         r#"
-        WITH recent_entries AS (
-            SELECT 
-                pair_id,
-                price,
-                source,
-                timestamp AS last_updated_timestamp
-            FROM 
-                {table_name}
-            WHERE
-                publisher = '{publisher_name}'
-                AND timestamp >= NOW() - INTERVAL '1 day'
-        ),
-        ranked_entries AS (
-            SELECT 
-                pair_id,
-                price,
-                source,
-                last_updated_timestamp,
-                ROW_NUMBER() OVER (PARTITION BY pair_id, source ORDER BY last_updated_timestamp DESC) as rn
-            FROM 
-                recent_entries
-        )
+    WITH recent_entries AS (
         SELECT 
             pair_id,
             price,
             source,
-            last_updated_timestamp
+            timestamp AS last_updated_timestamp
         FROM 
-            ranked_entries
-        WHERE 
-            rn = 1
-        ORDER BY 
-            pair_id, source ASC;
-        "#,
+            {table_name}
+        WHERE
+            publisher = '{publisher_name}'
+            AND timestamp >= NOW() - INTERVAL '1 day'
+    ),
+    ranked_entries AS (
+        SELECT 
+            pair_id,
+            price,
+            source,
+            last_updated_timestamp,
+            ROW_NUMBER() OVER (PARTITION BY pair_id, source ORDER BY last_updated_timestamp DESC) as rn,
+            COUNT(*) OVER (PARTITION BY pair_id, source) as daily_updates
+        FROM 
+            recent_entries
+    )
+    SELECT 
+        pair_id,
+        price,
+        source,
+        last_updated_timestamp,
+        daily_updates
+    FROM 
+        ranked_entries
+    WHERE 
+        rn = 1
+    ORDER BY 
+        pair_id, source ASC;
+    "#,
         table_name = table_name,
         publisher_name = publisher.name
     );
