@@ -1,7 +1,7 @@
 use bigdecimal::{BigDecimal, ToPrimitive};
 use chrono::{DateTime, NaiveDateTime};
 use diesel::prelude::QueryableByName;
-use diesel::sql_types::{Numeric, Timestamp, VarChar};
+use diesel::sql_types::{Numeric, Text, VarChar};
 use diesel::{ExpressionMethods, QueryDsl, Queryable, RunQueryDsl};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -14,7 +14,8 @@ use pragma_entities::{
     Currency, Entry, NewEntry,
 };
 
-use crate::utils::{convert_via_quote, normalize_to_decimals};
+use crate::handlers::entries::{AssetOraclePrice, SignedPublisherPrice};
+use crate::utils::{convert_via_quote, get_external_asset_id, normalize_to_decimals};
 
 #[derive(Deserialize)]
 #[allow(unused)]
@@ -354,6 +355,7 @@ pub async fn get_twap_price(
 
     Ok(entry)
 }
+
 pub async fn get_median_price(
     pool: &deadpool_diesel::postgres::Pool,
     pair_id: String,
@@ -509,54 +511,6 @@ pub async fn get_entries_between(
         .collect();
 
     Ok(entries)
-}
-
-#[derive(Debug, Queryable, QueryableByName)]
-pub struct LastEntryPrice {
-    #[diesel(sql_type = VarChar)]
-    pub pair_id: String,
-    #[diesel(sql_type = Numeric)]
-    pub price: BigDecimal,
-    #[diesel(sql_type = Timestamp)]
-    pub timestamp: NaiveDateTime,
-}
-
-pub async fn get_last_entries_for_pairs(
-    pool: &deadpool_diesel::postgres::Pool,
-    pairs: Vec<String>,
-) -> Result<Vec<LastEntryPrice>, InfraError> {
-    let raw_sql = format!(
-        r#"
-        SELECT
-            pair_id,
-            price,
-            timestamp
-        FROM (
-            SELECT
-                pair_id,
-                price,
-                timestamp,
-                ROW_NUMBER() OVER (PARTITION BY pair_id ORDER BY timestamp DESC) AS rn
-            FROM
-                entries
-            WHERE
-                pair_id IN ('{pairs_list}')
-        ) sub
-        WHERE
-            rn = 1;
-    "#,
-        pairs_list = pairs.join("','")
-    );
-
-    let conn = pool.get().await.map_err(adapt_infra_error)?;
-    let last_prices = conn
-        .interact(move |conn| diesel::sql_query(raw_sql).load::<LastEntryPrice>(conn))
-        .await
-        .map_err(adapt_infra_error)?
-        .map_err(adapt_infra_error)?;
-
-    last_prices.first().ok_or(InfraError::NotFound)?;
-    Ok(last_prices)
 }
 
 pub async fn get_decimals(
@@ -756,4 +710,197 @@ pub async fn get_ohlc(
         .collect();
 
     Ok(entries)
+}
+
+#[derive(Debug, Queryable, QueryableByName, Deserialize, Serialize)]
+struct RawMedianEntryWithComponents {
+    #[diesel(sql_type = VarChar)]
+    pub pair_id: String,
+    #[diesel(sql_type = Numeric)]
+    pub median_price: BigDecimal,
+    #[diesel(sql_type = Text)]
+    pub components: String, // array stored as json string
+}
+
+impl From<RawMedianEntryWithComponents> for MedianEntryWithComponents {
+    fn from(raw: RawMedianEntryWithComponents) -> Self {
+        let components: Vec<EntryComponent> = serde_json::from_str(&raw.components).unwrap();
+        let components = components
+            .into_iter()
+            .map(|c| EntryComponent {
+                timestamp: DateTime::parse_from_rfc3339(&c.timestamp)
+                    .unwrap()
+                    .timestamp()
+                    .to_string(),
+                ..c
+            })
+            .collect();
+        MedianEntryWithComponents {
+            pair_id: raw.pair_id,
+            median_price: raw.median_price,
+            components,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct EntryComponent {
+    pub pair_id: String,
+    pub price: BigDecimal,
+    pub timestamp: String,
+    pub publisher: String,
+    pub publisher_signature: String,
+}
+
+impl From<EntryComponent> for SignedPublisherPrice {
+    fn from(component: EntryComponent) -> Self {
+        SignedPublisherPrice {
+            oracle_asset_id: get_external_asset_id(&component.publisher, &component.pair_id),
+            oracle_price: component.price.to_string(),
+            timestamp: component.timestamp.to_string(),
+            // TODO(akhercha): get the signing key from the publisher name
+            signing_key: component.publisher,
+            signature: component.publisher_signature,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct MedianEntryWithComponents {
+    pub pair_id: String,
+    pub median_price: BigDecimal,
+    pub components: Vec<EntryComponent>,
+}
+
+impl From<MedianEntryWithComponents> for AssetOraclePrice {
+    fn from(median_entry: MedianEntryWithComponents) -> Self {
+        AssetOraclePrice {
+            global_asset_id: median_entry.pair_id,
+            median_price: median_entry.median_price.to_string(),
+            signed_prices: median_entry
+                .components
+                .into_iter()
+                .map(SignedPublisherPrice::from)
+                .collect(),
+            signature: "TO_SIGN_BY_PRAGMA".to_string(),
+        }
+    }
+}
+
+fn build_sql_query_for_median_with_components(pair_ids: &[String], interval_in_ms: u64) -> String {
+    let pairs_array = pair_ids
+        .iter()
+        .map(|pair_id| format!("'{}'", pair_id))
+        .collect::<Vec<String>>()
+        .join(",");
+
+    format!(
+        r#"
+            WITH pairs AS (
+                SELECT unnest(ARRAY[{pairs_array}]) AS pair_id
+            ),
+            filtered_entries AS (
+                SELECT 
+                    e.pair_id, 
+                    e.price, 
+                    e.id, 
+                    e.publisher, 
+                    e.timestamp, 
+                    e.source, 
+                    e.publisher_signature
+                FROM 
+                    entries e
+                JOIN 
+                    pairs p 
+                ON 
+                    e.pair_id = p.pair_id
+                WHERE 
+                    e.timestamp >= NOW() - INTERVAL '{interval} MILLISECONDS'
+            ),
+            ranked_entries AS (
+                SELECT 
+                    pair_id, 
+                    price, 
+                    id, 
+                    publisher, 
+                    timestamp, 
+                    source, 
+                    publisher_signature,
+                    ROW_NUMBER() OVER (PARTITION BY pair_id ORDER BY price) AS rnum,
+                    COUNT(*) OVER (PARTITION BY pair_id) AS total_count
+                FROM 
+                    filtered_entries
+            ),
+            median_entries AS (
+                SELECT 
+                    pair_id, 
+                    price, 
+                    id, 
+                    publisher, 
+                    timestamp, 
+                    source, 
+                    publisher_signature,
+                    total_count,
+                    rnum
+                FROM 
+                    ranked_entries
+                WHERE 
+                    rnum IN (FLOOR((total_count + 1) / 2.0)::int, CEIL((total_count + 1) / 2.0)::int)
+            )
+            SELECT 
+                pair_id,
+                AVG(price) AS median_price,
+                array_to_json(
+                    ARRAY_AGG(
+                        ROW(
+                            pair_id,
+                            price,
+                            timestamp,
+                            publisher,
+                            publisher_signature
+                        )::entry_component
+                    )
+                )::text AS components
+            FROM 
+                median_entries
+            GROUP BY 
+                pair_id;
+            "#,
+        pairs_array = pairs_array,
+        interval = interval_in_ms
+    )
+}
+
+pub const LIMIT_INTERVAL_IN_MS: u64 = 10000;
+
+pub async fn get_current_median_entries_with_components(
+    pool: &deadpool_diesel::postgres::Pool,
+    pair_ids: Vec<String>,
+) -> Result<Vec<MedianEntryWithComponents>, InfraError> {
+    let conn = pool.get().await.map_err(adapt_infra_error)?;
+    let mut interval_in_ms = 500;
+    let median_entries = loop {
+        let raw_sql = build_sql_query_for_median_with_components(&pair_ids, interval_in_ms);
+        let median_entries = conn
+            .interact(move |conn| {
+                diesel::sql_query(raw_sql).load::<RawMedianEntryWithComponents>(conn)
+            })
+            .await
+            .map_err(adapt_infra_error)?
+            .map_err(adapt_infra_error)?;
+
+        if !median_entries.is_empty() {
+            break median_entries;
+        }
+
+        interval_in_ms += 500;
+        if interval_in_ms >= LIMIT_INTERVAL_IN_MS {
+            return Err(InfraError::NotFound);
+        }
+    };
+
+    Ok(median_entries
+        .into_iter()
+        .map(MedianEntryWithComponents::from)
+        .collect())
 }

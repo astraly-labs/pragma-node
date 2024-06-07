@@ -6,18 +6,17 @@ use axum::response::IntoResponse;
 use pragma_entities::EntryError;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use starknet::core::utils::cairo_short_string_to_felt;
 use starknet::signers::SigningKey;
 use tokio::time::interval;
 
 use crate::handlers::entries::SubscribeToEntryResponse;
-use crate::infra::repositories::entry_repository::get_last_entries_for_pairs;
-use crate::utils::{get_price_message, sign};
+use crate::infra::repositories::entry_repository::get_current_median_entries_with_components;
+use crate::utils::get_entry_hash;
 use crate::AppState;
 
-use super::{SignedOraclePrice, StarkSignature, TimestampedSignature};
+use super::AssetOraclePrice;
 
-const UPDATE_INTERVAL_IN_MS: u64 = 500;
+const UPDATE_INTERVAL_IN_MS: u64 = 250;
 
 #[derive(Default, Debug, Serialize, Deserialize)]
 enum SubscriptionType {
@@ -63,9 +62,6 @@ async fn handle_subscription(mut socket: WebSocket, state: AppState) {
     // TODO(akhercha): Listen for changes in the entries dataase for subscribed pairs
     let mut update_interval = interval(waiting_duration);
 
-    // OraclePricesTick response containing the past entries
-    let mut entries = SubscribeToEntryResponse::default();
-
     // Pairs that the client is subscribed to
     let mut subscribed_pairs: Vec<String> = Vec::new();
 
@@ -74,7 +70,6 @@ async fn handle_subscription(mut socket: WebSocket, state: AppState) {
         tokio::select! {
             Some(msg) = socket.recv() => {
                 if let Ok(Message::Text(text)) = msg {
-                    // Handle subscription/unsubscription messages
                     if let Ok(subscription_msg) = serde_json::from_str::<SubscriptionRequest>(&text) {
                         // TODO(akhercha): what do we do about non existing pairs?
                         match subscription_msg.msg_type {
@@ -92,35 +87,30 @@ async fn handle_subscription(mut socket: WebSocket, state: AppState) {
                             pairs: subscribed_pairs.clone(),
                         }).unwrap();
                         if socket.send(Message::Text(ack_message)).await.is_err() {
-                            // Exit if there is an error sending message
+                            tracing::info!("Error sending message -- END");
                             break;
                         }
                     }
-                // Break channel if there's an error receiving messages
                 } else if msg.is_err() {
+                    tracing::info!("Error receiving message -- END");
                     break;
                 }
             },
             // Update entries logic every X milliseconds
             _ = update_interval.tick() => {
-                // Break channel if there's no more subscriptions
                 if subscribed_pairs.is_empty() {
-                    break;
+                    continue;
                 }
-                // TODO(akhercha): Fetch entries for subscribed pairs
-                match refresh_entries(&mut entries, &state, subscribed_pairs.clone()).await {
-                    Ok(_) => {},
-                    // Send error message and break channel if there's an error refreshing entries
+                let entries = match get_subscribed_pairs_entries(&state, subscribed_pairs.clone()).await {
+                    Ok(response) => response,
                     Err(e) => {
                         socket.send(Message::Text(json!({ "error": e.to_string() }).to_string())).await.unwrap();
-                        tracing::error!("Error refreshing entries: {:?}", e);
                         break;
                     }
                 };
                 let json_response = serde_json::to_string(&entries).unwrap();
-                // Send entries to the client
                 if socket.send(Message::Text(json_response)).await.is_err() {
-                    // Stop channel if there is an error sending message
+                    tracing::info!("Error sending message -- END");
                     break;
                 }
             }
@@ -128,63 +118,36 @@ async fn handle_subscription(mut socket: WebSocket, state: AppState) {
     }
 }
 
-async fn refresh_entries(
-    entries: &mut SubscribeToEntryResponse,
+async fn get_subscribed_pairs_entries(
     state: &AppState,
     subscribed_pairs: Vec<String>,
-) -> Result<(), EntryError> {
-    let last_entries = get_last_entries_for_pairs(&state.timescale_pool, subscribed_pairs).await?;
+) -> Result<SubscribeToEntryResponse, EntryError> {
+    // TODO(akhercha): entries should have at least 3 unique publishers
+    let median_entries =
+        get_current_median_entries_with_components(&state.timescale_pool, subscribed_pairs.clone())
+            .await
+            .map_err(|e| e.to_entry_error(&subscribed_pairs.join(",")))?;
 
-    for entry in last_entries {
-        let pair_id_hex = cairo_short_string_to_felt(&entry.pair_id).unwrap();
-        let pair_id_hex = format!("0x{:x}", pair_id_hex);
+    // TODO(akhercha): Build Pragma's signing key from AWS secret
+    let pragma_signer = SigningKey::from_random();
 
-        // TODO(akhercha): Use existing interval median method with 500ms
-        let asset_oracle_price = entries.oracle_prices.entry(pair_id_hex).or_default();
+    let mut response: SubscribeToEntryResponse = Default::default();
+    for entry in median_entries {
+        let median_price = entry.median_price.clone();
+        let mut oracle_price: AssetOraclePrice = entry.into();
 
-        // TODO(akhercha): Should be a median; not last price
-        asset_oracle_price.price = entry.price.to_string();
-
-        let (external_asset_id, hash_to_sign) = get_price_message(
-            // TODO(akhercha): Store our Publisher name somewhere
+        // Sign the oracle price
+        let hash_to_sign = get_entry_hash(
             "Pragma",
-            &entry.pair_id,
-            entry.timestamp.and_utc().timestamp() as u64,
-            &entry.price,
+            &oracle_price.global_asset_id,
+            chrono::Utc::now().timestamp() as u64,
+            &median_price,
         );
-
-        // TODO(akhercha): Wrong ATM - Sign every price with our registered StarkEx key when price published
-        let signer = SigningKey::from_random();
         // TODO(akhercha): unsafe unwrap
-        let signature = sign(&signer, hash_to_sign).unwrap();
-
-        // TODO(akhercha): Wrong - should be all the prices used to compute the median
-        let signed_price = SignedOraclePrice {
-            price: entry.price.to_string(),
-            timestamped_signature: TimestampedSignature {
-                // TODO(akhercha): Bad, we should sign every price with our registered
-                // starkex key when the price is published
-                signature: StarkSignature {
-                    r: format!("0x{}", signature.r.to_string()),
-                    s: format!("0x{}", signature.s.to_string()),
-                },
-                timestamp: entry.timestamp.and_utc().timestamp().to_string(),
-            },
-            external_asset_id: format!("0x{}", external_asset_id),
-        };
-
-        // TODO(akhercha): Get our public key from somewhere
-        let publisher_public_key = signer.verifying_key().scalar();
-        let publisher_public_key_hex = format!("{:x}", publisher_public_key);
-
-        asset_oracle_price
-            .signed_prices
-            .entry(publisher_public_key_hex)
-            .or_insert_with(|| vec![signed_price.clone()])
-            .insert(0, signed_price);
+        let signature = pragma_signer.sign(&hash_to_sign).unwrap();
+        oracle_price.signature = signature.to_string();
+        response.oracle_prices.push(oracle_price);
     }
-
-    entries.timestamp = chrono::Utc::now().timestamp().to_string();
-
-    Ok(())
+    response.timestamp = chrono::Utc::now().timestamp().to_string();
+    Ok(response)
 }

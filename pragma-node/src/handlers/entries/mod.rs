@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use serde::{Deserialize, Serialize};
 use starknet::core::types::FieldElement;
 use utoipa::{IntoParams, ToSchema};
@@ -203,43 +201,33 @@ pub struct GetOnchainOHLCResponse {
 // https://docs.starkware.co/starkex/api/perpetual/objects.html
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
-pub struct StarkSignature {
-    pub r: String,
-    pub s: String,
-}
-
-#[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
-pub struct TimestampedSignature {
-    pub signature: StarkSignature,
+pub struct SignedPublisherPrice {
+    pub oracle_asset_id: String,
+    pub oracle_price: String,
+    pub signing_key: String,
+    pub signature: String,
     pub timestamp: String,
-}
-
-#[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
-pub struct SignedOraclePrice {
-    pub price: String,
-    pub timestamped_signature: TimestampedSignature,
-    pub external_asset_id: String,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct AssetOraclePrice {
-    pub price: String,
-    pub signed_prices: HashMap<String, Vec<SignedOraclePrice>>,
+    pub global_asset_id: String,
+    pub median_price: String,
+    pub signature: String,
+    pub signed_prices: Vec<SignedPublisherPrice>,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct SubscribeToEntryResponse {
-    pub oracle_prices: HashMap<String, AssetOraclePrice>,
+    pub oracle_prices: Vec<AssetOraclePrice>,
     pub timestamp: String,
-    pub r#type: String,
 }
 
 impl Default for SubscribeToEntryResponse {
     fn default() -> Self {
         Self {
-            oracle_prices: HashMap::new(),
+            oracle_prices: Default::default(),
             timestamp: chrono::Utc::now().timestamp().to_string(),
-            r#type: String::from("ORACLE_PRICES_TICK"),
         }
     }
 }

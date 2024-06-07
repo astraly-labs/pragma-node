@@ -1,15 +1,10 @@
 use bigdecimal::{BigDecimal, ToPrimitive};
 
-use starknet::{
-    core::{
-        crypto::{pedersen_hash, EcdsaSignError, Signature},
-        types::FieldElement,
-        utils::cairo_short_string_to_felt,
-    },
-    signers::SigningKey,
+use starknet::core::{
+    crypto::pedersen_hash, types::FieldElement, utils::cairo_short_string_to_felt,
 };
 
-fn get_external_asset_id(oracle_name: &str, pair_id: &str) -> String {
+pub fn get_external_asset_id(oracle_name: &str, pair_id: &str) -> String {
     let oracle_name = cairo_short_string_to_felt(oracle_name).unwrap();
     let oracle_as_hex = format!("{:x}", oracle_name);
     let pair_id = cairo_short_string_to_felt(pair_id).unwrap();
@@ -47,29 +42,18 @@ fn build_second_number(timestamp: u64, price: &BigDecimal) -> FieldElement {
 ///  | 0 (92 bits)         | price (120 bits)              |   timestamp (32 bits)   |
 ///  ---------------------------------------------------------------------------------
 ///
-pub fn get_price_message(
+pub fn get_entry_hash(
     // TODO(akhercha): oracle name should be a constant "Pragma"
     oracle_name: &str,
     pair_id: &str,
     timestamp: u64,
     price: &BigDecimal,
-) -> (String, FieldElement) {
+) -> FieldElement {
     let external_asset_id = get_external_asset_id(oracle_name, pair_id);
     // TODO(akhercha): unsafe unwrap
     let first_number = FieldElement::from_hex_be(&external_asset_id).unwrap();
     let second_number = build_second_number(timestamp, price);
-    (
-        external_asset_id,
-        pedersen_hash(&first_number, &second_number),
-    )
-}
-
-/// Sign the hashed_data using the private_key.
-pub fn sign(
-    signing_key: &SigningKey,
-    hashed_data: FieldElement,
-) -> Result<Signature, EcdsaSignError> {
-    signing_key.sign(&hashed_data)
+    pedersen_hash(&first_number, &second_number)
 }
 
 #[cfg(test)]
@@ -79,7 +63,7 @@ mod tests {
 
     // TODO(akhercha): generate more tests with the CLI
     #[test]
-    fn test_get_price_message_with_example() {
+    fn test_get_entry_hash_with_example() {
         // 1. Setup
         let oracle_name = "Maker";
         let asset = "BTCUSD";
@@ -87,8 +71,7 @@ mod tests {
         let timestamp = 1577836800_u64;
 
         // 2. Action
-        let data = get_price_message(oracle_name, asset, timestamp, &price);
-        let hashed_data = data.1;
+        let hashed_data = get_entry_hash(oracle_name, asset, timestamp, &price);
 
         // 3. Check
         let expected_data = FieldElement::from_hex_be(
@@ -96,35 +79,5 @@ mod tests {
         )
         .unwrap();
         assert_eq!(hashed_data, expected_data);
-    }
-
-    #[test]
-    fn test_sign_with_example() {
-        // 1. Setup
-        let private_key = FieldElement::from_hex_be(
-            "178047D3869489C055D7EA54C014FFB834A069C9595186ABE04EA4D1223A03F",
-        )
-        .unwrap();
-        let signing_key = SigningKey::from_secret_scalar(private_key);
-        let hashed_data = FieldElement::from_hex_be(
-            "3e4113feb6c403cb0c954e5c09d239bf88fedb075220270f44173ac3cd41858",
-        )
-        .unwrap();
-
-        // 2. Action
-        let signature = sign(&signing_key, hashed_data).unwrap();
-
-        // 3. Check
-        let expected_r = FieldElement::from_hex_be(
-            "6a7a118a6fa508c4f0eb77ea0efbc8d48a64d4a570d93f5c61cd886877cb920",
-        )
-        .unwrap();
-        let expected_s = FieldElement::from_hex_be(
-            "6de9006a7bbf610d583d514951c98d15b1a0f6c78846986491d2c8ca049fd55",
-        )
-        .unwrap();
-
-        assert_eq!(signature.r, expected_r);
-        assert_eq!(signature.s, expected_s);
     }
 }
