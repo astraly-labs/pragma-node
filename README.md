@@ -99,10 +99,13 @@ For faster iterations, you can deploy every needed services required by `pragma-
 docker compose -f compose.dev.yaml up -d --build
 ```
 
-### 2. Fill the database
+### 2. Fill the onchain database
 
-The database tables are created automatically using the migrations in the `infra/pragma-node/postgres_migrations` folder.
-However, you need to fill the tables with data. To do so, you can either run the indexer or use a backup:
+The database tables are created automatically using our migrations:
+- offchain migrations are in the `pragma-entities/migrations` folder.
+- onchain migrations are in the `infra/pragma-node/postgres_migrations` folder.
+
+To fill the onchain tables with data you can either run the indexer or use a backup:
 
 #### Run the indexer:
 

@@ -15,7 +15,7 @@ use crate::infra::repositories::entry_repository::get_last_entries_for_pairs;
 use crate::utils::{get_price_message, sign};
 use crate::AppState;
 
-use super::{SignedOraclePrice, StarkSignature};
+use super::{SignedOraclePrice, StarkSignature, TimestampedSignature};
 
 const UPDATE_INTERVAL_IN_MS: u64 = 500;
 
@@ -76,6 +76,7 @@ async fn handle_subscription(mut socket: WebSocket, state: AppState) {
                 if let Ok(Message::Text(text)) = msg {
                     // Handle subscription/unsubscription messages
                     if let Ok(subscription_msg) = serde_json::from_str::<SubscriptionRequest>(&text) {
+                        // TODO(akhercha): what do we do about non existing pairs?
                         match subscription_msg.msg_type {
                             SubscriptionType::Subscribe => {
                                 subscribed_pairs.extend(subscription_msg.pairs.clone());
@@ -138,39 +139,44 @@ async fn refresh_entries(
         let pair_id_hex = cairo_short_string_to_felt(&entry.pair_id).unwrap();
         let pair_id_hex = format!("0x{:x}", pair_id_hex);
 
+        // TODO(akhercha): Use existing interval median method with 500ms
         let asset_oracle_price = entries.oracle_prices.entry(pair_id_hex).or_default();
 
         // TODO(akhercha): Should be a median; not last price
         asset_oracle_price.price = entry.price.to_string();
 
         let (external_asset_id, hash_to_sign) = get_price_message(
+            // TODO(akhercha): Store our Publisher name somewhere
             "Pragma",
             &entry.pair_id,
             entry.timestamp.and_utc().timestamp() as u64,
             &entry.price,
         );
 
-        // TODO(akhercha): Need to handle Signer with Pragma's registered key
+        // TODO(akhercha): Wrong ATM - Sign every price with our registered StarkEx key when price published
         let signer = SigningKey::from_random();
-
         // TODO(akhercha): unsafe unwrap
         let signature = sign(&signer, hash_to_sign).unwrap();
 
         // TODO(akhercha): Wrong - should be all the prices used to compute the median
         let signed_price = SignedOraclePrice {
             price: entry.price.to_string(),
-            // TODO(akhercha): is StarkSignature really needed? Try to use Signature
-            timestamped_signature: StarkSignature {
-                r: format!("0x{}", signature.r.to_string()),
-                s: format!("0x{}", signature.s.to_string()),
+            timestamped_signature: TimestampedSignature {
+                // TODO(akhercha): Bad, we should sign every price with our registered
+                // starkex key when the price is published
+                signature: StarkSignature {
+                    r: format!("0x{}", signature.r.to_string()),
+                    s: format!("0x{}", signature.s.to_string()),
+                },
+                timestamp: entry.timestamp.and_utc().timestamp().to_string(),
             },
             external_asset_id: format!("0x{}", external_asset_id),
         };
 
+        // TODO(akhercha): Get our public key from somewhere
         let publisher_public_key = signer.verifying_key().scalar();
         let publisher_public_key_hex = format!("{:x}", publisher_public_key);
 
-        // TODO(akhercha): unsafe unwrap
         asset_oracle_price
             .signed_prices
             .entry(publisher_public_key_hex)

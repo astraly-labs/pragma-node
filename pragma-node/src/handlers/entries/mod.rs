@@ -208,9 +208,15 @@ pub struct StarkSignature {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
+pub struct TimestampedSignature {
+    pub signature: StarkSignature,
+    pub timestamp: String,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
 pub struct SignedOraclePrice {
     pub price: String,
-    pub timestamped_signature: StarkSignature,
+    pub timestamped_signature: TimestampedSignature,
     pub external_asset_id: String,
 }
 
