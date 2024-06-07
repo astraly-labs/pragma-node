@@ -19,7 +19,7 @@ diesel::table! {
         timestamp -> Timestamptz,
         price -> Numeric,
         source -> Varchar,
-        publisher_signature -> Varchar
+        publisher_signature -> Nullable<Varchar>,
     }
 }
 

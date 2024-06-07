@@ -20,7 +20,7 @@ pub struct Entry {
     pub publisher: String,
     pub source: String,
     pub timestamp: NaiveDateTime,
-    pub publisher_signature: String,
+    pub publisher_signature: Option<String>,
     pub price: BigDecimal,
 }
 
