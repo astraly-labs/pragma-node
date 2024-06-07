@@ -125,16 +125,12 @@ pub async fn create_entries(
     );
 
     let message_hash = build_publish_message(&new_entries.entries)?.message_hash(account_address);
-
-    if !ecdsa_verify(
-        &public_key,
-        &message_hash,
-        &Signature {
-            r: new_entries.signature[0],
-            s: new_entries.signature[1],
-        },
-    )
-    .map_err(EntryError::InvalidSignature)?
+    let signature = Signature {
+        r: new_entries.signature[0],
+        s: new_entries.signature[1],
+    };
+    if !ecdsa_verify(&public_key, &message_hash, &signature)
+        .map_err(EntryError::InvalidSignature)?
     {
         tracing::error!("Invalid signature for message hash {:?}", &message_hash);
         return Err(EntryError::Unauthorized);
@@ -154,6 +150,7 @@ pub async fn create_entries(
                 publisher: entry.base.publisher.clone(),
                 source: entry.base.source.clone(),
                 timestamp: dt,
+                publisher_signature: format!("0x{}", signature),
                 price: entry.price.into(),
             })
         })
