@@ -201,13 +201,13 @@ pub struct GetOnchainOHLCResponse {
 // StarkEx objects
 // https://docs.starkware.co/starkex/api/perpetual/objects.html
 
-#[derive(Debug, Default, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
 pub struct StarkSignature {
     pub r: String,
     pub s: String,
 }
 
-#[derive(Debug, Default, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
 pub struct SignedOraclePrice {
     pub price: String,
     pub timestamped_signature: StarkSignature,
@@ -217,7 +217,7 @@ pub struct SignedOraclePrice {
 #[derive(Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct AssetOraclePrice {
     pub price: String,
-    pub signed_prices: HashMap<String, SignedOraclePrice>,
+    pub signed_prices: HashMap<String, Vec<SignedOraclePrice>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
@@ -227,14 +227,12 @@ pub struct SubscribeToEntryResponse {
     pub r#type: String,
 }
 
-pub const ORACLE_PRICES_TICK_TYPE: &str = "ORACLE_PRICES_TICK";
-
 impl Default for SubscribeToEntryResponse {
     fn default() -> Self {
         Self {
             oracle_prices: HashMap::new(),
-            timestamp: chrono::Utc::now().to_rfc3339(),
-            r#type: ORACLE_PRICES_TICK_TYPE.to_string(),
+            timestamp: chrono::Utc::now().timestamp().to_string(),
+            r#type: String::from("ORACLE_PRICES_TICK"),
         }
     }
 }

@@ -1,3 +1,4 @@
+use bigdecimal::num_bigint::ToBigInt;
 use bigdecimal::{BigDecimal, ToPrimitive};
 use chrono::NaiveDateTime;
 use std::collections::HashMap;
@@ -99,6 +100,14 @@ pub(crate) fn compute_volatility(entries: &Vec<MedianEntry>) -> f64 {
 
     let variance: f64 = values.iter().map(|v| v.0 / v.1).sum::<f64>() / values.len() as f64;
     variance.sqrt() * 10_f64.powi(8)
+}
+
+/// Converts a big decimal price to a hex string.
+pub(crate) fn big_decimal_price_to_hex(price: &BigDecimal) -> String {
+    format!(
+        "0x{}",
+        price.to_bigint().unwrap_or_default().to_str_radix(16)
+    )
 }
 
 #[cfg(test)]

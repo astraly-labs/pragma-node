@@ -2,6 +2,7 @@ pub use conversion::{convert_via_quote, format_bigdecimal_price, normalize_to_de
 pub use custom_extractors::json_extractor::JsonExtractor;
 pub use custom_extractors::path_extractor::PathExtractor;
 pub use signing::typed_data::TypedData;
+pub use starkex::{get_price_message, sign};
 
 mod conversion;
 mod custom_extractors;

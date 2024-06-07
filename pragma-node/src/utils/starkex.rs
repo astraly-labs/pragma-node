@@ -9,18 +9,17 @@ use starknet::{
     signers::SigningKey,
 };
 
-fn build_first_number(oracle_name: &str, pair_id: &str) -> FieldElement {
+fn get_external_asset_id(oracle_name: &str, pair_id: &str) -> String {
     let oracle_name = cairo_short_string_to_felt(oracle_name).unwrap();
     let oracle_as_hex = format!("{:x}", oracle_name);
     let pair_id = cairo_short_string_to_felt(pair_id).unwrap();
     let pair_id: u128 = pair_id.try_into().unwrap();
     // 32 bytes padding corresponding to 128 bits
     let pair_as_hex = format!("{:0<width$x}", pair_id, width = 32);
-    let v = format!("{}{}", pair_as_hex, oracle_as_hex);
-    FieldElement::from_hex_be(&v).unwrap()
+    format!("{}{}", pair_as_hex, oracle_as_hex)
 }
 
-fn build_second_number(timestamp: u64, price: BigDecimal) -> FieldElement {
+fn build_second_number(timestamp: u64, price: &BigDecimal) -> FieldElement {
     // TODO(akhercha): round?
     let price = price.round(2);
     // TODO(akhercha): 18 all the time ? Or can be different depending on pairs?
@@ -33,6 +32,7 @@ fn build_second_number(timestamp: u64, price: BigDecimal) -> FieldElement {
     FieldElement::from_hex_be(&v).unwrap()
 }
 
+/// TODO(akhercha): Update docstring to include external_asset_id
 /// Computes a signature-ready message based on oracle, asset, timestamp
 /// and price.
 /// The signature is the pedersen hash of two FieldElements:
@@ -47,21 +47,24 @@ fn build_second_number(timestamp: u64, price: BigDecimal) -> FieldElement {
 ///  | 0 (92 bits)         | price (120 bits)              |   timestamp (32 bits)   |
 ///  ---------------------------------------------------------------------------------
 ///
-#[allow(dead_code)]
 pub fn get_price_message(
     // TODO(akhercha): oracle name should be a constant "Pragma"
     oracle_name: &str,
     pair_id: &str,
     timestamp: u64,
-    price: BigDecimal,
-) -> FieldElement {
-    let first_number = build_first_number(oracle_name, pair_id);
+    price: &BigDecimal,
+) -> (String, FieldElement) {
+    let external_asset_id = get_external_asset_id(oracle_name, pair_id);
+    // TODO(akhercha): unsafe unwrap
+    let first_number = FieldElement::from_hex_be(&external_asset_id).unwrap();
     let second_number = build_second_number(timestamp, price);
-    pedersen_hash(&first_number, &second_number)
+    (
+        external_asset_id,
+        pedersen_hash(&first_number, &second_number),
+    )
 }
 
 /// Sign the hashed_data using the private_key.
-#[allow(dead_code)]
 pub fn sign(
     signing_key: SigningKey,
     hashed_data: FieldElement,
@@ -84,7 +87,8 @@ mod tests {
         let timestamp = 1577836800_u64;
 
         // 2. Action
-        let hashed_data = get_price_message(oracle_name, asset, timestamp, price);
+        let data = get_price_message(oracle_name, asset, timestamp, &price);
+        let hashed_data = data.1;
 
         // 3. Check
         let expected_data = FieldElement::from_hex_be(

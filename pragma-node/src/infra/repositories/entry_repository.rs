@@ -1,6 +1,7 @@
 use bigdecimal::{BigDecimal, ToPrimitive};
 use chrono::{DateTime, NaiveDateTime};
 use diesel::prelude::QueryableByName;
+use diesel::sql_types::{Numeric, Timestamp, VarChar};
 use diesel::{ExpressionMethods, QueryDsl, Queryable, RunQueryDsl};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -508,6 +509,54 @@ pub async fn get_entries_between(
         .collect();
 
     Ok(entries)
+}
+
+#[derive(Debug, Queryable, QueryableByName)]
+pub struct LastEntryPrice {
+    #[diesel(sql_type = VarChar)]
+    pub pair_id: String,
+    #[diesel(sql_type = Numeric)]
+    pub price: BigDecimal,
+    #[diesel(sql_type = Timestamp)]
+    pub timestamp: NaiveDateTime,
+}
+
+pub async fn get_last_entries_for_pairs(
+    pool: &deadpool_diesel::postgres::Pool,
+    pairs: Vec<String>,
+) -> Result<Vec<LastEntryPrice>, InfraError> {
+    let raw_sql = format!(
+        r#"
+        SELECT
+            pair_id,
+            price,
+            timestamp
+        FROM (
+            SELECT
+                pair_id,
+                price,
+                timestamp,
+                ROW_NUMBER() OVER (PARTITION BY pair_id ORDER BY timestamp DESC) AS rn
+            FROM
+                entries
+            WHERE
+                pair_id IN ('{pairs_list}')
+        ) sub
+        WHERE
+            rn = 1;
+    "#,
+        pairs_list = pairs.join("','")
+    );
+
+    let conn = pool.get().await.map_err(adapt_infra_error)?;
+    let last_prices = conn
+        .interact(move |conn| diesel::sql_query(raw_sql).load::<LastEntryPrice>(conn))
+        .await
+        .map_err(adapt_infra_error)?
+        .map_err(adapt_infra_error)?;
+
+    last_prices.first().ok_or(InfraError::NotFound)?;
+    Ok(last_prices)
 }
 
 pub async fn get_decimals(
