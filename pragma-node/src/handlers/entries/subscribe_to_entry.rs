@@ -29,7 +29,7 @@ enum SubscriptionType {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct SubscriptionMessage {
+struct SubscriptionRequest {
     msg_type: SubscriptionType,
     pairs: Vec<String>,
 }
@@ -75,7 +75,7 @@ async fn handle_subscription(mut socket: WebSocket, state: AppState) {
             Some(msg) = socket.recv() => {
                 if let Ok(Message::Text(text)) = msg {
                     // Handle subscription/unsubscription messages
-                    if let Ok(subscription_msg) = serde_json::from_str::<SubscriptionMessage>(&text) {
+                    if let Ok(subscription_msg) = serde_json::from_str::<SubscriptionRequest>(&text) {
                         match subscription_msg.msg_type {
                             SubscriptionType::Subscribe => {
                                 subscribed_pairs.extend(subscription_msg.pairs.clone());
@@ -88,7 +88,7 @@ async fn handle_subscription(mut socket: WebSocket, state: AppState) {
                         // Acknowledge subscription/unsubscription
                         let ack_message = serde_json::to_string(&SubscriptionAck {
                             msg_type: subscription_msg.msg_type,
-                            pairs: subscription_msg.pairs,
+                            pairs: subscribed_pairs.clone(),
                         }).unwrap();
                         if socket.send(Message::Text(ack_message)).await.is_err() {
                             // Exit if there is an error sending message
