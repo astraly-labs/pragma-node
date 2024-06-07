@@ -6,6 +6,7 @@ use axum::response::IntoResponse;
 use pragma_entities::EntryError;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use starknet::core::utils::cairo_short_string_to_felt;
 use starknet::signers::SigningKey;
 use tokio::time::interval;
 
@@ -14,7 +15,6 @@ use crate::infra::repositories::entry_repository::get_last_entries_for_pairs;
 use crate::utils::{get_price_message, sign};
 use crate::AppState;
 
-use super::utils::big_decimal_price_to_hex;
 use super::{SignedOraclePrice, StarkSignature};
 
 const UPDATE_INTERVAL_IN_MS: u64 = 500;
@@ -135,13 +135,13 @@ async fn refresh_entries(
     let last_entries = get_last_entries_for_pairs(&state.timescale_pool, subscribed_pairs).await?;
 
     for entry in last_entries {
-        let asset_oracle_price = entries
-            .oracle_prices
-            .entry(entry.pair_id.clone())
-            .or_default();
+        let pair_id_hex = cairo_short_string_to_felt(&entry.pair_id).unwrap();
+        let pair_id_hex = format!("0x{:x}", pair_id_hex);
+
+        let asset_oracle_price = entries.oracle_prices.entry(pair_id_hex).or_default();
 
         // TODO(akhercha): Should be a median; not last price
-        asset_oracle_price.price = big_decimal_price_to_hex(&entry.price);
+        asset_oracle_price.price = entry.price.to_string();
 
         let (external_asset_id, hash_to_sign) = get_price_message(
             "Pragma",
@@ -152,24 +152,28 @@ async fn refresh_entries(
 
         // TODO(akhercha): Need to handle Signer with Pragma's registered key
         let signer = SigningKey::from_random();
+
         // TODO(akhercha): unsafe unwrap
-        let signature = sign(signer, hash_to_sign).unwrap();
+        let signature = sign(&signer, hash_to_sign).unwrap();
 
         // TODO(akhercha): Wrong - should be all the prices used to compute the median
         let signed_price = SignedOraclePrice {
             price: entry.price.to_string(),
+            // TODO(akhercha): is StarkSignature really needed? Try to use Signature
             timestamped_signature: StarkSignature {
-                r: signature.r.to_string(),
-                s: signature.s.to_string(),
+                r: format!("0x{}", signature.r.to_string()),
+                s: format!("0x{}", signature.s.to_string()),
             },
-            external_asset_id,
+            external_asset_id: format!("0x{}", external_asset_id),
         };
 
-        // use pair_id to insert in signed_price if not existant, we should add signed_price
-        // in first position 0
+        let publisher_public_key = signer.verifying_key().scalar();
+        let publisher_public_key_hex = format!("{:x}", publisher_public_key);
+
+        // TODO(akhercha): unsafe unwrap
         asset_oracle_price
             .signed_prices
-            .entry(entry.pair_id.clone())
+            .entry(publisher_public_key_hex)
             .or_insert_with(|| vec![signed_price.clone()])
             .insert(0, signed_price);
     }

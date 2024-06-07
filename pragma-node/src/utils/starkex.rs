@@ -66,7 +66,7 @@ pub fn get_price_message(
 
 /// Sign the hashed_data using the private_key.
 pub fn sign(
-    signing_key: SigningKey,
+    signing_key: &SigningKey,
     hashed_data: FieldElement,
 ) -> Result<Signature, EcdsaSignError> {
     signing_key.sign(&hashed_data)
@@ -112,7 +112,7 @@ mod tests {
         .unwrap();
 
         // 2. Action
-        let signature = sign(signing_key, hashed_data).unwrap();
+        let signature = sign(&signing_key, hashed_data).unwrap();
 
         // 3. Check
         let expected_r = FieldElement::from_hex_be(
