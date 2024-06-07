@@ -20,6 +20,7 @@ pub struct Entry {
     pub publisher: String,
     pub source: String,
     pub timestamp: NaiveDateTime,
+    pub publisher_signature: String,
     pub price: BigDecimal,
 }
 
@@ -30,6 +31,7 @@ pub struct NewEntry {
     pub publisher: String,
     pub source: String,
     pub timestamp: NaiveDateTime,
+    pub publisher_signature: String,
     pub price: BigDecimal,
 }
 
@@ -51,6 +53,7 @@ impl Entry {
                 entries::pair_id.eq(excluded(entries::pair_id)),
                 entries::publisher.eq(excluded(entries::publisher)),
                 entries::source.eq(excluded(entries::source)),
+                entries::publisher_signature.eq(excluded(entries::publisher_signature)),
                 entries::timestamp.eq(excluded(entries::timestamp)),
                 entries::price.eq(excluded(entries::price)),
             ))
