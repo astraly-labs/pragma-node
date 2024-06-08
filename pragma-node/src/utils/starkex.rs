@@ -4,6 +4,7 @@ use starknet::core::{
     crypto::pedersen_hash, types::FieldElement, utils::cairo_short_string_to_felt,
 };
 
+/// TODO(akhercha): Write this.
 pub fn get_external_asset_id(oracle_name: &str, pair_id: &str) -> String {
     // TODO(akhercha): unsafe unwrap
     let oracle_name = cairo_short_string_to_felt(oracle_name).unwrap();
@@ -16,6 +17,7 @@ pub fn get_external_asset_id(oracle_name: &str, pair_id: &str) -> String {
     format!("{}{}", pair_as_hex, oracle_as_hex)
 }
 
+/// TODO(akhercha): Write this.
 fn build_second_number(timestamp: u64, price: &BigDecimal) -> FieldElement {
     // TODO(akhercha): round?
     let price = price.round(2);
@@ -31,12 +33,11 @@ fn build_second_number(timestamp: u64, price: &BigDecimal) -> FieldElement {
     FieldElement::from_hex_be(&v).unwrap()
 }
 
-/// TODO(akhercha): Update docstring to include external_asset_id
 /// Computes a signature-ready message based on oracle, asset, timestamp
 /// and price.
 /// The signature is the pedersen hash of two FieldElements:
 ///
-/// first number:
+/// first number (external_asset_id):
 ///  ---------------------------------------------------------------------------------
 ///  | asset_name (rest of the number)  - 211 bits       |   oracle_name (40 bits)   |
 ///  ---------------------------------------------------------------------------------
@@ -53,6 +54,7 @@ pub fn get_entry_hash(
     timestamp: u64,
     price: &BigDecimal,
 ) -> FieldElement {
+    // TODO(akhercha): unsafe unwrap
     let external_asset_id = get_external_asset_id(oracle_name, pair_id);
     // TODO(akhercha): unsafe unwrap
     let first_number = FieldElement::from_hex_be(&external_asset_id).unwrap();
@@ -65,7 +67,7 @@ mod tests {
     use super::*;
     use bigdecimal::{BigDecimal, FromPrimitive};
 
-    // TODO(akhercha): generate more tests with the CLI
+    // TODO(akhercha): do way more tests
     #[test]
     fn test_get_entry_hash_with_example() {
         // 1. Setup

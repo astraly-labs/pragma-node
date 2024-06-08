@@ -3,6 +3,7 @@ use std::time::Duration;
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::State;
 use axum::response::IntoResponse;
+use bigdecimal::BigDecimal;
 use pragma_entities::EntryError;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -156,7 +157,7 @@ async fn get_subscribed_pairs_entries(
             .await
             .map_err(|e| e.to_entry_error(&subscribed_pairs.join(",")))?;
 
-    // TODO(akhercha): Build Pragma's signing key from AWS secret
+    // TODO(akhercha): Build Pragma's signing key from AWS secret (stored in AppState)
     let pragma_signer = SigningKey::from_random();
 
     let mut response: SubscribeToEntryResponse = Default::default();
@@ -164,22 +165,37 @@ async fn get_subscribed_pairs_entries(
         let median_price = entry.median_price.clone();
         let mut oracle_price: AssetOraclePrice = entry.into();
 
-        // We need to sign (as Pragma) every computed median price
-        let hash_to_sign = get_entry_hash(
-            "Pragma",
+        let signature = sign_median_price_as_pragma(
+            &pragma_signer,
             &oracle_price.global_asset_id,
-            chrono::Utc::now().timestamp() as u64,
-            &median_price,
-        );
-        let signature = pragma_signer
-            .sign(&hash_to_sign)
-            .map_err(EntryError::InvalidSigner)?;
+            median_price,
+        )?;
 
-        oracle_price.signature = format!("0x{:?}", signature.to_string());
+        oracle_price.signature = signature;
         response.oracle_prices.push(oracle_price);
     }
     response.timestamp = chrono::Utc::now().timestamp().to_string();
     Ok(response)
+}
+
+/// Sign the median price as Pragma and return the signature
+/// 0x prefixed.
+fn sign_median_price_as_pragma(
+    signer: &SigningKey,
+    asset_id: &str,
+    median_price: BigDecimal,
+) -> Result<String, EntryError> {
+    let oracle_name = "PRAGMA";
+    let hash_to_sign = get_entry_hash(
+        oracle_name,
+        asset_id,
+        chrono::Utc::now().timestamp() as u64,
+        &median_price,
+    );
+    let signature = signer
+        .sign(&hash_to_sign)
+        .map_err(EntryError::InvalidSigner)?;
+    Ok(format!("0x{:}", signature))
 }
 
 impl From<EntryComponent> for SignedPublisherPrice {
