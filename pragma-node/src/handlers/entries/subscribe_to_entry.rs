@@ -19,6 +19,7 @@ use crate::AppState;
 
 use super::{AssetOraclePrice, SignedPublisherPrice};
 
+const PRAGMA_ORACLE_NAME: &str = "PRAGMA";
 const CHANNEL_UPDATE_INTERVAL_IN_MS: u64 = 500;
 
 #[derive(Default, Debug, Serialize, Deserialize)]
@@ -60,6 +61,7 @@ pub async fn subscribe_to_entry(
     ws.on_upgrade(move |socket| handle_channel(socket, state))
 }
 
+/// Handle the WebSocket channel.
 async fn handle_channel(mut socket: WebSocket, state: AppState) {
     let waiting_duration = Duration::from_millis(CHANNEL_UPDATE_INTERVAL_IN_MS);
     let mut update_interval = interval(waiting_duration);
@@ -82,6 +84,8 @@ async fn handle_channel(mut socket: WebSocket, state: AppState) {
     }
 }
 
+/// Handle the message received from the client.
+/// Subscribe or unsubscribe to the pairs requested.
 async fn handle_message_received(
     socket: &mut WebSocket,
     subscribed_pairs: &mut Vec<String>,
@@ -98,7 +102,6 @@ async fn handle_message_received(
                 subscribed_pairs.retain(|pair| !subscription_msg.pairs.contains(pair));
             }
         };
-
         if let Ok(ack_message) = serde_json::to_string(&SubscriptionAck {
             msg_type: subscription_msg.msg_type,
             pairs: subscribed_pairs.clone(),
@@ -117,6 +120,7 @@ async fn handle_message_received(
     }
 }
 
+/// Send the current median entries to the client.
 async fn send_median_entries(
     socket: &mut WebSocket,
     state: &AppState,
@@ -142,6 +146,7 @@ async fn send_median_entries(
     Ok(())
 }
 
+/// Get the current median entries for the subscribed pairs and sign them as Pragma.
 async fn get_subscribed_pairs_entries(
     state: &AppState,
     subscribed_pairs: &[String],
@@ -178,9 +183,8 @@ fn sign_median_price_as_pragma(
     asset_id: &str,
     median_price: BigDecimal,
 ) -> Result<String, EntryError> {
-    let oracle_name = "PRAGMA";
     let hash_to_sign = get_entry_hash(
-        oracle_name,
+        PRAGMA_ORACLE_NAME,
         asset_id,
         chrono::Utc::now().timestamp() as u64,
         &median_price,
@@ -219,6 +223,8 @@ impl From<MedianEntryWithComponents> for AssetOraclePrice {
     }
 }
 
+/// Send an error message to the client.
+/// (Does not close the connection)
 async fn send_error_message(socket: &mut WebSocket, error: &str) {
     let error_msg = json!({ "error": error }).to_string();
     socket.send(Message::Text(error_msg)).await.unwrap();
