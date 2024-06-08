@@ -1,7 +1,7 @@
-use bigdecimal::{BigDecimal, ToPrimitive};
+use bigdecimal::{BigDecimal, FromPrimitive, ToPrimitive};
 use chrono::{DateTime, NaiveDateTime};
 use diesel::prelude::QueryableByName;
-use diesel::sql_types::{Numeric, Text, VarChar};
+use diesel::sql_types::{Double, Jsonb, VarChar};
 use diesel::{ExpressionMethods, QueryDsl, Queryable, RunQueryDsl};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -716,15 +716,16 @@ pub async fn get_ohlc(
 struct RawMedianEntryWithComponents {
     #[diesel(sql_type = VarChar)]
     pub pair_id: String,
-    #[diesel(sql_type = Numeric)]
-    pub median_price: BigDecimal,
-    #[diesel(sql_type = Text)]
-    pub components: String, // array stored as json string
+    #[diesel(sql_type = Double)]
+    pub median_price: f64,
+    #[diesel(sql_type = Jsonb)]
+    pub components: serde_json::Value,
 }
 
 impl From<RawMedianEntryWithComponents> for MedianEntryWithComponents {
     fn from(raw: RawMedianEntryWithComponents) -> Self {
-        let components: Vec<EntryComponent> = serde_json::from_str(&raw.components).unwrap();
+        // TODO(akhercha): unsafe unwrap
+        let components: Vec<EntryComponent> = serde_json::from_value(raw.components).unwrap();
         let components = components
             .into_iter()
             .map(|c| EntryComponent {
@@ -737,12 +738,12 @@ impl From<RawMedianEntryWithComponents> for MedianEntryWithComponents {
             .collect();
         MedianEntryWithComponents {
             pair_id: raw.pair_id,
-            median_price: raw.median_price,
+            // TODO(akhercha): unsafe unwrap
+            median_price: BigDecimal::from_f64(raw.median_price).unwrap(),
             components,
         }
     }
 }
-
 #[derive(Debug, Deserialize, Serialize)]
 pub struct EntryComponent {
     pub pair_id: String,
@@ -782,96 +783,74 @@ impl From<MedianEntryWithComponents> for AssetOraclePrice {
                 .into_iter()
                 .map(SignedPublisherPrice::from)
                 .collect(),
-            signature: "TO_SIGN_BY_PRAGMA".to_string(),
+            signature: Default::default(),
         }
     }
 }
 
+/// Builds a SQL query that will fetch the recent prices between now and
+/// the given interval for each unique tuple (pair_id, publisher, source)
+/// and then calculate the median price for each pair_id.
+/// We also return in a JSON string the components that were used to calculate
+/// the median price.
 fn build_sql_query_for_median_with_components(pair_ids: &[String], interval_in_ms: u64) -> String {
-    let pairs_array = pair_ids
-        .iter()
-        .map(|pair_id| format!("'{}'", pair_id))
-        .collect::<Vec<String>>()
-        .join(",");
-
     format!(
         r#"
-            WITH pairs AS (
-                SELECT unnest(ARRAY[{pairs_array}]) AS pair_id
-            ),
-            filtered_entries AS (
-                SELECT 
-                    e.pair_id, 
-                    e.price, 
-                    e.id, 
-                    e.publisher, 
-                    e.timestamp, 
-                    e.source, 
-                    e.publisher_signature
-                FROM 
-                    entries e
-                JOIN 
-                    pairs p 
-                ON 
-                    e.pair_id = p.pair_id
-                WHERE 
-                    e.timestamp >= NOW() - INTERVAL '{interval} MILLISECONDS'
-            ),
-            ranked_entries AS (
-                SELECT 
-                    pair_id, 
-                    price, 
-                    id, 
-                    publisher, 
-                    timestamp, 
-                    source, 
+            WITH last_prices AS (
+                SELECT
+                    pair_id,
+                    publisher,
+                    source,
+                    price,
+                    timestamp,
                     publisher_signature,
-                    ROW_NUMBER() OVER (PARTITION BY pair_id ORDER BY price) AS rnum,
-                    COUNT(*) OVER (PARTITION BY pair_id) AS total_count
+                    ROW_NUMBER() OVER (PARTITION BY pair_id, publisher, source ORDER BY timestamp DESC) AS rn
                 FROM 
-                    filtered_entries
-            ),
-            median_entries AS (
-                SELECT 
-                    pair_id, 
-                    price, 
-                    id, 
-                    publisher, 
-                    timestamp, 
-                    source, 
-                    publisher_signature,
-                    total_count,
-                    rnum
-                FROM 
-                    ranked_entries
+                    entries
                 WHERE 
-                    rnum IN (FLOOR((total_count + 1) / 2.0)::int, CEIL((total_count + 1) / 2.0)::int)
+                    pair_id IN ({pairs_list})
+                    AND timestamp >= NOW() - INTERVAL '{interval_in_ms} milliseconds'
+            ),
+            filtered_last_prices AS (
+                SELECT 
+                    pair_id,
+                    publisher,
+                    source,
+                    price,
+                    timestamp,
+                    publisher_signature
+                FROM 
+                    last_prices
+                WHERE 
+                    rn = 1
             )
-            SELECT 
+            SELECT
                 pair_id,
-                AVG(price) AS median_price,
-                array_to_json(
-                    ARRAY_AGG(
-                        ROW(
-                            pair_id,
-                            price,
-                            timestamp,
-                            publisher,
-                            publisher_signature
-                        )::entry_component
-                    )
-                )::text AS components
-            FROM 
-                median_entries
+                percentile_cont(0.5) WITHIN GROUP (ORDER BY price) AS median_price,
+                jsonb_agg(
+			        jsonb_build_object(
+			            'pair_id', pair_id,
+			            'price', price,
+			            'timestamp', timestamp,
+			            'publisher', publisher,
+			            'publisher_signature', publisher_signature
+			        )
+			    ) AS components
+            FROM
+                filtered_last_prices
             GROUP BY 
                 pair_id;
             "#,
-        pairs_array = pairs_array,
-        interval = interval_in_ms
+        pairs_list = pair_ids
+            .iter()
+            .map(|pair_id| format!("'{}'", pair_id))
+            .collect::<Vec<String>>()
+            .join(", "),
+        interval_in_ms = interval_in_ms
     )
 }
 
-pub const LIMIT_INTERVAL_IN_MS: u64 = 10000;
+pub const LIMIT_INTERVAL_IN_MS: u64 = 5000;
 
 pub async fn get_current_median_entries_with_components(
     pool: &deadpool_diesel::postgres::Pool,
@@ -881,6 +860,7 @@ pub async fn get_current_median_entries_with_components(
     let mut interval_in_ms = 500;
     let median_entries = loop {
         let raw_sql = build_sql_query_for_median_with_components(&pair_ids, interval_in_ms);
+
         let median_entries = conn
             .interact(move |conn| {
                 diesel::sql_query(raw_sql).load::<RawMedianEntryWithComponents>(conn)
