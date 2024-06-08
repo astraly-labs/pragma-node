@@ -65,12 +65,12 @@ async fn handle_channel(mut socket: WebSocket, state: AppState) {
     loop {
         tokio::select! {
             Some(msg) = socket.recv() => {
-                if let Ok(Message::Text(_text)) = msg {
-                    handle_messages_received(&mut socket, &mut subscribed_pairs, _text).await;
+                if let Ok(Message::Text(text)) = msg {
+                    handle_messages_received(&mut socket, &mut subscribed_pairs, text).await;
                 }
             },
             _ = update_interval.tick() => {
-                match handle_entries_refresh(&mut socket, &state, subscribed_pairs.clone()).await {
+                match handle_entries_refresh(&mut socket, &state, &subscribed_pairs).await {
                     Ok(_) => {},
                     Err(_) => break
                 };
@@ -119,12 +119,12 @@ async fn handle_messages_received(
 async fn handle_entries_refresh(
     socket: &mut WebSocket,
     state: &AppState,
-    subscribed_pairs: Vec<String>,
+    subscribed_pairs: &[String],
 ) -> Result<(), EntryError> {
     if subscribed_pairs.is_empty() {
         return Ok(());
     }
-    let entries = match get_subscribed_pairs_entries(state, subscribed_pairs.clone()).await {
+    let entries = match get_subscribed_pairs_entries(state, subscribed_pairs).await {
         Ok(response) => response,
         Err(e) => {
             socket
@@ -147,10 +147,10 @@ async fn handle_entries_refresh(
 
 async fn get_subscribed_pairs_entries(
     state: &AppState,
-    subscribed_pairs: Vec<String>,
+    subscribed_pairs: &[String],
 ) -> Result<SubscribeToEntryResponse, EntryError> {
     let median_entries =
-        get_current_median_entries_with_components(&state.timescale_pool, subscribed_pairs.clone())
+        get_current_median_entries_with_components(&state.timescale_pool, subscribed_pairs)
             .await
             .map_err(|e| e.to_entry_error(&subscribed_pairs.join(",")))?;
 

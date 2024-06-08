@@ -861,12 +861,12 @@ pub const INTERVAL_INCREMENT_IN_MS: u64 = 0;
 /// and at least one entry for each pair_id.
 pub async fn get_current_median_entries_with_components(
     pool: &deadpool_diesel::postgres::Pool,
-    pair_ids: Vec<String>,
+    pair_ids: &[String],
 ) -> Result<Vec<MedianEntryWithComponents>, InfraError> {
     let conn = pool.get().await.map_err(adapt_infra_error)?;
     let mut interval_in_ms = 500;
     let median_entries = loop {
-        let raw_sql = build_sql_query_for_median_with_components(&pair_ids, interval_in_ms);
+        let raw_sql = build_sql_query_for_median_with_components(pair_ids, interval_in_ms);
 
         let median_entries = conn
             .interact(move |conn| {
