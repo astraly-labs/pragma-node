@@ -779,6 +779,8 @@ pub struct MedianEntryWithComponents {
     pub components: Vec<EntryComponent>,
 }
 
+pub const MINIMUM_NUMBER_OF_PUBLISHERS: usize = 3;
+
 /// Convert a list of raw entries into a list of valid median entries
 /// if the raw entries are valid.
 /// The entries are considered valid if:
@@ -811,8 +813,7 @@ fn get_median_entries_response(
             .map(|c| &c.publisher)
             .collect::<HashSet<_>>()
             .len();
-        // TODO(akhercha): Update this to 3 before final push!!!
-        if num_unique_publishers < 1 {
+        if num_unique_publishers < MINIMUM_NUMBER_OF_PUBLISHERS {
             return None;
         }
 
