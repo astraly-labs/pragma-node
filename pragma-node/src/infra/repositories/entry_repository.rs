@@ -4,7 +4,7 @@ use diesel::prelude::QueryableByName;
 use diesel::sql_types::{Double, Jsonb, VarChar};
 use diesel::{ExpressionMethods, QueryDsl, Queryable, RunQueryDsl};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use pragma_common::types::{AggregationMode, Interval};
 use pragma_entities::dto;
@@ -788,6 +788,48 @@ impl From<MedianEntryWithComponents> for AssetOraclePrice {
     }
 }
 
+/// Convert a list of raw entries into a list of valid median entries
+/// if the raw entries are valid.
+/// The entries are considered valid if:
+/// - not empty,
+/// - contains at a median price for each pair_id,
+/// - each median price has at least 3 unique publishers.
+fn entries_are_valid(
+    raw_entries: Vec<RawMedianEntryWithComponents>,
+    pairs_ids: &[String],
+) -> Option<Vec<MedianEntryWithComponents>> {
+    if raw_entries.is_empty() || pairs_ids.is_empty() {
+        return None;
+    }
+    let pairs_set: HashSet<_> = pairs_ids.iter().collect();
+    let mut found_pairs = HashSet::new();
+
+    let mut median_entries = Vec::with_capacity(raw_entries.len());
+    for raw_entry in raw_entries {
+        found_pairs.insert(raw_entry.pair_id.clone());
+
+        let median_entry = MedianEntryWithComponents::from(raw_entry);
+        let num_unique_publishers = median_entry
+            .components
+            .iter()
+            .map(|c| &c.publisher)
+            .collect::<HashSet<_>>()
+            .len();
+        // TODO(akhercha): Update this to 3 before prod!!!
+        if num_unique_publishers < 1 {
+            return None;
+        }
+
+        median_entries.push(median_entry);
+    }
+
+    if found_pairs.len() == pairs_set.len() {
+        Some(median_entries)
+    } else {
+        None
+    }
+}
+
 /// Builds a SQL query that will fetch the recent prices between now and
 /// the given interval for each unique tuple (pair_id, publisher, source)
 /// and then calculate the median price for each pair_id.
@@ -851,9 +893,9 @@ fn build_sql_query_for_median_with_components(pair_ids: &[String], interval_in_m
 }
 
 // TODO(akhercha): sort this out - do we want a limit ?
-// What happens then if we have nothing?
-pub const LIMIT_INTERVAL_IN_MS: u64 = 5000;
-pub const INTERVAL_INCREMENT_IN_MS: u64 = 0;
+// TODO(akhercha): What happens then if we still have nothing?
+pub const LIMIT_INTERVAL_IN_MS: u64 = 50000;
+pub const INTERVAL_INCREMENT_IN_MS: u64 = 500;
 
 /// Compute the median price for each pair_id in the given list of pair_ids
 /// over an interval of time.
@@ -868,7 +910,7 @@ pub async fn get_current_median_entries_with_components(
     let median_entries = loop {
         let raw_sql = build_sql_query_for_median_with_components(pair_ids, interval_in_ms);
 
-        let median_entries = conn
+        let raw_median_entries = conn
             .interact(move |conn| {
                 diesel::sql_query(raw_sql).load::<RawMedianEntryWithComponents>(conn)
             })
@@ -876,21 +918,16 @@ pub async fn get_current_median_entries_with_components(
             .map_err(adapt_infra_error)?
             .map_err(adapt_infra_error)?;
 
-        // TODO(akhercha): Should return only when we have entries for all subscribed pairs
-        // TODO(akhercha): Should return only if we have at least 3 unique publishers
-        if !median_entries.is_empty() {
-            break median_entries;
+        match entries_are_valid(raw_median_entries, pair_ids) {
+            Some(median_entries) => break median_entries,
+            None => interval_in_ms += INTERVAL_INCREMENT_IN_MS,
         }
 
-        // If the entries are invalid, increase the interval
-        interval_in_ms += INTERVAL_INCREMENT_IN_MS;
         if interval_in_ms >= LIMIT_INTERVAL_IN_MS {
+            tracing::info!("Still nothing until {}ms", interval_in_ms);
             return Err(InfraError::NotFound);
         }
     };
 
-    Ok(median_entries
-        .into_iter()
-        .map(MedianEntryWithComponents::from)
-        .collect())
+    Ok(median_entries)
 }

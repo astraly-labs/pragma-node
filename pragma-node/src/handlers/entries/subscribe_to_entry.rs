@@ -66,11 +66,11 @@ async fn handle_channel(mut socket: WebSocket, state: AppState) {
         tokio::select! {
             Some(msg) = socket.recv() => {
                 if let Ok(Message::Text(text)) = msg {
-                    handle_messages_received(&mut socket, &mut subscribed_pairs, text).await;
+                    handle_message_received(&mut socket, &mut subscribed_pairs, text).await;
                 }
             },
             _ = update_interval.tick() => {
-                match handle_entries_refresh(&mut socket, &state, &subscribed_pairs).await {
+                match send_median_entries(&mut socket, &state, &subscribed_pairs).await {
                     Ok(_) => {},
                     Err(_) => break
                 };
@@ -79,7 +79,7 @@ async fn handle_channel(mut socket: WebSocket, state: AppState) {
     }
 }
 
-async fn handle_messages_received(
+async fn handle_message_received(
     socket: &mut WebSocket,
     subscribed_pairs: &mut Vec<String>,
     message: String,
@@ -116,7 +116,7 @@ async fn handle_messages_received(
     }
 }
 
-async fn handle_entries_refresh(
+async fn send_median_entries(
     socket: &mut WebSocket,
     state: &AppState,
     subscribed_pairs: &[String],

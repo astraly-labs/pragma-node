@@ -102,7 +102,7 @@ pub(crate) fn compute_volatility(entries: &Vec<MedianEntry>) -> f64 {
     variance.sqrt() * 10_f64.powi(8)
 }
 
-/// Converts a big decimal price to a hex string.
+/// Converts a big decimal price to a hex string 0x prefixed.
 pub(crate) fn big_decimal_price_to_hex(price: &BigDecimal) -> String {
     format!(
         "0x{}",
