@@ -109,7 +109,11 @@ async fn main() {
         pragma_entities::connection::init_pool("pragma-node-api", ENV_POSTGRES_DATABASE_URL)
             .expect("can't init postgres (onchain db) pool");
 
-    let pragma_signer = utils::get_aws_pragma_signer(config.is_production_mode()).await;
+    let pragma_signer = if config.is_production_mode() {
+        utils::get_aws_pragma_signer().await
+    } else {
+        SigningKey::from_random()
+    };
 
     let state = AppState {
         timescale_pool,

@@ -8,18 +8,14 @@ pub enum AwsError {
     NoSecretFound,
 }
 
-pub async fn get_aws_pragma_signer(is_production: bool) -> SigningKey {
-    if is_production {
-        let aws_client = get_aws_client().await;
-        let pragma_secret_key = get_aws_secret(&aws_client, AWS_PRAGMA_PUBLIC_KEY_SECRET)
-            .await
-            .expect("can't get find pragma secret key");
-        let pragma_secret_key =
-            FieldElement::from_hex_be(&pragma_secret_key).expect("can't parse secret key");
-        SigningKey::from_secret_scalar(pragma_secret_key)
-    } else {
-        SigningKey::from_random()
-    }
+pub async fn get_aws_pragma_signer() -> SigningKey {
+    let aws_client = get_aws_client().await;
+    let pragma_secret_key = get_aws_secret(&aws_client, AWS_PRAGMA_PUBLIC_KEY_SECRET)
+        .await
+        .expect("can't get find pragma secret key");
+    let pragma_secret_key =
+        FieldElement::from_hex_be(&pragma_secret_key).expect("can't parse secret key");
+    SigningKey::from_secret_scalar(pragma_secret_key)
 }
 
 async fn get_aws_client() -> Client {
