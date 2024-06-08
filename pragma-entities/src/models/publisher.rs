@@ -55,4 +55,14 @@ impl Publishers {
             .select(Publishers::as_select())
             .load::<Publishers>(conn)
     }
+
+    pub fn get_account_address_by_name(
+        conn: &mut PgConnection,
+        name: String,
+    ) -> DieselResult<String> {
+        publishers::table
+            .filter(publishers::name.eq(name))
+            .select(publishers::account_address)
+            .get_result(conn)
+    }
 }

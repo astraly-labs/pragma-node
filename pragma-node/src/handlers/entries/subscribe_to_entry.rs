@@ -10,11 +10,13 @@ use starknet::signers::SigningKey;
 use tokio::time::interval;
 
 use crate::handlers::entries::SubscribeToEntryResponse;
-use crate::infra::repositories::entry_repository::get_current_median_entries_with_components;
+use crate::infra::repositories::entry_repository::{
+    get_current_median_entries_with_components, MedianEntryWithComponents,
+};
 use crate::utils::get_entry_hash;
 use crate::AppState;
 
-use super::AssetOraclePrice;
+use super::{AssetOraclePrice, SignedPublisherPrice};
 
 const UPDATE_INTERVAL_IN_MS: u64 = 500;
 
@@ -143,6 +145,21 @@ async fn send_median_entries(
             .unwrap();
     }
     Ok(())
+}
+
+impl From<MedianEntryWithComponents> for AssetOraclePrice {
+    fn from(median_entry: MedianEntryWithComponents) -> Self {
+        AssetOraclePrice {
+            global_asset_id: median_entry.pair_id,
+            median_price: median_entry.median_price.to_string(),
+            signed_prices: median_entry
+                .components
+                .into_iter()
+                .map(SignedPublisherPrice::from)
+                .collect(),
+            signature: Default::default(),
+        }
+    }
 }
 
 async fn get_subscribed_pairs_entries(

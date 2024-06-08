@@ -4,6 +4,7 @@ use diesel::prelude::QueryableByName;
 use diesel::sql_types::{Double, Jsonb, VarChar};
 use diesel::{ExpressionMethods, QueryDsl, Queryable, RunQueryDsl};
 use serde::{Deserialize, Serialize};
+use starknet::core::utils::cairo_short_string_to_felt;
 use std::collections::{HashMap, HashSet};
 
 use pragma_common::types::{AggregationMode, Interval};
@@ -14,7 +15,7 @@ use pragma_entities::{
     Currency, Entry, NewEntry,
 };
 
-use crate::handlers::entries::{AssetOraclePrice, SignedPublisherPrice};
+use crate::handlers::entries::SignedPublisherPrice;
 use crate::utils::{convert_via_quote, get_external_asset_id, normalize_to_decimals};
 
 #[derive(Deserialize)]
@@ -722,28 +723,46 @@ struct RawMedianEntryWithComponents {
     pub components: serde_json::Value,
 }
 
-impl From<RawMedianEntryWithComponents> for MedianEntryWithComponents {
-    fn from(raw: RawMedianEntryWithComponents) -> Self {
-        // TODO(akhercha): unsafe unwrap
-        let components: Vec<EntryComponent> = serde_json::from_value(raw.components).unwrap();
+#[derive(Debug)]
+pub enum ConversionError {
+    FailedSerialization,
+    InvalidDateTime,
+    BigDecimalConversion,
+}
+
+impl TryFrom<RawMedianEntryWithComponents> for MedianEntryWithComponents {
+    type Error = ConversionError;
+
+    fn try_from(raw: RawMedianEntryWithComponents) -> Result<Self, Self::Error> {
+        let components: Vec<EntryComponent> =
+            serde_json::from_value(raw.components).map_err(|_| Self::Error::FailedSerialization)?;
+
         let components = components
             .into_iter()
-            .map(|c| EntryComponent {
-                timestamp: DateTime::parse_from_rfc3339(&c.timestamp)
-                    .unwrap()
-                    .timestamp()
-                    .to_string(),
-                ..c
+            .map(|c| {
+                Ok(EntryComponent {
+                    timestamp: DateTime::parse_from_rfc3339(&c.timestamp)
+                        .map_err(|_| Self::Error::InvalidDateTime)?
+                        .timestamp()
+                        .to_string(),
+                    ..c
+                })
             })
-            .collect();
-        MedianEntryWithComponents {
-            pair_id: raw.pair_id,
-            // TODO(akhercha): unsafe unwrap
-            median_price: BigDecimal::from_f64(raw.median_price).unwrap(),
+            .collect::<Result<Vec<EntryComponent>, Self::Error>>()?;
+
+        let pair_id = cairo_short_string_to_felt(&raw.pair_id)
+            .map_err(|_| Self::Error::FailedSerialization)?;
+        let median_price =
+            BigDecimal::from_f64(raw.median_price).ok_or(Self::Error::BigDecimalConversion)?;
+
+        Ok(MedianEntryWithComponents {
+            pair_id: format!("0x{:x}", pair_id),
+            median_price,
             components,
-        }
+        })
     }
 }
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct EntryComponent {
     pub pair_id: String,
@@ -759,7 +778,6 @@ impl From<EntryComponent> for SignedPublisherPrice {
             oracle_asset_id: get_external_asset_id(&component.publisher, &component.pair_id),
             oracle_price: component.price.to_string(),
             timestamp: component.timestamp.to_string(),
-            // TODO(akhercha): get the signing key from the publisher name
             signing_key: component.publisher,
             signature: component.publisher_signature,
         }
@@ -773,32 +791,17 @@ pub struct MedianEntryWithComponents {
     pub components: Vec<EntryComponent>,
 }
 
-impl From<MedianEntryWithComponents> for AssetOraclePrice {
-    fn from(median_entry: MedianEntryWithComponents) -> Self {
-        AssetOraclePrice {
-            global_asset_id: median_entry.pair_id,
-            median_price: median_entry.median_price.to_string(),
-            signed_prices: median_entry
-                .components
-                .into_iter()
-                .map(SignedPublisherPrice::from)
-                .collect(),
-            signature: Default::default(),
-        }
-    }
-}
-
 /// Convert a list of raw entries into a list of valid median entries
 /// if the raw entries are valid.
 /// The entries are considered valid if:
 /// - not empty,
 /// - contains at a median price for each pair_id,
 /// - each median price has at least 3 unique publishers.
-fn entries_are_valid(
+fn get_median_entries_response(
     raw_entries: Vec<RawMedianEntryWithComponents>,
     pairs_ids: &[String],
 ) -> Option<Vec<MedianEntryWithComponents>> {
-    if raw_entries.is_empty() || pairs_ids.is_empty() {
+    if raw_entries.is_empty() {
         return None;
     }
     let pairs_set: HashSet<_> = pairs_ids.iter().collect();
@@ -808,21 +811,25 @@ fn entries_are_valid(
     for raw_entry in raw_entries {
         found_pairs.insert(raw_entry.pair_id.clone());
 
-        let median_entry = MedianEntryWithComponents::from(raw_entry);
+        let median_entry = MedianEntryWithComponents::try_from(raw_entry);
+        let median_entry = match median_entry {
+            Ok(median_entry) => median_entry,
+            Err(_) => panic!("Converting raw entry to median entry failed - should not happen!"),
+        };
+
         let num_unique_publishers = median_entry
             .components
             .iter()
             .map(|c| &c.publisher)
             .collect::<HashSet<_>>()
             .len();
-        // TODO(akhercha): Update this to 3 before prod!!!
+        // TODO(akhercha): Update this to 3 before final push!!!
         if num_unique_publishers < 1 {
             return None;
         }
 
         median_entries.push(median_entry);
     }
-
     if found_pairs.len() == pairs_set.len() {
         Some(median_entries)
     } else {
@@ -893,8 +900,9 @@ fn build_sql_query_for_median_with_components(pair_ids: &[String], interval_in_m
 }
 
 // TODO(akhercha): sort this out - do we want a limit ?
-// TODO(akhercha): What happens then if we still have nothing?
+// TODO(akhercha): What happens then if we still have nothing? Currently we raise error 404 & break the channel.
 pub const LIMIT_INTERVAL_IN_MS: u64 = 50000;
+pub const INITAL_INTERVAL_IN_MS: u64 = 500;
 pub const INTERVAL_INCREMENT_IN_MS: u64 = 500;
 
 /// Compute the median price for each pair_id in the given list of pair_ids
@@ -906,7 +914,7 @@ pub async fn get_current_median_entries_with_components(
     pair_ids: &[String],
 ) -> Result<Vec<MedianEntryWithComponents>, InfraError> {
     let conn = pool.get().await.map_err(adapt_infra_error)?;
-    let mut interval_in_ms = 500;
+    let mut interval_in_ms = INITAL_INTERVAL_IN_MS;
     let median_entries = loop {
         let raw_sql = build_sql_query_for_median_with_components(pair_ids, interval_in_ms);
 
@@ -918,7 +926,7 @@ pub async fn get_current_median_entries_with_components(
             .map_err(adapt_infra_error)?
             .map_err(adapt_infra_error)?;
 
-        match entries_are_valid(raw_median_entries, pair_ids) {
+        match get_median_entries_response(raw_median_entries, pair_ids) {
             Some(median_entries) => break median_entries,
             None => interval_in_ms += INTERVAL_INCREMENT_IN_MS,
         }
