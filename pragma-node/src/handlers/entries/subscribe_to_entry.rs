@@ -134,6 +134,7 @@ async fn handle_message_received(
 }
 
 /// Checks if the given pair currently exists in our database.
+/// Close the channel if the database connection fails.
 async fn does_pair_exists(conn: &Object, pair_id: String) -> bool {
     conn.interact({
         let pair_id = pair_id.clone();
