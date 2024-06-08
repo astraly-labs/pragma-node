@@ -894,7 +894,7 @@ fn build_sql_query_for_median_with_components(pair_ids: &[String], interval_in_m
 
 // TODO(akhercha): sort this out - do we want a limit ?
 // TODO(akhercha): What happens then if we still have nothing? Currently we raise error 404 & break the channel.
-pub const LIMIT_INTERVAL_IN_MS: u64 = 50000;
+pub const LIMIT_INTERVAL_IN_MS: u64 = 5000;
 pub const INITAL_INTERVAL_IN_MS: u64 = 500;
 pub const INTERVAL_INCREMENT_IN_MS: u64 = 500;
 
