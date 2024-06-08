@@ -131,6 +131,7 @@ PGPASSWORD=test-password pg_restore -h postgre-db -U postgres -d pragma /backup.
 ### 3. Export the required environment variables:
 
 ```bash
+export MODE=dev
 export TIMESCALE_DATABASE_URL="postgres://postgres:test-password@0.0.0.0:5432/pragma"
 export POSTGRES_DATABASE_URL="postgres://postgres:test-password@0.0.0.0:5433/pragma"
 export DATABASE_MAX_CONN=5
