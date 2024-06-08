@@ -195,9 +195,6 @@ pub struct GetOnchainOHLCResponse {
     pub data: Vec<OHLCEntry>,
 }
 
-// StarkEx objects
-// https://docs.starkware.co/starkex/api/perpetual/objects.html
-
 #[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
 pub struct SignedPublisherPrice {
     pub oracle_asset_id: String,
