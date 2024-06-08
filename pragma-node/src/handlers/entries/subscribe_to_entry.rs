@@ -4,7 +4,7 @@ use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::State;
 use axum::response::IntoResponse;
 use bigdecimal::BigDecimal;
-use pragma_entities::EntryError;
+use pragma_entities::{Entry, EntryError};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use starknet::signers::SigningKey;
@@ -71,7 +71,7 @@ async fn handle_channel(mut socket: WebSocket, state: AppState) {
         tokio::select! {
             Some(msg) = socket.recv() => {
                 if let Ok(Message::Text(text)) = msg {
-                    handle_message_received(&mut socket, &mut subscribed_pairs, text).await;
+                    handle_message_received(&mut socket, &state, &mut subscribed_pairs, text).await;
                 }
             },
             _ = update_interval.tick() => {
@@ -88,15 +88,35 @@ async fn handle_channel(mut socket: WebSocket, state: AppState) {
 /// Subscribe or unsubscribe to the pairs requested.
 async fn handle_message_received(
     socket: &mut WebSocket,
+    state: &AppState,
     subscribed_pairs: &mut Vec<String>,
     message: String,
 ) {
     if let Ok(subscription_msg) = serde_json::from_str::<SubscriptionRequest>(&message) {
-        // TODO(akhercha): send errors for pairs not handled by Pragma
         match subscription_msg.msg_type {
             SubscriptionType::Subscribe => {
-                subscribed_pairs.extend(subscription_msg.pairs.clone());
-                subscribed_pairs.dedup();
+                // TODO(akhercha): horrible block, refactor this
+                let conn = state
+                    .timescale_pool
+                    .get()
+                    .await
+                    .expect("Cant connect to DB");
+                for pair_id in subscription_msg.pairs.clone() {
+                    let r = conn
+                        .interact({
+                            let pair_id_clone = pair_id.clone();
+                            move |conn| Entry::exists(conn, pair_id_clone)
+                        })
+                        .await
+                        .unwrap()
+                        .unwrap();
+                    if !r {
+                        continue;
+                    }
+                    if !subscribed_pairs.contains(&pair_id) {
+                        subscribed_pairs.push(pair_id.clone());
+                    }
+                }
             }
             SubscriptionType::Unsubscribe => {
                 subscribed_pairs.retain(|pair| !subscription_msg.pairs.contains(pair));
@@ -156,23 +176,23 @@ async fn get_subscribed_pairs_entries(
             .await
             .map_err(|e| e.to_entry_error(&subscribed_pairs.join(",")))?;
 
-    let pragma_signer = &state.pragma_signer;
-
     let mut response: SubscribeToEntryResponse = Default::default();
+    let now = chrono::Utc::now().timestamp();
     for entry in median_entries {
         let median_price = entry.median_price.clone();
         let mut oracle_price: AssetOraclePrice = entry.into();
 
         let signature = sign_median_price_as_pragma(
-            pragma_signer,
+            &state.pragma_signer,
             &oracle_price.global_asset_id,
+            now as u64,
             median_price,
         )?;
 
         oracle_price.signature = signature;
         response.oracle_prices.push(oracle_price);
     }
-    response.timestamp = chrono::Utc::now().timestamp().to_string();
+    response.timestamp = now.to_string();
     Ok(response)
 }
 
@@ -181,14 +201,10 @@ async fn get_subscribed_pairs_entries(
 fn sign_median_price_as_pragma(
     signer: &SigningKey,
     asset_id: &str,
+    timestamp: u64,
     median_price: BigDecimal,
 ) -> Result<String, EntryError> {
-    let hash_to_sign = get_entry_hash(
-        PRAGMA_ORACLE_NAME,
-        asset_id,
-        chrono::Utc::now().timestamp() as u64,
-        &median_price,
-    );
+    let hash_to_sign = get_entry_hash(PRAGMA_ORACLE_NAME, asset_id, timestamp, &median_price);
     let signature = signer
         .sign(&hash_to_sign)
         .map_err(EntryError::InvalidSigner)?;

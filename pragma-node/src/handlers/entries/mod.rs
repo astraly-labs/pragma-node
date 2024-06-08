@@ -212,17 +212,8 @@ pub struct AssetOraclePrice {
     pub signed_prices: Vec<SignedPublisherPrice>,
 }
 
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct SubscribeToEntryResponse {
     pub oracle_prices: Vec<AssetOraclePrice>,
     pub timestamp: String,
-}
-
-impl Default for SubscribeToEntryResponse {
-    fn default() -> Self {
-        Self {
-            oracle_prices: Default::default(),
-            timestamp: chrono::Utc::now().timestamp().to_string(),
-        }
-    }
 }
