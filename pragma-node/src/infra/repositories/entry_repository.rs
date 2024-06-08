@@ -15,8 +15,7 @@ use pragma_entities::{
     Currency, Entry, NewEntry,
 };
 
-use crate::handlers::entries::SignedPublisherPrice;
-use crate::utils::{convert_via_quote, get_external_asset_id, normalize_to_decimals};
+use crate::utils::{convert_via_quote, normalize_to_decimals};
 
 #[derive(Deserialize)]
 #[allow(unused)]
@@ -769,19 +768,8 @@ pub struct EntryComponent {
     pub price: BigDecimal,
     pub timestamp: String,
     pub publisher: String,
+    pub publisher_address: String,
     pub publisher_signature: String,
-}
-
-impl From<EntryComponent> for SignedPublisherPrice {
-    fn from(component: EntryComponent) -> Self {
-        SignedPublisherPrice {
-            oracle_asset_id: get_external_asset_id(&component.publisher, &component.pair_id),
-            oracle_price: component.price.to_string(),
-            timestamp: component.timestamp.to_string(),
-            signing_key: component.publisher,
-            signature: component.publisher_signature,
-        }
-    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -847,23 +835,27 @@ fn build_sql_query_for_median_with_components(pair_ids: &[String], interval_in_m
         r#"
             WITH last_prices AS (
                 SELECT
-                    pair_id,
-                    publisher,
-                    source,
-                    price,
-                    timestamp,
-                    publisher_signature,
-                    ROW_NUMBER() OVER (PARTITION BY pair_id, publisher, source ORDER BY timestamp DESC) AS rn
+                    e.pair_id,
+                    e.publisher,
+                    p.account_address AS publisher_account_address,
+                    e.source,
+                    e.price,
+                    e.timestamp,
+                    e.publisher_signature,
+                    ROW_NUMBER() OVER (PARTITION BY e.pair_id, e.publisher, e.source ORDER BY e.timestamp DESC) AS rn
                 FROM 
-                    entries
+                    entries e
+                JOIN
+                    publishers p ON e.publisher = p.name
                 WHERE 
-                    pair_id IN ({pairs_list})
-                    AND timestamp >= NOW() - INTERVAL '{interval_in_ms} milliseconds'
+                    e.pair_id IN ({pairs_list})
+                    AND e.timestamp >= NOW() - INTERVAL '{interval_in_ms} milliseconds'
             ),
             filtered_last_prices AS (
                 SELECT 
                     pair_id,
                     publisher,
+                    publisher_account_address,
                     source,
                     price,
                     timestamp,
@@ -882,6 +874,7 @@ fn build_sql_query_for_median_with_components(pair_ids: &[String], interval_in_m
 			            'price', price,
 			            'timestamp', timestamp,
 			            'publisher', publisher,
+                        'publisher_address', publisher_account_address,
 			            'publisher_signature', publisher_signature
 			        )
 			    ) AS components

@@ -5,8 +5,10 @@ use starknet::core::{
 };
 
 pub fn get_external_asset_id(oracle_name: &str, pair_id: &str) -> String {
+    // TODO(akhercha): unsafe unwrap
     let oracle_name = cairo_short_string_to_felt(oracle_name).unwrap();
     let oracle_as_hex = format!("{:x}", oracle_name);
+    // TODO(akhercha): unsafe unwrap
     let pair_id = cairo_short_string_to_felt(pair_id).unwrap();
     let pair_id: u128 = pair_id.try_into().unwrap();
     // 32 bytes padding corresponding to 128 bits
@@ -19,11 +21,13 @@ fn build_second_number(timestamp: u64, price: &BigDecimal) -> FieldElement {
     let price = price.round(2);
     // TODO(akhercha): 18 all the time ? Or can be different depending on pairs?
     let price = price * BigDecimal::from(10_u128.pow(18));
+    // TODO(akhercha): unsafe unwrap
     let price = price.to_u128().unwrap();
     let price_as_hex = format!("{:x}", price);
     let timestamp: u128 = timestamp.into();
     let timestamp_as_hex = format!("{:x}", timestamp);
     let v = format!("{}{}", price_as_hex, timestamp_as_hex);
+    // TODO(akhercha): unsafe unwrap
     FieldElement::from_hex_be(&v).unwrap()
 }
 

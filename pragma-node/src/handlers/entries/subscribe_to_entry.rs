@@ -11,9 +11,9 @@ use tokio::time::interval;
 
 use crate::handlers::entries::SubscribeToEntryResponse;
 use crate::infra::repositories::entry_repository::{
-    get_current_median_entries_with_components, MedianEntryWithComponents,
+    get_current_median_entries_with_components, EntryComponent, MedianEntryWithComponents,
 };
-use crate::utils::get_entry_hash;
+use crate::utils::{get_entry_hash, get_external_asset_id};
 use crate::AppState;
 
 use super::{AssetOraclePrice, SignedPublisherPrice};
@@ -147,21 +147,6 @@ async fn send_median_entries(
     Ok(())
 }
 
-impl From<MedianEntryWithComponents> for AssetOraclePrice {
-    fn from(median_entry: MedianEntryWithComponents) -> Self {
-        AssetOraclePrice {
-            global_asset_id: median_entry.pair_id,
-            median_price: median_entry.median_price.to_string(),
-            signed_prices: median_entry
-                .components
-                .into_iter()
-                .map(SignedPublisherPrice::from)
-                .collect(),
-            signature: Default::default(),
-        }
-    }
-}
-
 async fn get_subscribed_pairs_entries(
     state: &AppState,
     subscribed_pairs: &[String],
@@ -190,9 +175,37 @@ async fn get_subscribed_pairs_entries(
             .sign(&hash_to_sign)
             .map_err(EntryError::InvalidSigner)?;
 
-        oracle_price.signature = signature.to_string();
+        oracle_price.signature = format!("0x{:?}", signature.to_string());
         response.oracle_prices.push(oracle_price);
     }
     response.timestamp = chrono::Utc::now().timestamp().to_string();
     Ok(response)
+}
+
+impl From<EntryComponent> for SignedPublisherPrice {
+    fn from(component: EntryComponent) -> Self {
+        let asset_id = get_external_asset_id(&component.publisher, &component.pair_id);
+        SignedPublisherPrice {
+            oracle_asset_id: format!("0x{}", asset_id),
+            oracle_price: component.price.to_string(),
+            timestamp: component.timestamp.to_string(),
+            signing_key: component.publisher_address,
+            signature: component.publisher_signature,
+        }
+    }
+}
+
+impl From<MedianEntryWithComponents> for AssetOraclePrice {
+    fn from(median_entry: MedianEntryWithComponents) -> Self {
+        AssetOraclePrice {
+            global_asset_id: median_entry.pair_id,
+            median_price: median_entry.median_price.to_string(),
+            signed_prices: median_entry
+                .components
+                .into_iter()
+                .map(SignedPublisherPrice::from)
+                .collect(),
+            signature: Default::default(),
+        }
+    }
 }
