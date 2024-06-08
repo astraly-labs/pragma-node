@@ -850,8 +850,15 @@ fn build_sql_query_for_median_with_components(pair_ids: &[String], interval_in_m
     )
 }
 
+// TODO(akhercha): sort this out - do we want a limit ?
+// What happens then if we have nothing?
 pub const LIMIT_INTERVAL_IN_MS: u64 = 5000;
+pub const INTERVAL_INCREMENT_IN_MS: u64 = 0;
 
+/// Compute the median price for each pair_id in the given list of pair_ids
+/// over an interval of time.
+/// The interval is increased until we have at least 3 unique publishers
+/// and at least one entry for each pair_id.
 pub async fn get_current_median_entries_with_components(
     pool: &deadpool_diesel::postgres::Pool,
     pair_ids: Vec<String>,
@@ -869,11 +876,14 @@ pub async fn get_current_median_entries_with_components(
             .map_err(adapt_infra_error)?
             .map_err(adapt_infra_error)?;
 
+        // TODO(akhercha): Should return only when we have entries for all subscribed pairs
+        // TODO(akhercha): Should return only if we have at least 3 unique publishers
         if !median_entries.is_empty() {
             break median_entries;
         }
 
-        interval_in_ms += 500;
+        // If the entries are invalid, increase the interval
+        interval_in_ms += INTERVAL_INCREMENT_IN_MS;
         if interval_in_ms >= LIMIT_INTERVAL_IN_MS {
             return Err(InfraError::NotFound);
         }

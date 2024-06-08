@@ -16,7 +16,7 @@ use crate::AppState;
 
 use super::AssetOraclePrice;
 
-const UPDATE_INTERVAL_IN_MS: u64 = 250;
+const UPDATE_INTERVAL_IN_MS: u64 = 500;
 
 #[derive(Default, Debug, Serialize, Deserialize)]
 enum SubscriptionType {
@@ -54,75 +54,101 @@ pub async fn subscribe_to_entry(
     ws: WebSocketUpgrade,
     State(state): State<AppState>,
 ) -> impl IntoResponse {
-    ws.on_upgrade(move |socket| handle_subscription(socket, state))
+    ws.on_upgrade(move |socket| handle_channel(socket, state))
 }
 
-async fn handle_subscription(mut socket: WebSocket, state: AppState) {
+async fn handle_channel(mut socket: WebSocket, state: AppState) {
     let waiting_duration = Duration::from_millis(UPDATE_INTERVAL_IN_MS);
-    // TODO(akhercha): Listen for changes in the entries dataase for subscribed pairs
     let mut update_interval = interval(waiting_duration);
-
-    // Pairs that the client is subscribed to
     let mut subscribed_pairs: Vec<String> = Vec::new();
 
-    // TODO(akhercha): refinements for readability
     loop {
         tokio::select! {
             Some(msg) = socket.recv() => {
-                if let Ok(Message::Text(text)) = msg {
-                    if let Ok(subscription_msg) = serde_json::from_str::<SubscriptionRequest>(&text) {
-                        // TODO(akhercha): what do we do about non existing pairs?
-                        match subscription_msg.msg_type {
-                            SubscriptionType::Subscribe => {
-                                subscribed_pairs.extend(subscription_msg.pairs.clone());
-                                subscribed_pairs.dedup();
-                            },
-                            SubscriptionType::Unsubscribe => {
-                                subscribed_pairs.retain(|pair| !subscription_msg.pairs.contains(pair));
-                            },
-                        };
-                        // Acknowledge subscription/unsubscription
-                        let ack_message = serde_json::to_string(&SubscriptionAck {
-                            msg_type: subscription_msg.msg_type,
-                            pairs: subscribed_pairs.clone(),
-                        }).unwrap();
-                        if socket.send(Message::Text(ack_message)).await.is_err() {
-                            tracing::info!("Error sending message -- END");
-                            break;
-                        }
-                    }
-                } else if msg.is_err() {
-                    tracing::info!("Error receiving message -- END");
-                    break;
+                if let Ok(Message::Text(_text)) = msg {
+                    handle_messages_received(&mut socket, &mut subscribed_pairs, _text).await;
                 }
             },
-            // Update entries logic every X milliseconds
             _ = update_interval.tick() => {
-                if subscribed_pairs.is_empty() {
-                    continue;
-                }
-                let entries = match get_subscribed_pairs_entries(&state, subscribed_pairs.clone()).await {
-                    Ok(response) => response,
-                    Err(e) => {
-                        socket.send(Message::Text(json!({ "error": e.to_string() }).to_string())).await.unwrap();
-                        break;
-                    }
+                match handle_entries_refresh(&mut socket, &state, subscribed_pairs.clone()).await {
+                    Ok(_) => {},
+                    Err(_) => break
                 };
-                let json_response = serde_json::to_string(&entries).unwrap();
-                if socket.send(Message::Text(json_response)).await.is_err() {
-                    tracing::info!("Error sending message -- END");
-                    break;
-                }
             }
         }
     }
+}
+
+async fn handle_messages_received(
+    socket: &mut WebSocket,
+    subscribed_pairs: &mut Vec<String>,
+    message: String,
+) {
+    if let Ok(subscription_msg) = serde_json::from_str::<SubscriptionRequest>(&message) {
+        // TODO(akhercha): send errors for pairs not handled by Pragma
+        match subscription_msg.msg_type {
+            SubscriptionType::Subscribe => {
+                subscribed_pairs.extend(subscription_msg.pairs.clone());
+                subscribed_pairs.dedup();
+            }
+            SubscriptionType::Unsubscribe => {
+                subscribed_pairs.retain(|pair| !subscription_msg.pairs.contains(pair));
+            }
+        };
+        let ack_message = serde_json::to_string(&SubscriptionAck {
+            msg_type: subscription_msg.msg_type,
+            pairs: subscribed_pairs.clone(),
+        })
+        .unwrap();
+        if socket.send(Message::Text(ack_message)).await.is_err() {
+            let error_msg = "Message received but could not send ack message.";
+            socket
+                .send(Message::Text(json!({ "error": error_msg }).to_string()))
+                .await
+                .unwrap();
+        }
+    } else {
+        let error_msg = "Invalid message type. Please check the documentation for more info.";
+        socket
+            .send(Message::Text(json!({ "error": error_msg }).to_string()))
+            .await
+            .unwrap();
+    }
+}
+
+async fn handle_entries_refresh(
+    socket: &mut WebSocket,
+    state: &AppState,
+    subscribed_pairs: Vec<String>,
+) -> Result<(), EntryError> {
+    if subscribed_pairs.is_empty() {
+        return Ok(());
+    }
+    let entries = match get_subscribed_pairs_entries(state, subscribed_pairs.clone()).await {
+        Ok(response) => response,
+        Err(e) => {
+            socket
+                .send(Message::Text(json!({ "error": e.to_string() }).to_string()))
+                .await
+                .unwrap();
+            return Err(e);
+        }
+    };
+    let json_response = serde_json::to_string(&entries).unwrap();
+    if socket.send(Message::Text(json_response)).await.is_err() {
+        let error_msg = "Could not send prices.";
+        socket
+            .send(Message::Text(json!({ "error": error_msg }).to_string()))
+            .await
+            .unwrap();
+    }
+    Ok(())
 }
 
 async fn get_subscribed_pairs_entries(
     state: &AppState,
     subscribed_pairs: Vec<String>,
 ) -> Result<SubscribeToEntryResponse, EntryError> {
-    // TODO(akhercha): entries should have at least 3 unique publishers
     let median_entries =
         get_current_median_entries_with_components(&state.timescale_pool, subscribed_pairs.clone())
             .await
@@ -136,15 +162,17 @@ async fn get_subscribed_pairs_entries(
         let median_price = entry.median_price.clone();
         let mut oracle_price: AssetOraclePrice = entry.into();
 
-        // Sign the oracle price
+        // We need to sign (as Pragma) every computed median price
         let hash_to_sign = get_entry_hash(
             "Pragma",
             &oracle_price.global_asset_id,
             chrono::Utc::now().timestamp() as u64,
             &median_price,
         );
-        // TODO(akhercha): unsafe unwrap
-        let signature = pragma_signer.sign(&hash_to_sign).unwrap();
+        let signature = pragma_signer
+            .sign(&hash_to_sign)
+            .map_err(EntryError::InvalidSigner)?;
+
         oracle_price.signature = signature.to_string();
         response.oracle_prices.push(oracle_price);
     }
