@@ -1,4 +1,4 @@
-pub use aws::{get_aws_client, get_aws_secret};
+pub use aws::get_aws_pragma_signer;
 pub use conversion::{convert_via_quote, format_bigdecimal_price, normalize_to_decimals};
 pub use custom_extractors::json_extractor::JsonExtractor;
 pub use custom_extractors::path_extractor::PathExtractor;
