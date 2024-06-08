@@ -19,7 +19,7 @@ use crate::AppState;
 
 use super::{AssetOraclePrice, SignedPublisherPrice};
 
-const UPDATE_INTERVAL_IN_MS: u64 = 500;
+const CHANNEL_UPDATE_INTERVAL_IN_MS: u64 = 500;
 
 #[derive(Default, Debug, Serialize, Deserialize)]
 enum SubscriptionType {
@@ -61,7 +61,7 @@ pub async fn subscribe_to_entry(
 }
 
 async fn handle_channel(mut socket: WebSocket, state: AppState) {
-    let waiting_duration = Duration::from_millis(UPDATE_INTERVAL_IN_MS);
+    let waiting_duration = Duration::from_millis(CHANNEL_UPDATE_INTERVAL_IN_MS);
     let mut update_interval = interval(waiting_duration);
     let mut subscribed_pairs: Vec<String> = Vec::new();
 
@@ -157,8 +157,7 @@ async fn get_subscribed_pairs_entries(
             .await
             .map_err(|e| e.to_entry_error(&subscribed_pairs.join(",")))?;
 
-    // TODO(akhercha): Build Pragma's signing key from AWS secret (stored in AppState)
-    let pragma_signer = SigningKey::from_random();
+    let pragma_signer = &state.pragma_signer;
 
     let mut response: SubscribeToEntryResponse = Default::default();
     for entry in median_entries {
@@ -166,7 +165,7 @@ async fn get_subscribed_pairs_entries(
         let mut oracle_price: AssetOraclePrice = entry.into();
 
         let signature = sign_median_price_as_pragma(
-            &pragma_signer,
+            pragma_signer,
             &oracle_price.global_asset_id,
             median_price,
         )?;

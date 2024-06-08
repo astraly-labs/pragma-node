@@ -7,7 +7,6 @@ use pragma_common::types::{AggregationMode, DataType, Interval, Network};
 pub use create_entry::create_entries;
 pub use get_entry::get_entry;
 pub use get_ohlc::get_ohlc;
-pub use get_onchain::get_onchain;
 pub use get_volatility::get_volatility;
 pub use subscribe_to_entry::subscribe_to_entry;
 
@@ -188,7 +187,6 @@ pub struct GetOnchainPublishersResponse(pub Vec<Publisher>);
 pub struct GetOnchainOHLCParams {
     pub network: Network,
     pub interval: Interval,
-    pub limit: Option<u64>,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize, ToSchema)]

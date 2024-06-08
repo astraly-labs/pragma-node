@@ -1,5 +1,7 @@
 use deadpool_diesel::postgres::Pool;
 use pragma_entities::connection::{ENV_POSTGRES_DATABASE_URL, ENV_TS_DATABASE_URL};
+use starknet::core::types::FieldElement;
+use starknet::signers::SigningKey;
 use std::net::SocketAddr;
 use utoipa::openapi::security::{ApiKey, ApiKeyValue, SecurityScheme};
 use utoipa::Modify;
@@ -20,6 +22,7 @@ mod utils;
 pub struct AppState {
     timescale_pool: Pool,
     postgres_pool: Pool,
+    pragma_signer: SigningKey,
 }
 
 #[tokio::main]
@@ -107,9 +110,22 @@ async fn main() {
         pragma_entities::connection::init_pool("pragma-node-api", ENV_POSTGRES_DATABASE_URL)
             .expect("can't init postgres (onchain db) pool");
 
+    let pragma_signer = if false {
+        let aws_client = utils::get_aws_client().await;
+        let pragma_secret_key = utils::get_aws_secret(&aws_client, "pragma-secret-key")
+            .await
+            .expect("can't get find pragma secret key");
+        let pragma_secret_key =
+            FieldElement::from_hex_be(&pragma_secret_key).expect("can't parse secret key");
+        SigningKey::from_secret_scalar(pragma_secret_key)
+    } else {
+        SigningKey::from_random()
+    };
+
     let state = AppState {
         timescale_pool,
         postgres_pool,
+        pragma_signer,
     };
 
     let app = app_router::<ApiDoc>(state.clone()).with_state(state);

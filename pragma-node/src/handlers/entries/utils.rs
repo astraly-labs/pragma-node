@@ -49,7 +49,7 @@ pub(crate) fn get_decimals_for_pair(
 /// If the list is empty, None is returned.
 #[allow(dead_code)]
 pub(crate) fn compute_median_price_and_time(
-    entries: &mut Vec<MedianEntry>,
+    entries: &mut [MedianEntry],
 ) -> Option<(BigDecimal, NaiveDateTime)> {
     if entries.is_empty() {
         return None;
@@ -73,7 +73,7 @@ pub(crate) fn compute_median_price_and_time(
 /// The volatility is computed as the annualized standard deviation of the log returns.
 /// The log returns are computed as the natural logarithm of the ratio between two consecutive median prices.
 /// The annualized standard deviation is computed as the square root of the variance multiplied by 10^8.
-pub(crate) fn compute_volatility(entries: &Vec<MedianEntry>) -> f64 {
+pub(crate) fn compute_volatility(entries: &[MedianEntry]) -> f64 {
     if entries.len() < 2 {
         return 0.0;
     }
