@@ -4,6 +4,8 @@ use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::State;
 use axum::response::IntoResponse;
 use bigdecimal::BigDecimal;
+
+use deadpool_diesel::postgres::Object;
 use pragma_entities::{Entry, EntryError};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -95,26 +97,17 @@ async fn handle_message_received(
     if let Ok(subscription_msg) = serde_json::from_str::<SubscriptionRequest>(&message) {
         match subscription_msg.msg_type {
             SubscriptionType::Subscribe => {
-                // TODO(akhercha): horrible block, refactor this
                 let conn = state
                     .timescale_pool
                     .get()
                     .await
-                    .expect("Cant connect to DB");
-                for pair_id in subscription_msg.pairs.clone() {
-                    let r = conn
-                        .interact({
-                            let pair_id_clone = pair_id.clone();
-                            move |conn| Entry::exists(conn, pair_id_clone)
-                        })
-                        .await
-                        .unwrap()
-                        .unwrap();
-                    if !r {
+                    .expect("Couldn't connect to the database.");
+                for pair_id in subscription_msg.pairs.iter() {
+                    if !does_pair_exists(&conn, pair_id.clone()).await {
                         continue;
                     }
-                    if !subscribed_pairs.contains(&pair_id) {
-                        subscribed_pairs.push(pair_id.clone());
+                    if !subscribed_pairs.contains(pair_id) {
+                        subscribed_pairs.push(pair_id.to_string());
                     }
                 }
             }
@@ -138,6 +131,17 @@ async fn handle_message_received(
         let error_msg = "Invalid message type. Please check the documentation for more info.";
         send_error_message(socket, error_msg).await;
     }
+}
+
+/// Checks if the given pair currently exists in our database.
+async fn does_pair_exists(conn: &Object, pair_id: String) -> bool {
+    conn.interact({
+        let pair_id = pair_id.clone();
+        move |conn| Entry::exists(conn, pair_id)
+    })
+    .await
+    .expect("Couldn't check if pair exists")
+    .expect("Couldn't get table result")
 }
 
 /// Send the current median entries to the client.
