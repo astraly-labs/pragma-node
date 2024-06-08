@@ -98,24 +98,22 @@ async fn handle_message_received(
                 subscribed_pairs.retain(|pair| !subscription_msg.pairs.contains(pair));
             }
         };
-        let ack_message = serde_json::to_string(&SubscriptionAck {
+
+        if let Ok(ack_message) = serde_json::to_string(&SubscriptionAck {
             msg_type: subscription_msg.msg_type,
             pairs: subscribed_pairs.clone(),
-        })
-        .unwrap();
-        if socket.send(Message::Text(ack_message)).await.is_err() {
-            let error_msg = "Message received but could not send ack message.";
-            socket
-                .send(Message::Text(json!({ "error": error_msg }).to_string()))
-                .await
-                .unwrap();
+        }) {
+            if socket.send(Message::Text(ack_message)).await.is_err() {
+                let error_msg = "Message received but could not send ack message.";
+                send_error_message(socket, error_msg).await;
+            }
+        } else {
+            let error_msg = "Could not serialize ack message.";
+            send_error_message(socket, error_msg).await;
         }
     } else {
         let error_msg = "Invalid message type. Please check the documentation for more info.";
-        socket
-            .send(Message::Text(json!({ "error": error_msg }).to_string()))
-            .await
-            .unwrap();
+        send_error_message(socket, error_msg).await;
     }
 }
 
@@ -130,20 +128,16 @@ async fn send_median_entries(
     let entries = match get_subscribed_pairs_entries(state, subscribed_pairs).await {
         Ok(response) => response,
         Err(e) => {
-            socket
-                .send(Message::Text(json!({ "error": e.to_string() }).to_string()))
-                .await
-                .unwrap();
+            send_error_message(socket, &e.to_string()).await;
             return Err(e);
         }
     };
-    let json_response = serde_json::to_string(&entries).unwrap();
-    if socket.send(Message::Text(json_response)).await.is_err() {
-        let error_msg = "Could not send prices.";
-        socket
-            .send(Message::Text(json!({ "error": error_msg }).to_string()))
-            .await
-            .unwrap();
+    if let Ok(json_response) = serde_json::to_string(&entries) {
+        if socket.send(Message::Text(json_response)).await.is_err() {
+            send_error_message(socket, "Could not send prices.").await;
+        }
+    } else {
+        send_error_message(socket, "Could not serialize prices.").await;
     }
     Ok(())
 }
@@ -223,4 +217,9 @@ impl From<MedianEntryWithComponents> for AssetOraclePrice {
             signature: Default::default(),
         }
     }
+}
+
+async fn send_error_message(socket: &mut WebSocket, error: &str) {
+    let error_msg = json!({ "error": error }).to_string();
+    socket.send(Message::Text(error_msg)).await.unwrap();
 }
