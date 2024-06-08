@@ -102,6 +102,7 @@ docker compose -f compose.dev.yaml up -d --build
 ### 2. Fill the onchain database
 
 The database tables are created automatically using our migrations:
+
 - offchain migrations are in the `pragma-entities/migrations` folder.
 - onchain migrations are in the `infra/pragma-node/postgres_migrations` folder.
 
