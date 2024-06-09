@@ -75,7 +75,7 @@ async fn init_config() -> Config {
 
     let server_config = envy::from_env::<ServerConfig>().unwrap_or_default();
     let kafka_config = envy::from_env::<KafkaConfig>().unwrap_or_default();
-    let mode_config = envy::from_env::<ModeConfig>().unwrap();
+    let mode_config = envy::from_env::<ModeConfig>().unwrap_or_default();
 
     Config {
         server: server_config,
