@@ -65,6 +65,7 @@ pub async fn subscribe_to_entry(
     ws.on_upgrade(move |socket| handle_channel(socket, state))
 }
 
+/// TODO(akhercha): currently only returns index median - need to add mark price
 /// Handle the WebSocket channel.
 async fn handle_channel(mut socket: WebSocket, state: AppState) {
     let waiting_duration = Duration::from_millis(CHANNEL_UPDATE_INTERVAL_IN_MS);
