@@ -16,7 +16,7 @@ use crate::handlers::entries::SubscribeToEntryResponse;
 use crate::infra::repositories::entry_repository::{
     get_current_median_entries_with_components, EntryComponent, MedianEntryWithComponents,
 };
-use crate::utils::{get_entry_hash, get_external_asset_id, HashError};
+use crate::utils::{get_encoded_pair_id, get_entry_hash, HashError};
 use crate::AppState;
 
 use super::{AssetOraclePrice, SignedPublisherPrice};
@@ -207,7 +207,7 @@ impl TryFrom<EntryComponent> for SignedPublisherPrice {
     type Error = HashError;
 
     fn try_from(component: EntryComponent) -> Result<Self, Self::Error> {
-        let asset_id = get_external_asset_id(&component.publisher, &component.pair_id)?;
+        let asset_id = get_encoded_pair_id(&component.pair_id)?;
         Ok(SignedPublisherPrice {
             oracle_asset_id: format!("0x{}", asset_id),
             oracle_price: component.price.to_string(),
