@@ -22,10 +22,6 @@ pub fn get_external_asset_id(oracle_name: &str, pair_id: &str) -> Result<String,
 
 /// Builds the second number for the hash computation based on timestamp and price.
 fn build_second_number(timestamp: u128, price: &BigDecimal) -> Result<FieldElement, HashError> {
-    // TODO(akhercha): round 2 was here to make the test pass but not sure
-    let price = price.round(2);
-    // TODO(akhercha): 18, the decimals, should depend on the initial pair_id
-    let price = price * BigDecimal::from(10_u128.pow(18));
     let price = price.to_u128().ok_or(HashError::ConversionError)?;
     let price_as_hex = format!("{:x}", price);
     let timestamp_as_hex = format!("{:x}", timestamp);
@@ -64,8 +60,10 @@ pub fn get_entry_hash(
 
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
+
     use super::*;
-    use bigdecimal::{BigDecimal, FromPrimitive};
+    use bigdecimal::BigDecimal;
 
     // Example from:
     // https://docs.starkware.co/starkex/perpetual/becoming-an-oracle-provider-for-starkex.html#signing_prices
@@ -74,7 +72,7 @@ mod tests {
         // 1. Setup
         let oracle_name = "Maker";
         let asset = "BTCUSD";
-        let price = BigDecimal::from_f64(11512.34).unwrap();
+        let price = BigDecimal::from_str("11512340000000000000000").unwrap();
         let timestamp = 1577836800_u64;
 
         // 2. Action
