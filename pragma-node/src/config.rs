@@ -55,10 +55,6 @@ impl Config {
         self.mode.mode == Mode::Production
     }
 
-    pub fn is_dev_mode(&self) -> bool {
-        self.mode.mode == Mode::Dev
-    }
-
     pub fn server_host(&self) -> &str {
         &self.server.host
     }

@@ -779,6 +779,7 @@ pub struct MedianEntryWithComponents {
     pub components: Vec<EntryComponent>,
 }
 
+// TODO: should change depending on MODE env variable
 pub const MINIMUM_NUMBER_OF_PUBLISHERS: usize = 3;
 
 /// Convert a list of raw entries into a list of valid median entries

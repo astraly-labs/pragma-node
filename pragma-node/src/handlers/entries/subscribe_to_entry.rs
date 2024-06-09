@@ -16,7 +16,7 @@ use crate::handlers::entries::SubscribeToEntryResponse;
 use crate::infra::repositories::entry_repository::{
     get_current_median_entries_with_components, EntryComponent, MedianEntryWithComponents,
 };
-use crate::utils::{get_entry_hash, get_external_asset_id};
+use crate::utils::{get_entry_hash, get_external_asset_id, HashError};
 use crate::AppState;
 
 use super::{AssetOraclePrice, SignedPublisherPrice};
@@ -167,7 +167,9 @@ async fn get_subscribed_pairs_entries(
     let now = chrono::Utc::now().timestamp();
     for entry in median_entries {
         let median_price = entry.median_price.clone();
-        let mut oracle_price: AssetOraclePrice = entry.into();
+        let mut oracle_price: AssetOraclePrice = entry
+            .try_into()
+            .map_err(|_| EntryError::InternalServerError)?;
 
         let signature = sign_median_price_as_pragma(
             &state.pragma_signer,
@@ -191,38 +193,45 @@ fn sign_median_price_as_pragma(
     timestamp: u64,
     median_price: BigDecimal,
 ) -> Result<String, EntryError> {
-    let hash_to_sign = get_entry_hash(PRAGMA_ORACLE_NAME, asset_id, timestamp, &median_price);
+    let hash_to_sign = get_entry_hash(PRAGMA_ORACLE_NAME, asset_id, timestamp, &median_price)
+        .map_err(|_| EntryError::InternalServerError)?;
     let signature = signer
         .sign(&hash_to_sign)
         .map_err(EntryError::InvalidSigner)?;
     Ok(format!("0x{:}", signature))
 }
 
-impl From<EntryComponent> for SignedPublisherPrice {
-    fn from(component: EntryComponent) -> Self {
-        let asset_id = get_external_asset_id(&component.publisher, &component.pair_id);
-        SignedPublisherPrice {
+impl TryFrom<EntryComponent> for SignedPublisherPrice {
+    type Error = HashError;
+
+    fn try_from(component: EntryComponent) -> Result<Self, Self::Error> {
+        let asset_id = get_external_asset_id(&component.publisher, &component.pair_id)?;
+        Ok(SignedPublisherPrice {
             oracle_asset_id: format!("0x{}", asset_id),
             oracle_price: component.price.to_string(),
             timestamp: component.timestamp.to_string(),
             signing_key: component.publisher_address,
             signature: component.publisher_signature,
-        }
+        })
     }
 }
 
-impl From<MedianEntryWithComponents> for AssetOraclePrice {
-    fn from(median_entry: MedianEntryWithComponents) -> Self {
-        AssetOraclePrice {
+impl TryFrom<MedianEntryWithComponents> for AssetOraclePrice {
+    type Error = HashError;
+
+    fn try_from(median_entry: MedianEntryWithComponents) -> Result<Self, Self::Error> {
+        let signed_prices: Result<Vec<SignedPublisherPrice>, HashError> = median_entry
+            .components
+            .into_iter()
+            .map(SignedPublisherPrice::try_from)
+            .collect();
+
+        Ok(AssetOraclePrice {
             global_asset_id: median_entry.pair_id,
             median_price: median_entry.median_price.to_string(),
-            signed_prices: median_entry
-                .components
-                .into_iter()
-                .map(SignedPublisherPrice::from)
-                .collect(),
+            signed_prices: signed_prices?,
             signature: Default::default(),
-        }
+        })
     }
 }
 
