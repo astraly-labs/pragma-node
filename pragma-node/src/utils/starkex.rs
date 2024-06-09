@@ -21,14 +21,13 @@ pub fn get_external_asset_id(oracle_name: &str, pair_id: &str) -> Result<String,
 }
 
 /// Builds the second number for the hash computation based on timestamp and price.
-fn build_second_number(timestamp: u64, price: &BigDecimal) -> Result<FieldElement, HashError> {
+fn build_second_number(timestamp: u128, price: &BigDecimal) -> Result<FieldElement, HashError> {
     // TODO(akhercha): round 2 was here to make the test pass but not sure
     let price = price.round(2);
     // TODO(akhercha): 18, the decimals, should depend on the initial pair_id
     let price = price * BigDecimal::from(10_u128.pow(18));
     let price = price.to_u128().ok_or(HashError::ConversionError)?;
     let price_as_hex = format!("{:x}", price);
-    let timestamp: u128 = timestamp.into();
     let timestamp_as_hex = format!("{:x}", timestamp);
     let v = format!("{}{}", price_as_hex, timestamp_as_hex);
     FieldElement::from_hex_be(&v).map_err(|_| HashError::ConversionError)
@@ -59,7 +58,7 @@ pub fn get_entry_hash(
     let external_asset_id = get_external_asset_id(oracle_name, pair_id)?;
     let first_number =
         FieldElement::from_hex_be(&external_asset_id).map_err(|_| HashError::ConversionError)?;
-    let second_number = build_second_number(timestamp, price)?;
+    let second_number = build_second_number(timestamp as u128, price)?;
     Ok(pedersen_hash(&first_number, &second_number))
 }
 
@@ -68,7 +67,8 @@ mod tests {
     use super::*;
     use bigdecimal::{BigDecimal, FromPrimitive};
 
-    // TODO(akhercha): do way more tests
+    // Example from:
+    // https://docs.starkware.co/starkex/perpetual/becoming-an-oracle-provider-for-starkex.html#signing_prices
     #[test]
     fn test_get_entry_hash_with_example() {
         // 1. Setup
@@ -88,4 +88,6 @@ mod tests {
         .unwrap();
         assert_eq!(hashed_data, expected_data);
     }
+
+    // TODO(akhercha): do way more tests
 }
