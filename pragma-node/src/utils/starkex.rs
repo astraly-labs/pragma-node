@@ -11,10 +11,11 @@ pub enum HashError {
 
 /// Converts oracle name and pair id to an external asset id.
 pub fn get_external_asset_id(oracle_name: &str, pair_id: &str) -> Result<String, HashError> {
+    let pair_id = pair_id.replace('/', ""); // Remove the "/" from the pair_id if it exists
     let oracle_name =
         cairo_short_string_to_felt(oracle_name).map_err(|_| HashError::ConversionError)?;
     let oracle_as_hex = format!("{:x}", oracle_name);
-    let pair_id = cairo_short_string_to_felt(pair_id).map_err(|_| HashError::ConversionError)?;
+    let pair_id = cairo_short_string_to_felt(&pair_id).map_err(|_| HashError::ConversionError)?;
     let pair_id: u128 = pair_id.try_into().map_err(|_| HashError::ConversionError)?;
     let pair_as_hex = format!("{:0<width$x}", pair_id, width = 32);
     Ok(format!("0x{}{}", pair_as_hex, oracle_as_hex))
@@ -51,8 +52,7 @@ pub fn get_entry_hash(
     timestamp: u64,
     price: &BigDecimal,
 ) -> Result<FieldElement, HashError> {
-    let pair_id = pair_id.replace('/', ""); // Remove the "/" from the pair_id if it exists
-    let external_asset_id = get_external_asset_id(oracle_name, &pair_id)?;
+    let external_asset_id = get_external_asset_id(oracle_name, pair_id)?;
     let first_number =
         FieldElement::from_hex_be(&external_asset_id).map_err(|_| HashError::ConversionError)?;
     let second_number = build_second_number(timestamp as u128, price)?;
