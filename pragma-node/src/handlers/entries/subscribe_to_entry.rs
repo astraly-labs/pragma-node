@@ -5,7 +5,7 @@ use axum::extract::State;
 use axum::response::IntoResponse;
 use bigdecimal::BigDecimal;
 
-use deadpool_diesel::postgres::Object;
+use deadpool_diesel::postgres::Pool;
 use pragma_entities::{Entry, EntryError};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -97,16 +97,10 @@ async fn handle_message_received(
     if let Ok(subscription_msg) = serde_json::from_str::<SubscriptionRequest>(&message) {
         match subscription_msg.msg_type {
             SubscriptionType::Subscribe => {
-                let conn = state
-                    .timescale_pool
-                    .get()
-                    .await
-                    .expect("Couldn't connect to the database.");
-                for pair_id in subscription_msg.pairs.iter() {
-                    if !does_pair_exists(&conn, pair_id.clone()).await {
-                        continue;
-                    }
-                    if !subscribed_pairs.contains(pair_id) {
+                let existing_pairs =
+                    only_existing_pairs(&state.timescale_pool, subscription_msg.pairs).await;
+                for pair_id in existing_pairs {
+                    if !subscribed_pairs.contains(&pair_id) {
                         subscribed_pairs.push(pair_id.to_string());
                     }
                 }
@@ -131,18 +125,6 @@ async fn handle_message_received(
         let error_msg = "Invalid message type. Please check the documentation for more info.";
         send_error_message(socket, error_msg).await;
     }
-}
-
-/// Checks if the given pair currently exists in our database.
-/// Close the channel if the database connection fails.
-async fn does_pair_exists(conn: &Object, pair_id: String) -> bool {
-    conn.interact({
-        let pair_id = pair_id.clone();
-        move |conn| Entry::exists(conn, pair_id)
-    })
-    .await
-    .expect("Couldn't check if pair exists")
-    .expect("Couldn't get table result")
 }
 
 /// Send the current median entries to the client.
@@ -242,6 +224,16 @@ impl From<MedianEntryWithComponents> for AssetOraclePrice {
             signature: Default::default(),
         }
     }
+}
+
+/// Given a list of pairs, only return the ones that exists in the
+/// database.
+async fn only_existing_pairs(pool: &Pool, pairs: Vec<String>) -> Vec<String> {
+    let conn = pool.get().await.expect("Couldn't connect to the database.");
+    conn.interact(move |conn| Entry::get_existing_pairs(conn, pairs))
+        .await
+        .expect("Couldn't check if pair exists")
+        .expect("Couldn't get table result")
 }
 
 /// Send an error message to the client.
