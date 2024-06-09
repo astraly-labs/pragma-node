@@ -62,6 +62,8 @@ services:
       - pragma_zookeeper_logs:/var/lib/zookeeper/log
     ports:
       - "2181:2181"
+    expose:
+      - 2181
 
   pragma-kafka:
     container_name: "pragma-kafka"
@@ -76,7 +78,8 @@ services:
       - "29092:29092"
       - "9092:9092"
     expose:
-      - "29092"
+      - 29092
+      - 9092
     healthcheck:
       test:
         [
@@ -93,13 +96,13 @@ services:
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,PLAINTEXT_E:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
 
   pragma-ingestor-1:
     container_name: "pragma-ingestor-1"
     environment:
-      - POSTGRES_DATABASE_URL=postgres://postgres:test-password@172.17.0.1:5432/pragma
-      - TIMESCALE_DATABASE_URL=postgres://postgres:test-password@172.17.0.1:5433/pragma
+      - TIMESCALE_DATABASE_URL=postgres://postgres:test-password@172.17.0.1:5432/pragma
+      - POSTGRES_DATABASE_URL=postgres://postgres:test-password@172.17.0.1:5433/pragma
       - DATABASE_MAX_CONN=5
       - BROKERS=172.17.0.1:9092
       - TOPIC=pragma-data
