@@ -18,6 +18,11 @@ pub async fn build_pragma_signer_from_aws() -> SigningKey {
     SigningKey::from_secret_scalar(pragma_secret_key)
 }
 
+/// Builds an aws client from environment variables:
+/// - AWS_ACCESS_KEY_ID
+/// - AWS_SECRET_ACCESS_KEY
+/// See:
+/// https://docs.aws.amazon.com/sdk-for-rust/latest/dg/credentials.html
 async fn get_aws_client() -> Client {
     let aws_config = aws_config::load_from_env().await;
     aws_sdk_secretsmanager::Client::new(&aws_config)
