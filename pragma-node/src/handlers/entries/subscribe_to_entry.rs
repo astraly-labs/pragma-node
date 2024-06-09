@@ -21,7 +21,9 @@ use crate::AppState;
 
 use super::{AssetOraclePrice, SignedPublisherPrice};
 
-const PRAGMA_ORACLE_NAME: &str = "PRAGMA";
+/// "PRAGMA" to number is bigger than 2**40 - we alias it to "PRGM" to fit in 40 bits.
+/// Needed for StarkEx signature.
+const PRAGMA_ORACLE_NAME: &str = "PRGM";
 const CHANNEL_UPDATE_INTERVAL_IN_MS: u64 = 500;
 
 #[derive(Default, Debug, Serialize, Deserialize)]
