@@ -1,16 +1,16 @@
 use aws_sdk_secretsmanager::Client;
 use starknet::{core::types::FieldElement, signers::SigningKey};
 
-const AWS_PRAGMA_PUBLIC_KEY_SECRET: &str = "pragma-secret-key";
+const AWS_PRAGMA_PRIVATE_KEY_SECRET: &str = "pragma-secret-key";
 
 #[derive(Debug)]
 pub enum AwsError {
     NoSecretFound,
 }
 
-pub async fn get_aws_pragma_signer() -> SigningKey {
+pub async fn build_pragma_signer_from_aws() -> SigningKey {
     let aws_client = get_aws_client().await;
-    let pragma_secret_key = get_aws_secret(&aws_client, AWS_PRAGMA_PUBLIC_KEY_SECRET)
+    let pragma_secret_key = get_aws_secret(&aws_client, AWS_PRAGMA_PRIVATE_KEY_SECRET)
         .await
         .expect("can't get find pragma secret key");
     let pragma_secret_key =

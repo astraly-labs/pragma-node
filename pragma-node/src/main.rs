@@ -110,7 +110,7 @@ async fn main() {
             .expect("can't init postgres (onchain db) pool");
 
     let pragma_signer = if config.is_production_mode() {
-        utils::get_aws_pragma_signer().await
+        utils::build_pragma_signer_from_aws().await
     } else {
         SigningKey::from_random()
     };
