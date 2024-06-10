@@ -102,7 +102,7 @@ pub async fn insert_perp_entries(new_perp_entries: Vec<NewPerpEntry>) -> Result<
 
     for entry in &entries {
         info!(
-            "new entry created {} - {}({}) - {}",
+            "new perp entry created {} - {}({}) - {}",
             entry.publisher, entry.pair_id, entry.price, entry.source
         );
     }
