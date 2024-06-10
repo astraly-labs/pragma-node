@@ -44,7 +44,7 @@ pub fn get_entry_hash(
     Ok(pedersen_hash(&first_number, &second_number))
 }
 
-/// Converts oracle name and pair id to an external asset id.
+/// Builds the first number for the hash computation based on oracle name and pair id.
 fn build_first_number(oracle_name: &str, pair_id: &str) -> Result<FieldElement, HashError> {
     let oracle_name =
         cairo_short_string_to_felt(oracle_name).map_err(|_| HashError::ConversionError)?;
@@ -67,77 +67,86 @@ fn build_second_number(timestamp: u128, price: &BigDecimal) -> Result<FieldEleme
 
 #[cfg(test)]
 mod tests {
+    use rstest::rstest;
     use std::str::FromStr;
 
     use super::*;
     use bigdecimal::BigDecimal;
 
-    // (pair_id, expected_encoded_pair_id)
-    type GetEncodedPairIdTestCase<'a> = (&'a str, &'a str);
-
-    #[test]
-    fn test_get_encoded_pair_id() {
-        let tests_cases: Vec<GetEncodedPairIdTestCase> = vec![
-            ("BTCUSD", "0x425443555344"),
-            ("BTC/USD", "0x425443555344"),
-            ("ETHUSD", "0x455448555344"),
-            ("DOGEUSD", "0x444f4745555344"),
-            ("SOLUSD", "0x534f4c555344"),
-            ("SOLUSDT", "0x534f4c55534454"),
-        ];
-
-        for (pair_id, expected_encoded_pair_id) in tests_cases {
-            let encoded_pair_id = get_encoded_pair_id(pair_id).expect("Could not encode pair id");
-            assert_eq!(
-                encoded_pair_id, expected_encoded_pair_id,
-                "Encoded pair id does not match for pair_id: {}",
-                pair_id
-            );
-        }
+    #[rstest]
+    #[case("BTCUSD", "0x425443555344")]
+    #[case("BTC/USD", "0x425443555344")]
+    #[case("ETHUSD", "0x455448555344")]
+    #[case("DOGEUSD", "0x444f4745555344")]
+    #[case("SOLUSD", "0x534f4c555344")]
+    #[case("SOLUSDT", "0x534f4c55534454")]
+    fn test_get_encoded_pair_id(#[case] pair_id: &str, #[case] expected_encoded_pair_id: &str) {
+        let encoded_pair_id = get_encoded_pair_id(pair_id).expect("Could not encode pair id");
+        assert_eq!(
+            encoded_pair_id, expected_encoded_pair_id,
+            "Encoded pair id does not match for pair_id: {}",
+            pair_id
+        );
     }
 
-    // ((oracle_name, pair_id, price, timestamp), expected_hash)
-    type GetEntryHashTestCase<'a> = ((&'a str, &'a str, &'a str, u64), &'a str);
-
-    #[test]
-    fn test_get_entry_hash() {
-        let tests_cases: Vec<GetEntryHashTestCase> = vec![
-            (
-                ("Maker", "BTCUSD", "11512340000000000000000", 1577836800),
-                "3e4113feb6c403cb0c954e5c09d239bf88fedb075220270f44173ac3cd41858",
-            ),
-            (
-                ("Maker", "BTC/USD", "11512340000000000000000", 1577836800),
-                "3e4113feb6c403cb0c954e5c09d239bf88fedb075220270f44173ac3cd41858",
-            ),
-            (
-                ("PRGM", "SOLUSD", "19511280076", 1577216800),
-                "3d683d36601ab3fd05dfbfecea8971a798f3c2e418fa54594c363e6e6816979",
-            ),
-            (
-                ("PRGM", "ETHUSD", "369511280076", 1577816800),
-                "6641dffd4e3499051ca0cd57e5c12b203bcf184576ce72e18d832de941e9656",
-            ),
-            (
-                ("TEST", "DOGEUSD", "51128006", 1517816800),
-                "18320fa96c61b1d8f98e1c85ae0a5a1159a46580ad32415122661c470d8d99f",
-            ),
-            (
-                ("TEST", "DOGE/USD", "51128006", 1517816800),
-                "18320fa96c61b1d8f98e1c85ae0a5a1159a46580ad32415122661c470d8d99f",
-            ),
-        ];
-
-        for ((oracle_name, pair_id, price, timestamp), expected_hash) in tests_cases {
-            let price = BigDecimal::from_str(price).unwrap();
-            let hashed_data = get_entry_hash(oracle_name, pair_id, timestamp, &price)
-                .expect("Could not build hash");
-            let expected_data = FieldElement::from_hex_be(expected_hash).unwrap();
-            assert_eq!(
-                hashed_data, expected_data,
-                "Hashes do not match for oracle_name: {}, pair_id: {}, price: {}, timestamp: {}",
-                oracle_name, pair_id, price, timestamp
-            );
-        }
+    #[rstest]
+    #[case(
+        "Maker",
+        "BTCUSD",
+        "11512340000000000000000",
+        1577836800,
+        "3e4113feb6c403cb0c954e5c09d239bf88fedb075220270f44173ac3cd41858"
+    )]
+    #[case(
+        "Maker",
+        "BTC/USD",
+        "11512340000000000000000",
+        1577836800,
+        "3e4113feb6c403cb0c954e5c09d239bf88fedb075220270f44173ac3cd41858"
+    )]
+    #[case(
+        "PRGM",
+        "SOLUSD",
+        "19511280076",
+        1577216800,
+        "3d683d36601ab3fd05dfbfecea8971a798f3c2e418fa54594c363e6e6816979"
+    )]
+    #[case(
+        "PRGM",
+        "ETHUSD",
+        "369511280076",
+        1577816800,
+        "6641dffd4e3499051ca0cd57e5c12b203bcf184576ce72e18d832de941e9656"
+    )]
+    #[case(
+        "TEST",
+        "DOGEUSD",
+        "51128006",
+        1517816800,
+        "18320fa96c61b1d8f98e1c85ae0a5a1159a46580ad32415122661c470d8d99f"
+    )]
+    #[case(
+        "TEST",
+        "DOGE/USD",
+        "51128006",
+        1517816800,
+        "18320fa96c61b1d8f98e1c85ae0a5a1159a46580ad32415122661c470d8d99f"
+    )]
+    fn test_get_entry_hash(
+        #[case] oracle_name: &str,
+        #[case] pair_id: &str,
+        #[case] price: &str,
+        #[case] timestamp: u64,
+        #[case] expected_hash: &str,
+    ) {
+        let price = BigDecimal::from_str(price).unwrap();
+        let hashed_data =
+            get_entry_hash(oracle_name, pair_id, timestamp, &price).expect("Could not build hash");
+        let expected_data = FieldElement::from_hex_be(expected_hash).unwrap();
+        assert_eq!(
+            hashed_data, expected_data,
+            "Hashes do not match for oracle_name: {}, pair_id: {}, price: {}, timestamp: {}",
+            oracle_name, pair_id, price, timestamp
+        );
     }
 }
