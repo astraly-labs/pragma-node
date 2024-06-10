@@ -1,18 +1,15 @@
 use bigdecimal::{BigDecimal, ToPrimitive};
 
+use pragma_common::types::ConversionError;
 use starknet::core::{
     crypto::pedersen_hash, types::FieldElement, utils::cairo_short_string_to_felt,
 };
 
-#[derive(Debug)]
-pub enum HashError {
-    ConversionError,
-}
-
 /// Converts a pair id to its hexadecimal id.
-pub fn get_encoded_pair_id(pair_id: &str) -> Result<String, HashError> {
+pub fn get_encoded_pair_id(pair_id: &str) -> Result<String, ConversionError> {
     let pair_id = pair_id.replace('/', ""); // Remove the "/" from the pair_id if it exists
-    let pair_id = cairo_short_string_to_felt(&pair_id).map_err(|_| HashError::ConversionError)?;
+    let pair_id =
+        cairo_short_string_to_felt(&pair_id).map_err(|_| ConversionError::FeltConversion)?;
     Ok(format!("0x{:x}", pair_id))
 }
 
@@ -37,7 +34,7 @@ pub fn get_entry_hash(
     pair_id: &str,
     timestamp: u64,
     price: &BigDecimal,
-) -> Result<FieldElement, HashError> {
+) -> Result<FieldElement, ConversionError> {
     let pair_id = pair_id.replace('/', ""); // Remove the "/" from the pair_id if it exists
     let first_number = build_first_number(oracle_name, &pair_id)?;
     let second_number = build_second_number(timestamp as u128, price)?;
@@ -45,24 +42,30 @@ pub fn get_entry_hash(
 }
 
 /// Builds the first number for the hash computation based on oracle name and pair id.
-fn build_first_number(oracle_name: &str, pair_id: &str) -> Result<FieldElement, HashError> {
+fn build_first_number(oracle_name: &str, pair_id: &str) -> Result<FieldElement, ConversionError> {
     let oracle_name =
-        cairo_short_string_to_felt(oracle_name).map_err(|_| HashError::ConversionError)?;
+        cairo_short_string_to_felt(oracle_name).map_err(|_| ConversionError::FeltConversion)?;
     let oracle_as_hex = format!("{:x}", oracle_name);
-    let pair_id = cairo_short_string_to_felt(pair_id).map_err(|_| HashError::ConversionError)?;
-    let pair_id: u128 = pair_id.try_into().map_err(|_| HashError::ConversionError)?;
+    let pair_id =
+        cairo_short_string_to_felt(pair_id).map_err(|_| ConversionError::FeltConversion)?;
+    let pair_id: u128 = pair_id
+        .try_into()
+        .map_err(|_| ConversionError::U128Conversion)?;
     let pair_as_hex = format!("{:0<width$x}", pair_id, width = 32);
     let v = format!("0x{}{}", pair_as_hex, oracle_as_hex);
-    FieldElement::from_hex_be(&v).map_err(|_| HashError::ConversionError)
+    FieldElement::from_hex_be(&v).map_err(|_| ConversionError::FeltConversion)
 }
 
 /// Builds the second number for the hash computation based on timestamp and price.
-fn build_second_number(timestamp: u128, price: &BigDecimal) -> Result<FieldElement, HashError> {
-    let price = price.to_u128().ok_or(HashError::ConversionError)?;
+fn build_second_number(
+    timestamp: u128,
+    price: &BigDecimal,
+) -> Result<FieldElement, ConversionError> {
+    let price = price.to_u128().ok_or(ConversionError::U128Conversion)?;
     let price_as_hex = format!("{:x}", price);
     let timestamp_as_hex = format!("{:x}", timestamp);
     let v = format!("0x{}{}", price_as_hex, timestamp_as_hex);
-    FieldElement::from_hex_be(&v).map_err(|_| HashError::ConversionError)
+    FieldElement::from_hex_be(&v).map_err(|_| ConversionError::FeltConversion)
 }
 
 #[cfg(test)]

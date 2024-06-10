@@ -1,6 +1,8 @@
 use bigdecimal::num_bigint::ToBigInt;
 use bigdecimal::{BigDecimal, ToPrimitive};
 use chrono::NaiveDateTime;
+use deadpool_diesel::postgres::Pool;
+use pragma_entities::Entry;
 use std::collections::HashMap;
 
 use crate::infra::repositories::entry_repository::MedianEntry;
@@ -108,6 +110,16 @@ pub(crate) fn big_decimal_price_to_hex(price: &BigDecimal) -> String {
         "0x{}",
         price.to_bigint().unwrap_or_default().to_str_radix(16)
     )
+}
+
+/// Given a list of pairs, only return the ones that exists in the
+/// database.
+pub(crate) async fn only_existing_pairs(pool: &Pool, pairs: Vec<String>) -> Vec<String> {
+    let conn = pool.get().await.expect("Couldn't connect to the database.");
+    conn.interact(move |conn| Entry::get_existing_pairs(conn, pairs))
+        .await
+        .expect("Couldn't check if pair exists")
+        .expect("Couldn't get table result")
 }
 
 #[cfg(test)]

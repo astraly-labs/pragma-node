@@ -8,7 +8,7 @@ use diesel::{ExpressionMethods, QueryDsl, Queryable, RunQueryDsl};
 use serde::{Deserialize, Serialize};
 use starknet::core::utils::cairo_short_string_to_felt;
 
-use pragma_common::types::{AggregationMode, Interval};
+use pragma_common::types::{AggregationMode, ConversionError, Interval};
 use pragma_entities::dto;
 use pragma_entities::{
     error::{adapt_infra_error, InfraError},
@@ -16,7 +16,8 @@ use pragma_entities::{
     Currency, Entry, NewEntry,
 };
 
-use crate::utils::{convert_via_quote, normalize_to_decimals};
+use crate::handlers::entries::{AssetOraclePrice, SignedPublisherPrice};
+use crate::utils::{convert_via_quote, get_encoded_pair_id, normalize_to_decimals};
 
 pub async fn _insert(
     pool: &deadpool_diesel::postgres::Pool,
@@ -716,13 +717,6 @@ struct RawMedianEntryWithComponents {
     pub components: serde_json::Value,
 }
 
-#[derive(Debug)]
-pub enum ConversionError {
-    FailedSerialization,
-    InvalidDateTime,
-    BigDecimalConversion,
-}
-
 impl TryFrom<RawMedianEntryWithComponents> for MedianEntryWithComponents {
     type Error = ConversionError;
 
@@ -730,6 +724,8 @@ impl TryFrom<RawMedianEntryWithComponents> for MedianEntryWithComponents {
         let components: Vec<EntryComponent> =
             serde_json::from_value(raw.components).map_err(|_| Self::Error::FailedSerialization)?;
 
+        // The database returns us the timestamp in RFC3339 format, so we
+        // need to convert it to a Unix timestamp before going further.
         let components = components
             .into_iter()
             .map(|c| {
@@ -766,11 +762,45 @@ pub struct EntryComponent {
     pub publisher_signature: String,
 }
 
+impl TryFrom<EntryComponent> for SignedPublisherPrice {
+    type Error = ConversionError;
+
+    fn try_from(component: EntryComponent) -> Result<Self, Self::Error> {
+        let asset_id = get_encoded_pair_id(&component.pair_id)?;
+        Ok(SignedPublisherPrice {
+            oracle_asset_id: format!("0x{}", asset_id),
+            oracle_price: component.price.to_string(),
+            timestamp: component.timestamp.to_string(),
+            signing_key: component.publisher_address,
+            signature: component.publisher_signature,
+        })
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct MedianEntryWithComponents {
     pub pair_id: String,
     pub median_price: BigDecimal,
     pub components: Vec<EntryComponent>,
+}
+
+impl TryFrom<MedianEntryWithComponents> for AssetOraclePrice {
+    type Error = ConversionError;
+
+    fn try_from(median_entry: MedianEntryWithComponents) -> Result<Self, Self::Error> {
+        let signed_prices: Result<Vec<SignedPublisherPrice>, ConversionError> = median_entry
+            .components
+            .into_iter()
+            .map(SignedPublisherPrice::try_from)
+            .collect();
+
+        Ok(AssetOraclePrice {
+            global_asset_id: median_entry.pair_id,
+            median_price: median_entry.median_price.to_string(),
+            signed_prices: signed_prices?,
+            signature: Default::default(),
+        })
+    }
 }
 
 // TODO: should change depending on MODE env variable

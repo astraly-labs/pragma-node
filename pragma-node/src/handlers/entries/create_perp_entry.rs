@@ -16,7 +16,7 @@ use super::{CreatePerpEntryRequest, CreatePerpEntryResponse, PerpEntry};
 #[derive(Debug, Serialize, Deserialize)]
 struct PublishMessage {
     action: String,
-    perp_entries: Vec<PerpEntry>,
+    entries: Vec<PerpEntry>,
 }
 
 // TODO(akhercha): double-check this
@@ -30,7 +30,7 @@ fn build_publish_message(
             "primaryType": "Request",
             "message": {{
                 "action": "Publish",
-                "perp_entries": {}
+                "entries": {}
             }},
             "types": {{
                 "StarkNetDomain": [
@@ -39,9 +39,9 @@ fn build_publish_message(
                 ],
                 "Request": [
                     {{"name": "action", "type": "felt"}},
-                    {{"name": "perp_entries", "type": "PerpPentry*"}}
+                    {{"name": "entries", "type": "Entry*"}}
                 ],
-                "PerpEntry": [
+                "Entry": [
                     {{"name": "base", "type": "Base"}},
                     {{"name": "pair_id", "type": "felt"}},
                     {{"name": "price", "type": "felt"}},
@@ -90,12 +90,7 @@ pub async fn create_perp_entries(
         .map_err(EntryError::InfraError)?;
 
     // Check if publisher is active
-    if !publisher.active {
-        tracing::error!("Publisher {:?} is not active", publisher_name);
-        return Err(EntryError::PublisherError(
-            PublisherError::InactivePublisher(publisher_name),
-        ));
-    }
+    publisher.assert_publisher_is_active()?;
 
     // Fetch public key from database
     // TODO: Fetch it from contract
@@ -187,6 +182,6 @@ mod tests {
         assert_eq!(typed_data.domain.name, "Pragma");
         assert_eq!(typed_data.domain.version, "1");
         assert_eq!(typed_data.message.action, "Publish");
-        assert_eq!(typed_data.message.perp_entries, perp_entries);
+        assert_eq!(typed_data.message.entries, perp_entries);
     }
 }

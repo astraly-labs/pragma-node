@@ -88,12 +88,7 @@ pub async fn create_entries(
         .map_err(EntryError::InfraError)?;
 
     // Check if publisher is active
-    if !publisher.active {
-        tracing::error!("Publisher {:?} is not active", publisher_name);
-        return Err(EntryError::PublisherError(
-            PublisherError::InactivePublisher(publisher_name),
-        ));
-    }
+    publisher.assert_publisher_is_active()?;
 
     // Fetch public key from database
     // TODO: Fetch it from contract

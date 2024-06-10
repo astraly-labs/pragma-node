@@ -5,21 +5,19 @@ use axum::extract::State;
 use axum::response::IntoResponse;
 use bigdecimal::BigDecimal;
 
-use deadpool_diesel::postgres::Pool;
-use pragma_entities::{Entry, EntryError};
+use pragma_entities::EntryError;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use starknet::signers::SigningKey;
 use tokio::time::interval;
 
 use crate::handlers::entries::SubscribeToEntryResponse;
-use crate::infra::repositories::entry_repository::{
-    get_current_median_entries_with_components, EntryComponent, MedianEntryWithComponents,
-};
-use crate::utils::{get_encoded_pair_id, get_entry_hash, HashError};
+use crate::infra::repositories::entry_repository::get_current_median_entries_with_components;
+use crate::utils::get_entry_hash;
 use crate::AppState;
 
-use super::{AssetOraclePrice, SignedPublisherPrice};
+use super::utils::only_existing_pairs;
+use super::AssetOraclePrice;
 
 /// "PRAGMA" to number is bigger than 2**40 - we alias it to "PRGM" to fit in 40 bits.
 /// Needed for StarkEx signature.
@@ -178,7 +176,7 @@ async fn get_subscribed_pairs_entries(
             .try_into()
             .map_err(|_| EntryError::InternalServerError)?;
 
-        let signature = sign_median_price_as_pragma(
+        let signature = sign_data(
             &state.pragma_signer,
             &oracle_price.global_asset_id,
             now as u64,
@@ -188,13 +186,13 @@ async fn get_subscribed_pairs_entries(
         oracle_price.signature = signature;
         response.oracle_prices.push(oracle_price);
     }
+    // Timestamp in seconds.
     response.timestamp = now.to_string();
     Ok(response)
 }
 
-/// Sign the median price as Pragma and return the signature
-/// 0x prefixed.
-fn sign_median_price_as_pragma(
+/// Sign the median price with the passed signer and return the signature 0x prefixed.
+fn sign_data(
     signer: &SigningKey,
     asset_id: &str,
     timestamp: u64,
@@ -206,50 +204,6 @@ fn sign_median_price_as_pragma(
         .sign(&hash_to_sign)
         .map_err(EntryError::InvalidSigner)?;
     Ok(format!("0x{:}", signature))
-}
-
-impl TryFrom<EntryComponent> for SignedPublisherPrice {
-    type Error = HashError;
-
-    fn try_from(component: EntryComponent) -> Result<Self, Self::Error> {
-        let asset_id = get_encoded_pair_id(&component.pair_id)?;
-        Ok(SignedPublisherPrice {
-            oracle_asset_id: format!("0x{}", asset_id),
-            oracle_price: component.price.to_string(),
-            timestamp: component.timestamp.to_string(),
-            signing_key: component.publisher_address,
-            signature: component.publisher_signature,
-        })
-    }
-}
-
-impl TryFrom<MedianEntryWithComponents> for AssetOraclePrice {
-    type Error = HashError;
-
-    fn try_from(median_entry: MedianEntryWithComponents) -> Result<Self, Self::Error> {
-        let signed_prices: Result<Vec<SignedPublisherPrice>, HashError> = median_entry
-            .components
-            .into_iter()
-            .map(SignedPublisherPrice::try_from)
-            .collect();
-
-        Ok(AssetOraclePrice {
-            global_asset_id: median_entry.pair_id,
-            median_price: median_entry.median_price.to_string(),
-            signed_prices: signed_prices?,
-            signature: Default::default(),
-        })
-    }
-}
-
-/// Given a list of pairs, only return the ones that exists in the
-/// database.
-async fn only_existing_pairs(pool: &Pool, pairs: Vec<String>) -> Vec<String> {
-    let conn = pool.get().await.expect("Couldn't connect to the database.");
-    conn.interact(move |conn| Entry::get_existing_pairs(conn, pairs))
-        .await
-        .expect("Couldn't check if pair exists")
-        .expect("Couldn't get table result")
 }
 
 /// Send an error message to the client.
