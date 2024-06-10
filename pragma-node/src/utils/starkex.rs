@@ -16,27 +16,6 @@ pub fn get_encoded_pair_id(pair_id: &str) -> Result<String, HashError> {
     Ok(format!("0x{:x}", pair_id))
 }
 
-/// Converts oracle name and pair id to an external asset id.
-fn build_first_number(oracle_name: &str, pair_id: &str) -> Result<FieldElement, HashError> {
-    let oracle_name =
-        cairo_short_string_to_felt(oracle_name).map_err(|_| HashError::ConversionError)?;
-    let oracle_as_hex = format!("{:x}", oracle_name);
-    let pair_id = cairo_short_string_to_felt(pair_id).map_err(|_| HashError::ConversionError)?;
-    let pair_id: u128 = pair_id.try_into().map_err(|_| HashError::ConversionError)?;
-    let pair_as_hex = format!("{:0<width$x}", pair_id, width = 32);
-    let v = format!("0x{}{}", pair_as_hex, oracle_as_hex);
-    FieldElement::from_hex_be(&v).map_err(|_| HashError::ConversionError)
-}
-
-/// Builds the second number for the hash computation based on timestamp and price.
-fn build_second_number(timestamp: u128, price: &BigDecimal) -> Result<FieldElement, HashError> {
-    let price = price.to_u128().ok_or(HashError::ConversionError)?;
-    let price_as_hex = format!("{:x}", price);
-    let timestamp_as_hex = format!("{:x}", timestamp);
-    let v = format!("0x{}{}", price_as_hex, timestamp_as_hex);
-    FieldElement::from_hex_be(&v).map_err(|_| HashError::ConversionError)
-}
-
 /// Computes a signature-ready message based on oracle, asset, timestamp
 /// and price.
 /// The signature is the pedersen hash of two FieldElements:
@@ -63,6 +42,27 @@ pub fn get_entry_hash(
     let first_number = build_first_number(oracle_name, &pair_id)?;
     let second_number = build_second_number(timestamp as u128, price)?;
     Ok(pedersen_hash(&first_number, &second_number))
+}
+
+/// Converts oracle name and pair id to an external asset id.
+fn build_first_number(oracle_name: &str, pair_id: &str) -> Result<FieldElement, HashError> {
+    let oracle_name =
+        cairo_short_string_to_felt(oracle_name).map_err(|_| HashError::ConversionError)?;
+    let oracle_as_hex = format!("{:x}", oracle_name);
+    let pair_id = cairo_short_string_to_felt(pair_id).map_err(|_| HashError::ConversionError)?;
+    let pair_id: u128 = pair_id.try_into().map_err(|_| HashError::ConversionError)?;
+    let pair_as_hex = format!("{:0<width$x}", pair_id, width = 32);
+    let v = format!("0x{}{}", pair_as_hex, oracle_as_hex);
+    FieldElement::from_hex_be(&v).map_err(|_| HashError::ConversionError)
+}
+
+/// Builds the second number for the hash computation based on timestamp and price.
+fn build_second_number(timestamp: u128, price: &BigDecimal) -> Result<FieldElement, HashError> {
+    let price = price.to_u128().ok_or(HashError::ConversionError)?;
+    let price_as_hex = format!("{:x}", price);
+    let timestamp_as_hex = format!("{:x}", timestamp);
+    let v = format!("0x{}{}", price_as_hex, timestamp_as_hex);
+    FieldElement::from_hex_be(&v).map_err(|_| HashError::ConversionError)
 }
 
 #[cfg(test)]
