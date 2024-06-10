@@ -32,6 +32,7 @@ async fn main() {
     #[openapi(
         paths(
             handlers::entries::create_entry::create_entries,
+            handlers::entries::create_perp_entry::create_perp_entries,
             handlers::entries::get_entry::get_entry,
             handlers::entries::get_ohlc::get_ohlc,
             handlers::entries::subscribe_to_entry::subscribe_to_entry,
@@ -48,6 +49,8 @@ async fn main() {
             schemas(
                 handlers::entries::CreateEntryRequest,
                 handlers::entries::CreateEntryResponse,
+                handlers::entries::CreatePerpEntryRequest,
+                handlers::entries::CreatePerpEntryResponse,
                 handlers::entries::GetEntryParams,
                 handlers::entries::GetEntryResponse,
                 handlers::entries::SubscribeToEntryResponse,

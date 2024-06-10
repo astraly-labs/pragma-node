@@ -23,7 +23,11 @@ use super::{AssetOraclePrice, SignedPublisherPrice};
 
 /// "PRAGMA" to number is bigger than 2**40 - we alias it to "PRGM" to fit in 40 bits.
 /// Needed for StarkEx signature.
+/// See:
+/// https://docs.starkware.co/starkex/perpetual/becoming-an-oracle-provider-for-starkex.html
 const PRAGMA_ORACLE_NAME: &str = "PRGM";
+
+/// Interval in milliseconds that the channel will update the client with the latest prices.
 const CHANNEL_UPDATE_INTERVAL_IN_MS: u64 = 500;
 
 #[derive(Default, Debug, Serialize, Deserialize)]

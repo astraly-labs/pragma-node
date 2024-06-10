@@ -24,6 +24,18 @@ diesel::table! {
 }
 
 diesel::table! {
+    perp_entries (id, timestamp) {
+        id -> Uuid,
+        pair_id -> Varchar,
+        publisher -> Text,
+        timestamp -> Timestamptz,
+        price -> Numeric,
+        source -> Varchar,
+        publisher_signature -> Varchar,
+    }
+}
+
+diesel::table! {
     publishers (id) {
         id -> Uuid,
         name -> Varchar,
@@ -34,4 +46,4 @@ diesel::table! {
     }
 }
 
-diesel::allow_tables_to_appear_in_same_query!(currencies, entries, publishers,);
+diesel::allow_tables_to_appear_in_same_query!(currencies, entries, perp_entries, publishers,);

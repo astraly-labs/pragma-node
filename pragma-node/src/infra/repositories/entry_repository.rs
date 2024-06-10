@@ -1,3 +1,5 @@
+use std::collections::{HashMap, HashSet};
+
 use bigdecimal::{BigDecimal, FromPrimitive, ToPrimitive};
 use chrono::{DateTime, NaiveDateTime};
 use diesel::prelude::QueryableByName;
@@ -5,7 +7,6 @@ use diesel::sql_types::{Double, Jsonb, VarChar};
 use diesel::{ExpressionMethods, QueryDsl, Queryable, RunQueryDsl};
 use serde::{Deserialize, Serialize};
 use starknet::core::utils::cairo_short_string_to_felt;
-use std::collections::{HashMap, HashSet};
 
 use pragma_common::types::{AggregationMode, Interval};
 use pragma_entities::dto;
@@ -16,13 +17,6 @@ use pragma_entities::{
 };
 
 use crate::utils::{convert_via_quote, normalize_to_decimals};
-
-#[derive(Deserialize)]
-#[allow(unused)]
-pub struct EntriesFilter {
-    pair_id: Option<String>,
-    publisher_contains: Option<String>,
-}
 
 pub async fn _insert(
     pool: &deadpool_diesel::postgres::Pool,

@@ -5,6 +5,7 @@ use utoipa::{IntoParams, ToSchema};
 use pragma_common::types::{AggregationMode, DataType, Interval, Network};
 
 pub use create_entry::create_entries;
+pub use create_perp_entry::create_perp_entries;
 pub use get_entry::get_entry;
 pub use get_ohlc::get_ohlc;
 pub use get_volatility::get_volatility;
@@ -13,6 +14,7 @@ pub use subscribe_to_entry::subscribe_to_entry;
 use crate::infra::repositories::entry_repository::OHLCEntry;
 
 pub mod create_entry;
+pub mod create_perp_entry;
 pub mod get_entry;
 pub mod get_ohlc;
 pub mod get_onchain;
@@ -43,6 +45,25 @@ pub struct CreateEntryRequest {
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct CreateEntryResponse {
+    number_entries_created: usize,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, ToSchema)]
+pub struct PerpEntry {
+    base: BaseEntry,
+    pair_id: String,
+    price: u128,
+    volume: u128,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct CreatePerpEntryRequest {
+    signature: Vec<FieldElement>,
+    perp_entries: Vec<PerpEntry>,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct CreatePerpEntryResponse {
     number_entries_created: usize,
 }
 
