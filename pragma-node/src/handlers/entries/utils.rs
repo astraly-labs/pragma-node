@@ -3,6 +3,9 @@ use bigdecimal::{BigDecimal, ToPrimitive};
 use chrono::NaiveDateTime;
 use deadpool_diesel::postgres::Pool;
 use pragma_entities::Entry;
+use starknet::core::crypto::{EcdsaSignError, Signature};
+use starknet::core::types::FieldElement;
+use starknet::signers::SigningKey;
 use std::collections::HashMap;
 
 use crate::infra::repositories::entry_repository::MedianEntry;
@@ -120,6 +123,14 @@ pub(crate) async fn only_existing_pairs(pool: &Pool, pairs: Vec<String>) -> Vec<
         .await
         .expect("Couldn't check if pair exists")
         .expect("Couldn't get table result")
+}
+
+/// Sign the passed data with the signer & return the signature 0x prefixed.
+pub(crate) fn sign_data(
+    signer: &SigningKey,
+    data: FieldElement,
+) -> Result<Signature, EcdsaSignError> {
+    signer.sign(&data)
 }
 
 #[cfg(test)]
