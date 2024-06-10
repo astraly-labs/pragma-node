@@ -112,6 +112,7 @@ async fn main() {
         pragma_entities::connection::init_pool("pragma-node-api", ENV_POSTGRES_DATABASE_URL)
             .expect("can't init postgres (onchain db) pool");
 
+    // TODO(#54): Build the signer using a builder pattern
     let pragma_signer = if config.is_production_mode() {
         utils::build_pragma_signer_from_aws().await
     } else {
