@@ -114,6 +114,8 @@ async fn handle_message_received(
                 subscribed_pairs.retain(|pair| !subscription_msg.pairs.contains(pair));
             }
         };
+        // We send an ack message to the client with the subscribed pairs (so
+        // the client knows which pairs are successfully subscribed).
         if let Ok(ack_message) = serde_json::to_string(&SubscriptionAck {
             msg_type: subscription_msg.msg_type,
             pairs: subscribed_pairs.clone(),
@@ -187,7 +189,7 @@ async fn get_subscribed_pairs_entries(
         response.oracle_prices.push(oracle_price);
     }
     // Timestamp in seconds.
-    response.timestamp = now.to_string();
+    response.timestamp_s = now.to_string();
     Ok(response)
 }
 
