@@ -13,7 +13,6 @@ pub enum HashError {
 pub fn get_encoded_pair_id(pair_id: &str) -> Result<String, HashError> {
     let pair_id = pair_id.replace('/', ""); // Remove the "/" from the pair_id if it exists
     let pair_id = cairo_short_string_to_felt(&pair_id).map_err(|_| HashError::ConversionError)?;
-    let pair_id: u128 = pair_id.try_into().map_err(|_| HashError::ConversionError)?;
     Ok(format!("0x{:x}", pair_id))
 }
 
@@ -73,12 +72,36 @@ mod tests {
     use super::*;
     use bigdecimal::BigDecimal;
 
-    // Test case structure - ((oracle_name, pair_id, price, timestamp), expected_hash)
-    type TestCase<'a> = ((&'a str, &'a str, &'a str, u64), &'a str);
+    // (pair_id, expected_encoded_pair_id)
+    type GetEncodedPairIdTestCase<'a> = (&'a str, &'a str);
+
+    #[test]
+    fn test_get_encoded_pair_id() {
+        let tests_cases: Vec<GetEncodedPairIdTestCase> = vec![
+            ("BTCUSD", "0x425443555344"),
+            ("BTC/USD", "0x425443555344"),
+            ("ETHUSD", "0x455448555344"),
+            ("DOGEUSD", "0x444f4745555344"),
+            ("SOLUSD", "0x534f4c555344"),
+            ("SOLUSDT", "0x534f4c55534454"),
+        ];
+
+        for (pair_id, expected_encoded_pair_id) in tests_cases {
+            let encoded_pair_id = get_encoded_pair_id(pair_id).expect("Could not encode pair id");
+            assert_eq!(
+                encoded_pair_id, expected_encoded_pair_id,
+                "Encoded pair id does not match for pair_id: {}",
+                pair_id
+            );
+        }
+    }
+
+    // ((oracle_name, pair_id, price, timestamp), expected_hash)
+    type GetEntryHashTestCase<'a> = ((&'a str, &'a str, &'a str, u64), &'a str);
 
     #[test]
     fn test_get_entry_hash() {
-        let tests_cases: Vec<TestCase> = vec![
+        let tests_cases: Vec<GetEntryHashTestCase> = vec![
             (
                 ("Maker", "BTCUSD", "11512340000000000000000", 1577836800),
                 "3e4113feb6c403cb0c954e5c09d239bf88fedb075220270f44173ac3cd41858",
@@ -110,7 +133,11 @@ mod tests {
             let hashed_data = get_entry_hash(oracle_name, pair_id, timestamp, &price)
                 .expect("Could not build hash");
             let expected_data = FieldElement::from_hex_be(expected_hash).unwrap();
-            assert_eq!(hashed_data, expected_data);
+            assert_eq!(
+                hashed_data, expected_data,
+                "Hashes do not match for oracle_name: {}, pair_id: {}, price: {}, timestamp: {}",
+                oracle_name, pair_id, price, timestamp
+            );
         }
     }
 }
