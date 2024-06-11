@@ -1,19 +1,14 @@
 use dotenvy::dotenv;
 use pragma_entities::connection::ENV_TS_DATABASE_URL;
-use pragma_entities::{adapt_infra_error, Entry, InfraError, NewEntry, NewPerpEntry, PerpEntry};
-use serde::Deserialize;
+use pragma_entities::{
+    adapt_infra_error, Entry, FutureEntry, InfraError, NewEntry, NewFutureEntry, NewPerpEntry,
+    PerpEntry,
+};
 use tokio::sync::mpsc;
 use tracing::{error, info};
 mod config;
 mod consumer;
 mod error;
-
-#[derive(Deserialize)]
-#[serde(untagged)]
-enum EntriesRequest {
-    NewEntries(Vec<NewEntry>),
-    NewPerpEntries(Vec<NewPerpEntry>),
-}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -38,24 +33,34 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 async fn process_payload(payload: Vec<u8>) -> Result<(), Box<dyn std::error::Error>> {
-    match serde_json::from_slice::<EntriesRequest>(&payload) {
-        Ok(EntriesRequest::NewEntries(entries)) => {
-            info!("total of '{}' new entries available.", entries.len());
-            if let Err(e) = insert_entries(entries).await {
-                error!("error while inserting entries : {:?}", e);
+    let decoded_payload = String::from_utf8_lossy(&payload);
+    let is_future_entries = decoded_payload.contains("expiration_timestamp");
+    if !is_future_entries {
+        match serde_json::from_slice::<Vec<NewEntry>>(&payload) {
+            Ok(entries) => {
+                info!("[SPOT] total of '{}' new entries available.", entries.len());
+                if let Err(e) = insert_entries(entries).await {
+                    error!("error while inserting entries : {:?}", e);
+                }
+            }
+            Err(e) => {
+                error!("Failed to deserialize payload: {:?}", e);
             }
         }
-        Ok(EntriesRequest::NewPerpEntries(perp_entries)) => {
-            info!(
-                "total of '{}' new perp entries available.",
-                perp_entries.len()
-            );
-            if let Err(e) = insert_perp_entries(perp_entries).await {
-                error!("error while inserting perp entries : {:?}", e);
+    } else {
+        match serde_json::from_slice::<Vec<NewFutureEntry>>(&payload) {
+            Ok(future_entries) => {
+                info!(
+                    "[FUTURE/PERP] total of '{}' new entries available.",
+                    future_entries.len()
+                );
+                if let Err(e) = insert_future_entries(future_entries).await {
+                    error!("error while inserting future entries : {:?}", e);
+                }
             }
-        }
-        Err(e) => {
-            error!("Failed to deserialize payload: {:?}", e);
+            Err(e) => {
+                error!("Failed to deserialize payload: {:?}", e);
+            }
         }
     }
     Ok(())
@@ -85,26 +90,66 @@ pub async fn insert_entries(new_entries: Vec<NewEntry>) -> Result<(), InfraError
     Ok(())
 }
 
+/// Insert new future entries into the database.
+/// Future entries means future & perpetual entries.
+/// If the expiration timestamp is not provided, the entry is considered as a perpetual entry.
+/// It will be then inserted into the perp_entries table.
 // TODO: move this to a service
-// TODO: refactor with function above to avoid duplication
-pub async fn insert_perp_entries(new_perp_entries: Vec<NewPerpEntry>) -> Result<(), InfraError> {
+pub async fn insert_future_entries(new_entries: Vec<NewFutureEntry>) -> Result<(), InfraError> {
+    // TODO(akhercha): creating a connection pool for each request is not efficient
     let conn = pragma_entities::connection::init_pool("pragma-ingestor", ENV_TS_DATABASE_URL)
         .expect("cannot connect to database")
         .get()
         .await
         .expect("cannot get connection from pool");
 
-    let entries = conn
-        .interact(move |conn| PerpEntry::create_many(conn, new_perp_entries))
-        .await
-        .map_err(adapt_infra_error)?
-        .map_err(adapt_infra_error)?;
+    // filter out in two groups: perp & future
+    let new_perp_entries = new_entries
+        .iter()
+        .filter(|entry| entry.expiration_timestamp.and_utc().timestamp() == 0)
+        .map(|entry| NewPerpEntry::from(entry.clone()))
+        .collect::<Vec<NewPerpEntry>>();
 
-    for entry in &entries {
+    if !new_perp_entries.is_empty() {
         info!(
-            "new perp entry created {} - {}({}) - {}",
-            entry.publisher, entry.pair_id, entry.price, entry.source
+            "[PERP] total of '{}' new entries available.",
+            new_perp_entries.len()
         );
+        let entries = conn
+            .interact(move |conn| PerpEntry::create_many(conn, new_perp_entries))
+            .await
+            .map_err(adapt_infra_error)?
+            .map_err(adapt_infra_error)?;
+        for entry in &entries {
+            info!(
+                "new perp entry created {} - {}({}) - {}",
+                entry.publisher, entry.pair_id, entry.price, entry.source
+            );
+        }
+    }
+
+    let new_future_entries = new_entries
+        .iter()
+        .filter(|entry| entry.expiration_timestamp.and_utc().timestamp() > 0)
+        .cloned()
+        .collect::<Vec<NewFutureEntry>>();
+
+    if !new_future_entries.is_empty() {
+        info!(
+            "[FUTURE] total of '{}' new entries available.",
+            new_future_entries.len()
+        );
+        let entries = conn
+            .interact(move |conn| FutureEntry::create_many(conn, new_future_entries))
+            .await
+            .map_err(adapt_infra_error)?
+            .map_err(adapt_infra_error)?;
+        for entry in &entries {
+            info!(
+                "new future entry created {} - {}({}) - {}",
+                entry.publisher, entry.pair_id, entry.price, entry.source
+            );
+        }
     }
 
     Ok(())

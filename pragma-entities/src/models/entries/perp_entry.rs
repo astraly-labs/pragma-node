@@ -1,5 +1,6 @@
 use crate::dto::entry as dto;
 use crate::models::DieselResult;
+use crate::NewFutureEntry;
 use bigdecimal::BigDecimal;
 use diesel::internal::derives::multiconnection::chrono::NaiveDateTime;
 use diesel::upsert::excluded;
@@ -21,6 +22,7 @@ pub struct PerpEntry {
     pub publisher: String,
     pub source: String,
     pub timestamp: NaiveDateTime,
+    pub expiration_timestamp: Option<NaiveDateTime>,
     pub publisher_signature: String,
     pub price: BigDecimal,
 }
@@ -32,8 +34,23 @@ pub struct NewPerpEntry {
     pub publisher: String,
     pub source: String,
     pub timestamp: NaiveDateTime,
+    pub expiration_timestamp: Option<NaiveDateTime>,
     pub publisher_signature: String,
     pub price: BigDecimal,
+}
+
+impl From<NewFutureEntry> for NewPerpEntry {
+    fn from(entry: NewFutureEntry) -> Self {
+        NewPerpEntry {
+            pair_id: entry.pair_id,
+            publisher: entry.publisher,
+            source: entry.source,
+            timestamp: entry.timestamp,
+            expiration_timestamp: Option::None,
+            publisher_signature: entry.publisher_signature,
+            price: entry.price,
+        }
+    }
 }
 
 impl PerpEntry {
@@ -63,6 +80,7 @@ impl PerpEntry {
                 perp_entries::source.eq(excluded(perp_entries::source)),
                 perp_entries::publisher_signature.eq(excluded(perp_entries::publisher_signature)),
                 perp_entries::timestamp.eq(excluded(perp_entries::timestamp)),
+                perp_entries::expiration_timestamp.eq(None::<NaiveDateTime>),
                 perp_entries::price.eq(excluded(perp_entries::price)),
             ))
             .get_results(conn)

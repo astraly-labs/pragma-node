@@ -24,11 +24,25 @@ diesel::table! {
 }
 
 diesel::table! {
+    future_entries (id, timestamp) {
+        id -> Uuid,
+        pair_id -> Varchar,
+        publisher -> Text,
+        timestamp -> Timestamptz,
+        expiration_timestamp -> Timestamptz,
+        price -> Numeric,
+        source -> Varchar,
+        publisher_signature -> Varchar,
+    }
+}
+
+diesel::table! {
     perp_entries (id, timestamp) {
         id -> Uuid,
         pair_id -> Varchar,
         publisher -> Text,
         timestamp -> Timestamptz,
+        expiration_timestamp -> Nullable<Timestamptz>,
         price -> Numeric,
         source -> Varchar,
         publisher_signature -> Varchar,

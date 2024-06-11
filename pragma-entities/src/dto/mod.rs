@@ -1,4 +1,5 @@
 pub mod entry;
+pub mod future_entry;
 pub mod perp_entry;
 pub mod publisher;
 

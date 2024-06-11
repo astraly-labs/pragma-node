@@ -1,41 +1,28 @@
+pub mod create_entry;
+pub mod create_future_entry;
+pub mod get_entry;
+pub mod get_ohlc;
+pub mod get_onchain;
+pub mod get_volatility;
+pub mod subscribe_to_entry;
+pub mod types;
+pub mod utils;
+
+pub use create_entry::create_entries;
+pub use create_future_entry::create_future_entries;
+pub use get_entry::get_entry;
+pub use get_ohlc::get_ohlc;
+pub use get_volatility::get_volatility;
+pub use subscribe_to_entry::subscribe_to_entry;
+
 use serde::{Deserialize, Serialize};
 use starknet::core::types::FieldElement;
 use utoipa::{IntoParams, ToSchema};
 
 use pragma_common::types::{AggregationMode, DataType, Interval, Network};
 
-pub use create_entry::create_entries;
-pub use create_perp_entry::create_perp_entries;
-pub use get_entry::get_entry;
-pub use get_ohlc::get_ohlc;
-pub use get_volatility::get_volatility;
-pub use subscribe_to_entry::subscribe_to_entry;
-
+use crate::handlers::entries::types::{Entry, FutureEntry};
 use crate::infra::repositories::entry_repository::OHLCEntry;
-
-pub mod create_entry;
-pub mod create_perp_entry;
-pub mod get_entry;
-pub mod get_ohlc;
-pub mod get_onchain;
-pub mod get_volatility;
-pub mod subscribe_to_entry;
-pub mod utils;
-
-#[derive(Debug, Serialize, Deserialize, PartialEq, ToSchema)]
-pub struct BaseEntry {
-    timestamp: u64,
-    source: String,
-    publisher: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, PartialEq, ToSchema)]
-pub struct Entry {
-    base: BaseEntry,
-    pair_id: String,
-    price: u128,
-    volume: u128,
-}
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct CreateEntryRequest {
@@ -48,22 +35,14 @@ pub struct CreateEntryResponse {
     number_entries_created: usize,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, ToSchema)]
-pub struct PerpEntry {
-    base: BaseEntry,
-    pair_id: String,
-    price: u128,
-    volume: u128,
-}
-
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
-pub struct CreatePerpEntryRequest {
+pub struct CreateFutureEntryRequest {
     signature: Vec<FieldElement>,
-    perp_entries: Vec<PerpEntry>,
+    entries: Vec<FutureEntry>,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
-pub struct CreatePerpEntryResponse {
+pub struct CreateFutureEntryResponse {
     number_entries_created: usize,
 }
 

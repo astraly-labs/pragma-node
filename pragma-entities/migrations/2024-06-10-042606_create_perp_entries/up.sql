@@ -6,10 +6,13 @@ CREATE TABLE perp_entries (
   pair_id VARCHAR NOT NULL,
   price NUMERIC NOT NULL,
   timestamp TIMESTAMPTZ NOT NULL,
+  expiration_timestamp TIMESTAMPTZ DEFAULT NULL,
   publisher TEXT NOT NULL,
   publisher_signature TEXT NOT NULL,
   source VARCHAR NOT NULL,
-  PRIMARY KEY (id, timestamp)
+  PRIMARY KEY (id, timestamp),
+  -- Perp entries don't have an expiration timestamp
+  CHECK (expiration_timestamp IS NULL)
 );
 
 CREATE UNIQUE INDEX idx_perp_entries_unique ON perp_entries(pair_id, source, timestamp DESC);

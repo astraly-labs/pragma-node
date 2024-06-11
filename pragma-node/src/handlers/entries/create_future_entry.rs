@@ -1,13 +1,13 @@
 use axum::extract::State;
 use axum::Json;
 use chrono::{DateTime, Utc};
-use pragma_entities::{EntryError, NewEntry, PublisherError};
+use pragma_entities::{EntryError, NewFutureEntry, PublisherError};
 use starknet::core::crypto::{ecdsa_verify, Signature};
 use starknet::core::types::FieldElement;
 
+use super::{types::build_publish_message, CreateFutureEntryRequest, CreateFutureEntryResponse};
+
 use crate::config::config;
-use crate::handlers::entries::types::build_publish_message;
-use crate::handlers::entries::{CreateEntryRequest, CreateEntryResponse};
 use crate::infra::kafka;
 use crate::infra::repositories::publisher_repository;
 use crate::utils::JsonExtractor;
@@ -15,23 +15,23 @@ use crate::AppState;
 
 #[utoipa::path(
     post,
-    path = "/node/v1/data/publish",
-    request_body = CreateEntryRequest,
+    path = "/node/v1/data/publish_future",
+    request_body = CreatePerpEntryRequest,
     responses(
-        (status = 200, description = "Entries published successfuly", body = CreateEntryResponse),
+        (status = 200, description = "Entries published successfuly", body = CreatePerpEntryResponse),
         (status = 401, description = "Unauthorized Publisher", body = EntryError)
     )
 )]
-pub async fn create_entries(
+pub async fn create_future_entries(
     State(state): State<AppState>,
-    JsonExtractor(new_entries): JsonExtractor<CreateEntryRequest>,
-) -> Result<Json<CreateEntryResponse>, EntryError> {
-    tracing::info!("Received new entries: {:?}", new_entries);
+    JsonExtractor(new_entries): JsonExtractor<CreateFutureEntryRequest>,
+) -> Result<Json<CreateFutureEntryResponse>, EntryError> {
+    tracing::info!("Received new future entries: {:?}", new_entries);
 
     let config = config().await;
 
     if new_entries.entries.is_empty() {
-        return Ok(Json(CreateEntryResponse {
+        return Ok(Json(CreateFutureEntryResponse {
             number_entries_created: 0,
         }));
     }
@@ -72,13 +72,12 @@ pub async fn create_entries(
         account_address
     );
 
-    let published_message = build_publish_message(&new_entries.entries)?;
-    let message_hash = published_message.message_hash(account_address);
-
+    let message_hash = build_publish_message(&new_entries.entries)?.message_hash(account_address);
     let signature = Signature {
         r: new_entries.signature[0],
         s: new_entries.signature[1],
     };
+
     if !ecdsa_verify(&public_key, &message_hash, &signature)
         .map_err(EntryError::InvalidSignature)?
     {
@@ -89,22 +88,31 @@ pub async fn create_entries(
     let new_entries_db = new_entries
         .entries
         .iter()
-        .map(|entry| {
-            let dt = match DateTime::<Utc>::from_timestamp(entry.base.timestamp as i64, 0) {
+        .map(|future_entry| {
+            let dt = match DateTime::<Utc>::from_timestamp(future_entry.base.timestamp as i64, 0) {
                 Some(dt) => dt.naive_utc(),
                 None => return Err(EntryError::InvalidTimestamp),
             };
 
-            Ok(NewEntry {
-                pair_id: entry.pair_id.clone(),
-                publisher: entry.base.publisher.clone(),
-                source: entry.base.source.clone(),
+            let expiry_dt = match DateTime::<Utc>::from_timestamp(
+                future_entry.expiration_timestamp as i64,
+                0,
+            ) {
+                Some(dt) => dt.naive_utc(),
+                None => return Err(EntryError::InvalidTimestamp),
+            };
+
+            Ok(NewFutureEntry {
+                pair_id: future_entry.pair_id.clone(),
+                publisher: future_entry.base.publisher.clone(),
+                source: future_entry.base.source.clone(),
                 timestamp: dt,
+                expiration_timestamp: expiry_dt,
                 publisher_signature: format!("0x{}", signature),
-                price: entry.price.into(),
+                price: future_entry.price.into(),
             })
         })
-        .collect::<Result<Vec<NewEntry>, EntryError>>()?;
+        .collect::<Result<Vec<NewFutureEntry>, EntryError>>()?;
 
     let data =
         serde_json::to_vec(&new_entries_db).map_err(|e| EntryError::PublishData(e.to_string()))?;
@@ -116,53 +124,34 @@ pub async fn create_entries(
         )));
     };
 
-    Ok(Json(CreateEntryResponse {
+    Ok(Json(CreateFutureEntryResponse {
         number_entries_created: new_entries.entries.len(),
     }))
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::handlers::entries::types::{BaseEntry, Entry};
-
     use super::*;
     use rstest::rstest;
 
+    use crate::handlers::entries::types::{FutureEntry, PerpEntry};
+
     #[rstest]
     fn test_build_publish_message_empty() {
-        let entries: Vec<Entry> = vec![];
+        let entries: Vec<PerpEntry> = vec![];
         let typed_data = build_publish_message(&entries).unwrap();
-
-        assert_eq!(typed_data.primary_type, "Request");
-        assert_eq!(typed_data.domain.name, "Pragma");
-        assert_eq!(typed_data.domain.version, "1");
-        assert_eq!(typed_data.message.action, "Publish");
-        assert_eq!(typed_data.message.entries, entries);
-    }
-
-    #[rstest]
-    #[ignore = "TODO: Compute hash with Pragma SDK"]
-    fn test_build_publish_message() {
-        let entries = vec![Entry {
-            base: BaseEntry {
-                timestamp: 0,
-                source: "source".to_string(),
-                publisher: "publisher".to_string(),
-            },
-            pair_id: "pair_id".to_string(),
-            price: 0,
-            volume: 0,
-        }];
-        let typed_data = build_publish_message(&entries).unwrap();
-
         assert_eq!(typed_data.primary_type, "Request");
         assert_eq!(typed_data.domain.name, "Pragma");
         assert_eq!(typed_data.domain.version, "1");
         assert_eq!(typed_data.message.action, "Publish");
         assert_eq!(typed_data.message.entries, entries);
 
-        let msg_hash = typed_data.message_hash(FieldElement::ZERO);
-        // Hash computed with the Pragma SDK (python)
-        assert_eq!(msg_hash, FieldElement::from_hex_be("").unwrap());
+        let entries: Vec<FutureEntry> = vec![];
+        let typed_data = build_publish_message(&entries).unwrap();
+        assert_eq!(typed_data.primary_type, "Request");
+        assert_eq!(typed_data.domain.name, "Pragma");
+        assert_eq!(typed_data.domain.version, "1");
+        assert_eq!(typed_data.message.action, "Publish");
+        assert_eq!(typed_data.message.entries, entries);
     }
 }

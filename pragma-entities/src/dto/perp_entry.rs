@@ -10,6 +10,7 @@ pub struct PerpEntry {
     pub publisher: String,
     pub source: String,
     pub timestamp: u64,
+    pub expiration_timestamp: Option<u64>,
     pub publisher_signature: String,
     pub price: u128,
 }
@@ -29,6 +30,7 @@ impl From<crate::PerpEntry> for PerpEntry {
             publisher: perp_entry.publisher,
             source: perp_entry.source,
             timestamp: perp_entry.timestamp.and_utc().timestamp_millis() as u64,
+            expiration_timestamp: Option::None,
             publisher_signature: perp_entry.publisher_signature,
             price: perp_entry.price.to_u128().unwrap_or(0), // change default value ?
         }
