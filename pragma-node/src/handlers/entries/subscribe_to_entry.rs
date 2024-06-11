@@ -173,7 +173,7 @@ async fn get_subscribed_pairs_entries(
             .try_into()
             .map_err(|_| EntryError::InternalServerError)?;
 
-        let signature = sign_median_price_as_pragma(
+        let signature = sign_median_price(
             &state.pragma_signer,
             &oracle_price.global_asset_id,
             now as u64,
@@ -189,7 +189,7 @@ async fn get_subscribed_pairs_entries(
 }
 
 /// Sign the median price with the passed signer and return the signature 0x prefixed.
-fn sign_median_price_as_pragma(
+fn sign_median_price(
     signer: &SigningKey,
     asset_id: &str,
     timestamp: u64,
