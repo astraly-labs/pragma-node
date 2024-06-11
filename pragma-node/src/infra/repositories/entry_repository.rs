@@ -16,6 +16,10 @@ use pragma_entities::{
     Currency, Entry, NewEntry,
 };
 
+use crate::handlers::entries::constants::{
+    INITAL_INTERVAL_IN_MS, INTERVAL_INCREMENT_IN_MS, MAX_INTERVAL_WITHOUT_ENTRIES,
+    MINIMUM_NUMBER_OF_PUBLISHERS,
+};
 use crate::handlers::entries::{AssetOraclePrice, SignedPublisherPrice};
 use crate::utils::{convert_via_quote, get_encoded_pair_id, normalize_to_decimals};
 
@@ -803,9 +807,6 @@ impl TryFrom<MedianEntryWithComponents> for AssetOraclePrice {
     }
 }
 
-// TODO: should change depending on MODE env variable
-pub const MINIMUM_NUMBER_OF_PUBLISHERS: usize = 3;
-
 /// Convert a list of raw entries into a list of valid median entries
 /// if the raw entries are valid.
 /// The entries are considered valid if:
@@ -918,12 +919,6 @@ fn build_sql_query_for_median_with_components(pair_ids: &[String], interval_in_m
     )
 }
 
-// TODO(akhercha): sort this out - do we want a limit ?
-// TODO(akhercha): What happens then if we still have nothing? Currently we raise error 404 & break the channel.
-pub const LIMIT_INTERVAL_IN_MS: u64 = 10000;
-pub const INITAL_INTERVAL_IN_MS: u64 = 500;
-pub const INTERVAL_INCREMENT_IN_MS: u64 = 500;
-
 /// Compute the median price for each pair_id in the given list of pair_ids
 /// over an interval of time.
 /// The interval is increased until we have at least 3 unique publishers
@@ -950,7 +945,7 @@ pub async fn get_current_median_entries_with_components(
             None => interval_in_ms += INTERVAL_INCREMENT_IN_MS,
         }
 
-        if interval_in_ms >= LIMIT_INTERVAL_IN_MS {
+        if interval_in_ms >= MAX_INTERVAL_WITHOUT_ENTRIES {
             return Err(InfraError::NotFound);
         }
     };

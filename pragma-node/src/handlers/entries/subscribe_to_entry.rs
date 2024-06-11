@@ -16,14 +16,9 @@ use crate::infra::repositories::entry_repository::get_current_median_entries_wit
 use crate::utils::get_entry_hash;
 use crate::AppState;
 
+use super::constants::PRAGMA_ORACLE_NAME_FOR_STARKEX;
 use super::utils::{only_existing_pairs, sign_data};
 use super::AssetOraclePrice;
-
-/// "PRAGMA" to number is bigger than 2**40 - we alias it to "PRGM" to fit in 40 bits.
-/// Needed for StarkEx signature.
-/// See:
-/// https://docs.starkware.co/starkex/perpetual/becoming-an-oracle-provider-for-starkex.html
-const PRAGMA_ORACLE_NAME: &str = "PRGM";
 
 /// Interval in milliseconds that the channel will update the client with the latest prices.
 const CHANNEL_UPDATE_INTERVAL_IN_MS: u64 = 500;
@@ -200,8 +195,13 @@ fn sign_median_price_as_pragma(
     timestamp: u64,
     median_price: BigDecimal,
 ) -> Result<String, EntryError> {
-    let hash_to_sign = get_entry_hash(PRAGMA_ORACLE_NAME, asset_id, timestamp, &median_price)
-        .map_err(|_| EntryError::InternalServerError)?;
+    let hash_to_sign = get_entry_hash(
+        PRAGMA_ORACLE_NAME_FOR_STARKEX,
+        asset_id,
+        timestamp,
+        &median_price,
+    )
+    .map_err(|_| EntryError::InternalServerError)?;
     let signature = sign_data(signer, hash_to_sign).map_err(EntryError::InvalidSigner)?;
     Ok(format!("0x{:}", signature))
 }
