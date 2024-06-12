@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use axum::extract::{Query, State};
+use axum::extract::State;
 use axum::response::IntoResponse;
 use pragma_entities::InfraError;
 use serde::{Deserialize, Serialize};
@@ -9,6 +9,7 @@ use serde_json::json;
 use pragma_common::types::{Interval, Network};
 use tokio::time::interval;
 
+use crate::handlers::entries::utils::is_onchain_existing_pair;
 use crate::infra::repositories::entry_repository::OHLCEntry;
 use crate::infra::repositories::onchain_repository::get_ohlc;
 use crate::AppState;
@@ -107,11 +108,20 @@ async fn handle_message_received(
     if let Ok(subscription_msg) = serde_json::from_str::<SubscriptionRequest>(&message) {
         match subscription_msg.msg_type {
             SubscriptionType::Subscribe => {
-                // TODO: check if the pair exists in the database
-                // let existing_pairs =
-                //     only_existing_pairs(&state.postgres_pool, subscription_msg.pairs).await;
-                *subscribed_pair = Some(subscription_msg.pair.clone());
+                let pair_exists = is_onchain_existing_pair(
+                    &state.postgres_pool,
+                    &subscription_msg.pair,
+                    subscription_msg.network,
+                )
+                .await;
+                if !pair_exists {
+                    let error_msg = "Pair does not exist in the onchain database.";
+                    send_error_message(socket, error_msg).await;
+                    return;
+                }
+
                 *network = subscription_msg.network;
+                *subscribed_pair = Some(subscription_msg.pair.clone());
                 *interval = subscription_msg.interval;
             }
             SubscriptionType::Unsubscribe => {
