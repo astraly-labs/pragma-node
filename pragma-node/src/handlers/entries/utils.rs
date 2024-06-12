@@ -72,7 +72,7 @@ pub(crate) fn compute_median_price_and_time(
     Some((median_price, latest_time))
 }
 
-/// Given a list of pairs and a network, returns if that exists in the
+/// Given a pair and a network, returns if it exists in the
 /// onchain database.
 pub(crate) async fn is_onchain_existing_pair(pool: &Pool, pair: &String, network: Network) -> bool {
     let existings_pairs = get_existing_pairs(pool, network)
