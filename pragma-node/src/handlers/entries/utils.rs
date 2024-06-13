@@ -1,3 +1,4 @@
+use axum::extract::ws::{Message, WebSocket};
 use bigdecimal::num_bigint::ToBigInt;
 use bigdecimal::{BigDecimal, ToPrimitive};
 use chrono::NaiveDateTime;
@@ -187,6 +188,13 @@ pub(crate) fn sign_data(
     data: FieldElement,
 ) -> Result<Signature, EcdsaSignError> {
     signer.sign(&data)
+}
+
+/// Send an error message to the client.
+/// (Does not close the connection)
+pub(crate) async fn send_err_to_socket(socket: &mut WebSocket, error: &str) {
+    let error_msg = serde_json::json!({ "error": error }).to_string();
+    socket.send(Message::Text(error_msg)).await.unwrap();
 }
 
 #[cfg(test)]

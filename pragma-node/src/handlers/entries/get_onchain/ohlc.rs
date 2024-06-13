@@ -4,12 +4,11 @@ use axum::extract::State;
 use axum::response::IntoResponse;
 use pragma_entities::InfraError;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 
 use pragma_common::types::{Interval, Network};
 use tokio::time::interval;
 
-use crate::handlers::entries::utils::is_onchain_existing_pair;
+use crate::handlers::entries::utils::{is_onchain_existing_pair, send_err_to_socket};
 use crate::infra::repositories::entry_repository::OHLCEntry;
 use crate::infra::repositories::onchain_repository::get_ohlc;
 use crate::AppState;
@@ -116,7 +115,7 @@ async fn handle_message_received(
                 .await;
                 if !pair_exists {
                     let error_msg = "Pair does not exist in the onchain database.";
-                    send_error_message(socket, error_msg).await;
+                    send_err_to_socket(socket, error_msg).await;
                     return;
                 }
 
@@ -138,15 +137,15 @@ async fn handle_message_received(
         }) {
             if socket.send(Message::Text(ack_message)).await.is_err() {
                 let error_msg = "Message received but could not send ack message.";
-                send_error_message(socket, error_msg).await;
+                send_err_to_socket(socket, error_msg).await;
             }
         } else {
             let error_msg = "Could not serialize ack message.";
-            send_error_message(socket, error_msg).await;
+            send_err_to_socket(socket, error_msg).await;
         }
     } else {
         let error_msg = "Invalid message type. Please check the documentation for more info.";
-        send_error_message(socket, error_msg).await;
+        send_err_to_socket(socket, error_msg).await;
     }
 }
 
@@ -178,23 +177,16 @@ async fn send_ohlc_data(
     {
         Ok(()) => ohlc_data,
         Err(e) => {
-            send_error_message(socket, &e.to_string()).await;
+            send_err_to_socket(socket, &e.to_string()).await;
             return Err(e);
         }
     };
     if let Ok(json_response) = serde_json::to_string(&entries) {
         if socket.send(Message::Text(json_response)).await.is_err() {
-            send_error_message(socket, "Could not send prices.").await;
+            send_err_to_socket(socket, "Could not send prices.").await;
         }
     } else {
-        send_error_message(socket, "Could not serialize prices.").await;
+        send_err_to_socket(socket, "Could not serialize prices.").await;
     }
     Ok(())
-}
-
-/// Send an error message to the client.
-/// (Does not close the connection)
-async fn send_error_message(socket: &mut WebSocket, error: &str) {
-    let error_msg = json!({ "error": error }).to_string();
-    socket.send(Message::Text(error_msg)).await.unwrap();
 }

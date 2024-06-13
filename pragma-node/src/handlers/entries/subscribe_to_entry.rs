@@ -9,10 +9,10 @@ use bigdecimal::BigDecimal;
 use pragma_common::types::DataType;
 use pragma_entities::EntryError;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use starknet::signers::SigningKey;
 use tokio::time::interval;
 
+use crate::handlers::entries::utils::send_err_to_socket;
 use crate::handlers::entries::SubscribeToEntryResponse;
 use crate::infra::repositories::entry_repository::{
     get_current_median_entries_with_components, MedianEntryWithComponents,
@@ -178,15 +178,15 @@ async fn handle_message_received(
         }) {
             if socket.send(Message::Text(ack_message)).await.is_err() {
                 let error_msg = "Message received but could not send ack message.";
-                send_error_message(socket, error_msg).await;
+                send_err_to_socket(socket, error_msg).await;
             }
         } else {
             let error_msg = "Could not serialize ack message.";
-            send_error_message(socket, error_msg).await;
+            send_err_to_socket(socket, error_msg).await;
         }
     } else {
         let error_msg = "Invalid message type. Please check the documentation for more info.";
-        send_error_message(socket, error_msg).await;
+        send_err_to_socket(socket, error_msg).await;
     }
 }
 
@@ -202,17 +202,17 @@ async fn send_median_entries(
     let response = match get_subscribed_pairs_medians(state, subscription).await {
         Ok(response) => response,
         Err(e) => {
-            send_error_message(socket, &e.to_string()).await;
+            send_err_to_socket(socket, &e.to_string()).await;
             return Err(e);
         }
     };
 
     if let Ok(json_response) = serde_json::to_string(&response) {
         if socket.send(Message::Text(json_response)).await.is_err() {
-            send_error_message(socket, "Could not send prices.").await;
+            send_err_to_socket(socket, "Could not send prices.").await;
         }
     } else {
-        send_error_message(socket, "Could not serialize prices.").await;
+        send_err_to_socket(socket, "Could not serialize prices.").await;
     }
     Ok(())
 }
@@ -319,11 +319,4 @@ fn sign_median_price(
     .map_err(|_| EntryError::InternalServerError)?;
     let signature = sign_data(signer, hash_to_sign).map_err(EntryError::InvalidSigner)?;
     Ok(format!("0x{:}", signature))
-}
-
-/// Send an error message to the client.
-/// (Does not close the connection)
-async fn send_error_message(socket: &mut WebSocket, error: &str) {
-    let error_msg = json!({ "error": error }).to_string();
-    let _ = socket.send(Message::Text(error_msg)).await;
 }
