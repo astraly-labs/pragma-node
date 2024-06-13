@@ -82,7 +82,6 @@ async fn process_payload(pool: &Pool, payload: Vec<u8>) -> Result<(), Box<dyn st
     Ok(())
 }
 
-// TODO: move this to a service
 pub async fn insert_spot_entries(
     pool: &Pool,
     new_entries: Vec<NewEntry>,
@@ -104,11 +103,6 @@ pub async fn insert_spot_entries(
     Ok(())
 }
 
-/// Insert new future entries into the database.
-/// Future entries means future & perpetual entries.
-/// If the expiration timestamp is not provided, the entry is considered as a perpetual entry.
-/// It will be then inserted into the perp_entries table.
-// TODO: move this to a service
 pub async fn insert_future_entries(
     pool: &Pool,
     new_entries: Vec<NewFutureEntry>,
