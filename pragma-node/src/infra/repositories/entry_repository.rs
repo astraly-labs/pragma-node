@@ -961,8 +961,13 @@ pub async fn get_current_median_entries_with_components(
             None => interval_in_ms += INTERVAL_INCREMENT_IN_MS,
         }
 
+        // Return an empty list if we could not validate the entries
+        // TODO: bad behaviour - we should check the pairs individually
+        // and return the correct pairs, not cancel everything if only
+        // one pair is invalid.
         if interval_in_ms >= MAX_INTERVAL_WITHOUT_ENTRIES {
-            return Err(InfraError::NotFound);
+            tracing::error!("Could not find entries to compute the median price");
+            return Ok(vec![]);
         }
     };
 
