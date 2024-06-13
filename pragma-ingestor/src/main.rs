@@ -1,3 +1,4 @@
+use deadpool_diesel::postgres::Pool;
 use dotenvy::dotenv;
 use pragma_entities::connection::ENV_TS_DATABASE_URL;
 use pragma_entities::{
@@ -21,25 +22,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         config::CONFIG.topic
     );
 
+    let pool = pragma_entities::connection::init_pool("pragma-ingestor", ENV_TS_DATABASE_URL)
+        .expect("cannot connect to database");
+
     let (tx, mut rx) = mpsc::unbounded_channel::<Vec<u8>>();
     tokio::spawn(consumer::consume(tx));
     loop {
         while let Some(payload) = rx.recv().await {
-            if let Err(e) = process_payload(payload).await {
+            if let Err(e) = process_payload(&pool, payload).await {
                 error!("error while processing payload: {:?}", e);
             }
         }
     }
 }
 
-async fn process_payload(payload: Vec<u8>) -> Result<(), Box<dyn std::error::Error>> {
+async fn process_payload(pool: &Pool, payload: Vec<u8>) -> Result<(), Box<dyn std::error::Error>> {
     let decoded_payload = String::from_utf8_lossy(&payload);
     let is_future_entries = decoded_payload.contains("expiration_timestamp");
     if !is_future_entries {
         match serde_json::from_slice::<Vec<NewEntry>>(&payload) {
             Ok(entries) => {
                 info!("[SPOT] total of '{}' new entries available.", entries.len());
-                if let Err(e) = insert_entries(entries).await {
+                if let Err(e) = insert_entries(pool, entries).await {
                     error!("error while inserting entries : {:?}", e);
                 }
             }
@@ -54,7 +58,7 @@ async fn process_payload(payload: Vec<u8>) -> Result<(), Box<dyn std::error::Err
                     "[FUTURE/PERP] total of '{}' new entries available.",
                     future_entries.len()
                 );
-                if let Err(e) = insert_future_entries(future_entries).await {
+                if let Err(e) = insert_future_entries(pool, future_entries).await {
                     error!("error while inserting future entries : {:?}", e);
                 }
             }
@@ -67,13 +71,8 @@ async fn process_payload(payload: Vec<u8>) -> Result<(), Box<dyn std::error::Err
 }
 
 // TODO: move this to a service
-pub async fn insert_entries(new_entries: Vec<NewEntry>) -> Result<(), InfraError> {
-    let conn = pragma_entities::connection::init_pool("pragma-ingestor", ENV_TS_DATABASE_URL)
-        .expect("cannot connect to database")
-        .get()
-        .await
-        .expect("cannot get connection from pool");
-
+pub async fn insert_entries(pool: &Pool, new_entries: Vec<NewEntry>) -> Result<(), InfraError> {
+    let conn = pool.get().await.map_err(adapt_infra_error)?;
     let entries = conn
         .interact(move |conn| Entry::create_many(conn, new_entries))
         .await
@@ -95,14 +94,11 @@ pub async fn insert_entries(new_entries: Vec<NewEntry>) -> Result<(), InfraError
 /// If the expiration timestamp is not provided, the entry is considered as a perpetual entry.
 /// It will be then inserted into the perp_entries table.
 // TODO: move this to a service
-pub async fn insert_future_entries(new_entries: Vec<NewFutureEntry>) -> Result<(), InfraError> {
+pub async fn insert_future_entries(
+    pool: &Pool,
+    new_entries: Vec<NewFutureEntry>,
+) -> Result<(), InfraError> {
     // TODO(akhercha): creating a connection pool for each request is not efficient
-    let conn = pragma_entities::connection::init_pool("pragma-ingestor", ENV_TS_DATABASE_URL)
-        .expect("cannot connect to database")
-        .get()
-        .await
-        .expect("cannot get connection from pool");
-
     // filter out in two groups: perp & future
     let new_perp_entries = new_entries
         .iter()
@@ -110,6 +106,7 @@ pub async fn insert_future_entries(new_entries: Vec<NewFutureEntry>) -> Result<(
         .map(|entry| NewPerpEntry::from(entry.clone()))
         .collect::<Vec<NewPerpEntry>>();
 
+    let conn = pool.get().await.map_err(adapt_infra_error)?;
     if !new_perp_entries.is_empty() {
         info!(
             "[PERP] total of '{}' new entries available.",

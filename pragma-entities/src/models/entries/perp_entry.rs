@@ -27,7 +27,7 @@ pub struct PerpEntry {
     pub price: BigDecimal,
 }
 
-#[derive(Serialize, Deserialize, Insertable, AsChangeset)]
+#[derive(Debug, Serialize, Deserialize, Insertable, AsChangeset)]
 #[diesel(table_name = perp_entries)]
 pub struct NewPerpEntry {
     pub pair_id: String,

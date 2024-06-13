@@ -2233,6 +2233,7 @@ dependencies = [
  "serde_json",
  "starknet",
  "thiserror",
+ "tracing",
  "utoipa",
  "uuid 1.8.0",
 ]
@@ -2241,6 +2242,7 @@ dependencies = [
 name = "pragma-ingestor"
 version = "0.1.0"
 dependencies = [
+ "deadpool-diesel",
  "dotenvy",
  "envy",
  "lazy_static",

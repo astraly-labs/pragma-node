@@ -57,7 +57,6 @@ impl FutureEntry {
                 future_entries::pair_id,
                 future_entries::source,
                 future_entries::timestamp,
-                future_entries::expiration_timestamp,
             ))
             .do_update()
             .set((

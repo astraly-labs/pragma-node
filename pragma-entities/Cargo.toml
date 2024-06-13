@@ -22,3 +22,4 @@ starknet = "0.9.0"
 thiserror = "1.0.49"
 utoipa = "4"
 uuid = { version = "1.4", features = ["fast-rng", "v4", "serde"] }
+tracing = "0.1"
