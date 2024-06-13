@@ -18,12 +18,14 @@ use super::entry_repository::OHLCEntry;
 
 const BACKWARD_TIMESTAMP_INTERVAL: &str = "1 hour";
 
+// Retrieve the postgres table name based on the network and data type.
 fn get_table_name(network: Network, data_type: DataType) -> &'static str {
     match (network, data_type) {
         (Network::Testnet, DataType::SpotEntry) => "spot_entry",
         (Network::Mainnet, DataType::SpotEntry) => "mainnet_spot_entry",
         (Network::Testnet, DataType::FutureEntry) => "future_entry",
         (Network::Mainnet, DataType::FutureEntry) => "mainnet_future_entry",
+        _ => panic!("Unsupported network and data type combination"),
     }
 }
 

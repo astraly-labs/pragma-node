@@ -8,7 +8,7 @@ use diesel::{ExpressionMethods, QueryDsl, Queryable, RunQueryDsl};
 use serde::{Deserialize, Serialize};
 use starknet::core::utils::cairo_short_string_to_felt;
 
-use pragma_common::types::{AggregationMode, ConversionError, Interval};
+use pragma_common::types::{AggregationMode, ConversionError, DataType, Interval};
 use pragma_entities::dto;
 use pragma_entities::{
     error::{adapt_infra_error, InfraError},
@@ -852,12 +852,25 @@ fn get_median_entries_response(
     }
 }
 
+/// Retrieves the timescale table name for the given entry type.
+fn get_table_name_from_type(entry_type: DataType) -> &'static str {
+    match entry_type {
+        DataType::SpotEntry => "entries",
+        DataType::FutureEntry => "future_entries",
+        DataType::PerpEntry => "perp_entries",
+    }
+}
+
 /// Builds a SQL query that will fetch the recent prices between now and
 /// the given interval for each unique tuple (pair_id, publisher, source)
 /// and then calculate the median price for each pair_id.
 /// We also return in a JSON string the components that were used to calculate
 /// the median price.
-fn build_sql_query_for_median_with_components(pair_ids: &[String], interval_in_ms: u64) -> String {
+fn build_sql_query_for_median_with_components(
+    pair_ids: &[String],
+    interval_in_ms: u64,
+    entry_type: DataType,
+) -> String {
     format!(
         r#"
             WITH last_prices AS (
@@ -871,7 +884,7 @@ fn build_sql_query_for_median_with_components(pair_ids: &[String], interval_in_m
                     e.publisher_signature,
                     ROW_NUMBER() OVER (PARTITION BY e.pair_id, e.publisher, e.source ORDER BY e.timestamp DESC) AS rn
                 FROM 
-                    entries e
+                    {table_name} e
                 JOIN
                     publishers p ON e.publisher = p.name
                 WHERE 
@@ -910,12 +923,13 @@ fn build_sql_query_for_median_with_components(pair_ids: &[String], interval_in_m
             GROUP BY 
                 pair_id;
             "#,
+        table_name = get_table_name_from_type(entry_type),
         pairs_list = pair_ids
             .iter()
             .map(|pair_id| format!("'{}'", pair_id))
             .collect::<Vec<String>>()
             .join(", "),
-        interval_in_ms = interval_in_ms
+        interval_in_ms = interval_in_ms,
     )
 }
 
@@ -926,11 +940,13 @@ fn build_sql_query_for_median_with_components(pair_ids: &[String], interval_in_m
 pub async fn get_current_median_entries_with_components(
     pool: &deadpool_diesel::postgres::Pool,
     pair_ids: &[String],
+    entry_type: DataType,
 ) -> Result<Vec<MedianEntryWithComponents>, InfraError> {
     let conn = pool.get().await.map_err(adapt_infra_error)?;
     let mut interval_in_ms = INITAL_INTERVAL_IN_MS;
     let median_entries = loop {
-        let raw_sql = build_sql_query_for_median_with_components(pair_ids, interval_in_ms);
+        let raw_sql =
+            build_sql_query_for_median_with_components(pair_ids, interval_in_ms, entry_type);
 
         let raw_median_entries = conn
             .interact(move |conn| {

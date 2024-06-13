@@ -26,4 +26,4 @@ pub const INTERVAL_INCREMENT_IN_MS: u64 = 500;
 /// Represents the minimum number of unique publishers that we need to have
 /// for a pair_id in order to return the computed price.
 /// TODO: should be lower for development mode (1)
-pub const MINIMUM_NUMBER_OF_PUBLISHERS: usize = 3;
+pub const MINIMUM_NUMBER_OF_PUBLISHERS: usize = 1;

@@ -6,6 +6,7 @@ use axum::extract::State;
 use axum::response::IntoResponse;
 use bigdecimal::BigDecimal;
 
+use pragma_common::types::DataType;
 use pragma_entities::EntryError;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -13,16 +14,15 @@ use starknet::signers::SigningKey;
 use tokio::time::interval;
 
 use crate::handlers::entries::SubscribeToEntryResponse;
-use crate::infra::repositories::entry_repository::get_current_median_entries_with_components;
+use crate::infra::repositories::entry_repository::{
+    get_current_median_entries_with_components, MedianEntryWithComponents,
+};
 use crate::utils::get_entry_hash;
 use crate::AppState;
 
 use super::constants::PRAGMA_ORACLE_NAME_FOR_STARKEX;
 use super::utils::{only_existing_pairs, sign_data};
 use super::AssetOraclePrice;
-
-/// Interval in milliseconds that the channel will update the client with the latest prices.
-const CHANNEL_UPDATE_INTERVAL_IN_MS: u64 = 500;
 
 #[derive(Default, Debug, Serialize, Deserialize)]
 enum SubscriptionType {
@@ -123,6 +123,9 @@ pub async fn subscribe_to_entry(
     ws.on_upgrade(move |socket| handle_channel(socket, state))
 }
 
+/// Interval in milliseconds that the channel will update the client with the latest prices.
+const CHANNEL_UPDATE_INTERVAL_IN_MS: u64 = 500;
+
 /// Handle the WebSocket channel.
 async fn handle_channel(mut socket: WebSocket, state: AppState) {
     let waiting_duration = Duration::from_millis(CHANNEL_UPDATE_INTERVAL_IN_MS);
@@ -155,16 +158,14 @@ async fn handle_message_received(
     message: String,
 ) {
     if let Ok(subscription_msg) = serde_json::from_str::<SubscriptionRequest>(&message) {
+        let (existing_spot_pairs, existing_perp_pairs, _) =
+            only_existing_pairs(&state.timescale_pool, subscription_msg.pairs).await;
         match subscription_msg.msg_type {
             SubscriptionType::Subscribe => {
-                let (existing_spot_pairs, existing_perp_pairs, _) =
-                    only_existing_pairs(&state.timescale_pool, subscription_msg.pairs).await;
                 subscription.add_spot_pairs(existing_spot_pairs);
                 subscription.add_perp_pairs(existing_perp_pairs);
             }
             SubscriptionType::Unsubscribe => {
-                let (existing_spot_pairs, existing_perp_pairs, _) =
-                    only_existing_pairs(&state.timescale_pool, subscription_msg.pairs).await;
                 subscription.remove_spot_pairs(&existing_spot_pairs);
                 subscription.remove_perp_pairs(&existing_perp_pairs);
             }
@@ -221,19 +222,7 @@ async fn get_subscribed_pairs_medians(
     state: &AppState,
     subscription: &CurrentSubscription,
 ) -> Result<SubscribeToEntryResponse, EntryError> {
-    // 1. Get spot median entries.
-    let mut median_entries = get_current_median_entries_with_components(
-        &state.timescale_pool,
-        &subscription.get_subscribed_spot_pairs(),
-    )
-    .await
-    .map_err(|e| e.to_entry_error(&subscription.get_subscribed_spot_pairs().join(",")))?;
-
-    // 2. Get perp median entries.
-    // TODO: Implement perp median entries.
-    median_entries.extend(vec![]);
-
-    // 3. Sign all the median entries.
+    let median_entries = get_all_median_entries(state, subscription).await?;
     let mut response: SubscribeToEntryResponse = Default::default();
     let now = chrono::Utc::now().timestamp();
     for entry in median_entries {
@@ -252,11 +241,60 @@ async fn get_subscribed_pairs_medians(
         oracle_price.signature = signature;
         response.oracle_prices.push(oracle_price);
     }
-    // Timestamp in seconds.
     response.timestamp_s = now.to_string();
-
-    // 4. Return the response.
     Ok(response)
+}
+
+async fn get_all_median_entries(
+    state: &AppState,
+    subscription: &CurrentSubscription,
+) -> Result<Vec<MedianEntryWithComponents>, EntryError> {
+    let mut median_entries = vec![];
+
+    let index_median_entries =
+        compute_index_median_entries(state, subscription.get_subscribed_spot_pairs()).await?;
+    median_entries.extend(index_median_entries);
+
+    let mark_median_entries =
+        compute_mark_median_entries(state, subscription.get_subscribed_perp_pairs()).await?;
+    median_entries.extend(mark_median_entries);
+
+    Ok(median_entries)
+}
+
+async fn compute_index_median_entries(
+    state: &AppState,
+    pairs: Vec<String>,
+) -> Result<Vec<MedianEntryWithComponents>, EntryError> {
+    get_current_median_entries_with_components(&state.timescale_pool, &pairs, DataType::SpotEntry)
+        .await
+        .map_err(|e| e.to_entry_error(&pairs.join(",")))
+}
+
+async fn compute_mark_median_entries(
+    state: &AppState,
+    perp_pairs: Vec<String>,
+) -> Result<Vec<MedianEntryWithComponents>, EntryError> {
+    let mut mark_median_entries = vec![];
+
+    let (usd_pairs, _non_usd_pairs): (Vec<String>, Vec<String>) = perp_pairs
+        .into_iter()
+        .partition(|pair| pair.ends_with("USD"));
+    let usd_mark_median_entries = get_current_median_entries_with_components(
+        &state.timescale_pool,
+        &usd_pairs,
+        DataType::PerpEntry,
+    )
+    .await
+    // TODO: nice error
+    .map_err(|e| e.to_entry_error(&"".to_string()))?;
+    mark_median_entries.extend(usd_mark_median_entries);
+
+    // TODO: Implement for non_usd_pairs, i.e median + divide by {currency}/USD spot price
+    let non_usd_mark_median_entries = vec![];
+    mark_median_entries.extend(non_usd_mark_median_entries);
+
+    Ok(mark_median_entries)
 }
 
 /// Sign the median price with the passed signer and return the signature 0x prefixed.

@@ -36,6 +36,8 @@ pub enum DataType {
     #[serde(rename = "spot_entry")]
     #[default]
     SpotEntry,
+    #[serde(rename = "perp_entry")]
+    PerpEntry,
     #[serde(rename = "future_entry")]
     FutureEntry,
 }
