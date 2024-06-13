@@ -87,7 +87,6 @@ impl CurrentSubscription {
     }
 
     /// Get the subscribed perps pairs with the MARK suffix.
-    #[allow(dead_code)]
     fn get_fmt_subscribed_perp_pairs(&self) -> Vec<String> {
         self.perp_pairs
             .iter()
@@ -252,7 +251,6 @@ async fn get_all_median_entries(
     let mut median_entries = vec![];
 
     // TODO: can be parallelized
-
     let index_median_entries =
         compute_index_median_entries(state, subscription.get_subscribed_spot_pairs()).await?;
     median_entries.extend(index_median_entries);
@@ -283,6 +281,7 @@ async fn compute_mark_median_entries(
 ) -> Result<Vec<MedianEntryWithComponents>, EntryError> {
     let mut mark_median_entries = vec![];
 
+    // Can parallelize the usd/non_usd pairs computations
     let (usd_pairs, _non_usd_pairs): (Vec<String>, Vec<String>) = perp_pairs
         .into_iter()
         .partition(|pair| pair.ends_with("USD"));
@@ -298,6 +297,9 @@ async fn compute_mark_median_entries(
 
     // TODO: Implement for non_usd_pairs, i.e median + divide by {currency}/USD spot price
     let non_usd_mark_median_entries = vec![];
+    // 1. Get the median spot prices for the non_usd (usdt, usdc.....) (usdc/usd, usdt/usd..)
+    // 2. Get the median mark prices of the non usd pairs
+    // 3. divide median mark price by median spot price
     mark_median_entries.extend(non_usd_mark_median_entries);
 
     Ok(mark_median_entries)
