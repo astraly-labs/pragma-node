@@ -10,7 +10,10 @@ pub use get_ohlc::get_ohlc;
 pub use get_onchain::get_onchain;
 pub use get_volatility::get_volatility;
 
-use crate::infra::repositories::entry_repository::OHLCEntry;
+use crate::{
+    infra::repositories::entry_repository::OHLCEntry,
+    utils::{doc_examples, UnixTimestamp},
+};
 
 pub mod create_entry;
 pub mod get_entry;
@@ -134,7 +137,11 @@ pub struct GetOnchainCheckpointsResponse(pub Vec<Checkpoint>);
 
 #[derive(Debug, Deserialize, IntoParams, ToSchema)]
 pub struct GetEntryParams {
-    pub timestamp: Option<u64>,
+    /// The unix timestamp in seconds. This endpoint will return the first update whose
+    /// timestamp is <= the provided value.
+    #[param(value_type = i64)]
+    #[param(example = doc_examples::timestamp_example)]
+    pub timestamp: Option<UnixTimestamp>,
     pub interval: Option<Interval>,
     pub routing: Option<bool>,
     pub aggregation: Option<AggregationMode>,
@@ -143,7 +150,7 @@ pub struct GetEntryParams {
 impl Default for GetEntryParams {
     fn default() -> Self {
         Self {
-            timestamp: Some(chrono::Utc::now().timestamp() as u64),
+            timestamp: Some(chrono::Utc::now().timestamp()),
             interval: Some(Interval::default()),
             routing: Some(false),
             aggregation: Some(AggregationMode::default()),

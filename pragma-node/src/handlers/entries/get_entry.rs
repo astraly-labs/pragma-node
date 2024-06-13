@@ -34,7 +34,7 @@ pub async fn get_entry(
     // Construct pair id
     let pair_id = currency_pair_to_pair_id(&pair.0, &pair.1);
 
-    let now = chrono::Utc::now().timestamp() as u64;
+    let now = chrono::Utc::now().timestamp();
 
     let timestamp = if let Some(timestamp) = params.timestamp {
         timestamp
