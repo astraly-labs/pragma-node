@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use deadpool_diesel::postgres::Pool;
 use dotenvy::dotenv;
 use pragma_entities::connection::ENV_TS_DATABASE_URL;
@@ -83,6 +85,36 @@ async fn process_payload(pool: &Pool, payload: Vec<u8>) -> Result<(), Box<dyn st
     Ok(())
 }
 
+/// Only keep future_entries that have unique (pair_id, source, timestamp, expiration_timestamp).
+// TODO(akhercha): We are doing this cause else it creates conflicts on the database.
+// This is happening because our timestamp precision is currently too low - in seconds.
+// We should fix this by increasing the precision of the timestamp to milliseconds.
+// TODO(akhercha): This should be addressed soon as it means we are dropping relevant
+// entries.
+fn filter_unique_new_future_entries(
+    mut new_future_entries: Vec<NewFutureEntry>,
+) -> Vec<NewFutureEntry> {
+    let mut seen = HashSet::new();
+    new_future_entries.retain(|entry| {
+        seen.insert((entry.pair_id.clone(), entry.source.clone(), entry.timestamp))
+    });
+    new_future_entries
+}
+
+/// Only keep future_entries that have unique (pair_id, source, timestamp, expiration_timestamp).
+// TODO(akhercha): We are doing this cause else it creates conflicts on the database.
+// This is happening because our timestamp precision is currently too low - in seconds.
+// We should fix this by increasing the precision of the timestamp to milliseconds.
+// TODO(akhercha): This should be addressed soon as it means we are dropping relevant
+// entries.
+fn filter_unique_new_perp_entries(mut new_perp_entries: Vec<NewPerpEntry>) -> Vec<NewPerpEntry> {
+    let mut seen = HashSet::new();
+    new_perp_entries.retain(|entry| {
+        seen.insert((entry.pair_id.clone(), entry.source.clone(), entry.timestamp))
+    });
+    new_perp_entries
+}
+
 // TODO(akhercha): very similar functions - refactor
 
 pub async fn insert_spot_entries(
@@ -110,6 +142,7 @@ pub async fn insert_future_entries(
     pool: &Pool,
     new_entries: Vec<NewFutureEntry>,
 ) -> Result<(), InfraError> {
+    let new_entries = filter_unique_new_future_entries(new_entries);
     let conn = pool.get().await.map_err(adapt_infra_error)?;
     let entries = conn
         .interact(move |conn| FutureEntry::create_many(conn, new_entries))
@@ -129,6 +162,7 @@ pub async fn insert_perp_entries(
     pool: &Pool,
     new_entries: Vec<NewPerpEntry>,
 ) -> Result<(), InfraError> {
+    let new_entries = filter_unique_new_perp_entries(new_entries);
     let conn = pool.get().await.map_err(adapt_infra_error)?;
     let entries = conn
         .interact(move |conn| PerpEntry::create_many(conn, new_entries))
