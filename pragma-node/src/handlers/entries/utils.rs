@@ -3,7 +3,7 @@ use bigdecimal::{BigDecimal, ToPrimitive};
 use chrono::NaiveDateTime;
 use deadpool_diesel::postgres::Pool;
 use pragma_common::types::Network;
-use pragma_entities::Entry;
+use pragma_entities::{Entry, PerpEntry};
 use starknet::core::crypto::{EcdsaSignError, Signature};
 use starknet::core::types::FieldElement;
 use starknet::signers::SigningKey;
@@ -130,12 +130,55 @@ pub(crate) fn big_decimal_price_to_hex(price: &BigDecimal) -> String {
 
 /// Given a list of pairs, only return the ones that exists in the
 /// database.
-pub(crate) async fn only_existing_pairs(pool: &Pool, pairs: Vec<String>) -> Vec<String> {
+/// A list of pairs can contains:
+/// - Spot pairs: formatted as usual (e.g. "BTC/USD")
+/// - Perpetual pairs: usual pair with a mark suffix (e.g. "BTC/USD:MARK")
+/// - TODO Future pairs: ...
+/// Returns three separate lists of pairs: spot pairs, perpetual pairs and future pairs.
+pub(crate) async fn only_existing_pairs(
+    pool: &Pool,
+    pairs: Vec<String>,
+) -> (
+    Vec<String>, // spot pairs
+    Vec<String>, // perpetual pairs
+    Vec<String>, // future pairs
+) {
     let conn = pool.get().await.expect("Couldn't connect to the database.");
-    conn.interact(move |conn| Entry::get_existing_pairs(conn, pairs))
+
+    let pairs = pairs
+        .iter()
+        .map(|pair| pair.to_uppercase().trim().to_string())
+        .collect::<Vec<String>>();
+
+    // Check spot entries
+    let spot_pairs = pairs
+        .iter()
+        .filter(|pair| !pair.contains(':'))
+        .map(|pair| pair.to_string())
+        .collect::<Vec<String>>();
+    let spot_pairs = conn
+        .interact(move |conn| Entry::get_existing_pairs(conn, spot_pairs))
+        .await
+        .expect("Couldn't check if pair exists")
+        .expect("Couldn't get table result");
+
+    // Check perp entries
+    let perp_pairs = pairs
+        .iter()
+        .filter(|pair| pair.contains(":MARK"))
+        .map(|pair| pair.to_string())
+        .collect::<Vec<String>>();
+    let perp_pairs = conn
+        .interact(move |conn| PerpEntry::get_existing_pairs(conn, perp_pairs))
         .await
         .expect("Couldn't check if pair exists")
         .expect("Couldn't get table result")
+        .into_iter()
+        .map(|pair| format!("{}:MARK", pair))
+        .collect::<Vec<String>>();
+
+    // TODO: Future entries aren't handled
+    (spot_pairs, perp_pairs, vec![])
 }
 
 /// Sign the passed data with the signer & return the signature 0x prefixed.

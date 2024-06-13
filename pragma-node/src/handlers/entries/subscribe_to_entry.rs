@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::time::Duration;
 
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
@@ -44,6 +45,66 @@ struct SubscriptionAck {
     pairs: Vec<String>,
 }
 
+#[derive(Debug, Default, Serialize, Deserialize)]
+struct CurrentSubscription {
+    spot_pairs: HashSet<String>,
+    perp_pairs: HashSet<String>,
+}
+
+impl CurrentSubscription {
+    fn is_empty(&self) -> bool {
+        self.spot_pairs.is_empty() && self.perp_pairs.is_empty()
+    }
+
+    fn add_spot_pairs(&mut self, pairs: Vec<String>) {
+        self.spot_pairs.extend(pairs);
+    }
+
+    fn add_perp_pairs(&mut self, pairs: Vec<String>) {
+        self.perp_pairs.extend(pairs);
+    }
+
+    fn remove_spot_pairs(&mut self, pairs: &[String]) {
+        for pair in pairs {
+            self.spot_pairs.remove(pair);
+        }
+    }
+
+    fn remove_perp_pairs(&mut self, pairs: &[String]) {
+        for pair in pairs {
+            self.perp_pairs.remove(pair);
+        }
+    }
+
+    /// Get the subscribed spot pairs.
+    fn get_subscribed_spot_pairs(&self) -> Vec<String> {
+        self.spot_pairs.iter().cloned().collect()
+    }
+
+    /// Get the subscribed perps pairs (without suffix).
+    fn get_subscribed_perp_pairs(&self) -> Vec<String> {
+        self.perp_pairs.iter().cloned().collect()
+    }
+
+    /// Get the subscribed perps pairs with the MARK suffix.
+    #[allow(dead_code)]
+    fn get_fmt_subscribed_perp_pairs(&self) -> Vec<String> {
+        self.perp_pairs
+            .iter()
+            .map(|pair| format!("{}:MARK", pair))
+            .collect()
+    }
+
+    /// Get all the currently subscribed pairs.
+    /// (Spot and Perp pairs with the suffix)
+    fn get_fmt_subscribed_pairs(&self) -> Vec<String> {
+        let mut spot_pairs = self.get_subscribed_spot_pairs();
+        let perp_pairs = self.get_subscribed_perp_pairs();
+        spot_pairs.extend(perp_pairs);
+        spot_pairs
+    }
+}
+
 #[utoipa::path(
     get,
     path = "/node/v1/data/subscribe",
@@ -62,22 +123,21 @@ pub async fn subscribe_to_entry(
     ws.on_upgrade(move |socket| handle_channel(socket, state))
 }
 
-/// TODO(akhercha): currently only returns index median - need to add mark price
 /// Handle the WebSocket channel.
 async fn handle_channel(mut socket: WebSocket, state: AppState) {
     let waiting_duration = Duration::from_millis(CHANNEL_UPDATE_INTERVAL_IN_MS);
     let mut update_interval = interval(waiting_duration);
-    let mut subscribed_pairs: Vec<String> = Vec::new();
+    let mut subscription: CurrentSubscription = Default::default();
 
     loop {
         tokio::select! {
             Some(msg) = socket.recv() => {
                 if let Ok(Message::Text(text)) = msg {
-                    handle_message_received(&mut socket, &state, &mut subscribed_pairs, text).await;
+                    handle_message_received(&mut socket, &state, &mut subscription, text).await;
                 }
             },
             _ = update_interval.tick() => {
-                match send_median_entries(&mut socket, &state, &subscribed_pairs).await {
+                match send_median_entries(&mut socket, &state, &subscription).await {
                     Ok(_) => {},
                     Err(_) => break
                 };
@@ -91,29 +151,29 @@ async fn handle_channel(mut socket: WebSocket, state: AppState) {
 async fn handle_message_received(
     socket: &mut WebSocket,
     state: &AppState,
-    subscribed_pairs: &mut Vec<String>,
+    subscription: &mut CurrentSubscription,
     message: String,
 ) {
     if let Ok(subscription_msg) = serde_json::from_str::<SubscriptionRequest>(&message) {
         match subscription_msg.msg_type {
             SubscriptionType::Subscribe => {
-                let existing_pairs =
+                let (existing_spot_pairs, existing_perp_pairs, _) =
                     only_existing_pairs(&state.timescale_pool, subscription_msg.pairs).await;
-                for pair_id in existing_pairs {
-                    if !subscribed_pairs.contains(&pair_id) {
-                        subscribed_pairs.push(pair_id.to_string());
-                    }
-                }
+                subscription.add_spot_pairs(existing_spot_pairs);
+                subscription.add_perp_pairs(existing_perp_pairs);
             }
             SubscriptionType::Unsubscribe => {
-                subscribed_pairs.retain(|pair| !subscription_msg.pairs.contains(pair));
+                let (existing_spot_pairs, existing_perp_pairs, _) =
+                    only_existing_pairs(&state.timescale_pool, subscription_msg.pairs).await;
+                subscription.remove_spot_pairs(&existing_spot_pairs);
+                subscription.remove_perp_pairs(&existing_perp_pairs);
             }
         };
         // We send an ack message to the client with the subscribed pairs (so
         // the client knows which pairs are successfully subscribed).
         if let Ok(ack_message) = serde_json::to_string(&SubscriptionAck {
             msg_type: subscription_msg.msg_type,
-            pairs: subscribed_pairs.clone(),
+            pairs: subscription.get_fmt_subscribed_pairs(),
         }) {
             if socket.send(Message::Text(ack_message)).await.is_err() {
                 let error_msg = "Message received but could not send ack message.";
@@ -133,19 +193,20 @@ async fn handle_message_received(
 async fn send_median_entries(
     socket: &mut WebSocket,
     state: &AppState,
-    subscribed_pairs: &[String],
+    subscription: &CurrentSubscription,
 ) -> Result<(), EntryError> {
-    if subscribed_pairs.is_empty() {
+    if subscription.is_empty() {
         return Ok(());
     }
-    let entries = match get_subscribed_pairs_entries(state, subscribed_pairs).await {
+    let response = match get_subscribed_pairs_medians(state, subscription).await {
         Ok(response) => response,
         Err(e) => {
             send_error_message(socket, &e.to_string()).await;
             return Err(e);
         }
     };
-    if let Ok(json_response) = serde_json::to_string(&entries) {
+
+    if let Ok(json_response) = serde_json::to_string(&response) {
         if socket.send(Message::Text(json_response)).await.is_err() {
             send_error_message(socket, "Could not send prices.").await;
         }
@@ -156,15 +217,23 @@ async fn send_median_entries(
 }
 
 /// Get the current median entries for the subscribed pairs and sign them as Pragma.
-async fn get_subscribed_pairs_entries(
+async fn get_subscribed_pairs_medians(
     state: &AppState,
-    subscribed_pairs: &[String],
+    subscription: &CurrentSubscription,
 ) -> Result<SubscribeToEntryResponse, EntryError> {
-    let median_entries =
-        get_current_median_entries_with_components(&state.timescale_pool, subscribed_pairs)
-            .await
-            .map_err(|e| e.to_entry_error(&subscribed_pairs.join(",")))?;
+    // 1. Get spot median entries.
+    let mut median_entries = get_current_median_entries_with_components(
+        &state.timescale_pool,
+        &subscription.get_subscribed_spot_pairs(),
+    )
+    .await
+    .map_err(|e| e.to_entry_error(&subscription.get_subscribed_spot_pairs().join(",")))?;
 
+    // 2. Get perp median entries.
+    // TODO: Implement perp median entries.
+    median_entries.extend(vec![]);
+
+    // 3. Sign all the median entries.
     let mut response: SubscribeToEntryResponse = Default::default();
     let now = chrono::Utc::now().timestamp();
     for entry in median_entries {
@@ -185,6 +254,8 @@ async fn get_subscribed_pairs_entries(
     }
     // Timestamp in seconds.
     response.timestamp_s = now.to_string();
+
+    // 4. Return the response.
     Ok(response)
 }
 
@@ -210,5 +281,5 @@ fn sign_median_price(
 /// (Does not close the connection)
 async fn send_error_message(socket: &mut WebSocket, error: &str) {
     let error_msg = json!({ "error": error }).to_string();
-    socket.send(Message::Text(error_msg)).await.unwrap();
+    let _ = socket.send(Message::Text(error_msg)).await;
 }
