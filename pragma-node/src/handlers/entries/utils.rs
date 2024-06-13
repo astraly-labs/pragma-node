@@ -167,15 +167,15 @@ pub(crate) async fn only_existing_pairs(
     let perp_pairs = pairs
         .iter()
         .filter(|pair| pair.contains(":MARK"))
-        .map(|pair| pair.to_string())
+        .map(|pair| pair.replace(":MARK", "").to_string())
         .collect::<Vec<String>>();
+
     let perp_pairs = conn
         .interact(move |conn| PerpEntry::get_existing_pairs(conn, perp_pairs))
         .await
         .expect("Couldn't check if pair exists")
         .expect("Couldn't get table result")
         .into_iter()
-        .map(|pair| format!("{}:MARK", pair))
         .collect::<Vec<String>>();
 
     // TODO: Future entries aren't handled

@@ -99,7 +99,7 @@ impl CurrentSubscription {
     /// (Spot and Perp pairs with the suffix)
     fn get_fmt_subscribed_pairs(&self) -> Vec<String> {
         let mut spot_pairs = self.get_subscribed_spot_pairs();
-        let perp_pairs = self.get_subscribed_perp_pairs();
+        let perp_pairs = self.get_fmt_subscribed_perp_pairs();
         spot_pairs.extend(perp_pairs);
         spot_pairs
     }
