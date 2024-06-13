@@ -75,9 +75,9 @@ async fn handle_channel(mut socket: WebSocket, state: AppState) {
 
     //send a ping (unsupported by some browsers) just to kick things off and get a response
     if socket.send(Message::Ping(vec![])).await.is_ok() {
-        println!("Pinged ...");
+        tracing::info!("Pinged ...");
     } else {
-        println!("Could not send ping !");
+        tracing::info!("Could not send ping !");
         // no Error here since the only thing we can do is to close the connection.
         // If we can not send messages, there is no way to salvage the statemachine anyway.
         return;
@@ -230,6 +230,5 @@ async fn send_error_message(socket: &mut WebSocket, error: &str) {
     let error_msg = json!({ "error": error }).to_string();
     if socket.send(Message::Text(error_msg)).await.is_err() {
         tracing::error!("Client already disconnected. Could not send error message.");
-        return;
     }
 }

@@ -330,7 +330,7 @@ pub async fn get_twap_price(
         }
     };
 
-    let date_time = DateTime::from_timestamp(time as i64, 0).ok_or(InfraError::InvalidTimeStamp)?;
+    let date_time = DateTime::from_timestamp(time, 0).ok_or(InfraError::InvalidTimeStamp)?;
 
     let raw_entry = conn
         .interact(move |conn| {
@@ -436,7 +436,7 @@ pub async fn get_median_price(
         }
     };
 
-    let date_time = DateTime::from_timestamp(time as i64, 0).ok_or(InfraError::InvalidTimeStamp)?;
+    let date_time = DateTime::from_timestamp(time, 0).ok_or(InfraError::InvalidTimeStamp)?;
 
     let raw_entry = conn
         .interact(move |conn| {
@@ -682,7 +682,7 @@ pub async fn get_ohlc(
         }
     };
 
-    let date_time = DateTime::from_timestamp(time as i64, 0).ok_or(InfraError::InvalidTimeStamp)?;
+    let date_time = DateTime::from_timestamp(time, 0).ok_or(InfraError::InvalidTimeStamp)?;
 
     let raw_entries = conn
         .interact(move |conn| {
