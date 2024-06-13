@@ -73,6 +73,16 @@ async fn handle_channel(mut socket: WebSocket, state: AppState) {
     let mut ohlc_to_compute = 10;
     let mut ohlc_data: Vec<OHLCEntry> = Vec::new();
 
+    //send a ping (unsupported by some browsers) just to kick things off and get a response
+    if socket.send(Message::Ping(vec![])).await.is_ok() {
+        println!("Pinged ...");
+    } else {
+        println!("Could not send ping !");
+        // no Error here since the only thing we can do is to close the connection.
+        // If we can not send messages, there is no way to salvage the statemachine anyway.
+        return;
+    }
+
     loop {
         tokio::select! {
             Some(msg) = socket.recv() => {
@@ -196,5 +206,8 @@ async fn send_ohlc_data(
 /// (Does not close the connection)
 async fn send_error_message(socket: &mut WebSocket, error: &str) {
     let error_msg = json!({ "error": error }).to_string();
-    socket.send(Message::Text(error_msg)).await.unwrap();
+    if socket.send(Message::Text(error_msg)).await.is_err() {
+        tracing::error!("Client already disconnected. Could not send error message.");
+        return;
+    }
 }
