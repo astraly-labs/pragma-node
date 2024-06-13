@@ -251,6 +251,8 @@ async fn get_all_median_entries(
 ) -> Result<Vec<MedianEntryWithComponents>, EntryError> {
     let mut median_entries = vec![];
 
+    // TODO: can be parallelized
+
     let index_median_entries =
         compute_index_median_entries(state, subscription.get_subscribed_spot_pairs()).await?;
     median_entries.extend(index_median_entries);
@@ -264,11 +266,15 @@ async fn get_all_median_entries(
 
 async fn compute_index_median_entries(
     state: &AppState,
-    pairs: Vec<String>,
+    spot_pairs: Vec<String>,
 ) -> Result<Vec<MedianEntryWithComponents>, EntryError> {
-    get_current_median_entries_with_components(&state.timescale_pool, &pairs, DataType::SpotEntry)
-        .await
-        .map_err(|e| e.to_entry_error(&pairs.join(",")))
+    get_current_median_entries_with_components(
+        &state.timescale_pool,
+        &spot_pairs,
+        DataType::SpotEntry,
+    )
+    .await
+    .map_err(|e| e.to_entry_error(&spot_pairs.join(",")))
 }
 
 async fn compute_mark_median_entries(
