@@ -182,6 +182,37 @@ pub async fn get_last_updated_timestamp(
 }
 
 #[derive(Queryable, QueryableByName)]
+pub struct EntryPairId {
+    #[diesel(sql_type = VarChar)]
+    pub pair_id: String,
+}
+
+// TODO(0xevolve): Only works for Spot entries
+pub async fn get_existing_pairs(
+    pool: &Pool,
+    network: Network,
+) -> Result<Vec<EntryPairId>, InfraError> {
+    let raw_sql = format!(
+        r#"
+        SELECT DISTINCT
+            pair_id
+        FROM
+            {table_name};
+    "#,
+        table_name = get_table_name(network, DataType::SpotEntry)
+    );
+
+    let conn = pool.get().await.map_err(adapt_infra_error)?;
+    let raw_entries = conn
+        .interact(move |conn| diesel::sql_query(raw_sql).load::<EntryPairId>(conn))
+        .await
+        .map_err(adapt_infra_error)?
+        .map_err(adapt_infra_error)?;
+
+    Ok(raw_entries)
+}
+
+#[derive(Queryable, QueryableByName)]
 struct RawCheckpoint {
     #[diesel(sql_type = VarChar)]
     pub transaction_hash: String,

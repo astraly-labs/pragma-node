@@ -1,5 +1,5 @@
 use chrono::{NaiveDateTime, Timelike};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 #[derive(Debug)]
@@ -11,7 +11,7 @@ pub enum ConversionError {
     U128Conversion,
 }
 
-#[derive(Default, Debug, Deserialize, ToSchema, Clone, Copy)]
+#[derive(Default, Debug, Serialize, Deserialize, ToSchema, Clone, Copy)]
 pub enum AggregationMode {
     #[serde(rename = "median")]
     #[default]
@@ -22,7 +22,7 @@ pub enum AggregationMode {
     Twap,
 }
 
-#[derive(Default, Debug, Deserialize, ToSchema, Clone, Copy)]
+#[derive(Default, Debug, Serialize, Deserialize, ToSchema, Clone, Copy)]
 pub enum Network {
     #[serde(rename = "testnet")]
     #[default]
@@ -41,7 +41,7 @@ pub enum DataType {
 }
 
 // Supported Aggregation Intervals
-#[derive(Default, Debug, Deserialize, ToSchema, Clone, Copy)]
+#[derive(Default, Debug, Serialize, Deserialize, ToSchema, Clone, Copy)]
 pub enum Interval {
     #[serde(rename = "1min")]
     #[default]

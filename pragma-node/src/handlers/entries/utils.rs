@@ -2,13 +2,16 @@ use bigdecimal::num_bigint::ToBigInt;
 use bigdecimal::{BigDecimal, ToPrimitive};
 use chrono::NaiveDateTime;
 use deadpool_diesel::postgres::Pool;
+use pragma_common::types::Network;
 use pragma_entities::Entry;
 use starknet::core::crypto::{EcdsaSignError, Signature};
 use starknet::core::types::FieldElement;
 use starknet::signers::SigningKey;
 use std::collections::HashMap;
 
-use crate::infra::repositories::entry_repository::MedianEntry;
+use crate::infra::repositories::{
+    entry_repository::MedianEntry, onchain_repository::get_existing_pairs,
+};
 
 const ONE_YEAR_IN_SECONDS: f64 = 3153600_f64;
 
@@ -72,6 +75,16 @@ pub(crate) fn compute_median_price_and_time(
     let latest_time = entries.last().unwrap().time;
 
     Some((median_price, latest_time))
+}
+
+/// Given a pair and a network, returns if it exists in the
+/// onchain database.
+pub(crate) async fn is_onchain_existing_pair(pool: &Pool, pair: &String, network: Network) -> bool {
+    let existings_pairs = get_existing_pairs(pool, network)
+        .await
+        .expect("Couldn't get the existing pairs from the database.");
+
+    existings_pairs.into_iter().any(|p| p.pair_id == *pair)
 }
 
 /// Computes the volatility from a list of entries.
