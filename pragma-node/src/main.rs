@@ -2,6 +2,8 @@ use deadpool_diesel::postgres::Pool;
 use pragma_entities::connection::{ENV_POSTGRES_DATABASE_URL, ENV_TS_DATABASE_URL};
 use starknet::signers::SigningKey;
 use std::net::SocketAddr;
+use tower_http::cors::CorsLayer;
+use tower_http::trace::{DefaultMakeSpan, TraceLayer};
 use utoipa::openapi::security::{ApiKey, ApiKeyValue, SecurityScheme};
 use utoipa::Modify;
 use utoipa::OpenApi;
@@ -127,7 +129,15 @@ async fn main() {
         pragma_signer,
     };
 
-    let app = app_router::<ApiDoc>(state.clone()).with_state(state);
+    let app = app_router::<ApiDoc>(state.clone())
+        .with_state(state)
+        // Logging so we can see whats going on
+        .layer(
+            TraceLayer::new_for_http()
+                .make_span_with(DefaultMakeSpan::default().include_headers(true)),
+        )
+        // Permissive CORS layer to allow all origins
+        .layer(CorsLayer::permissive());
 
     let host = config.server_host();
     let port = config.server_port();

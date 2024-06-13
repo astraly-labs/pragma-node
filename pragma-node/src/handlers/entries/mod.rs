@@ -22,8 +22,11 @@ use utoipa::{IntoParams, ToSchema};
 
 use pragma_common::types::{AggregationMode, DataType, Interval, Network};
 
-use crate::handlers::entries::types::{Entry, FutureEntry};
-use crate::infra::repositories::entry_repository::OHLCEntry;
+use crate::{
+    handlers::entries::types::{Entry, FutureEntry},
+    infra::repositories::entry_repository::OHLCEntry,
+    utils::{doc_examples, UnixTimestamp},
+};
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct CreateEntryRequest {
@@ -136,7 +139,11 @@ pub struct GetOnchainCheckpointsResponse(pub Vec<Checkpoint>);
 
 #[derive(Debug, Deserialize, IntoParams, ToSchema)]
 pub struct GetEntryParams {
-    pub timestamp: Option<u64>,
+    /// The unix timestamp in seconds. This endpoint will return the first update whose
+    /// timestamp is <= the provided value.
+    #[param(value_type = i64)]
+    #[param(example = doc_examples::timestamp_example)]
+    pub timestamp: Option<UnixTimestamp>,
     pub interval: Option<Interval>,
     pub routing: Option<bool>,
     pub aggregation: Option<AggregationMode>,
@@ -145,7 +152,7 @@ pub struct GetEntryParams {
 impl Default for GetEntryParams {
     fn default() -> Self {
         Self {
-            timestamp: Some(chrono::Utc::now().timestamp_millis() as u64),
+            timestamp: Some(chrono::Utc::now().timestamp()),
             interval: Some(Interval::default()),
             routing: Some(false),
             aggregation: Some(AggregationMode::default()),

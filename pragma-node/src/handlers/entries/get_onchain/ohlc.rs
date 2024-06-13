@@ -72,12 +72,26 @@ async fn handle_channel(mut socket: WebSocket, state: AppState) {
     let mut ohlc_to_compute = 10;
     let mut ohlc_data: Vec<OHLCEntry> = Vec::new();
 
+    //send a ping (unsupported by some browsers) just to kick things off and get a response
+    if socket.send(Message::Ping(vec![])).await.is_ok() {
+        tracing::info!("Pinged ...");
+    } else {
+        tracing::info!("Could not send ping !");
+        // no Error here since the only thing we can do is to close the connection.
+        // If we can not send messages, there is no way to salvage the statemachine anyway.
+        return;
+    }
+
     loop {
         tokio::select! {
-            Some(msg) = socket.recv() => {
-                if let Ok(Message::Text(text)) = msg {
-                    handle_message_received(&mut socket, &state, &mut subscribed_pair, &mut network, &mut interval, text).await;
-                }
+            Some(maybe_msg) = socket.recv() => {
+                // TODO: remove once we have proper top-level error handling
+                let msg = if let Ok(msg) = maybe_msg {
+                    msg
+                } else {
+                    break;
+                };
+                handle_message_received(&mut socket, &state, &mut subscribed_pair, &mut network, &mut interval, msg).await;
             },
             _ = update_interval.tick() => {
                 match send_ohlc_data(&mut socket, &state, &subscribed_pair, &mut ohlc_data, network, interval, ohlc_to_compute).await {
@@ -102,9 +116,27 @@ async fn handle_message_received(
     subscribed_pair: &mut Option<String>,
     network: &mut Network,
     interval: &mut Interval,
-    message: String,
+    message: Message,
 ) {
-    if let Ok(subscription_msg) = serde_json::from_str::<SubscriptionRequest>(&message) {
+    let maybe_client_message = match message {
+        Message::Close(_) => {
+            // TODO: Send the close message to gracefully shut down the connection
+            // Otherwise the client might get an abnormal Websocket closure
+            // error.
+            return;
+        }
+        Message::Text(text) => serde_json::from_str::<SubscriptionRequest>(&text),
+        Message::Binary(data) => serde_json::from_slice::<SubscriptionRequest>(&data),
+        Message::Ping(_) => {
+            // Axum will send Pong automatically
+            return;
+        }
+        Message::Pong(_) => {
+            return;
+        }
+    };
+
+    if let Ok(subscription_msg) = maybe_client_message {
         match subscription_msg.msg_type {
             SubscriptionType::Subscribe => {
                 let pair_exists = is_onchain_existing_pair(

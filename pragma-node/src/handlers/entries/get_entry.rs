@@ -33,7 +33,7 @@ pub async fn get_entry(
     // Construct pair id
     let pair_id = currency_pair_to_pair_id(&pair.0, &pair.1);
 
-    let now = chrono::Utc::now().timestamp_millis() as u64;
+    let now = chrono::Utc::now().timestamp();
 
     let timestamp = if let Some(timestamp) = params.timestamp {
         timestamp
@@ -55,7 +55,6 @@ pub async fn get_entry(
 
     let is_routing = params.routing.unwrap_or(false);
 
-    // Validate given timestamp
     if timestamp > now {
         return Err(EntryError::InvalidTimestamp);
     }
@@ -83,7 +82,7 @@ fn adapt_entry_to_entry_response(
 ) -> GetEntryResponse {
     GetEntryResponse {
         pair_id,
-        timestamp: entry.time.and_utc().timestamp_millis() as u64,
+        timestamp: entry.time.and_utc().timestamp() as u64,
         num_sources_aggregated: entry.num_sources as usize,
         price: big_decimal_price_to_hex(&entry.median_price),
         decimals,

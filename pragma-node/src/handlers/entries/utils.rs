@@ -5,6 +5,7 @@ use chrono::NaiveDateTime;
 use deadpool_diesel::postgres::Pool;
 use pragma_common::types::Network;
 use pragma_entities::{Entry, PerpEntry};
+use serde_json::json;
 use starknet::core::crypto::{EcdsaSignError, Signature};
 use starknet::core::types::FieldElement;
 use starknet::signers::SigningKey;
@@ -193,8 +194,10 @@ pub(crate) fn sign_data(
 /// Send an error message to the client.
 /// (Does not close the connection)
 pub(crate) async fn send_err_to_socket(socket: &mut WebSocket, error: &str) {
-    let error_msg = serde_json::json!({ "error": error }).to_string();
-    socket.send(Message::Text(error_msg)).await.unwrap();
+    let error_msg = json!({ "error": error }).to_string();
+    if socket.send(Message::Text(error_msg)).await.is_err() {
+        tracing::error!("Client already disconnected. Could not send error message.");
+    }
 }
 
 #[cfg(test)]
