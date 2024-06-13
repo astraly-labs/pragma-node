@@ -756,7 +756,7 @@ impl TryFrom<RawMedianEntryWithComponents> for MedianEntryWithComponents {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct EntryComponent {
     pub pair_id: String,
     pub price: BigDecimal,

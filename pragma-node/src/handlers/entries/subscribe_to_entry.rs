@@ -248,17 +248,17 @@ async fn get_all_median_entries(
     state: &AppState,
     subscription: &CurrentSubscription,
 ) -> Result<Vec<MedianEntryWithComponents>, EntryError> {
+    let index_pairs = subscription.get_subscribed_spot_pairs();
+    let perp_pairs = subscription.get_subscribed_perp_pairs();
+
+    let (index_median_entries, mark_median_entries_result) = tokio::join!(
+        compute_index_median_entries(state, index_pairs),
+        compute_mark_median_entries(state, perp_pairs)
+    );
+
     let mut median_entries = vec![];
-
-    // TODO: can be parallelized
-    let index_median_entries =
-        compute_index_median_entries(state, subscription.get_subscribed_spot_pairs()).await?;
-    median_entries.extend(index_median_entries);
-
-    let mark_median_entries =
-        compute_mark_median_entries(state, subscription.get_subscribed_perp_pairs()).await?;
-    median_entries.extend(mark_median_entries);
-
+    median_entries.extend(index_median_entries?);
+    median_entries.extend(mark_median_entries_result?);
     Ok(median_entries)
 }
 
@@ -279,28 +279,94 @@ async fn compute_mark_median_entries(
     state: &AppState,
     perp_pairs: Vec<String>,
 ) -> Result<Vec<MedianEntryWithComponents>, EntryError> {
-    let mut mark_median_entries = vec![];
-
-    // Can parallelize the usd/non_usd pairs computations
-    let (usd_pairs, _non_usd_pairs): (Vec<String>, Vec<String>) = perp_pairs
+    let (usd_pairs, non_usd_pairs): (Vec<String>, Vec<String>) = perp_pairs
         .into_iter()
         .partition(|pair| pair.ends_with("USD"));
-    let usd_mark_median_entries = get_current_median_entries_with_components(
+
+    let (usd_mark_median_entries, non_usd_mark_median_entries) = tokio::join!(
+        compute_mark_median_entries_for_usd_pairs(state, usd_pairs),
+        compute_mark_median_entries_for_non_usd_pairs(state, non_usd_pairs)
+    );
+
+    let mut mark_median_entries = vec![];
+    mark_median_entries.extend(usd_mark_median_entries?);
+    mark_median_entries.extend(non_usd_mark_median_entries?);
+    Ok(mark_median_entries)
+}
+
+async fn compute_mark_median_entries_for_usd_pairs(
+    state: &AppState,
+    usd_pairs: Vec<String>,
+) -> Result<Vec<MedianEntryWithComponents>, EntryError> {
+    if usd_pairs.is_empty() {
+        return Ok(vec![]);
+    }
+    get_current_median_entries_with_components(
         &state.timescale_pool,
         &usd_pairs,
         DataType::PerpEntry,
     )
     .await
-    // TODO: nice error
-    .map_err(|e| e.to_entry_error(&"".to_string()))?;
-    mark_median_entries.extend(usd_mark_median_entries);
+    .map_err(|e| e.to_entry_error(&usd_pairs.join(",")))
+}
 
-    // TODO: Implement for non_usd_pairs, i.e median + divide by {currency}/USD spot price
-    let non_usd_mark_median_entries = vec![];
-    // 1. Get the median spot prices for the non_usd (usdt, usdc.....) (usdc/usd, usdt/usd..)
-    // 2. Get the median mark prices of the non usd pairs
-    // 3. divide median mark price by median spot price
-    mark_median_entries.extend(non_usd_mark_median_entries);
+async fn compute_mark_median_entries_for_non_usd_pairs(
+    state: &AppState,
+    non_usd_pairs: Vec<String>,
+) -> Result<Vec<MedianEntryWithComponents>, EntryError> {
+    if non_usd_pairs.is_empty() {
+        return Ok(vec![]);
+    }
+    let usd_pairs: Vec<String> = non_usd_pairs
+        .iter()
+        // safe to unwrap since we are sure that the pairs are in the format of "XXX/YYY"
+        .map(|pair| format!("{}/USD", pair.split('/').last().unwrap()))
+        .collect();
+
+    let (usd_pairs_spot_median_entries, pairs_perp_median_entries) = tokio::join!(
+        get_current_median_entries_with_components(
+            &state.timescale_pool,
+            &usd_pairs,
+            DataType::SpotEntry,
+        ),
+        get_current_median_entries_with_components(
+            &state.timescale_pool,
+            &non_usd_pairs,
+            DataType::PerpEntry,
+        )
+    );
+
+    let mut mark_median_entries = vec![];
+    let usd_pairs_spot_median_entries = usd_pairs_spot_median_entries?;
+    let pairs_perp_median_entries = pairs_perp_median_entries?;
+
+    for perp_median_entry in pairs_perp_median_entries {
+        let related_usd_spot = format!(
+            "{}/USD",
+            // safe to unwrap since we are sure that the pairs are in the format of "XXX/YYY"
+            perp_median_entry.pair_id.split('/').last().unwrap()
+        );
+
+        let spot_usd_median_entry = usd_pairs_spot_median_entries
+            .iter()
+            .find(|spot_median_entry| spot_median_entry.pair_id == related_usd_spot)
+            .ok_or(EntryError::InternalServerError)?;
+
+        let perp_pair_price = perp_median_entry.median_price.clone();
+        let spot_usd_price = spot_usd_median_entry.median_price.clone();
+        let mark_price = perp_pair_price / spot_usd_price;
+
+        let mut components = perp_median_entry.components;
+        components.extend(spot_usd_median_entry.components.clone());
+
+        let mark_median_entry = MedianEntryWithComponents {
+            // TODO: do we need to change eg. BTC/USDT to BTC/USD here?
+            pair_id: perp_median_entry.pair_id.clone(),
+            median_price: mark_price,
+            components,
+        };
+        mark_median_entries.push(mark_median_entry);
+    }
 
     Ok(mark_median_entries)
 }
