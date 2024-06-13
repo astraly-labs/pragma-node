@@ -36,6 +36,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 }
 
+// TODO(akhercha): Abstract out the insertion-try-to-insert logic
 async fn process_payload(pool: &Pool, payload: Vec<u8>) -> Result<(), Box<dyn std::error::Error>> {
     let decoded_payload = String::from_utf8_lossy(&payload);
     let is_future_entries = decoded_payload.contains("expiration_timestamp");
@@ -81,6 +82,8 @@ async fn process_payload(pool: &Pool, payload: Vec<u8>) -> Result<(), Box<dyn st
     }
     Ok(())
 }
+
+// TODO(akhercha): very similar functions - refactor
 
 pub async fn insert_spot_entries(
     pool: &Pool,
