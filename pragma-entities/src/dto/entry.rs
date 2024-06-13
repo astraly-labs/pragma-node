@@ -27,7 +27,7 @@ impl From<crate::Entry> for Entry {
             pair_id: entry.pair_id,
             publisher: entry.publisher,
             source: entry.source,
-            timestamp: entry.timestamp.and_utc().timestamp_millis() as u64,
+            timestamp: entry.timestamp.and_utc().timestamp() as u64,
             price: entry.price.to_u128().unwrap_or(0), // change default value ?
         }
     }
