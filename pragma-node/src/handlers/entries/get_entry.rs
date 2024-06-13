@@ -56,7 +56,6 @@ pub async fn get_entry(
 
     let is_routing = params.routing.unwrap_or(false);
 
-    // Validate given timestamp
     if timestamp > now {
         return Err(EntryError::InvalidTimestamp);
     }
