@@ -87,7 +87,7 @@ pub async fn routing(
     pool: &deadpool_diesel::postgres::Pool,
     pair_id: String,
     interval: Interval,
-    timestamp: u64,
+    timestamp: i64,
     is_routing: bool,
     agg_mode: AggregationMode,
 ) -> Result<(MedianEntry, u32), InfraError> {
@@ -164,7 +164,7 @@ async fn find_alternative_pair_price(
     base: &str,
     quote: &str,
     interval: Interval,
-    timestamp: u64,
+    timestamp: i64,
     agg_mode: AggregationMode,
 ) -> Result<(MedianEntry, u32), InfraError> {
     let conn = pool.get().await.map_err(adapt_infra_error)?;
@@ -213,7 +213,7 @@ async fn get_price_decimals(
     pool: &deadpool_diesel::postgres::Pool,
     pair_id: String,
     interval: Interval,
-    timestamp: u64,
+    timestamp: i64,
     agg_mode: AggregationMode,
 ) -> Result<(MedianEntry, u32), InfraError> {
     let entry = match agg_mode {
@@ -251,7 +251,7 @@ pub async fn get_twap_price(
     pool: &deadpool_diesel::postgres::Pool,
     pair_id: String,
     interval: Interval,
-    time: u64,
+    time: i64,
 ) -> Result<MedianEntry, InfraError> {
     let conn = pool.get().await.map_err(adapt_infra_error)?;
 
@@ -357,7 +357,7 @@ pub async fn get_median_price(
     pool: &deadpool_diesel::postgres::Pool,
     pair_id: String,
     interval: Interval,
-    time: u64,
+    time: i64,
 ) -> Result<MedianEntry, InfraError> {
     let conn = pool.get().await.map_err(adapt_infra_error)?;
 
@@ -595,7 +595,7 @@ pub async fn get_ohlc(
     pool: &deadpool_diesel::postgres::Pool,
     pair_id: String,
     interval: Interval,
-    time: u64,
+    time: i64,
 ) -> Result<Vec<OHLCEntry>, InfraError> {
     let conn = pool.get().await.map_err(adapt_infra_error)?;
 
