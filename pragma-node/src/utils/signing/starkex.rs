@@ -35,25 +35,32 @@ pub fn get_entry_hash(
     timestamp: u64,
     price: &BigDecimal,
 ) -> Result<FieldElement, ConversionError> {
-    let pair_id = pair_id.replace('/', ""); // Remove the "/" from the pair_id if it exists
-    let first_number = build_first_number(oracle_name, &pair_id)?;
+    let first_number = build_external_asset_id(oracle_name, pair_id)?;
     let second_number = build_second_number(timestamp as u128, price)?;
     Ok(pedersen_hash(&first_number, &second_number))
 }
 
-/// Builds the first number for the hash computation based on oracle name and pair id.
-fn build_first_number(oracle_name: &str, pair_id: &str) -> Result<FieldElement, ConversionError> {
+pub fn get_external_asset_id(oracle_name: &str, pair_id: &str) -> Result<String, ConversionError> {
+    let pair_id = pair_id.replace('/', ""); // Remove the "/" from the pair_id if it exists
     let oracle_name =
         cairo_short_string_to_felt(oracle_name).map_err(|_| ConversionError::FeltConversion)?;
     let oracle_as_hex = format!("{:x}", oracle_name);
     let pair_id =
-        cairo_short_string_to_felt(pair_id).map_err(|_| ConversionError::FeltConversion)?;
+        cairo_short_string_to_felt(&pair_id).map_err(|_| ConversionError::FeltConversion)?;
     let pair_id: u128 = pair_id
         .try_into()
         .map_err(|_| ConversionError::U128Conversion)?;
     let pair_as_hex = format!("{:0<width$x}", pair_id, width = 32);
-    let v = format!("0x{}{}", pair_as_hex, oracle_as_hex);
-    FieldElement::from_hex_be(&v).map_err(|_| ConversionError::FeltConversion)
+    Ok(format!("0x{}{}", pair_as_hex, oracle_as_hex))
+}
+
+/// Builds the first number for the hash computation based on oracle name and pair id.
+fn build_external_asset_id(
+    oracle_name: &str,
+    pair_id: &str,
+) -> Result<FieldElement, ConversionError> {
+    let external_asset_id = get_external_asset_id(oracle_name, pair_id)?;
+    FieldElement::from_hex_be(&external_asset_id).map_err(|_| ConversionError::FeltConversion)
 }
 
 /// Builds the second number for the hash computation based on timestamp and price.

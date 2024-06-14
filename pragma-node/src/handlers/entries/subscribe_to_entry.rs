@@ -226,16 +226,13 @@ async fn get_subscribed_pairs_medians(
     let now = chrono::Utc::now().timestamp();
     for entry in median_entries {
         let median_price = entry.median_price.clone();
+        let pair_id = entry.pair_id.clone();
         let mut oracle_price: AssetOraclePrice = entry
             .try_into()
             .map_err(|_| EntryError::InternalServerError)?;
 
-        let signature = sign_median_price(
-            &state.pragma_signer,
-            &oracle_price.global_asset_id,
-            now as u64,
-            median_price,
-        )?;
+        let signature =
+            sign_median_price(&state.pragma_signer, &pair_id, now as u64, median_price)?;
 
         oracle_price.signature = signature;
         response.oracle_prices.push(oracle_price);
@@ -361,7 +358,6 @@ async fn compute_mark_median_entries_for_non_usd_pairs(
         components.extend(spot_usd_median_entry.components.clone());
 
         let mark_median_entry = MedianEntryWithComponents {
-            // TODO: do we need to change eg. BTC/USDT to BTC/USD here?
             pair_id: perp_median_entry.pair_id.clone(),
             median_price: mark_price,
             components,

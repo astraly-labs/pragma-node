@@ -6,7 +6,6 @@ use diesel::prelude::QueryableByName;
 use diesel::sql_types::{Double, Jsonb, VarChar};
 use diesel::{ExpressionMethods, QueryDsl, Queryable, RunQueryDsl};
 use serde::{Deserialize, Serialize};
-use starknet::core::utils::cairo_short_string_to_felt;
 
 use pragma_common::types::{AggregationMode, ConversionError, DataType, Interval};
 use pragma_entities::dto;
@@ -18,10 +17,12 @@ use pragma_entities::{
 
 use crate::handlers::entries::constants::{
     INITAL_INTERVAL_IN_MS, INTERVAL_INCREMENT_IN_MS, MAX_INTERVAL_WITHOUT_ENTRIES,
-    MINIMUM_NUMBER_OF_PUBLISHERS,
+    MINIMUM_NUMBER_OF_PUBLISHERS, PRAGMA_ORACLE_NAME_FOR_STARKEX,
 };
 use crate::handlers::entries::{AssetOraclePrice, SignedPublisherPrice};
-use crate::utils::{convert_via_quote, get_encoded_pair_id, normalize_to_decimals};
+use crate::utils::{
+    convert_via_quote, get_encoded_pair_id, get_external_asset_id, normalize_to_decimals,
+};
 
 pub async fn _insert(
     pool: &deadpool_diesel::postgres::Pool,
@@ -743,13 +744,11 @@ impl TryFrom<RawMedianEntryWithComponents> for MedianEntryWithComponents {
             })
             .collect::<Result<Vec<EntryComponent>, Self::Error>>()?;
 
-        let pair_id = cairo_short_string_to_felt(&raw.pair_id)
-            .map_err(|_| Self::Error::FailedSerialization)?;
         let median_price =
             BigDecimal::from_f64(raw.median_price).ok_or(Self::Error::BigDecimalConversion)?;
 
         Ok(MedianEntryWithComponents {
-            pair_id: format!("0x{:x}", pair_id),
+            pair_id: raw.pair_id,
             median_price,
             components,
         })
@@ -798,8 +797,11 @@ impl TryFrom<MedianEntryWithComponents> for AssetOraclePrice {
             .map(SignedPublisherPrice::try_from)
             .collect();
 
+        let global_asset_id =
+            get_external_asset_id(PRAGMA_ORACLE_NAME_FOR_STARKEX, &median_entry.pair_id)?;
+
         Ok(AssetOraclePrice {
-            global_asset_id: median_entry.pair_id,
+            global_asset_id,
             median_price: median_entry.median_price.to_string(),
             signed_prices: signed_prices?,
             signature: Default::default(),
@@ -857,7 +859,7 @@ fn get_table_name_from_type(entry_type: DataType) -> &'static str {
     match entry_type {
         DataType::SpotEntry => "entries",
         DataType::FutureEntry => "future_entries",
-        DataType::PerpEntry => "perp_entries",
+        DataType::PerpEntry => "future_entries",
     }
 }
 
