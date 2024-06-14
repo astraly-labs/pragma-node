@@ -99,6 +99,9 @@ impl MarkPricer {
 
             let perp_pair_price = perp_median_entry.median_price.clone();
             let spot_usd_price = spot_usd_median_entry.median_price.clone();
+
+            // TODO: gives the wrong price, need to get the decimals of spot
+            // stablecoin USD price & apply to it before dividing
             let mark_price = perp_pair_price / spot_usd_price;
 
             let mut components = perp_median_entry.components;
