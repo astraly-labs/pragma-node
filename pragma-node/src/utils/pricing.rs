@@ -50,7 +50,7 @@ pub struct MarkPricer {
 }
 
 impl MarkPricer {
-    fn build_stable_to_usd_pairs(non_usd_pairs: Vec<String>) -> Vec<String> {
+    fn build_stable_to_usd_pairs(non_usd_pairs: &[String]) -> Vec<String> {
         non_usd_pairs
             .iter()
             .map(|pair| format!("{}/USD", pair.split('/').last().unwrap()))
@@ -58,9 +58,9 @@ impl MarkPricer {
     }
 
     /// Computes the stablecoin/USD pairs median entries.
-    pub async fn get_stablecoins_index_entries(
+    async fn get_stablecoins_index_entries(
         db_pool: &Pool,
-        stablecoin_pairs: Vec<String>,
+        stablecoin_pairs: &[String],
     ) -> Result<Vec<MedianEntryWithComponents>, EntryError> {
         let stable_to_usd_pairs = Self::build_stable_to_usd_pairs(stablecoin_pairs);
         let stablecoins_index_pricer = IndexPricer::new(stable_to_usd_pairs, DataType::SpotEntry);
@@ -68,12 +68,12 @@ impl MarkPricer {
     }
 
     /// Computes the non USD quoted pairs median entries.
-    pub async fn get_pairs_entries(
+    async fn get_pairs_entries(
         db_pool: &Pool,
-        pairs: Vec<String>,
+        pairs: &[String],
         pair_type: DataType,
     ) -> Result<Vec<MedianEntryWithComponents>, EntryError> {
-        let pairs_entries = IndexPricer::new(pairs, pair_type);
+        let pairs_entries = IndexPricer::new(pairs.to_vec(), pair_type);
         pairs_entries.compute(db_pool).await
     }
 
@@ -126,8 +126,8 @@ impl Pricer for MarkPricer {
             return Ok(vec![]);
         }
         let (stablecoins_spot_entries, pairs_perp_entries) = tokio::join!(
-            Self::get_stablecoins_index_entries(db_pool, self.pairs.clone()),
-            Self::get_pairs_entries(db_pool, self.pairs.clone(), self.pair_type)
+            Self::get_stablecoins_index_entries(db_pool, &self.pairs),
+            Self::get_pairs_entries(db_pool, &self.pairs, self.pair_type)
         );
         Self::merge_entries_from(stablecoins_spot_entries?, pairs_perp_entries?)
     }

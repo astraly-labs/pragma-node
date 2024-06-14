@@ -256,6 +256,7 @@ async fn get_all_entries(
     let mark_pricer_usd = IndexPricer::new(usd_pairs, DataType::PerpEntry);
     let mark_pricer_non_usd = MarkPricer::new(non_usd_pairs, DataType::PerpEntry);
 
+    // Compute entries concurrently
     let (index_entries, usd_mark_entries, non_usd_mark_entries) = tokio::join!(
         index_pricer.compute(&state.timescale_pool),
         mark_pricer_usd.compute(&state.timescale_pool),
