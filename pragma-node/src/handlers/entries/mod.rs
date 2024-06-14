@@ -150,7 +150,7 @@ pub struct GetEntryParams {
 impl Default for GetEntryParams {
     fn default() -> Self {
         Self {
-            timestamp: Some(chrono::Utc::now().timestamp()),
+            timestamp: Some(chrono::Utc::now().timestamp_millis()),
             interval: Some(Interval::default()),
             routing: Some(false),
             aggregation: Some(AggregationMode::default()),
