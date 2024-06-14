@@ -22,7 +22,7 @@ pub struct PublishersFilter {
 }
 
 impl Publisher {
-    pub fn assert_publisher_is_active(&self) -> Result<(), PublisherError> {
+    pub fn assert_is_active(&self) -> Result<(), PublisherError> {
         if self.active {
             Ok(())
         } else {

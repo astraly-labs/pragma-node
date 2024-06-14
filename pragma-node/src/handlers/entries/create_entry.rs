@@ -43,7 +43,7 @@ pub async fn create_entries(
         .map_err(EntryError::InfraError)?;
 
     // Check if publisher is active
-    publisher.assert_publisher_is_active()?;
+    publisher.assert_is_active()?;
 
     // Fetch public key from database
     // TODO: Fetch it from contract

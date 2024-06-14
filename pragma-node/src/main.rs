@@ -64,7 +64,6 @@ async fn main() {
                 handlers::entries::GetOnchainCheckpointsResponse,
                 handlers::entries::GetOnchainPublishersParams,
                 handlers::entries::GetOnchainPublishersResponse,
-                handlers::entries::GetOnchainOHLCParams,
                 handlers::entries::GetOnchainOHLCResponse,
             ),
             schemas(

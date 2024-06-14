@@ -15,7 +15,7 @@ use crate::handlers::entries::constants::PRAGMA_ORACLE_NAME_FOR_STARKEX;
 use super::sign_data;
 
 pub enum SigningError {
-    ConversionError(ConversionError),
+    ConversionError,
     SigningError(EcdsaSignError),
 }
 
@@ -31,7 +31,7 @@ pub fn sign_median_price(
         timestamp,
         &median_price,
     )
-    .map_err(SigningError::ConversionError)?;
+    .map_err(|_| SigningError::ConversionError)?;
     let signature = sign_data(signer, hash_to_sign).map_err(SigningError::SigningError)?;
     Ok(format!("0x{:}", signature))
 }

@@ -191,12 +191,6 @@ pub struct Publisher {
 #[derive(Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct GetOnchainPublishersResponse(pub Vec<Publisher>);
 
-#[derive(Debug, Default, Deserialize, IntoParams, ToSchema)]
-pub struct GetOnchainOHLCParams {
-    pub network: Network,
-    pub interval: Interval,
-}
-
 #[derive(Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct GetOnchainOHLCResponse {
     pub pair_id: String,
