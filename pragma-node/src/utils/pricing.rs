@@ -53,6 +53,8 @@ pub struct MarkPricer {
 }
 
 impl MarkPricer {
+    /// Builds the stablecoin/USD pairs from the non USD pairs.
+    /// Example: ["BTC/USDT", "ETH/USDT"] -> ["USDT/USD"]
     fn build_stable_to_usd_pairs(non_usd_pairs: &[String]) -> Vec<String> {
         non_usd_pairs
             .iter()
@@ -71,6 +73,7 @@ impl MarkPricer {
     }
 
     /// Retrieves the number of decimals for quote stablecoins.
+    /// Example: ["BTC/USDT", "ETH/USDT"] -> {"USDT": 6}
     async fn get_stablecoins_decimals(
         db_pool: &Pool,
         stablecoin_pairs: Vec<String>,
@@ -104,6 +107,9 @@ impl MarkPricer {
         pairs_entries.compute(db_pool).await
     }
 
+    /// Given the median price of a perp pair, the median price of the spot
+    /// stablecoin/USD pair and the number of decimals of the stablecoin, computes
+    /// the mark price.
     fn compute_mark_price(
         perp_pair_price: &BigDecimal,
         spot_usd_price: &BigDecimal,

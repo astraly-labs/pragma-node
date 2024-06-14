@@ -4,11 +4,11 @@ use std::time::Duration;
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::State;
 use axum::response::IntoResponse;
+use serde::{Deserialize, Serialize};
+use tokio::time::interval;
 
 use pragma_common::types::DataType;
 use pragma_entities::EntryError;
-use serde::{Deserialize, Serialize};
-use tokio::time::interval;
 
 use crate::handlers::entries::utils::send_err_to_socket;
 use crate::handlers::entries::SubscribeToEntryResponse;
@@ -133,7 +133,7 @@ async fn handle_channel(mut socket: WebSocket, state: AppState) {
             maybe_msg = socket.recv() => {
                 match maybe_msg {
                     Some(Ok(msg)) => {
-                        decode_and_process_message_received(&mut socket, &state, &mut subscription, msg).await;
+                        decode_and_handle_message_received(&mut socket, &state, &mut subscription, msg).await;
                     }
                     Some(Err(_)) | None => {
                         tracing::info!("Client disconnected or error occurred. Closing the channel.");
@@ -156,7 +156,7 @@ async fn handle_channel(mut socket: WebSocket, state: AppState) {
     }
 }
 
-async fn decode_and_process_message_received(
+async fn decode_and_handle_message_received(
     socket: &mut WebSocket,
     state: &AppState,
     subscription: &mut CurrentSubscription,
@@ -176,8 +176,8 @@ async fn decode_and_process_message_received(
         Message::Pong(_) => return,
     };
 
-    if let Ok(subscription_request) = maybe_request {
-        handle_subscription_request(socket, state, subscription, subscription_request).await;
+    if let Ok(request) = maybe_request {
+        handle_subscription_request(socket, state, subscription, request).await;
     } else {
         let error_msg = "Invalid message type. Please check the documentation for more info.";
         send_err_to_socket(socket, error_msg).await;
@@ -276,7 +276,7 @@ async fn get_subscribed_pairs_medians(
         oracle_price.signature = signature;
         response.oracle_prices.push(oracle_price);
     }
-    response.timestamp_s = now;
+    response.timestamp = now;
     Ok(response)
 }
 
