@@ -1,9 +1,40 @@
 use bigdecimal::{BigDecimal, ToPrimitive};
+use starknet::{
+    core::{
+        crypto::{pedersen_hash, EcdsaSignError},
+        types::FieldElement,
+        utils::cairo_short_string_to_felt,
+    },
+    signers::SigningKey,
+};
 
 use pragma_common::types::ConversionError;
-use starknet::core::{
-    crypto::pedersen_hash, types::FieldElement, utils::cairo_short_string_to_felt,
-};
+
+use crate::handlers::entries::constants::PRAGMA_ORACLE_NAME_FOR_STARKEX;
+
+use super::sign_data;
+
+pub enum SigningError {
+    ConversionError(ConversionError),
+    SigningError(EcdsaSignError),
+}
+
+pub fn sign_median_price(
+    signer: &SigningKey,
+    asset_id: &str,
+    timestamp: u64,
+    median_price: BigDecimal,
+) -> Result<String, SigningError> {
+    let hash_to_sign = get_entry_hash(
+        PRAGMA_ORACLE_NAME_FOR_STARKEX,
+        asset_id,
+        timestamp,
+        &median_price,
+    )
+    .map_err(SigningError::ConversionError)?;
+    let signature = sign_data(signer, hash_to_sign).map_err(SigningError::SigningError)?;
+    Ok(format!("0x{:}", signature))
+}
 
 /// Converts a pair id to its hexadecimal id.
 pub fn get_encoded_pair_id(pair_id: &str) -> Result<String, ConversionError> {
@@ -29,7 +60,7 @@ pub fn get_encoded_pair_id(pair_id: &str) -> Result<String, ConversionError> {
 ///
 /// See:
 /// https://docs.starkware.co/starkex/perpetual/becoming-an-oracle-provider-for-starkex.html#signing_prices
-pub fn get_entry_hash(
+fn get_entry_hash(
     oracle_name: &str,
     pair_id: &str,
     timestamp: u64,

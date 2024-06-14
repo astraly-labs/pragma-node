@@ -4,7 +4,7 @@ use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::Json;
 use serde_json::json;
-use starknet::core::crypto::{EcdsaSignError, EcdsaVerifyError};
+use starknet::core::crypto::EcdsaVerifyError;
 use utoipa::ToSchema;
 
 #[derive(Debug, thiserror::Error, ToSchema)]
@@ -26,7 +26,7 @@ pub enum EntryError {
     #[error("invalid signature")]
     InvalidSignature(EcdsaVerifyError),
     #[error("could not sign price")]
-    InvalidSigner(EcdsaSignError),
+    InvalidSigner,
     #[error("unauthorized request")]
     Unauthorized,
     #[error("invalid timestamp")]

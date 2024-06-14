@@ -4,12 +4,10 @@ use std::time::Duration;
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::State;
 use axum::response::IntoResponse;
-use bigdecimal::BigDecimal;
 
 use pragma_common::types::DataType;
 use pragma_entities::EntryError;
 use serde::{Deserialize, Serialize};
-use starknet::signers::SigningKey;
 use tokio::time::interval;
 
 use crate::handlers::entries::utils::send_err_to_socket;
@@ -17,11 +15,10 @@ use crate::handlers::entries::SubscribeToEntryResponse;
 use crate::infra::repositories::entry_repository::{
     get_current_median_entries_with_components, MedianEntryWithComponents,
 };
-use crate::utils::get_entry_hash;
+use crate::utils::sign_median_price;
 use crate::AppState;
 
-use super::constants::PRAGMA_ORACLE_NAME_FOR_STARKEX;
-use super::utils::{only_existing_pairs, sign_data};
+use super::utils::only_existing_pairs;
 use super::AssetOraclePrice;
 
 #[derive(Default, Debug, Serialize, Deserialize)]
@@ -231,8 +228,8 @@ async fn get_subscribed_pairs_medians(
             .try_into()
             .map_err(|_| EntryError::InternalServerError)?;
 
-        let signature =
-            sign_median_price(&state.pragma_signer, &pair_id, now as u64, median_price)?;
+        let signature = sign_median_price(&state.pragma_signer, &pair_id, now as u64, median_price)
+            .map_err(|_| EntryError::InvalidSigner)?;
 
         oracle_price.signature = signature;
         response.oracle_prices.push(oracle_price);
@@ -366,22 +363,4 @@ async fn compute_mark_median_entries_for_non_usd_pairs(
     }
 
     Ok(mark_median_entries)
-}
-
-/// Sign the median price with the passed signer and return the signature 0x prefixed.
-fn sign_median_price(
-    signer: &SigningKey,
-    asset_id: &str,
-    timestamp: u64,
-    median_price: BigDecimal,
-) -> Result<String, EntryError> {
-    let hash_to_sign = get_entry_hash(
-        PRAGMA_ORACLE_NAME_FOR_STARKEX,
-        asset_id,
-        timestamp,
-        &median_price,
-    )
-    .map_err(|_| EntryError::InternalServerError)?;
-    let signature = sign_data(signer, hash_to_sign).map_err(EntryError::InvalidSigner)?;
-    Ok(format!("0x{:}", signature))
 }

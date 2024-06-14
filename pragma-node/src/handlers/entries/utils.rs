@@ -6,9 +6,6 @@ use deadpool_diesel::postgres::Pool;
 use pragma_common::types::Network;
 use pragma_entities::{Entry, FutureEntry};
 use serde_json::json;
-use starknet::core::crypto::{EcdsaSignError, Signature};
-use starknet::core::types::FieldElement;
-use starknet::signers::SigningKey;
 use std::collections::HashMap;
 
 use crate::infra::repositories::{
@@ -180,14 +177,6 @@ pub(crate) async fn only_existing_pairs(
         .collect::<Vec<String>>();
 
     (spot_pairs, perp_pairs)
-}
-
-/// Sign the passed data with the signer & return the signature 0x prefixed.
-pub(crate) fn sign_data(
-    signer: &SigningKey,
-    data: FieldElement,
-) -> Result<Signature, EcdsaSignError> {
-    signer.sign(&data)
 }
 
 /// Send an error message to the client.
