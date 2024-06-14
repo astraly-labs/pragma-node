@@ -130,13 +130,16 @@ async fn handle_channel(mut socket: WebSocket, state: AppState) {
 
     loop {
         tokio::select! {
-            Some(maybe_msg) = socket.recv() => {
-                let msg = if let Ok(msg) = maybe_msg {
-                    msg
-                } else {
-                    continue;
-                };
-                decode_and_process_message_received(&mut socket, &state, &mut subscription, msg).await;
+            maybe_msg = socket.recv() => {
+                match maybe_msg {
+                    Some(Ok(msg)) => {
+                        decode_and_process_message_received(&mut socket, &state, &mut subscription, msg).await;
+                    }
+                    Some(Err(_)) | None => {
+                        tracing::info!("Client disconnected or error occurred. Closing the channel.");
+                        break;
+                    }
+                }
             },
             _ = update_interval.tick() => {
                 match send_median_entries(&mut socket, &state, &subscription).await {
@@ -145,6 +148,11 @@ async fn handle_channel(mut socket: WebSocket, state: AppState) {
                 };
             },
         }
+    }
+
+    // Ensure the socket is closed properly if the loop exits
+    if let Err(e) = socket.close().await {
+        tracing::error!("Failed to close the socket: {}", e);
     }
 }
 
