@@ -932,7 +932,7 @@ fn build_sql_query_for_median_with_components(
             .join(", "),
         interval_in_ms = interval_in_ms,
         perp_filter = match entry_type {
-            DataType::PerpEntry => "AND (e.expiry_timestamp IS NULL OR e.expiry_timestamp = 0)",
+            DataType::PerpEntry => "AND e.expiry_timestamp IS NULL",
             _ => "",
         }
     )
