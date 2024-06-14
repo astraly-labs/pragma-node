@@ -37,7 +37,7 @@ pub fn sign_median_price(
 }
 
 /// Converts a pair id to its hexadecimal id.
-pub fn get_encoded_pair_id(pair_id: &str) -> Result<String, ConversionError> {
+pub fn get_global_asset_it(pair_id: &str) -> Result<String, ConversionError> {
     let pair_id = pair_id.replace('/', ""); // Remove the "/" from the pair_id if it exists
     let pair_id =
         cairo_short_string_to_felt(&pair_id).map_err(|_| ConversionError::FeltConversion)?;
@@ -48,7 +48,7 @@ pub fn get_encoded_pair_id(pair_id: &str) -> Result<String, ConversionError> {
 /// and price.
 /// The signature is the pedersen hash of two FieldElements:
 ///
-/// first number (external_asset_id):
+/// first number (oracle_asset_id):
 ///  ---------------------------------------------------------------------------------
 ///  | asset_name (rest of the number)  - 211 bits       |   oracle_name (40 bits)   |
 ///  ---------------------------------------------------------------------------------
@@ -71,7 +71,7 @@ fn get_entry_hash(
     Ok(pedersen_hash(&first_number, &second_number))
 }
 
-pub fn get_external_asset_id(oracle_name: &str, pair_id: &str) -> Result<String, ConversionError> {
+pub fn get_oracle_asset_id(oracle_name: &str, pair_id: &str) -> Result<String, ConversionError> {
     let pair_id = pair_id.replace('/', ""); // Remove the "/" from the pair_id if it exists
     let oracle_name =
         cairo_short_string_to_felt(oracle_name).map_err(|_| ConversionError::FeltConversion)?;
@@ -90,7 +90,7 @@ fn build_external_asset_id(
     oracle_name: &str,
     pair_id: &str,
 ) -> Result<FieldElement, ConversionError> {
-    let external_asset_id = get_external_asset_id(oracle_name, pair_id)?;
+    let external_asset_id = get_oracle_asset_id(oracle_name, pair_id)?;
     FieldElement::from_hex_be(&external_asset_id).map_err(|_| ConversionError::FeltConversion)
 }
 
@@ -122,7 +122,7 @@ mod tests {
     #[case("SOLUSD", "0x534f4c555344")]
     #[case("SOLUSDT", "0x534f4c55534454")]
     fn test_get_encoded_pair_id(#[case] pair_id: &str, #[case] expected_encoded_pair_id: &str) {
-        let encoded_pair_id = get_encoded_pair_id(pair_id).expect("Could not encode pair id");
+        let encoded_pair_id = get_global_asset_it(pair_id).expect("Could not encode pair id");
         assert_eq!(
             encoded_pair_id, expected_encoded_pair_id,
             "Encoded pair id does not match for pair_id: {}",

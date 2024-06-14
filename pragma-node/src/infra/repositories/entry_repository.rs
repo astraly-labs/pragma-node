@@ -17,11 +17,11 @@ use pragma_entities::{
 
 use crate::handlers::entries::constants::{
     INITAL_INTERVAL_IN_MS, INTERVAL_INCREMENT_IN_MS, MAX_INTERVAL_WITHOUT_ENTRIES,
-    MINIMUM_NUMBER_OF_PUBLISHERS, PRAGMA_ORACLE_NAME_FOR_STARKEX,
+    MINIMUM_NUMBER_OF_PUBLISHERS,
 };
 use crate::handlers::entries::{AssetOraclePrice, SignedPublisherPrice};
 use crate::utils::{
-    convert_via_quote, get_encoded_pair_id, get_external_asset_id, normalize_to_decimals,
+    convert_via_quote, get_global_asset_it, get_oracle_asset_id, normalize_to_decimals,
 };
 
 pub async fn _insert(
@@ -769,7 +769,7 @@ impl TryFrom<EntryComponent> for SignedPublisherPrice {
     type Error = ConversionError;
 
     fn try_from(component: EntryComponent) -> Result<Self, Self::Error> {
-        let asset_id = get_encoded_pair_id(&component.pair_id)?;
+        let asset_id = get_oracle_asset_id(&component.publisher, &component.pair_id)?;
         Ok(SignedPublisherPrice {
             oracle_asset_id: format!("0x{}", asset_id),
             oracle_price: component.price.to_string(),
@@ -797,8 +797,7 @@ impl TryFrom<MedianEntryWithComponents> for AssetOraclePrice {
             .map(SignedPublisherPrice::try_from)
             .collect();
 
-        let global_asset_id =
-            get_external_asset_id(PRAGMA_ORACLE_NAME_FOR_STARKEX, &median_entry.pair_id)?;
+        let global_asset_id = get_global_asset_it(&median_entry.pair_id)?;
 
         Ok(AssetOraclePrice {
             global_asset_id,
