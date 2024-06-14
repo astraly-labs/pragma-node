@@ -10,5 +10,6 @@ mod aws;
 mod conversion;
 mod custom_extractors;
 pub mod doc_examples;
+pub mod pricing;
 mod signing;
 mod types;
