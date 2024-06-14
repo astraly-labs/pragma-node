@@ -132,8 +132,6 @@ impl MarkPricer {
             let spot_usd_price =
                 spot_usd_price / BigDecimal::from(10_u32.pow(decimals.to_u32().unwrap()));
 
-            tracing::info!("DIVIDING {} BY {}", perp_pair_price, spot_usd_price);
-
             let mark_price = perp_pair_price / spot_usd_price;
 
             let mut components = perp_median_entry.components;
