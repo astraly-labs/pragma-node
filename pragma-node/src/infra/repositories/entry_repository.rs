@@ -20,9 +20,7 @@ use crate::handlers::entries::constants::{
     MINIMUM_NUMBER_OF_PUBLISHERS,
 };
 use crate::handlers::entries::{AssetOraclePrice, SignedPublisherPrice};
-use crate::utils::{
-    convert_via_quote, get_global_asset_it, get_oracle_asset_id, normalize_to_decimals,
-};
+use crate::utils::{convert_via_quote, normalize_to_decimals, StarkexPrice};
 
 pub async fn _insert(
     pool: &deadpool_diesel::postgres::Pool,
@@ -769,7 +767,7 @@ impl TryFrom<EntryComponent> for SignedPublisherPrice {
     type Error = ConversionError;
 
     fn try_from(component: EntryComponent) -> Result<Self, Self::Error> {
-        let asset_id = get_oracle_asset_id(&component.publisher, &component.pair_id)?;
+        let asset_id = StarkexPrice::get_oracle_asset_id(&component.publisher, &component.pair_id)?;
         Ok(SignedPublisherPrice {
             oracle_asset_id: format!("0x{}", asset_id),
             oracle_price: component.price.to_string(),
@@ -797,7 +795,7 @@ impl TryFrom<MedianEntryWithComponents> for AssetOraclePrice {
             .map(SignedPublisherPrice::try_from)
             .collect();
 
-        let global_asset_id = get_global_asset_it(&median_entry.pair_id)?;
+        let global_asset_id = StarkexPrice::get_global_asset_it(&median_entry.pair_id)?;
 
         Ok(AssetOraclePrice {
             global_asset_id,

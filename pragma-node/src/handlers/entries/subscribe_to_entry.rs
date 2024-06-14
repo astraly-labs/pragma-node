@@ -14,9 +14,10 @@ use crate::handlers::entries::utils::send_err_to_socket;
 use crate::handlers::entries::SubscribeToEntryResponse;
 use crate::infra::repositories::entry_repository::MedianEntryWithComponents;
 use crate::utils::pricing::{IndexPricer, MarkPricer, Pricer};
-use crate::utils::sign_median_price;
+use crate::utils::{sign_data, StarkexPrice};
 use crate::AppState;
 
+use super::constants::PRAGMA_ORACLE_NAME_FOR_STARKEX;
 use super::utils::only_existing_pairs;
 use super::AssetOraclePrice;
 
@@ -229,7 +230,13 @@ async fn get_subscribed_pairs_medians(
             .try_into()
             .map_err(|_| EntryError::InternalServerError)?;
 
-        let signature = sign_median_price(&state.pragma_signer, &pair_id, now as u64, median_price)
+        let starkex_price = StarkexPrice {
+            oracle_name: PRAGMA_ORACLE_NAME_FOR_STARKEX.to_string(),
+            pair_id: pair_id.clone(),
+            timestamp: now as u64,
+            price: median_price,
+        };
+        let signature = sign_data(&state.pragma_signer, &starkex_price)
             .map_err(|_| EntryError::InvalidSigner)?;
 
         oracle_price.signature = signature;

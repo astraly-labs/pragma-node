@@ -1,109 +1,88 @@
 use bigdecimal::{BigDecimal, ToPrimitive};
-use starknet::{
-    core::{
-        crypto::{pedersen_hash, EcdsaSignError},
-        types::FieldElement,
-        utils::cairo_short_string_to_felt,
-    },
-    signers::SigningKey,
+use starknet::core::{
+    crypto::pedersen_hash, types::FieldElement, utils::cairo_short_string_to_felt,
 };
 
 use pragma_common::types::ConversionError;
 
-use crate::handlers::entries::constants::PRAGMA_ORACLE_NAME_FOR_STARKEX;
+use super::Signable;
 
-use super::sign_data;
-
-pub enum SigningError {
-    ConversionError,
-    SigningError(EcdsaSignError),
+pub struct StarkexPrice {
+    pub oracle_name: String,
+    pub pair_id: String,
+    pub timestamp: u64,
+    pub price: BigDecimal,
 }
 
-pub fn sign_median_price(
-    signer: &SigningKey,
-    asset_id: &str,
-    timestamp: u64,
-    median_price: BigDecimal,
-) -> Result<String, SigningError> {
-    let hash_to_sign = get_entry_hash(
-        PRAGMA_ORACLE_NAME_FOR_STARKEX,
-        asset_id,
-        timestamp,
-        &median_price,
-    )
-    .map_err(|_| SigningError::ConversionError)?;
-    let signature = sign_data(signer, hash_to_sign).map_err(SigningError::SigningError)?;
-    Ok(format!("0x{:}", signature))
+impl StarkexPrice {
+    pub fn get_global_asset_it(pair_id: &str) -> Result<String, ConversionError> {
+        let pair_id = pair_id.replace('/', ""); // Remove the "/" from the pair_id if it exists
+        let pair_id =
+            cairo_short_string_to_felt(&pair_id).map_err(|_| ConversionError::FeltConversion)?;
+        Ok(format!("0x{:x}", pair_id))
+    }
+
+    pub fn get_oracle_asset_id(
+        oracle_name: &str,
+        pair_id: &str,
+    ) -> Result<String, ConversionError> {
+        let pair_id = pair_id.replace('/', ""); // Remove the "/" from the pair_id if it exists
+        let oracle_name =
+            cairo_short_string_to_felt(oracle_name).map_err(|_| ConversionError::FeltConversion)?;
+        let oracle_as_hex = format!("{:x}", oracle_name);
+        let pair_id =
+            cairo_short_string_to_felt(&pair_id).map_err(|_| ConversionError::FeltConversion)?;
+        let pair_id: u128 = pair_id
+            .try_into()
+            .map_err(|_| ConversionError::U128Conversion)?;
+        let pair_as_hex = format!("{:0<width$x}", pair_id, width = 32);
+        Ok(format!("0x{}{}", pair_as_hex, oracle_as_hex))
+    }
+
+    /// Builds the first number for the hash computation based on oracle name and pair id.
+    pub fn build_external_asset_id(
+        oracle_name: &str,
+        pair_id: &str,
+    ) -> Result<FieldElement, ConversionError> {
+        let external_asset_id = Self::get_oracle_asset_id(oracle_name, pair_id)?;
+        FieldElement::from_hex_be(&external_asset_id).map_err(|_| ConversionError::FeltConversion)
+    }
+
+    /// Builds the second number for the hash computation based on timestamp and price.
+    pub fn build_second_number(
+        timestamp: u128,
+        price: &BigDecimal,
+    ) -> Result<FieldElement, ConversionError> {
+        let price = price.to_u128().ok_or(ConversionError::U128Conversion)?;
+        let price_as_hex = format!("{:x}", price);
+        let timestamp_as_hex = format!("{:x}", timestamp);
+        let v = format!("0x{}{}", price_as_hex, timestamp_as_hex);
+        FieldElement::from_hex_be(&v).map_err(|_| ConversionError::FeltConversion)
+    }
 }
 
-/// Converts a pair id to its hexadecimal id.
-pub fn get_global_asset_it(pair_id: &str) -> Result<String, ConversionError> {
-    let pair_id = pair_id.replace('/', ""); // Remove the "/" from the pair_id if it exists
-    let pair_id =
-        cairo_short_string_to_felt(&pair_id).map_err(|_| ConversionError::FeltConversion)?;
-    Ok(format!("0x{:x}", pair_id))
-}
-
-/// Computes a signature-ready message based on oracle, asset, timestamp
-/// and price.
-/// The signature is the pedersen hash of two FieldElements:
-///
-/// first number (oracle_asset_id):
-///  ---------------------------------------------------------------------------------
-///  | asset_name (rest of the number)  - 211 bits       |   oracle_name (40 bits)   |
-///  ---------------------------------------------------------------------------------
-///
-/// second number:
-///  ---------------------------------------------------------------------------------
-///  | 0 (92 bits)         | price (120 bits)              |   timestamp (32 bits)   |
-///  ---------------------------------------------------------------------------------
-///
-/// See:
-/// https://docs.starkware.co/starkex/perpetual/becoming-an-oracle-provider-for-starkex.html#signing_prices
-fn get_entry_hash(
-    oracle_name: &str,
-    pair_id: &str,
-    timestamp: u64,
-    price: &BigDecimal,
-) -> Result<FieldElement, ConversionError> {
-    let first_number = build_external_asset_id(oracle_name, pair_id)?;
-    let second_number = build_second_number(timestamp as u128, price)?;
-    Ok(pedersen_hash(&first_number, &second_number))
-}
-
-pub fn get_oracle_asset_id(oracle_name: &str, pair_id: &str) -> Result<String, ConversionError> {
-    let pair_id = pair_id.replace('/', ""); // Remove the "/" from the pair_id if it exists
-    let oracle_name =
-        cairo_short_string_to_felt(oracle_name).map_err(|_| ConversionError::FeltConversion)?;
-    let oracle_as_hex = format!("{:x}", oracle_name);
-    let pair_id =
-        cairo_short_string_to_felt(&pair_id).map_err(|_| ConversionError::FeltConversion)?;
-    let pair_id: u128 = pair_id
-        .try_into()
-        .map_err(|_| ConversionError::U128Conversion)?;
-    let pair_as_hex = format!("{:0<width$x}", pair_id, width = 32);
-    Ok(format!("0x{}{}", pair_as_hex, oracle_as_hex))
-}
-
-/// Builds the first number for the hash computation based on oracle name and pair id.
-fn build_external_asset_id(
-    oracle_name: &str,
-    pair_id: &str,
-) -> Result<FieldElement, ConversionError> {
-    let external_asset_id = get_oracle_asset_id(oracle_name, pair_id)?;
-    FieldElement::from_hex_be(&external_asset_id).map_err(|_| ConversionError::FeltConversion)
-}
-
-/// Builds the second number for the hash computation based on timestamp and price.
-fn build_second_number(
-    timestamp: u128,
-    price: &BigDecimal,
-) -> Result<FieldElement, ConversionError> {
-    let price = price.to_u128().ok_or(ConversionError::U128Conversion)?;
-    let price_as_hex = format!("{:x}", price);
-    let timestamp_as_hex = format!("{:x}", timestamp);
-    let v = format!("0x{}{}", price_as_hex, timestamp_as_hex);
-    FieldElement::from_hex_be(&v).map_err(|_| ConversionError::FeltConversion)
+impl Signable for StarkexPrice {
+    /// Computes a signature-ready message based on oracle, asset, timestamp
+    /// and price.
+    /// The signature is the pedersen hash of two FieldElements:
+    ///
+    /// first number (oracle_asset_id):
+    ///  ---------------------------------------------------------------------------------
+    ///  | asset_name (rest of the number)  - 211 bits       |   oracle_name (40 bits)   |
+    ///  ---------------------------------------------------------------------------------
+    ///
+    /// second number:
+    ///  ---------------------------------------------------------------------------------
+    ///  | 0 (92 bits)         | price (120 bits)              |   timestamp (32 bits)   |
+    ///  ---------------------------------------------------------------------------------
+    ///
+    /// See:
+    /// https://docs.starkware.co/starkex/perpetual/becoming-an-oracle-provider-for-starkex.html#signing_prices
+    fn get_hash(&self) -> Result<FieldElement, ConversionError> {
+        let first_number = Self::build_external_asset_id(&self.oracle_name, &self.pair_id)?;
+        let second_number = Self::build_second_number(self.timestamp as u128, &self.price)?;
+        Ok(pedersen_hash(&first_number, &second_number))
+    }
 }
 
 #[cfg(test)]
@@ -122,7 +101,8 @@ mod tests {
     #[case("SOLUSD", "0x534f4c555344")]
     #[case("SOLUSDT", "0x534f4c55534454")]
     fn test_get_encoded_pair_id(#[case] pair_id: &str, #[case] expected_encoded_pair_id: &str) {
-        let encoded_pair_id = get_global_asset_it(pair_id).expect("Could not encode pair id");
+        let encoded_pair_id =
+            StarkexPrice::get_global_asset_it(pair_id).expect("Could not encode pair id");
         assert_eq!(
             encoded_pair_id, expected_encoded_pair_id,
             "Encoded pair id does not match for pair_id: {}",
@@ -181,8 +161,13 @@ mod tests {
         #[case] expected_hash: &str,
     ) {
         let price = BigDecimal::from_str(price).unwrap();
-        let hashed_data =
-            get_entry_hash(oracle_name, pair_id, timestamp, &price).expect("Could not build hash");
+        let starkex_price = StarkexPrice {
+            oracle_name: oracle_name.to_string(),
+            pair_id: pair_id.to_string(),
+            timestamp,
+            price: price.clone(),
+        };
+        let hashed_data = starkex_price.get_hash().expect("Could not build hash");
         let expected_data = FieldElement::from_hex_be(expected_hash).unwrap();
         assert_eq!(
             hashed_data, expected_data,
