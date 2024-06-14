@@ -19,14 +19,15 @@ use super::entry_repository::OHLCEntry;
 const BACKWARD_TIMESTAMP_INTERVAL: &str = "1 hour";
 
 // Retrieve the postgres table name based on the network and data type.
-fn get_table_name(network: Network, data_type: DataType) -> &'static str {
-    match (network, data_type) {
+fn get_table_name(network: Network, data_type: DataType) -> Result<&'static str, InfraError> {
+    let table = match (network, data_type) {
         (Network::Testnet, DataType::SpotEntry) => "spot_entry",
         (Network::Mainnet, DataType::SpotEntry) => "mainnet_spot_entry",
         (Network::Testnet, DataType::FutureEntry) => "future_entry",
         (Network::Mainnet, DataType::FutureEntry) => "mainnet_future_entry",
-        _ => panic!("Unsupported network and data type combination"),
-    }
+        _ => return Err(InfraError::InternalServerError),
+    };
+    Ok(table)
 }
 
 #[derive(Queryable, QueryableByName)]
@@ -104,7 +105,7 @@ fn build_sql_query(
         ORDER BY 
             FE.timestamp DESC;
     "#,
-        table_name = get_table_name(network, DataType::SpotEntry),
+        table_name = get_table_name(network, DataType::SpotEntry)?,
         backward_interval = BACKWARD_TIMESTAMP_INTERVAL,
         aggregation_subquery = aggregation_query
     );
@@ -165,7 +166,7 @@ pub async fn get_last_updated_timestamp(
         ORDER BY timestamp DESC
         LIMIT 1;
     "#,
-        table_name = get_table_name(network, DataType::SpotEntry)
+        table_name = get_table_name(network, DataType::SpotEntry)?
     );
 
     let conn = pool.get().await.map_err(adapt_infra_error)?;
@@ -201,7 +202,7 @@ pub async fn get_existing_pairs(
         FROM
             {table_name};
     "#,
-        table_name = get_table_name(network, DataType::SpotEntry)
+        table_name = get_table_name(network, DataType::SpotEntry)?
     );
 
     let conn = pool.get().await.map_err(adapt_infra_error)?;
@@ -497,7 +498,7 @@ pub async fn get_publishers_with_components(
     currencies: HashMap<String, BigDecimal>,
     publishers: Vec<RawPublisher>,
 ) -> Result<Vec<Publisher>, InfraError> {
-    let table_name = get_table_name(network, data_type);
+    let table_name = get_table_name(network, data_type)?;
     let publisher_names = publishers.iter().map(|p| p.name.clone()).collect();
 
     let updates = get_all_publishers_updates(pool, table_name, publisher_names).await?;
@@ -576,7 +577,7 @@ async fn get_entries_from_timestamp(
                 timestamp
             ASC
         "#,
-        table_name = get_table_name(network, DataType::SpotEntry),
+        table_name = get_table_name(network, DataType::SpotEntry)?,
         pair_id = pair_id,
         start_timestamp = start_timestamp
     );
