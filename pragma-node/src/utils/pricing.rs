@@ -18,6 +18,8 @@ pub struct IndexPricer {
     pair_type: DataType,
 }
 
+/// Computes the most recent index price for a list of pairs.
+/// The index price is the median of the pairs.
 impl Pricer for IndexPricer {
     fn new(pairs: Vec<String>, pair_type: DataType) -> Self {
         Self { pairs, pair_type }
@@ -35,6 +37,13 @@ impl Pricer for IndexPricer {
 
 // =======================================
 
+/// Computes the mark price for a list of pairs.
+/// The mark price can be computed with two methods:
+/// 1. if the quote asset is USD, we just return the median price of the recent
+/// perp entries.
+/// 2. if the quote asset is a stablecoin, we compute the median price of the
+/// spot stablecoin/USD pairs and then we divide the median price of the perp
+/// pairs by the median price of the stablecoin.
 pub struct MarkPricer {
     pairs: Vec<String>,
     pair_type: DataType,
@@ -48,6 +57,7 @@ impl MarkPricer {
             .collect()
     }
 
+    /// Computes the stablecoin/USD pairs median entries.
     pub async fn get_stablecoins_index_entries(
         db_pool: &Pool,
         stablecoin_pairs: Vec<String>,
@@ -57,6 +67,7 @@ impl MarkPricer {
         stablecoins_index_pricer.compute(db_pool).await
     }
 
+    /// Computes the non USD quoted pairs median entries.
     pub async fn get_pairs_entries(
         db_pool: &Pool,
         pairs: Vec<String>,
@@ -66,6 +77,8 @@ impl MarkPricer {
         pairs_entries.compute(db_pool).await
     }
 
+    /// Builds the complete list of entries from the median price of the spot
+    /// stablecoin/USD pairs and the median price of the perp pairs.
     pub fn merge_entries_from(
         stablecoins_spot_entries: Vec<MedianEntryWithComponents>,
         pairs_perp_entries: Vec<MedianEntryWithComponents>,
