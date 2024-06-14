@@ -223,5 +223,5 @@ pub struct AssetOraclePrice {
 #[derive(Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct SubscribeToEntryResponse {
     pub oracle_prices: Vec<AssetOraclePrice>,
-    pub timestamp_s: String,
+    pub timestamp_s: UnixTimestamp,
 }
