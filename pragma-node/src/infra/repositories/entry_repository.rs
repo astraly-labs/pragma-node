@@ -890,6 +890,7 @@ fn build_sql_query_for_median_with_components(
                 WHERE 
                     e.pair_id IN ({pairs_list})
                     AND e.timestamp >= NOW() - INTERVAL '{interval_in_ms} milliseconds'
+                    {perp_filter}
             ),
             filtered_last_prices AS (
                 SELECT 
@@ -930,6 +931,10 @@ fn build_sql_query_for_median_with_components(
             .collect::<Vec<String>>()
             .join(", "),
         interval_in_ms = interval_in_ms,
+        perp_filter = match entry_type {
+            DataType::PerpEntry => "AND (e.expiry_timestamp IS NULL OR e.expiry_timestamp = 0)",
+            _ => "",
+        }
     )
 }
 
@@ -966,7 +971,6 @@ pub async fn get_current_median_entries_with_components(
         // and return the correct pairs, not cancel everything if only
         // one pair is invalid.
         if interval_in_ms >= MAX_INTERVAL_WITHOUT_ENTRIES {
-            tracing::error!("Could not find entries to compute the median price");
             return Ok(vec![]);
         }
     };

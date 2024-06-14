@@ -1,8 +1,9 @@
 use crate::dto::entry as dto;
 use crate::models::DieselResult;
 use bigdecimal::BigDecimal;
+use diesel::dsl::sql;
 use diesel::internal::derives::multiconnection::chrono::NaiveDateTime;
-use diesel::upsert::excluded;
+use diesel::BoolExpressionMethods;
 use diesel::{
     AsChangeset, ExpressionMethods, Insertable, PgConnection, PgTextExpressionMethods, QueryDsl,
     Queryable, RunQueryDsl, Selectable, SelectableHelper,
@@ -21,7 +22,9 @@ pub struct FutureEntry {
     pub publisher: String,
     pub source: String,
     pub timestamp: NaiveDateTime,
-    pub expiration_timestamp: NaiveDateTime,
+    // If expiration_timestamp is None, it means the entry is a perpetual future
+    // else it is a regular future entry that will expire at the expiration_timestamp.
+    pub expiration_timestamp: Option<NaiveDateTime>,
     pub publisher_signature: String,
     pub price: BigDecimal,
 }
@@ -33,7 +36,7 @@ pub struct NewFutureEntry {
     pub publisher: String,
     pub source: String,
     pub timestamp: NaiveDateTime,
-    pub expiration_timestamp: NaiveDateTime,
+    pub expiration_timestamp: Option<NaiveDateTime>,
     pub publisher_signature: String,
     pub price: BigDecimal,
 }
@@ -51,25 +54,18 @@ impl FutureEntry {
         data: Vec<NewFutureEntry>,
     ) -> DieselResult<Vec<FutureEntry>> {
         diesel::insert_into(future_entries::table)
-            .values(data)
+            .values(&data)
             .returning(FutureEntry::as_returning())
             .on_conflict((
                 future_entries::pair_id,
                 future_entries::source,
                 future_entries::timestamp,
+                future_entries::expiration_timestamp,
             ))
-            .do_update()
-            .set((
-                future_entries::pair_id.eq(excluded(future_entries::pair_id)),
-                future_entries::publisher.eq(excluded(future_entries::publisher)),
-                future_entries::source.eq(excluded(future_entries::source)),
-                future_entries::publisher_signature
-                    .eq(excluded(future_entries::publisher_signature)),
-                future_entries::timestamp.eq(excluded(future_entries::timestamp)),
-                future_entries::expiration_timestamp
-                    .eq(excluded(future_entries::expiration_timestamp)),
-                future_entries::price.eq(excluded(future_entries::price)),
-            ))
+            // TODO(akhercha): We are loosing some data currently because of duplicates.
+            // It happens because we don't have enough precision in the timestamp (in s, not ms).
+            // So we have multiple price for the same timestamp.
+            .do_nothing()
             .get_results(conn)
     }
 
@@ -113,6 +109,21 @@ impl FutureEntry {
     ) -> DieselResult<Vec<String>> {
         future_entries::table
             .filter(future_entries::pair_id.eq_any(searched_pairs))
+            .select(future_entries::pair_id)
+            .distinct()
+            .load::<String>(conn)
+    }
+
+    pub fn get_existing_perp_pairs(
+        conn: &mut PgConnection,
+        searched_pairs: Vec<String>,
+    ) -> DieselResult<Vec<String>> {
+        future_entries::table
+            .filter(future_entries::pair_id.eq_any(searched_pairs).and(
+                future_entries::expiration_timestamp.is_null().or(
+                    future_entries::expiration_timestamp.eq(sql("timestamp '1970-01-01 00:00:00'")),
+                ),
+            ))
             .select(future_entries::pair_id)
             .distinct()
             .load::<String>(conn)

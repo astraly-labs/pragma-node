@@ -94,12 +94,17 @@ pub async fn create_future_entries(
                 None => return Err(EntryError::InvalidTimestamp),
             };
 
-            let expiry_dt = match DateTime::<Utc>::from_timestamp(
-                future_entry.expiration_timestamp as i64,
-                0,
-            ) {
-                Some(dt) => dt.naive_utc(),
-                None => return Err(EntryError::InvalidTimestamp),
+            // For expiration_timestamp, 0 is sent by publishers for perpetual entries.
+            // We set them to None in the database to easily filter them out.
+            let expiry_dt = if future_entry.expiration_timestamp == 0 {
+                None
+            } else {
+                match DateTime::<Utc>::from_timestamp_millis(
+                    future_entry.expiration_timestamp as i64,
+                ) {
+                    Some(dt) => Some(dt.naive_utc()),
+                    None => return Err(EntryError::InvalidTimestamp),
+                }
             };
 
             Ok(NewFutureEntry {

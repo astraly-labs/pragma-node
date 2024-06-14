@@ -4,7 +4,7 @@ use bigdecimal::{BigDecimal, ToPrimitive};
 use chrono::NaiveDateTime;
 use deadpool_diesel::postgres::Pool;
 use pragma_common::types::Network;
-use pragma_entities::{Entry, PerpEntry};
+use pragma_entities::{Entry, FutureEntry};
 use serde_json::json;
 use starknet::core::crypto::{EcdsaSignError, Signature};
 use starknet::core::types::FieldElement;
@@ -131,19 +131,19 @@ pub(crate) fn big_decimal_price_to_hex(price: &BigDecimal) -> String {
 }
 
 /// Given a list of pairs, only return the ones that exists in the
-/// database.
+/// database in separate lists.
+/// TODO: handle future pairs?
 /// A list of pairs can contains:
 /// - Spot pairs: formatted as usual (e.g. "BTC/USD")
 /// - Perpetual pairs: usual pair with a mark suffix (e.g. "BTC/USD:MARK")
-/// - TODO Future pairs: ...
-/// Returns three separate lists of pairs: spot pairs, perpetual pairs and future pairs.
+/// Returns two lists of pairs: spot pairs & perpetual pairs.
 pub(crate) async fn only_existing_pairs(
     pool: &Pool,
     pairs: Vec<String>,
 ) -> (
     Vec<String>, // spot pairs
     Vec<String>, // perpetual pairs
-    Vec<String>, // future pairs
+                 // TODO: future_pairs
 ) {
     let conn = pool.get().await.expect("Couldn't connect to the database.");
 
@@ -172,15 +172,14 @@ pub(crate) async fn only_existing_pairs(
         .collect::<Vec<String>>();
 
     let perp_pairs = conn
-        .interact(move |conn| PerpEntry::get_existing_pairs(conn, perp_pairs))
+        .interact(move |conn| FutureEntry::get_existing_perp_pairs(conn, perp_pairs))
         .await
         .expect("Couldn't check if pair exists")
         .expect("Couldn't get table result")
         .into_iter()
         .collect::<Vec<String>>();
 
-    // TODO: Future entries aren't handled
-    (spot_pairs, perp_pairs, vec![])
+    (spot_pairs, perp_pairs)
 }
 
 /// Sign the passed data with the signer & return the signature 0x prefixed.

@@ -143,7 +143,7 @@ async fn handle_channel(mut socket: WebSocket, state: AppState) {
                     Ok(_) => {},
                     Err(_) => break
                 };
-            }
+            },
         }
     }
 }
@@ -157,7 +157,7 @@ async fn handle_message_received(
     message: String,
 ) {
     if let Ok(subscription_msg) = serde_json::from_str::<SubscriptionRequest>(&message) {
-        let (existing_spot_pairs, existing_perp_pairs, _) =
+        let (existing_spot_pairs, existing_perp_pairs) =
             only_existing_pairs(&state.timescale_pool, subscription_msg.pairs).await;
         match subscription_msg.msg_type {
             SubscriptionType::Subscribe => {

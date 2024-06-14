@@ -84,6 +84,7 @@ pub struct FutureEntry {
     pub pair_id: String,
     pub price: u128,
     pub volume: u128,
+    // in milliseconds
     pub expiration_timestamp: u64,
 }
 

@@ -29,19 +29,6 @@ diesel::table! {
         pair_id -> Varchar,
         publisher -> Text,
         timestamp -> Timestamptz,
-        expiration_timestamp -> Timestamptz,
-        price -> Numeric,
-        source -> Varchar,
-        publisher_signature -> Varchar,
-    }
-}
-
-diesel::table! {
-    perp_entries (id, timestamp) {
-        id -> Uuid,
-        pair_id -> Varchar,
-        publisher -> Text,
-        timestamp -> Timestamptz,
         expiration_timestamp -> Nullable<Timestamptz>,
         price -> Numeric,
         source -> Varchar,
@@ -60,4 +47,4 @@ diesel::table! {
     }
 }
 
-diesel::allow_tables_to_appear_in_same_query!(currencies, entries, perp_entries, publishers,);
+diesel::allow_tables_to_appear_in_same_query!(currencies, entries, future_entries, publishers,);
