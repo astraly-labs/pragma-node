@@ -347,6 +347,7 @@ async fn compute_mark_median_entries_for_non_usd_pairs(
             perp_median_entry.pair_id.split('/').last().unwrap()
         );
 
+        // TODO(akhercha): currently fails here, pairs are stored in hexa already, not XX/YY
         let spot_usd_median_entry = usd_pairs_spot_median_entries
             .iter()
             .find(|spot_median_entry| spot_median_entry.pair_id == related_usd_spot)
