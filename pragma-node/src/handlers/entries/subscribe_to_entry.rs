@@ -240,7 +240,7 @@ async fn get_subscribed_pairs_medians(
         oracle_price.signature = signature;
         response.oracle_prices.push(oracle_price);
     }
-    response.timestamp_s = now.to_string();
+    response.timestamp_s = now;
     Ok(response)
 }
 
