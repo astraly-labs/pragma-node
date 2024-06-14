@@ -933,7 +933,7 @@ fn build_sql_query_for_median_with_components(
             .join(", "),
         interval_in_ms = interval_in_ms,
         perp_filter = match entry_type {
-            DataType::PerpEntry => "AND e.expiry_timestamp IS NULL",
+            DataType::PerpEntry => "AND e.expiration_timestamp IS NULL",
             _ => "",
         }
     )
@@ -972,6 +972,11 @@ pub async fn get_current_median_entries_with_components(
         // and return the correct pairs, not cancel everything if only
         // one pair is invalid.
         if interval_in_ms >= MAX_INTERVAL_WITHOUT_ENTRIES {
+            tracing::error!(
+                "Couldnt compute median entries for: {}, [{:?}]",
+                pair_ids.join(", "),
+                entry_type
+            );
             return Ok(vec![]);
         }
     };

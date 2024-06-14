@@ -239,6 +239,7 @@ async fn get_subscribed_pairs_medians(
     Ok(response)
 }
 
+/// Get index & mark prices for the subscribed pairs.
 async fn get_all_entries(
     state: &AppState,
     subscription: &CurrentSubscription,
@@ -262,8 +263,8 @@ async fn get_all_entries(
     );
 
     let mut median_entries = vec![];
-    median_entries.extend(index_entries?);
-    median_entries.extend(usd_mark_entries?);
-    median_entries.extend(non_usd_mark_entries?);
+    median_entries.extend(index_entries.unwrap_or_default());
+    median_entries.extend(usd_mark_entries.unwrap_or_default());
+    median_entries.extend(non_usd_mark_entries.unwrap_or_default());
     Ok(median_entries)
 }
