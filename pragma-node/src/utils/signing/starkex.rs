@@ -15,7 +15,7 @@ pub struct StarkexPrice {
 }
 
 impl StarkexPrice {
-    pub fn get_global_asset_it(pair_id: &str) -> Result<String, ConversionError> {
+    pub fn get_global_asset_id(pair_id: &str) -> Result<String, ConversionError> {
         let pair_id = pair_id.replace('/', ""); // Remove the "/" from the pair_id if it exists
         let pair_id =
             cairo_short_string_to_felt(&pair_id).map_err(|_| ConversionError::FeltConversion)?;
@@ -102,7 +102,7 @@ mod tests {
     #[case("SOLUSDT", "0x534f4c55534454")]
     fn test_get_encoded_pair_id(#[case] pair_id: &str, #[case] expected_encoded_pair_id: &str) {
         let encoded_pair_id =
-            StarkexPrice::get_global_asset_it(pair_id).expect("Could not encode pair id");
+            StarkexPrice::get_global_asset_id(pair_id).expect("Could not encode pair id");
         assert_eq!(
             encoded_pair_id, expected_encoded_pair_id,
             "Encoded pair id does not match for pair_id: {}",

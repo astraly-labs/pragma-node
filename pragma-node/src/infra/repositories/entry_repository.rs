@@ -795,7 +795,7 @@ impl TryFrom<MedianEntryWithComponents> for AssetOraclePrice {
             .map(SignedPublisherPrice::try_from)
             .collect();
 
-        let global_asset_id = StarkexPrice::get_global_asset_it(&median_entry.pair_id)?;
+        let global_asset_id = StarkexPrice::get_global_asset_id(&median_entry.pair_id)?;
 
         Ok(AssetOraclePrice {
             global_asset_id,
