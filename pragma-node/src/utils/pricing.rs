@@ -81,7 +81,7 @@ impl MarkPricer {
             .map_err(|_| EntryError::InternalServerError)?;
         let stablecoins_names: Vec<String> = stablecoin_pairs
             .iter()
-            // TODO: unsafe unwrap
+            // safe unwrap since we know the pairs are formatted "XXX/YYY"
             .map(|pair| pair.split('/').last().unwrap().to_string())
             .collect();
         let decimals = conn
@@ -104,6 +104,20 @@ impl MarkPricer {
         pairs_entries.compute(db_pool).await
     }
 
+    fn compute_mark_price(
+        perp_pair_price: &BigDecimal,
+        spot_usd_price: &BigDecimal,
+        decimals: &BigDecimal,
+    ) -> BigDecimal {
+        let decimals_as_u32 = decimals
+            .to_u32()
+            .ok_or(EntryError::InternalServerError)
+            .unwrap();
+        let scaler = BigDecimal::from(10_u32.pow(decimals_as_u32));
+        let spot_usd_price = spot_usd_price / scaler;
+        perp_pair_price / spot_usd_price
+    }
+
     /// Builds the complete list of entries from the median price of the spot
     /// stablecoin/USD pairs and the median price of the perp pairs.
     pub fn merge_entries_from(
@@ -114,7 +128,7 @@ impl MarkPricer {
         let mut merged_entries = vec![];
 
         for perp_median_entry in pairs_perp_entries {
-            // TODO: unsafe unwrap
+            // safe unwrap since we know the pairs are formatted "XXX/YYY"
             let stable_coin_name = perp_median_entry.pair_id.split('/').last().unwrap();
             let related_usd_spot = format!("{}/USD", stable_coin_name);
 
@@ -123,16 +137,13 @@ impl MarkPricer {
                 .find(|spot_median_entry| spot_median_entry.pair_id == related_usd_spot)
                 .ok_or(EntryError::InternalServerError)?;
 
-            let perp_pair_price = perp_median_entry.median_price.clone();
-            let spot_usd_price = spot_usd_median_entry.median_price.clone();
-
-            // TODO: unsafe unwrap
-            let decimals = stablecoins_decimals.get(stable_coin_name).unwrap();
-            // TODO: shitty unsafe unwrap
-            let spot_usd_price =
-                spot_usd_price / BigDecimal::from(10_u32.pow(decimals.to_u32().unwrap()));
-
-            let mark_price = perp_pair_price / spot_usd_price;
+            let mark_price = Self::compute_mark_price(
+                &perp_median_entry.median_price,
+                &spot_usd_median_entry.median_price,
+                stablecoins_decimals
+                    .get(stable_coin_name)
+                    .ok_or(EntryError::InternalServerError)?,
+            );
 
             let mut components = perp_median_entry.components;
             components.extend(spot_usd_median_entry.components.clone());
