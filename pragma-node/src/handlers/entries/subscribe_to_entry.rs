@@ -130,10 +130,13 @@ async fn handle_channel(mut socket: WebSocket, state: AppState) {
 
     loop {
         tokio::select! {
-            Some(msg) = socket.recv() => {
-                if let Ok(Message::Text(text)) = msg {
-                    handle_message_received(&mut socket, &state, &mut subscription, text).await;
-                }
+            Some(maybe_msg) = socket.recv() => {
+                let msg = if let Ok(msg) = maybe_msg {
+                    msg
+                } else {
+                    continue;
+                };
+                decode_and_process_message_received(&mut socket, &state, &mut subscription, msg).await;
             },
             _ = update_interval.tick() => {
                 match send_median_entries(&mut socket, &state, &subscription).await {
@@ -145,43 +148,66 @@ async fn handle_channel(mut socket: WebSocket, state: AppState) {
     }
 }
 
-/// Handle the message received from the client.
-/// Subscribe or unsubscribe to the pairs requested.
-async fn handle_message_received(
+async fn decode_and_process_message_received(
     socket: &mut WebSocket,
     state: &AppState,
     subscription: &mut CurrentSubscription,
-    message: String,
+    message: Message,
 ) {
-    if let Ok(subscription_msg) = serde_json::from_str::<SubscriptionRequest>(&message) {
-        let (existing_spot_pairs, existing_perp_pairs) =
-            only_existing_pairs(&state.timescale_pool, subscription_msg.pairs).await;
-        match subscription_msg.msg_type {
-            SubscriptionType::Subscribe => {
-                subscription.add_spot_pairs(existing_spot_pairs);
-                subscription.add_perp_pairs(existing_perp_pairs);
-            }
-            SubscriptionType::Unsubscribe => {
-                subscription.remove_spot_pairs(&existing_spot_pairs);
-                subscription.remove_perp_pairs(&existing_perp_pairs);
-            }
-        };
-        // We send an ack message to the client with the subscribed pairs (so
-        // the client knows which pairs are successfully subscribed).
-        if let Ok(ack_message) = serde_json::to_string(&SubscriptionAck {
-            msg_type: subscription_msg.msg_type,
-            pairs: subscription.get_fmt_subscribed_pairs(),
-        }) {
-            if socket.send(Message::Text(ack_message)).await.is_err() {
-                let error_msg = "Message received but could not send ack message.";
-                send_err_to_socket(socket, error_msg).await;
-            }
-        } else {
-            let error_msg = "Could not serialize ack message.";
+    let maybe_request = match message {
+        Message::Close(_) => {
+            // TODO: Send the close message to gracefully shut down the connection
+            // Otherwise the client might get an abnormal Websocket closure
+            // error.
+            return;
+        }
+        Message::Text(text) => serde_json::from_str::<SubscriptionRequest>(&text),
+        Message::Binary(data) => serde_json::from_slice::<SubscriptionRequest>(&data),
+        // Axum will send Pong automatically
+        Message::Ping(_) => return,
+        Message::Pong(_) => return,
+    };
+
+    if let Ok(subscription_request) = maybe_request {
+        handle_subscription_request(socket, state, subscription, subscription_request).await;
+    } else {
+        let error_msg = "Invalid message type. Please check the documentation for more info.";
+        send_err_to_socket(socket, error_msg).await;
+    }
+}
+
+/// Handle the message received from the client.
+/// Subscribe or unsubscribe to the pairs requested.
+async fn handle_subscription_request(
+    socket: &mut WebSocket,
+    state: &AppState,
+    subscription: &mut CurrentSubscription,
+    request: SubscriptionRequest,
+) {
+    let (existing_spot_pairs, existing_perp_pairs) =
+        only_existing_pairs(&state.timescale_pool, request.pairs).await;
+    match request.msg_type {
+        SubscriptionType::Subscribe => {
+            subscription.add_spot_pairs(existing_spot_pairs);
+            subscription.add_perp_pairs(existing_perp_pairs);
+        }
+        SubscriptionType::Unsubscribe => {
+            subscription.remove_spot_pairs(&existing_spot_pairs);
+            subscription.remove_perp_pairs(&existing_perp_pairs);
+        }
+    };
+    // We send an ack message to the client with the subscribed pairs (so
+    // the client knows which pairs are successfully subscribed).
+    if let Ok(ack_message) = serde_json::to_string(&SubscriptionAck {
+        msg_type: request.msg_type,
+        pairs: subscription.get_fmt_subscribed_pairs(),
+    }) {
+        if socket.send(Message::Text(ack_message)).await.is_err() {
+            let error_msg = "Message received but could not send ack message.";
             send_err_to_socket(socket, error_msg).await;
         }
     } else {
-        let error_msg = "Invalid message type. Please check the documentation for more info.";
+        let error_msg = "Could not serialize ack message.";
         send_err_to_socket(socket, error_msg).await;
     }
 }
