@@ -82,7 +82,7 @@ fn adapt_entry_to_entry_response(
 ) -> GetEntryResponse {
     GetEntryResponse {
         pair_id,
-        timestamp: entry.time.and_utc().timestamp() as u64,
+        timestamp: entry.time.and_utc().timestamp_millis() as u64,
         num_sources_aggregated: entry.num_sources as usize,
         price: big_decimal_price_to_hex(&entry.median_price),
         decimals,
