@@ -31,4 +31,14 @@ impl Currency {
             .select((currencies::name, currencies::decimals))
             .get_results::<(String, BigDecimal)>(conn)
     }
+
+    pub fn get_decimals_for(
+        conn: &mut PgConnection,
+        pairs: Vec<String>,
+    ) -> DieselResult<Vec<(String, BigDecimal)>> {
+        currencies::table
+            .filter(currencies::name.eq_any(pairs))
+            .select((currencies::name, currencies::decimals))
+            .get_results::<(String, BigDecimal)>(conn)
+    }
 }

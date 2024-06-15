@@ -8,7 +8,7 @@ use tracing::{error, info};
 pub async fn consume(tx: UnboundedSender<Vec<u8>>) {
     let consumer: StreamConsumer = ClientConfig::new()
         .set("group.id", &CONFIG.group_id)
-        .set("bootstrap.servers", &CONFIG.brokers.join(","))
+        .set("bootstrap.servers", CONFIG.brokers.join(","))
         .set("enable.partition.eof", "false")
         .set("session.timeout.ms", "6000")
         .set("auto.offset.reset", "earliest")
@@ -23,7 +23,7 @@ pub async fn consume(tx: UnboundedSender<Vec<u8>>) {
 
     info!(
         "start consuming at {}({})",
-        &CONFIG.brokers.join(","),
+        CONFIG.brokers.join(","),
         &CONFIG.topic
     );
 

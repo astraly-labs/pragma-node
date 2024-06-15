@@ -1,41 +1,32 @@
+pub mod constants;
+pub mod create_entry;
+pub mod create_future_entry;
+pub mod get_entry;
+pub mod get_ohlc;
+pub mod get_onchain;
+pub mod get_volatility;
+pub mod subscribe_to_entry;
+pub mod types;
+pub mod utils;
+
+pub use create_entry::create_entries;
+pub use create_future_entry::create_future_entries;
+pub use get_entry::get_entry;
+pub use get_ohlc::get_ohlc;
+pub use get_volatility::get_volatility;
+pub use subscribe_to_entry::subscribe_to_entry;
+
 use serde::{Deserialize, Serialize};
 use starknet::core::types::FieldElement;
 use utoipa::{IntoParams, ToSchema};
 
 use pragma_common::types::{AggregationMode, DataType, Interval, Network};
 
-pub use create_entry::create_entries;
-pub use get_entry::get_entry;
-pub use get_ohlc::get_ohlc;
-pub use get_onchain::get_onchain;
-pub use get_volatility::get_volatility;
-
 use crate::{
+    handlers::entries::types::{Entry, FutureEntry},
     infra::repositories::entry_repository::OHLCEntry,
     utils::{doc_examples, UnixTimestamp},
 };
-
-pub mod create_entry;
-pub mod get_entry;
-pub mod get_ohlc;
-pub mod get_onchain;
-pub mod get_volatility;
-pub mod utils;
-
-#[derive(Debug, Serialize, Deserialize, PartialEq, ToSchema)]
-pub struct BaseEntry {
-    timestamp: u64,
-    source: String,
-    publisher: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, PartialEq, ToSchema)]
-pub struct Entry {
-    base: BaseEntry,
-    pair_id: String,
-    price: u128,
-    volume: u128,
-}
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct CreateEntryRequest {
@@ -45,6 +36,17 @@ pub struct CreateEntryRequest {
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct CreateEntryResponse {
+    number_entries_created: usize,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct CreateFutureEntryRequest {
+    signature: Vec<FieldElement>,
+    entries: Vec<FutureEntry>,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct CreateFutureEntryResponse {
     number_entries_created: usize,
 }
 
@@ -189,15 +191,31 @@ pub struct Publisher {
 #[derive(Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct GetOnchainPublishersResponse(pub Vec<Publisher>);
 
-#[derive(Debug, Default, Deserialize, IntoParams, ToSchema)]
-pub struct GetOnchainOHLCParams {
-    pub network: Network,
-    pub interval: Interval,
-    pub limit: Option<u64>,
-}
-
 #[derive(Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct GetOnchainOHLCResponse {
     pub pair_id: String,
     pub data: Vec<OHLCEntry>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
+pub struct SignedPublisherPrice {
+    pub oracle_asset_id: String,
+    pub oracle_price: String,
+    pub signing_key: String,
+    pub signature: String,
+    pub timestamp: String,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize, ToSchema)]
+pub struct AssetOraclePrice {
+    pub global_asset_id: String,
+    pub median_price: String,
+    pub signature: String,
+    pub signed_prices: Vec<SignedPublisherPrice>,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize, ToSchema)]
+pub struct SubscribeToEntryResponse {
+    pub oracle_prices: Vec<AssetOraclePrice>,
+    pub timestamp: UnixTimestamp,
 }

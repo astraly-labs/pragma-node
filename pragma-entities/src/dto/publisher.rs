@@ -2,6 +2,8 @@ use serde::Deserialize;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
+use crate::PublisherError;
+
 #[derive(Clone, Debug, PartialEq, ToSchema)]
 pub struct Publisher {
     pub id: Uuid,
@@ -17,6 +19,16 @@ pub struct Publisher {
 pub struct PublishersFilter {
     pub is_active: Option<bool>,
     pub name_contains: Option<String>,
+}
+
+impl Publisher {
+    pub fn assert_is_active(&self) -> Result<(), PublisherError> {
+        if self.active {
+            Ok(())
+        } else {
+            Err(PublisherError::InactivePublisher(self.name.clone()))
+        }
+    }
 }
 
 impl From<crate::Publishers> for Publisher {

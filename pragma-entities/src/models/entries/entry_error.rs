@@ -25,6 +25,8 @@ pub enum EntryError {
     InfraError(InfraError),
     #[error("invalid signature")]
     InvalidSignature(EcdsaVerifyError),
+    #[error("could not sign price")]
+    InvalidSigner,
     #[error("unauthorized request")]
     Unauthorized,
     #[error("invalid timestamp")]
