@@ -13,6 +13,7 @@ pub use models::{
     currency_error::CurrencyError,
     entry::{Entry, NewEntry},
     entry_error::{EntryError, VolatilityError},
+    future_entry::{FutureEntry, NewFutureEntry},
     publisher::{NewPublisher, Publishers},
     publisher_error::PublisherError,
 };

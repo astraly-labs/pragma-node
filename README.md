@@ -99,10 +99,14 @@ For faster iterations, you can deploy every needed services required by `pragma-
 docker compose -f compose.dev.yaml up -d --build
 ```
 
-### 2. Fill the database
+### 2. Fill the onchain database
 
-The database tables are created automatically using the migrations in the `infra/pragma-node/postgres_migrations` folder.
-However, you need to fill the tables with data. To do so, you can either run the indexer or use a backup:
+The database tables are created automatically using our migrations:
+
+- offchain migrations are in the `pragma-entities/migrations` folder.
+- onchain migrations are in the `infra/pragma-node/postgres_migrations` folder.
+
+To fill the onchain tables with data you can either run the indexer or use a backup:
 
 #### Run the indexer:
 
@@ -110,7 +114,7 @@ However, you need to fill the tables with data. To do so, you can either run the
 git clone git@github.com:astraly-labs/indexer-service.git
 cd indexer-service
 # Index & fill the spot_entry (testnet) table
-apibara run examples/pragma/testnet/sepolia-script-spot.js -A [YOUR_APIBARA_API_KEY] --connection-string postgres://postgres:test-password@localhost:5433/pragma --table-name spot_entry --timeout-duration-seconds=240
+apibara run examples/pragma/testnet/sepolia-script-spot.js -A [YOUR_APIBARA_API_KEY] --connection-string postgres://postgres:test-password@localhost:5432/pragma --table-name spot_entry --timeout-duration-seconds=240
 ```
 
 #### Use the backup (ask for a file):
@@ -127,6 +131,7 @@ PGPASSWORD=test-password pg_restore -h postgre-db -U postgres -d pragma /backup.
 ### 3. Export the required environment variables:
 
 ```bash
+export MODE=dev
 export TIMESCALE_DATABASE_URL="postgres://postgres:test-password@0.0.0.0:5432/pragma"
 export POSTGRES_DATABASE_URL="postgres://postgres:test-password@0.0.0.0:5433/pragma"
 export DATABASE_MAX_CONN=5

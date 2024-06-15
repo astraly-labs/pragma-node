@@ -10,6 +10,7 @@ pub struct Entry {
     pub publisher: String,
     pub source: String,
     pub timestamp: u64,
+    pub publisher_signature: Option<String>,
     pub price: u128,
 }
 
@@ -28,6 +29,7 @@ impl From<crate::Entry> for Entry {
             publisher: entry.publisher,
             source: entry.source,
             timestamp: entry.timestamp.and_utc().timestamp_millis() as u64,
+            publisher_signature: entry.publisher_signature,
             price: entry.price.to_u128().unwrap_or(0), // change default value ?
         }
     }
