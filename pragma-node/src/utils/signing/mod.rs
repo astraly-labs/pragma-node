@@ -13,7 +13,7 @@ pub enum SigningError {
     #[error("cannot convert type")]
     ConversionError,
     #[error("cannot sign: {0}")]
-    SigningError(EcdsaSignError),
+    SigningError(#[from] EcdsaSignError),
 }
 
 pub trait Signable {
