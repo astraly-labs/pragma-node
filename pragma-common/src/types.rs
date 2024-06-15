@@ -2,15 +2,6 @@ use chrono::{NaiveDateTime, Timelike};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-#[derive(Debug)]
-pub enum ConversionError {
-    FailedSerialization,
-    InvalidDateTime,
-    BigDecimalConversion,
-    FeltConversion,
-    U128Conversion,
-}
-
 #[derive(Default, Debug, Serialize, Deserialize, ToSchema, Clone, Copy)]
 pub enum AggregationMode {
     #[serde(rename = "median")]
@@ -36,8 +27,6 @@ pub enum DataType {
     #[serde(rename = "spot_entry")]
     #[default]
     SpotEntry,
-    #[serde(rename = "perp_entry")]
-    PerpEntry,
     #[serde(rename = "future_entry")]
     FutureEntry,
 }

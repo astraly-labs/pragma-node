@@ -90,15 +90,4 @@ impl Entry {
 
         query.select(Entry::as_select()).load::<Entry>(conn)
     }
-
-    pub fn get_existing_pairs(
-        conn: &mut PgConnection,
-        searched_pairs: Vec<String>,
-    ) -> DieselResult<Vec<String>> {
-        entries::table
-            .filter(entries::pair_id.eq_any(searched_pairs))
-            .select(entries::pair_id)
-            .distinct()
-            .load::<String>(conn)
-    }
 }

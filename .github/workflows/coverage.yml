@@ -12,7 +12,7 @@ jobs:
 
     env:
       HOST: 0.0.0.0
-      PORT: 3000
+      PORT: 8080
       POSTGRES_DATABASE_URL: postgres://postgres:postgres@localhost:5432
 
     services:

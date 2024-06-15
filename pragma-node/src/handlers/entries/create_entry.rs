@@ -1,17 +1,64 @@
+use crate::config::config;
+use crate::handlers::entries::{CreateEntryRequest, CreateEntryResponse};
+use crate::infra::kafka;
+use crate::infra::repositories::publisher_repository;
+use crate::utils::{JsonExtractor, TypedData};
+use crate::AppState;
 use axum::extract::State;
 use axum::Json;
 use chrono::{DateTime, Utc};
 use pragma_entities::{EntryError, NewEntry, PublisherError};
+use serde::{Deserialize, Serialize};
 use starknet::core::crypto::{ecdsa_verify, Signature};
 use starknet::core::types::FieldElement;
 
-use crate::config::config;
-use crate::handlers::entries::types::build_publish_message;
-use crate::handlers::entries::{CreateEntryRequest, CreateEntryResponse};
-use crate::infra::kafka;
-use crate::infra::repositories::publisher_repository;
-use crate::utils::JsonExtractor;
-use crate::AppState;
+use super::Entry;
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PublishMessage {
+    action: String,
+    entries: Vec<Entry>,
+}
+
+pub(crate) fn build_publish_message(
+    entries: &Vec<Entry>,
+) -> Result<TypedData<PublishMessage>, EntryError> {
+    // Construct the raw string with placeholders for the entries
+    let raw_message = format!(
+        r#"{{
+            "domain": {{"name": "Pragma", "version": "1"}},
+            "primaryType": "Request",
+            "message": {{
+                "action": "Publish",
+                "entries": {}
+            }},
+            "types": {{
+                "StarkNetDomain": [
+                    {{"name": "name", "type": "felt"}},
+                    {{"name": "version", "type": "felt"}}
+                ],
+                "Request": [
+                    {{"name": "action", "type": "felt"}},
+                    {{"name": "entries", "type": "Entry*"}}
+                ],
+                "Entry": [
+                    {{"name": "base", "type": "Base"}},
+                    {{"name": "pair_id", "type": "felt"}},
+                    {{"name": "price", "type": "felt"}},
+                    {{"name": "volume", "type": "felt"}}
+                ],
+                "Base": [
+                    {{"name": "publisher", "type": "felt"}},
+                    {{"name": "source", "type": "felt"}},
+                    {{"name": "timestamp", "type": "felt"}}
+                ]
+            }}
+        }}"#,
+        serde_json::to_string(entries).map_err(|e| EntryError::BuildPublish(e.to_string()))?
+    );
+
+    serde_json::from_str(&raw_message).map_err(|e| EntryError::BuildPublish(e.to_string()))
+}
 
 #[utoipa::path(
     post,
@@ -43,7 +90,12 @@ pub async fn create_entries(
         .map_err(EntryError::InfraError)?;
 
     // Check if publisher is active
-    publisher.assert_is_active()?;
+    if !publisher.active {
+        tracing::error!("Publisher {:?} is not active", publisher_name);
+        return Err(EntryError::PublisherError(
+            PublisherError::InactivePublisher(publisher_name),
+        ));
+    }
 
     // Fetch public key from database
     // TODO: Fetch it from contract
@@ -72,9 +124,7 @@ pub async fn create_entries(
         account_address
     );
 
-    let published_message = build_publish_message(&new_entries.entries)?;
-    let message_hash = published_message.message_hash(account_address);
-
+    let message_hash = build_publish_message(&new_entries.entries)?.message_hash(account_address);
     let signature = Signature {
         r: new_entries.signature[0],
         s: new_entries.signature[1],
@@ -123,14 +173,14 @@ pub async fn create_entries(
 
 #[cfg(test)]
 mod tests {
-    use crate::handlers::entries::types::{BaseEntry, Entry};
+    use crate::handlers::entries::BaseEntry;
 
     use super::*;
     use rstest::rstest;
 
     #[rstest]
     fn test_build_publish_message_empty() {
-        let entries: Vec<Entry> = vec![];
+        let entries = vec![];
         let typed_data = build_publish_message(&entries).unwrap();
 
         assert_eq!(typed_data.primary_type, "Request");

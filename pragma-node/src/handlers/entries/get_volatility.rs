@@ -80,7 +80,7 @@ pub async fn get_volatility(
 
 fn adapt_entry_to_entry_response(
     pair_id: String,
-    entries: &[MedianEntry],
+    entries: &Vec<MedianEntry>,
     decimals: u32,
 ) -> GetVolatilityResponse {
     let volatility = compute_volatility(entries);

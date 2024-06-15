@@ -9,9 +9,7 @@ use crate::handlers::entries::get_onchain::{
     checkpoints::get_onchain_checkpoints, get_onchain, ohlc::subscribe_to_onchain_ohlc,
     publishers::get_onchain_publishers,
 };
-use crate::handlers::entries::{
-    create_entries, create_future_entries, get_entry, get_ohlc, get_volatility, subscribe_to_entry,
-};
+use crate::handlers::entries::{create_entries, get_entry, get_ohlc, get_volatility};
 use crate::AppState;
 
 pub fn app_router<T: OpenApiT>(state: AppState) -> Router<AppState> {
@@ -40,9 +38,7 @@ async fn handler_404() -> impl IntoResponse {
 fn data_routes(state: AppState) -> Router<AppState> {
     Router::new()
         .route("/publish", post(create_entries))
-        .route("/publish_future", post(create_future_entries))
         .route("/:base/:quote", get(get_entry))
-        .route("/subscribe", get(subscribe_to_entry))
         .with_state(state)
 }
 

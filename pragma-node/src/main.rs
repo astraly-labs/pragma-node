@@ -1,6 +1,5 @@
 use deadpool_diesel::postgres::Pool;
 use pragma_entities::connection::{ENV_POSTGRES_DATABASE_URL, ENV_TS_DATABASE_URL};
-use starknet::signers::SigningKey;
 use std::net::SocketAddr;
 use tower_http::cors::CorsLayer;
 use tower_http::trace::{DefaultMakeSpan, TraceLayer};
@@ -23,7 +22,6 @@ mod utils;
 pub struct AppState {
     timescale_pool: Pool,
     postgres_pool: Pool,
-    pragma_signer: SigningKey,
 }
 
 #[tokio::main]
@@ -34,10 +32,8 @@ async fn main() {
     #[openapi(
         paths(
             handlers::entries::create_entry::create_entries,
-            handlers::entries::create_future_entry::create_future_entries,
             handlers::entries::get_entry::get_entry,
             handlers::entries::get_ohlc::get_ohlc,
-            handlers::entries::subscribe_to_entry::subscribe_to_entry,
             handlers::entries::get_volatility::get_volatility,
             handlers::entries::get_onchain::get_onchain,
             handlers::entries::get_onchain::checkpoints::get_onchain_checkpoints,
@@ -51,11 +47,8 @@ async fn main() {
             schemas(
                 handlers::entries::CreateEntryRequest,
                 handlers::entries::CreateEntryResponse,
-                handlers::entries::CreateFutureEntryRequest,
-                handlers::entries::CreateFutureEntryResponse,
                 handlers::entries::GetEntryParams,
                 handlers::entries::GetEntryResponse,
-                handlers::entries::SubscribeToEntryResponse,
                 handlers::entries::GetVolatilityResponse,
                 handlers::entries::GetOHLCResponse,
                 handlers::entries::GetOnchainParams,
@@ -64,13 +57,12 @@ async fn main() {
                 handlers::entries::GetOnchainCheckpointsResponse,
                 handlers::entries::GetOnchainPublishersParams,
                 handlers::entries::GetOnchainPublishersResponse,
+                handlers::entries::GetOnchainOHLCParams,
                 handlers::entries::GetOnchainOHLCResponse,
             ),
             schemas(
-                handlers::entries::types::BaseEntry,
-                handlers::entries::types::Entry,
-                handlers::entries::types::PerpEntry,
-                handlers::entries::types::FutureEntry,
+                handlers::entries::Entry,
+                handlers::entries::BaseEntry,
                 handlers::entries::OnchainEntry,
                 handlers::entries::Checkpoint,
                 handlers::entries::Publisher,
@@ -115,17 +107,9 @@ async fn main() {
         pragma_entities::connection::init_pool("pragma-node-api", ENV_POSTGRES_DATABASE_URL)
             .expect("can't init postgres (onchain db) pool");
 
-    // TODO(#54): Build the signer using a builder pattern
-    let pragma_signer = if config.is_production_mode() {
-        utils::build_pragma_signer_from_aws().await
-    } else {
-        SigningKey::from_random()
-    };
-
     let state = AppState {
         timescale_pool,
         postgres_pool,
-        pragma_signer,
     };
 
     let app = app_router::<ApiDoc>(state.clone())

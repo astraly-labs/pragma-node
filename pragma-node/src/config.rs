@@ -30,31 +30,13 @@ impl Default for KafkaConfig {
     }
 }
 
-#[derive(Default, Debug, Deserialize, PartialEq)]
-#[serde(rename_all = "lowercase")]
-pub enum Mode {
-    Dev,
-    #[default]
-    Production,
-}
-
-#[derive(Default, Debug, Deserialize)]
-pub struct ModeConfig {
-    mode: Mode,
-}
-
-#[derive(Default, Debug, Deserialize)]
+#[derive(Debug)]
 pub struct Config {
-    mode: ModeConfig,
     server: ServerConfig,
     kafka: KafkaConfig,
 }
 
 impl Config {
-    pub fn is_production_mode(&self) -> bool {
-        self.mode.mode == Mode::Production
-    }
-
     pub fn server_host(&self) -> &str {
         &self.server.host
     }
@@ -75,12 +57,10 @@ async fn init_config() -> Config {
 
     let server_config = envy::from_env::<ServerConfig>().unwrap_or_default();
     let kafka_config = envy::from_env::<KafkaConfig>().unwrap_or_default();
-    let mode_config = envy::from_env::<ModeConfig>().unwrap_or_default();
 
     Config {
         server: server_config,
         kafka: kafka_config,
-        mode: mode_config,
     }
 }
 

@@ -1,11 +1,7 @@
-use axum::extract::ws::{Message, WebSocket};
-use bigdecimal::num_bigint::ToBigInt;
 use bigdecimal::{BigDecimal, ToPrimitive};
 use chrono::NaiveDateTime;
 use deadpool_diesel::postgres::Pool;
 use pragma_common::types::Network;
-use pragma_entities::{Entry, FutureEntry};
-use serde_json::json;
 use std::collections::HashMap;
 
 use crate::infra::repositories::{
@@ -56,7 +52,7 @@ pub(crate) fn get_decimals_for_pair(
 /// If the list is empty, None is returned.
 #[allow(dead_code)]
 pub(crate) fn compute_median_price_and_time(
-    entries: &mut [MedianEntry],
+    entries: &mut Vec<MedianEntry>,
 ) -> Option<(BigDecimal, NaiveDateTime)> {
     if entries.is_empty() {
         return None;
@@ -90,7 +86,7 @@ pub(crate) async fn is_onchain_existing_pair(pool: &Pool, pair: &String, network
 /// The volatility is computed as the annualized standard deviation of the log returns.
 /// The log returns are computed as the natural logarithm of the ratio between two consecutive median prices.
 /// The annualized standard deviation is computed as the square root of the variance multiplied by 10^8.
-pub(crate) fn compute_volatility(entries: &[MedianEntry]) -> f64 {
+pub(crate) fn compute_volatility(entries: &Vec<MedianEntry>) -> f64 {
     if entries.len() < 2 {
         return 0.0;
     }
@@ -117,75 +113,6 @@ pub(crate) fn compute_volatility(entries: &[MedianEntry]) -> f64 {
 
     let variance: f64 = values.iter().map(|v| v.0 / v.1).sum::<f64>() / values.len() as f64;
     variance.sqrt() * 10_f64.powi(8)
-}
-
-/// Converts a big decimal price to a hex string 0x prefixed.
-pub(crate) fn big_decimal_price_to_hex(price: &BigDecimal) -> String {
-    format!(
-        "0x{}",
-        price.to_bigint().unwrap_or_default().to_str_radix(16)
-    )
-}
-
-/// Given a list of pairs, only return the ones that exists in the
-/// database in separate lists.
-/// TODO: handle future pairs?
-/// A list of pairs can contains:
-/// - Spot pairs: formatted as usual (e.g. "BTC/USD")
-/// - Perpetual pairs: usual pair with a mark suffix (e.g. "BTC/USD:MARK")
-/// Returns two lists of pairs: spot pairs & perpetual pairs.
-pub(crate) async fn only_existing_pairs(
-    pool: &Pool,
-    pairs: Vec<String>,
-) -> (
-    Vec<String>, // spot pairs
-    Vec<String>, // perpetual pairs
-                 // TODO: future_pairs
-) {
-    let conn = pool.get().await.expect("Couldn't connect to the database.");
-
-    let pairs = pairs
-        .iter()
-        .map(|pair| pair.to_uppercase().trim().to_string())
-        .collect::<Vec<String>>();
-
-    // Check spot entries
-    let spot_pairs = pairs
-        .iter()
-        .filter(|pair| !pair.contains(':'))
-        .map(|pair| pair.to_string())
-        .collect::<Vec<String>>();
-    let spot_pairs = conn
-        .interact(move |conn| Entry::get_existing_pairs(conn, spot_pairs))
-        .await
-        .expect("Couldn't check if pair exists")
-        .expect("Couldn't get table result");
-
-    // Check perp entries
-    let perp_pairs = pairs
-        .iter()
-        .filter(|pair| pair.contains(":MARK"))
-        .map(|pair| pair.replace(":MARK", "").to_string())
-        .collect::<Vec<String>>();
-
-    let perp_pairs = conn
-        .interact(move |conn| FutureEntry::get_existing_perp_pairs(conn, perp_pairs))
-        .await
-        .expect("Couldn't check if pair exists")
-        .expect("Couldn't get table result")
-        .into_iter()
-        .collect::<Vec<String>>();
-
-    (spot_pairs, perp_pairs)
-}
-
-/// Send an error message to the client.
-/// (Does not close the connection)
-pub(crate) async fn send_err_to_socket(socket: &mut WebSocket, error: &str) {
-    let error_msg = json!({ "error": error }).to_string();
-    if socket.send(Message::Text(error_msg)).await.is_err() {
-        tracing::error!("Client already disconnected. Could not send error message.");
-    }
 }
 
 #[cfg(test)]

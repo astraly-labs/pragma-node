@@ -4,8 +4,5 @@
 db/
 infra/db/password.txt
 
-# Vscode settings
-.vscode
-
 # Vscode workspaces
 *.code-workspace
