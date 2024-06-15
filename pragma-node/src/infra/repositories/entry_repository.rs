@@ -829,7 +829,10 @@ fn get_median_entries_response(
         let median_entry = MedianEntryWithComponents::try_from(raw_entry);
         let median_entry = match median_entry {
             Ok(median_entry) => median_entry,
-            Err(_) => panic!("Converting raw entry to median entry failed - should not happen!"),
+            Err(e) => {
+                tracing::error!("Cannot convert raw median entry to median entry: {:?}", e);
+                return None;
+            }
         };
 
         let num_unique_publishers = median_entry

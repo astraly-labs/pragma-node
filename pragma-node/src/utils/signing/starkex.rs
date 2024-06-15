@@ -78,7 +78,7 @@ impl Signable for StarkexPrice {
     ///
     /// See:
     /// https://docs.starkware.co/starkex/perpetual/becoming-an-oracle-provider-for-starkex.html#signing_prices
-    fn get_hash(&self) -> Result<FieldElement, ConversionError> {
+    fn try_get_hash(&self) -> Result<FieldElement, ConversionError> {
         let first_number = Self::build_external_asset_id(&self.oracle_name, &self.pair_id)?;
         let second_number = Self::build_second_number(self.timestamp as u128, &self.price)?;
         Ok(pedersen_hash(&first_number, &second_number))
@@ -167,7 +167,7 @@ mod tests {
             timestamp,
             price: price.clone(),
         };
-        let hashed_data = starkex_price.get_hash().expect("Could not build hash");
+        let hashed_data = starkex_price.try_get_hash().expect("Could not build hash");
         let expected_data = FieldElement::from_hex_be(expected_hash).unwrap();
         assert_eq!(
             hashed_data, expected_data,
