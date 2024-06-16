@@ -2,20 +2,22 @@ use aws_sdk_secretsmanager::Client;
 use starknet::{core::types::FieldElement, signers::SigningKey};
 
 const AWS_PRAGMA_PRIVATE_KEY_SECRET: &str = "pragma-secret-key";
+const AWS_JSON_STARK_PRIVATE_KEY_FIELD: &str = "STARK_PRIVATE_KEY";
 
 #[derive(Debug)]
 pub enum AwsError {
     NoSecretFound,
+    DeserializationError,
 }
 
-pub async fn build_pragma_signer_from_aws() -> SigningKey {
+pub async fn build_pragma_signer_from_aws() -> Option<SigningKey> {
     let aws_client = get_aws_client().await;
-    let pragma_secret_key = get_aws_secret(&aws_client, AWS_PRAGMA_PRIVATE_KEY_SECRET)
+    let secret_json_response = get_aws_secret(&aws_client, AWS_PRAGMA_PRIVATE_KEY_SECRET)
         .await
-        .expect("can't get find pragma secret key");
-    let pragma_secret_key =
-        FieldElement::from_hex_be(&pragma_secret_key).expect("can't parse secret key");
-    SigningKey::from_secret_scalar(pragma_secret_key)
+        .ok()?;
+    let pragma_secret_key: String = get_pragma_secret_key(secret_json_response).ok()?;
+    let pragma_secret_key = FieldElement::from_hex_be(&pragma_secret_key).ok()?;
+    Some(SigningKey::from_secret_scalar(pragma_secret_key))
 }
 
 /// Builds an aws client from environment variables:
@@ -38,9 +40,20 @@ async fn get_aws_secret(client: &Client, secret_name: &str) -> Result<String, Aw
         Ok(wrapped_secret) => {
             let secret = wrapped_secret
                 .secret_string
-                .expect("No secret string found");
+                .ok_or(AwsError::NoSecretFound)?;
             Ok(secret)
         }
         Err(_) => Err(AwsError::NoSecretFound),
     }
+}
+
+/// Parses the secret_json_response String, gets the STARK_PRIVATE_KEY field
+/// & returns it as a String.
+fn get_pragma_secret_key(secret_json_response: String) -> Result<String, AwsError> {
+    let secret_json: serde_json::Value =
+        serde_json::from_str(&secret_json_response).map_err(|_| AwsError::DeserializationError)?;
+    let pragma_secret_key = secret_json[AWS_JSON_STARK_PRIVATE_KEY_FIELD]
+        .as_str()
+        .ok_or(AwsError::DeserializationError)?;
+    Ok(pragma_secret_key.to_string())
 }

@@ -183,6 +183,7 @@ pub(crate) async fn only_existing_pairs(
 /// (Does not close the connection)
 pub(crate) async fn send_err_to_socket(socket: &mut WebSocket, error: &str) {
     let error_msg = json!({ "error": error }).to_string();
+    tracing::error!("Sending back an error to client: {}", error);
     if socket.send(Message::Text(error_msg)).await.is_err() {
         tracing::error!("Client already disconnected. Could not send error message.");
     }

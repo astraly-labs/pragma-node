@@ -23,7 +23,7 @@ mod utils;
 pub struct AppState {
     timescale_pool: Pool,
     postgres_pool: Pool,
-    pragma_signer: SigningKey,
+    pragma_signer: Option<SigningKey>,
 }
 
 #[tokio::main]
@@ -116,10 +116,10 @@ async fn main() {
             .expect("can't init postgres (onchain db) pool");
 
     // TODO(#54): Build the signer using a builder pattern
-    let pragma_signer = if config.is_production_mode() {
+    let pragma_signer: Option<SigningKey> = if config.is_production_mode() {
         utils::build_pragma_signer_from_aws().await
     } else {
-        SigningKey::from_random()
+        Some(SigningKey::from_random())
     };
 
     let state = AppState {

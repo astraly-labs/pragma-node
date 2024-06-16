@@ -3,6 +3,7 @@ use std::time::Duration;
 
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::State;
+use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use serde::{Deserialize, Serialize};
 use tokio::time::interval;
@@ -116,6 +117,9 @@ pub async fn subscribe_to_entry(
     ws: WebSocketUpgrade,
     State(state): State<AppState>,
 ) -> impl IntoResponse {
+    if state.pragma_signer.is_none() {
+        return (StatusCode::LOCKED, "Locked: Pragma signer not found").into_response();
+    }
     ws.on_upgrade(move |socket| handle_channel(socket, state))
 }
 
@@ -257,6 +261,12 @@ async fn get_subscribed_pairs_medians(
     let mut response: SubscribeToEntryResponse = Default::default();
     let now = chrono::Utc::now().timestamp();
 
+    let pragma_signer = state
+        .pragma_signer
+        .as_ref()
+        // Should not happen, as the endpoint is disabled if the signer is not found.
+        .ok_or(EntryError::InternalServerError)?;
+
     for entry in median_entries {
         let median_price = entry.median_price.clone();
         let pair_id = entry.pair_id.clone();
@@ -270,8 +280,8 @@ async fn get_subscribed_pairs_medians(
             timestamp: now as u64,
             price: median_price,
         };
-        let signature = sign_data(&state.pragma_signer, &starkex_price)
-            .map_err(|_| EntryError::InvalidSigner)?;
+        let signature =
+            sign_data(pragma_signer, &starkex_price).map_err(|_| EntryError::InvalidSigner)?;
 
         oracle_price.signature = signature;
         response.oracle_prices.push(oracle_price);
