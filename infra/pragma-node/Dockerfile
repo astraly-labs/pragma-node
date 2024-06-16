@@ -16,10 +16,8 @@ RUN cargo install --path .
 FROM debian:bookworm-slim
 
 # Install necessary packages including CA certificates
-RUN apt-get update && apt-get install -y \
-    libpq-dev \
-    ca-certificates \
-    bash
+RUN apt-get update && apt-get install -y libpq-dev libssl-dev ca-certificates bash && rm -rf /var/lib/apt/lists/*
+RUN update-ca-certificates
 
 RUN groupadd pragma
 
