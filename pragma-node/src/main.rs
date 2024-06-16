@@ -43,6 +43,7 @@ async fn main() {
             handlers::entries::get_onchain::checkpoints::get_onchain_checkpoints,
             handlers::entries::get_onchain::publishers::get_onchain_publishers,
             handlers::entries::get_onchain::ohlc::subscribe_to_onchain_ohlc,
+            handlers::entries::test_ws::test_ws,
         ),
         components(
             schemas(pragma_entities::dto::Entry, pragma_entities::EntryError),

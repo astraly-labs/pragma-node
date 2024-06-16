@@ -6,6 +6,7 @@ pub mod get_ohlc;
 pub mod get_onchain;
 pub mod get_volatility;
 pub mod subscribe_to_entry;
+pub mod test_ws;
 pub mod types;
 pub mod utils;
 

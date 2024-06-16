@@ -21,6 +21,7 @@ diesel = { version = "2.1", features = [
 diesel_migrations = "2"
 dotenvy = "0.15"
 envy = "0.4.2"
+futures-util = "0.3.30"
 lazy_static = "1.4.0"
 pragma-common = { path = "../pragma-common", version = "1.0.0" }
 pragma-entities = { path = "../pragma-entities", version = "1.0.0" }
