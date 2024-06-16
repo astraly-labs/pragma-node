@@ -20,6 +20,7 @@ use crate::AppState;
 pub struct Subscriber<WsState, Payload> {
     pub id: Uuid,
     pub ip_address: Option<IpAddr>,
+    // TODO: what is the purpose on closed?
     pub closed: bool,
     pub _app_state: Arc<AppState>,
     pub _ws_state: Arc<WsState>,
@@ -28,6 +29,7 @@ pub struct Subscriber<WsState, Payload> {
     pub sender: SplitSink<WebSocket, Message>,
     pub receiver: SplitStream<WebSocket>,
     pub update_interval: Interval,
+    // TODO: watches for exit but where/when is it set?
     pub exit: watch::Receiver<bool>,
 }
 
@@ -49,7 +51,7 @@ where
 {
     pub fn new(socket: WebSocket, app_state: Arc<AppState>) -> Self {
         let (sender, receiver) = socket.split();
-        let (_, rx) = mpsc::channel::<Payload>(32);
+        let (_, rx) = mpsc::channel::<Payload>(1);
         let (_, exit_rx) = watch::channel(false);
 
         let init_state = WsState::default();
@@ -86,11 +88,14 @@ where
                         None => {}
                     }
                 },
-                maybe_payload = self.notify_receiver.recv() => {
-                    if let Some(payload) = maybe_payload {
-                        handler.handle_payload(payload).await;
-                    }
-                },
+                // TODO: does not work as intended
+                // maybe_payload = self.notify_receiver.recv() => {
+                //     if let Some(payload) = maybe_payload {
+                //         handler.handle_payload(payload).await;
+                //     } else {
+                //         tracing::error!("Could not receive payload");
+                //     }
+                // },
                 _ = self.update_interval.tick() => {
                     handler.periodic_interval(self).await;
                 },
@@ -122,12 +127,12 @@ pub struct ChannelCommunication {
 impl SubscriberHandler<WsState, ChannelCommunication> for WsTestHandler {
     async fn handle_message(&mut self, message: ChannelCommunication) {
         // Custom logic for handling a message
-        println!("Handling message: {:?}", message);
+        tracing::info!("Handling message: {:?}", message);
     }
 
     async fn handle_payload(&mut self, payload: ChannelCommunication) {
         // Custom logic for handling a payload
-        println!("Handling payload: {:?}", payload);
+        tracing::info!("Handling payload: {:?}", payload);
     }
 
     async fn decode_and_handle_message_received(
@@ -137,6 +142,7 @@ impl SubscriberHandler<WsState, ChannelCommunication> for WsTestHandler {
     ) {
         match msg {
             Message::Text(text) => {
+                tracing::info!("📨 [TEXT]");
                 let msg = serde_json::from_str::<ChannelCommunication>(&text);
                 if let Ok(msg) = msg {
                     self.handle_message(msg).await;
@@ -145,16 +151,16 @@ impl SubscriberHandler<WsState, ChannelCommunication> for WsTestHandler {
                 }
             }
             Message::Binary(_) => {
-                println!("Received binary message");
+                tracing::info!("📨 [BINARY]");
             }
             Message::Ping(_) => {
-                println!("Received ping message");
+                tracing::info!("📨 [PING]");
             }
             Message::Pong(_) => {
-                println!("Received pong message");
+                tracing::info!("📨 [PONG]");
             }
             Message::Close(_) => {
-                println!("Received close message");
+                tracing::info!("👋 [CLOSE]");
                 subscriber.closed = true;
             }
         }
@@ -164,7 +170,9 @@ impl SubscriberHandler<WsState, ChannelCommunication> for WsTestHandler {
         &mut self,
         subscriber: &mut Subscriber<WsState, ChannelCommunication>,
     ) {
+        tracing::info!("🕒 [PERIODIC INTERVAL]");
         if subscriber.closed {
+            // If the channel is closed, we shouldn't do anything here
             return;
         }
         let _ = subscriber
