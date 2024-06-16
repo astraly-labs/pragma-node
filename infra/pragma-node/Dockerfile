@@ -15,7 +15,11 @@ RUN cargo install --path .
 
 FROM debian:bookworm-slim
 
-RUN apt-get update && apt-get install -y libpq-dev bash
+# Install necessary packages including CA certificates
+RUN apt-get update && apt-get install -y \
+    libpq-dev \
+    ca-certificates \
+    bash
 
 RUN groupadd pragma
 
@@ -25,8 +29,7 @@ USER node:pragma
 
 WORKDIR /home/pragma-node
 
-COPY --from=builder --chown=node:pragma  /home/pragma-node/bin/pragma-node /usr/local/bin/pragma-node
-# COPY infra/pragma-node/config/.env.example .env
+COPY --from=builder --chown=node:pragma /home/pragma-node/bin/pragma-node /usr/local/bin/pragma-node
 
 EXPOSE 3000
 
