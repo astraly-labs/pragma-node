@@ -1,4 +1,3 @@
-use std::fmt::Display;
 use std::net::IpAddr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -16,16 +15,6 @@ use uuid::Uuid;
 
 use crate::AppState;
 
-#[derive(Debug, Clone, Deserialize, Serialize, Default)]
-pub struct WsState {
-    pub msg: String,
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize, Default)]
-pub struct ChannelCommunication {
-    pub msg: String,
-}
-
 /// Subscriber is an actor that handles a single websocket connection.
 /// It listens to the store for updates and sends them to the client.
 pub struct Subscriber<WsState, Payload> {
@@ -33,26 +22,31 @@ pub struct Subscriber<WsState, Payload> {
     pub ip_address: Option<IpAddr>,
     pub closed: bool,
     pub _app_state: Arc<AppState>,
-    pub ws_state: Arc<WsState>,
+    pub _ws_state: Arc<WsState>,
     // TODO: what do I use this for?
-    pub _notify_receiver: Receiver<Payload>,
+    pub notify_receiver: Receiver<Payload>,
     pub sender: SplitSink<WebSocket, Message>,
     pub receiver: SplitStream<WebSocket>,
     pub update_interval: Interval,
     pub exit: watch::Receiver<bool>,
 }
 
-impl Display for Subscriber<WsState, ChannelCommunication> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "Subscriber {{ id: {}, ip_address: {:?}, closed: {}, ws_state: {:?} }}",
-            self.id, self.ip_address, self.closed, self.ws_state
-        )
-    }
+pub trait SubscriberHandler<WsState, Payload> {
+    async fn handle_message(&mut self, message: Payload);
+    async fn handle_payload(&mut self, payload: Payload);
+    async fn decode_and_handle_message_received(
+        &mut self,
+        msg: Message,
+        subscriber: &mut Subscriber<WsState, Payload>,
+    );
+    async fn periodic_interval(&mut self, subscriber: &mut Subscriber<WsState, Payload>);
 }
 
-impl<WsState: Default, Payload> Subscriber<WsState, Payload> {
+impl<WsState, Payload> Subscriber<WsState, Payload>
+where
+    WsState: Default + std::fmt::Debug + Send + Sync + 'static,
+    Payload: std::fmt::Debug + Send + Sync + 'static,
+{
     pub fn new(socket: WebSocket, app_state: Arc<AppState>) -> Self {
         let (sender, receiver) = socket.split();
         let (_, rx) = mpsc::channel::<Payload>(32);
@@ -65,8 +59,8 @@ impl<WsState: Default, Payload> Subscriber<WsState, Payload> {
             ip_address: None,
             closed: false,
             _app_state: app_state,
-            ws_state: Arc::new(init_state),
-            _notify_receiver: rx,
+            _ws_state: Arc::new(init_state),
+            notify_receiver: rx,
             sender,
             receiver,
             update_interval: interval(Duration::from_secs(1)),
@@ -74,13 +68,16 @@ impl<WsState: Default, Payload> Subscriber<WsState, Payload> {
         }
     }
 
-    pub async fn listen(&mut self) {
+    pub async fn listen<H>(&mut self, mut handler: H)
+    where
+        H: SubscriberHandler<WsState, Payload> + Send + 'static,
+    {
         loop {
             tokio::select! {
                 maybe_msg = self.receiver.next() => {
                     match maybe_msg {
                         Some(Ok(msg)) => {
-                            self.decode_and_handle_message_received(msg).await;
+                            handler.decode_and_handle_message_received(msg, self).await;
                         }
                         Some(Err(_)) => {
                             tracing::info!("Client disconnected or error occurred. Closing the channel.");
@@ -89,18 +86,13 @@ impl<WsState: Default, Payload> Subscriber<WsState, Payload> {
                         None => {}
                     }
                 },
-                // maybe_payload = self.notify_receiver.recv() => {
-                //     match maybe_payload {
-                //         Some(payload) => {
-                //             self.handle_payload(payload).await;
-                //         }
-                //         None => {
-                //             tracing::info!("Nuhhh");
-                //         }
-                //     }
-                // },
+                maybe_payload = self.notify_receiver.recv() => {
+                    if let Some(payload) = maybe_payload {
+                        handler.handle_payload(payload).await;
+                    }
+                },
                 _ = self.update_interval.tick() => {
-                    self.periodic_interval().await;
+                    handler.periodic_interval(self).await;
                 },
                 _ = self.exit.changed() => {
                     if *self.exit.borrow() {
@@ -111,41 +103,74 @@ impl<WsState: Default, Payload> Subscriber<WsState, Payload> {
             }
         }
     }
+}
 
-    async fn decode_and_handle_message_received(&mut self, msg: Message) {
+// ==================================================
+
+struct WsTestHandler;
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+pub struct WsState {
+    pub msg: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+pub struct ChannelCommunication {
+    pub msg: String,
+}
+
+impl SubscriberHandler<WsState, ChannelCommunication> for WsTestHandler {
+    async fn handle_message(&mut self, message: ChannelCommunication) {
+        // Custom logic for handling a message
+        println!("Handling message: {:?}", message);
+    }
+
+    async fn handle_payload(&mut self, payload: ChannelCommunication) {
+        // Custom logic for handling a payload
+        println!("Handling payload: {:?}", payload);
+    }
+
+    async fn decode_and_handle_message_received(
+        &mut self,
+        msg: Message,
+        subscriber: &mut Subscriber<WsState, ChannelCommunication>,
+    ) {
         match msg {
-            Message::Text(_) => {
-                tracing::info!("[TEXT]");
+            Message::Text(text) => {
+                let msg = serde_json::from_str::<ChannelCommunication>(&text);
+                if let Ok(msg) = msg {
+                    self.handle_message(msg).await;
+                } else {
+                    tracing::error!("Could not decode message");
+                }
             }
             Message::Binary(_) => {
-                tracing::info!("[BINARY]");
+                println!("Received binary message");
             }
             Message::Ping(_) => {
-                tracing::info!("[PING]");
+                println!("Received ping message");
             }
             Message::Pong(_) => {
-                tracing::info!("[PONG]");
+                println!("Received pong message");
             }
             Message::Close(_) => {
-                tracing::info!("[CLOSING]");
-                self.closed = true;
+                println!("Received close message");
+                subscriber.closed = true;
             }
         }
     }
 
-    async fn _handle_message(&mut self, _message: Payload) {
-        todo!()
-    }
-
-    async fn _handle_payload(&mut self, _payload: Payload) {
-        todo!()
-    }
-
-    async fn periodic_interval(&mut self) {
-        if self.closed {
+    async fn periodic_interval(
+        &mut self,
+        subscriber: &mut Subscriber<WsState, ChannelCommunication>,
+    ) {
+        if subscriber.closed {
             return;
         }
-        let _ = self.sender.send(Message::Text("tic".to_string())).await;
+        let _ = subscriber
+            .sender
+            .send(Message::Text("tic".to_string()))
+            .await;
     }
 }
 
@@ -164,16 +189,16 @@ pub async fn test_ws(ws: WebSocketUpgrade, State(state): State<AppState>) -> imp
     ws.on_upgrade(move |socket| create_new_subscriber(socket, state))
 }
 
-/// Handle the WebSocket channel.
 async fn create_new_subscriber(socket: WebSocket, app_state: AppState) {
     let mut subscriber =
         Subscriber::<WsState, ChannelCommunication>::new(socket, Arc::new(app_state));
+    let handler = WsTestHandler;
     let _ = subscriber
         .sender
         .send(Message::Text(format!(
-            "You are registered as:\n{}",
-            subscriber
+            "You are registered as:\n[{:?}] {}",
+            subscriber.ip_address, subscriber.id
         )))
         .await;
-    subscriber.listen().await;
+    subscriber.listen(handler).await;
 }
