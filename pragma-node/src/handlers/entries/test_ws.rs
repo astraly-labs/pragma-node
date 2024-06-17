@@ -41,7 +41,7 @@ pub struct Subscriber<WsState, Payload> {
     pub exit: watch::Receiver<bool>,
 }
 
-pub trait SubscriberHandler<WsState, Payload> {
+pub trait ChannelHandler<WsState, Payload> {
     async fn handle_client_message(&mut self, message: Payload);
     async fn handle_server_message(
         &mut self,
@@ -101,16 +101,17 @@ where
 
     pub async fn listen<H>(&mut self, mut handler: H)
     where
-        H: SubscriberHandler<WsState, Payload> + Send + 'static,
+        H: ChannelHandler<WsState, Payload>,
     {
         loop {
             tokio::select! {
                 // Messages from the client
-                maybe_msg = self.receiver.next() => {
-                    match maybe_msg {
-                        Some(Ok(msg)) => {
-                            let msg = handler.decode_and_handle_message_received(self, msg).await;
-                            if msg.is_break() {
+                maybe_client_msg = self.receiver.next() => {
+                    match maybe_client_msg {
+                        Some(Ok(client_msg)) => {
+                            tracing::info!("New message from client 👇");
+                            let client_msg = handler.decode_and_handle_message_received(self, client_msg).await;
+                            if client_msg.is_break() {
                                 break;
                             }
                         }
@@ -127,15 +128,15 @@ where
                     handler.periodic_interval(self).await;
                 },
                 // Messages from the server to the client
-                // maybe_payload = self.notify_receiver.recv() => {
-                //     match maybe_payload {
-                //         Some(payload) => {
-                //             tracing::info!("🥡 [SERVER PAYLOAD]");
-                //             handler.handle_server_message(self, payload).await;
-                //         }
-                //         None => {}
-                //     }
-                // },
+                maybe_server_msg = self.notify_receiver.recv() => {
+                    match maybe_server_msg {
+                        Some(server_msg) => {
+                            tracing::info!("🥡 [SERVER MESSAGE]");
+                            handler.handle_server_message(self, server_msg).await;
+                        }
+                        None => {}
+                    }
+                },
                 // Exit signal
                 _ = self.exit.changed() => {
                     if *self.exit.borrow() {
@@ -152,7 +153,7 @@ where
 // ====================================================================================
 // ====================================================================================
 
-struct WsTestHandler;
+struct WsTestEndpointHandler;
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct WsState {
@@ -164,7 +165,7 @@ pub struct ChannelUpdateMsg {
     pub msg: String,
 }
 
-impl SubscriberHandler<WsState, ChannelUpdateMsg> for WsTestHandler {
+impl ChannelHandler<WsState, ChannelUpdateMsg> for WsTestEndpointHandler {
     async fn handle_client_message(&mut self, message: ChannelUpdateMsg) {
         tracing::info!("{:?}", message);
     }
@@ -186,7 +187,6 @@ impl SubscriberHandler<WsState, ChannelUpdateMsg> for WsTestHandler {
         subscriber: &mut Subscriber<WsState, ChannelUpdateMsg>,
         msg: Message,
     ) -> ControlFlow<(), ()> {
-        tracing::info!("New message from client 👇");
         match msg {
             Message::Close(_) => {
                 tracing::info!("👋 [CLOSE]");
@@ -212,12 +212,11 @@ impl SubscriberHandler<WsState, ChannelUpdateMsg> for WsTestHandler {
                 tracing::info!("📨 [PONG]");
             }
         }
-        return ControlFlow::Continue(());
+        ControlFlow::Continue(())
     }
 
     async fn periodic_interval(&mut self, subscriber: &mut Subscriber<WsState, ChannelUpdateMsg>) {
         if subscriber.closed {
-            // If the channel is closed, we shouldn't do anything here
             return;
         }
         let _ = subscriber
@@ -287,7 +286,7 @@ async fn create_new_subscriber(socket: WebSocket, app_state: AppState, client_ad
         .await;
 
     // Main event loop for the subscriber
-    let handler = WsTestHandler;
+    let handler = WsTestEndpointHandler;
     tokio::spawn(async move {
         subscriber.listen(handler).await;
     });
