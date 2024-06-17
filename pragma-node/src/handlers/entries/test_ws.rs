@@ -1,5 +1,6 @@
 use std::net::IpAddr;
 use std::net::SocketAddr;
+use std::ops::ControlFlow;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc::{self, Receiver};
@@ -51,7 +52,7 @@ pub trait SubscriberHandler<WsState, Payload> {
         &mut self,
         subscriber: &mut Subscriber<WsState, Payload>,
         msg: Message,
-    );
+    ) -> ControlFlow<(), ()>;
     async fn periodic_interval(&mut self, subscriber: &mut Subscriber<WsState, Payload>);
 }
 
@@ -60,18 +61,18 @@ where
     WsState: Default + std::fmt::Debug + Send + Sync + 'static,
     Payload: std::fmt::Debug + Send + Sync + 'static,
 {
-    pub fn new(
+    pub async fn new(
         socket: WebSocket,
         ip_address: IpAddr,
         app_state: Arc<AppState>,
         notify_receiver: Receiver<Payload>,
         exit_receiver: watch::Receiver<bool>,
         update_interval_in_ms: u64,
-    ) -> Self {
+    ) -> Result<Self, String> {
         let (sender, receiver) = socket.split();
         let init_state = WsState::default();
 
-        Subscriber {
+        let mut subscriber = Subscriber {
             id: Uuid::new_v4(),
             ip_address,
             closed: false,
@@ -82,12 +83,20 @@ where
             receiver,
             update_interval: interval(Duration::from_millis(update_interval_in_ms)),
             exit: exit_receiver,
-        }
+        };
+
+        subscriber.assert_is_healthy().await?;
+
+        Ok(subscriber)
     }
 
-    pub async fn channel_is_healthy(&mut self) -> bool {
+    /// Perform the initial handshake with the client - ensure the channel is healthy
+    async fn assert_is_healthy(&mut self) -> Result<(), String> {
         let ping_status = self.sender.send(Message::Ping(vec![1, 2, 3])).await;
-        !ping_status.is_err()
+        if ping_status.is_err() {
+            return Err("Failed to send a ping message".to_string());
+        }
+        Ok(())
     }
 
     pub async fn listen<H>(&mut self, mut handler: H)
@@ -100,7 +109,10 @@ where
                 maybe_msg = self.receiver.next() => {
                     match maybe_msg {
                         Some(Ok(msg)) => {
-                            handler.decode_and_handle_message_received(self, msg).await;
+                            let msg = handler.decode_and_handle_message_received(self, msg).await;
+                            if msg.is_break() {
+                                break;
+                            }
                         }
                         Some(Err(_)) => {
                             tracing::info!("Client disconnected or error occurred. Closing the channel.");
@@ -148,19 +160,19 @@ pub struct WsState {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-pub struct ChannelCommunication {
+pub struct ChannelUpdateMsg {
     pub msg: String,
 }
 
-impl SubscriberHandler<WsState, ChannelCommunication> for WsTestHandler {
-    async fn handle_client_message(&mut self, message: ChannelCommunication) {
+impl SubscriberHandler<WsState, ChannelUpdateMsg> for WsTestHandler {
+    async fn handle_client_message(&mut self, message: ChannelUpdateMsg) {
         tracing::info!("{:?}", message);
     }
 
     async fn handle_server_message(
         &mut self,
-        subscriber: &mut Subscriber<WsState, ChannelCommunication>,
-        message: ChannelCommunication,
+        subscriber: &mut Subscriber<WsState, ChannelUpdateMsg>,
+        message: ChannelUpdateMsg,
     ) {
         let _ = subscriber
             .sender
@@ -168,15 +180,22 @@ impl SubscriberHandler<WsState, ChannelCommunication> for WsTestHandler {
             .await;
     }
 
+    // Decode & handle messages received from the client
     async fn decode_and_handle_message_received(
         &mut self,
-        subscriber: &mut Subscriber<WsState, ChannelCommunication>,
+        subscriber: &mut Subscriber<WsState, ChannelUpdateMsg>,
         msg: Message,
-    ) {
+    ) -> ControlFlow<(), ()> {
+        tracing::info!("New message from client 👇");
         match msg {
+            Message::Close(_) => {
+                tracing::info!("👋 [CLOSE]");
+                subscriber.closed = true;
+                return ControlFlow::Break(());
+            }
             Message::Text(text) => {
                 tracing::info!("📨 [TEXT]");
-                let msg = serde_json::from_str::<ChannelCommunication>(&text);
+                let msg = serde_json::from_str::<ChannelUpdateMsg>(&text);
                 if let Ok(msg) = msg {
                     self.handle_client_message(msg).await;
                 } else {
@@ -192,17 +211,11 @@ impl SubscriberHandler<WsState, ChannelCommunication> for WsTestHandler {
             Message::Pong(_) => {
                 tracing::info!("📨 [PONG]");
             }
-            Message::Close(_) => {
-                tracing::info!("👋 [CLOSE]");
-                subscriber.closed = true;
-            }
         }
+        return ControlFlow::Continue(());
     }
 
-    async fn periodic_interval(
-        &mut self,
-        subscriber: &mut Subscriber<WsState, ChannelCommunication>,
-    ) {
+    async fn periodic_interval(&mut self, subscriber: &mut Subscriber<WsState, ChannelUpdateMsg>) {
         if subscriber.closed {
             // If the channel is closed, we shouldn't do anything here
             return;
@@ -234,25 +247,37 @@ pub async fn test_ws(
     State(state): State<AppState>,
     ConnectInfo(client_addr): ConnectInfo<SocketAddr>,
 ) -> impl IntoResponse {
-    tracing::info!("🔗 [IP] {:?}", client_addr);
     ws.on_upgrade(move |socket| create_new_subscriber(socket, state, client_addr))
 }
 
 async fn create_new_subscriber(socket: WebSocket, app_state: AppState, client_addr: SocketAddr) {
     // Channel communication between the server & the subscriber
-    let (notify_sender, notify_receiver) = mpsc::channel::<ChannelCommunication>(100);
+    let (notify_sender, notify_receiver) = mpsc::channel::<ChannelUpdateMsg>(100);
+    // Exit signal, allow to close the channel from the server side
     let (exit_sender, exit_receiver) = watch::channel(false);
 
-    let mut subscriber = Subscriber::<WsState, ChannelCommunication>::new(
+    let mut subscriber = match Subscriber::<WsState, ChannelUpdateMsg>::new(
         socket,
         client_addr.ip(),
         Arc::new(app_state),
         notify_receiver,
         exit_receiver,
         1000,
-    );
+    )
+    .await
+    {
+        Ok(subscriber) => subscriber,
+        Err(e) => {
+            tracing::error!("Failed to create a new subscriber. Error: {}", e);
+            return;
+        }
+    };
 
-    let handler = WsTestHandler;
+    // Save information about the current subscriber
+    let current_subscriber_id = subscriber.id;
+    let current_subscriber_ip = subscriber.ip_address;
+
+    // Send a welcome message
     let _ = subscriber
         .sender
         .send(Message::Text(format!(
@@ -261,32 +286,28 @@ async fn create_new_subscriber(socket: WebSocket, app_state: AppState, client_ad
         )))
         .await;
 
-    if !subscriber.channel_is_healthy().await {
-        exit_sender.send(true).unwrap();
-        subscriber.closed = true;
-        tracing::error!(
-            "Subscriber [{}] {} channel is not healthy. Closing the channel.",
-            subscriber.ip_address,
-            subscriber.id
-        );
-        return;
-    }
-
+    // Main event loop for the subscriber
+    let handler = WsTestHandler;
     tokio::spawn(async move {
         subscriber.listen(handler).await;
     });
 
+    // Send some messages to the client as the server using the notification chan
     for _ in 0..5 {
-        notify_sender
-            .send(ChannelCommunication {
+        let _ = notify_sender
+            .send(ChannelUpdateMsg {
                 msg: String::from("Hello from the server"),
             })
-            .await
-            .unwrap();
+            .await;
         // wait 5s
         tokio::time::sleep(Duration::from_secs(1)).await;
     }
 
-    // close the channel after some tests
+    // close the channel when talk is over
+    tracing::info!(
+        "End of discussions. Closing channel for [{}] {}",
+        current_subscriber_ip,
+        current_subscriber_id
+    );
     exit_sender.send(true).unwrap();
 }
