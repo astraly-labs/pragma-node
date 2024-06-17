@@ -15,8 +15,8 @@ use crate::infra::repositories::onchain_repository::{
 use crate::utils::{format_bigdecimal_price, PathExtractor};
 use crate::AppState;
 
-use super::utils::currency_pair_to_pair_id;
 use super::OnchainEntry;
+use crate::utils::currency_pair_to_pair_id;
 
 #[utoipa::path(
     get,

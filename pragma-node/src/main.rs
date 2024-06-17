@@ -17,6 +17,7 @@ mod errors;
 mod handlers;
 mod infra;
 mod routes;
+mod types;
 mod utils;
 
 #[derive(Clone)]
@@ -68,10 +69,10 @@ async fn main() {
                 handlers::entries::GetOnchainOHLCResponse,
             ),
             schemas(
-                handlers::entries::types::BaseEntry,
-                handlers::entries::types::Entry,
-                handlers::entries::types::PerpEntry,
-                handlers::entries::types::FutureEntry,
+                types::entries::BaseEntry,
+                types::entries::Entry,
+                types::entries::PerpEntry,
+                types::entries::FutureEntry,
                 handlers::entries::OnchainEntry,
                 handlers::entries::Checkpoint,
                 handlers::entries::Publisher,

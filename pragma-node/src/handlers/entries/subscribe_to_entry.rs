@@ -11,16 +11,16 @@ use tokio::time::interval;
 use pragma_common::types::DataType;
 use pragma_entities::EntryError;
 
-use crate::handlers::entries::utils::send_err_to_socket;
 use crate::handlers::entries::SubscribeToEntryResponse;
 use crate::infra::repositories::entry_repository::MedianEntryWithComponents;
 use crate::utils::pricing::{IndexPricer, MarkPricer, Pricer};
+use crate::utils::send_err_to_socket;
 use crate::utils::{sign_data, StarkexPrice};
 use crate::AppState;
 
 use super::constants::PRAGMA_ORACLE_NAME_FOR_STARKEX;
-use super::utils::only_existing_pairs;
 use super::AssetOraclePrice;
+use crate::utils::only_existing_pairs;
 
 #[derive(Default, Debug, Serialize, Deserialize)]
 enum SubscriptionType {

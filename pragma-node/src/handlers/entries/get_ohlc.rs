@@ -7,8 +7,8 @@ use crate::utils::PathExtractor;
 use crate::AppState;
 use pragma_entities::EntryError;
 
-use super::utils::currency_pair_to_pair_id;
 use super::GetEntryParams;
+use crate::utils::currency_pair_to_pair_id;
 
 #[utoipa::path(
         get,

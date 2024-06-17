@@ -9,7 +9,7 @@ use crate::utils::PathExtractor;
 use crate::AppState;
 use pragma_entities::{error::InfraError, EntryError, VolatilityError};
 
-use super::utils::{compute_volatility, currency_pair_to_pair_id};
+use crate::utils::{compute_volatility, currency_pair_to_pair_id};
 
 /// Volatility query
 #[derive(Deserialize, IntoParams)]

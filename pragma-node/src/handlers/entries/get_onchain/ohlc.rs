@@ -8,9 +8,9 @@ use serde::{Deserialize, Serialize};
 use pragma_common::types::{Interval, Network};
 use tokio::time::interval;
 
-use crate::handlers::entries::utils::{is_onchain_existing_pair, send_err_to_socket};
 use crate::infra::repositories::entry_repository::OHLCEntry;
 use crate::infra::repositories::onchain_repository::get_ohlc;
+use crate::utils::{is_onchain_existing_pair, send_err_to_socket};
 use crate::AppState;
 
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
