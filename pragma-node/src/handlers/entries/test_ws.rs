@@ -1,3 +1,4 @@
+use std::fmt::Debug;
 use std::net::IpAddr;
 use std::net::SocketAddr;
 use std::ops::ControlFlow;
@@ -58,8 +59,9 @@ pub trait ChannelHandler<WsState, Payload> {
 
 impl<WsState, Payload> Subscriber<WsState, Payload>
 where
-    WsState: Default + std::fmt::Debug + Send + Sync + 'static,
-    Payload: std::fmt::Debug + Send + Sync + 'static,
+    // TODO(akhercha): Remove Debug
+    WsState: Default + Debug,
+    Payload: Debug,
 {
     pub async fn new(
         socket: WebSocket,
