@@ -129,12 +129,9 @@ where
                 },
                 // Messages from the server to the client
                 maybe_server_msg = self.notify_receiver.recv() => {
-                    match maybe_server_msg {
-                        Some(server_msg) => {
-                            tracing::info!("🥡 [SERVER MESSAGE]");
-                            handler.handle_server_message(self, server_msg).await;
-                        }
-                        None => {}
+                    if let Some(server_msg) = maybe_server_msg {
+                        tracing::info!("🥡 [SERVER MESSAGE]");
+                        handler.handle_server_message(self, server_msg).await;
                     }
                 },
                 // Exit signal
@@ -292,14 +289,14 @@ async fn create_new_subscriber(socket: WebSocket, app_state: AppState, client_ad
     });
 
     // Send some messages to the client as the server using the notification chan
-    for _ in 0..5 {
+    for _ in 0..50 {
         let _ = notify_sender
             .send(ChannelUpdateMsg {
                 msg: String::from("Hello from the server"),
             })
             .await;
         // wait 5s
-        tokio::time::sleep(Duration::from_secs(1)).await;
+        tokio::time::sleep(Duration::from_secs(10)).await;
     }
 
     // close the channel when talk is over
@@ -308,5 +305,5 @@ async fn create_new_subscriber(socket: WebSocket, app_state: AppState, client_ad
         current_subscriber_ip,
         current_subscriber_id
     );
-    exit_sender.send(true).unwrap();
+    let _ = exit_sender.send(true);
 }
