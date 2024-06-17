@@ -8,7 +8,7 @@ use axum::response::IntoResponse;
 use futures_util::SinkExt;
 use serde::{Deserialize, Serialize};
 
-use crate::types::ws::{ChannelHandler, Subscriber, WebSocketError};
+use crate::types::ws::{ChannelHandler, Subscriber};
 use crate::AppState;
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
@@ -31,13 +31,17 @@ pub struct PriceUpdate {
     new_price: String,
 }
 
+pub enum TestError {
+    ExampleError,
+}
+
 struct WsTestHandler;
-impl ChannelHandler<WsState, ClientMsg, ServerMsg> for WsTestHandler {
+impl ChannelHandler<WsState, ClientMsg, ServerMsg, TestError> for WsTestHandler {
     async fn handle_client_msg(
         &mut self,
         _subscriber: &mut Subscriber<WsState>,
         message: ClientMsg,
-    ) -> Result<(), WebSocketError> {
+    ) -> Result<(), TestError> {
         tracing::info!("{:?}", message);
         Ok(())
     }
@@ -46,7 +50,7 @@ impl ChannelHandler<WsState, ClientMsg, ServerMsg> for WsTestHandler {
         &mut self,
         subscriber: &mut Subscriber<WsState>,
         message: ServerMsg,
-    ) -> Result<(), WebSocketError> {
+    ) -> Result<(), TestError> {
         let _ = subscriber
             .sender
             .send(Message::Text(serde_json::to_string(&message).unwrap()))
@@ -57,7 +61,7 @@ impl ChannelHandler<WsState, ClientMsg, ServerMsg> for WsTestHandler {
     async fn periodic_interval(
         &mut self,
         subscriber: &mut Subscriber<WsState>,
-    ) -> Result<(), WebSocketError> {
+    ) -> Result<(), TestError> {
         if subscriber.closed {
             return Ok(());
         }
@@ -91,7 +95,7 @@ pub async fn test_ws(
 
 async fn create_new_subscriber(socket: WebSocket, app_state: AppState, client_addr: SocketAddr) {
     // Channel communication between the server & the subscriber
-    let (mut subscriber, notify_sender) =
+    let (mut subscriber, _) =
         match Subscriber::<WsState>::new(socket, client_addr.ip(), Arc::new(app_state), 1000).await
         {
             Ok(subscriber) => subscriber,
@@ -101,36 +105,7 @@ async fn create_new_subscriber(socket: WebSocket, app_state: AppState, client_ad
             }
         };
 
-    // Send a welcome message
-    let _ = notify_sender
-        .send(Message::Text(
-            serde_json::to_string(&ServerMsg {
-                msg: format!(
-                    "You are registered as:\n[{:?}] {}",
-                    subscriber.ip_address, subscriber.id
-                ),
-            })
-            .unwrap(),
-        ))
-        .await;
-
     // Main event loop for the subscriber
     let handler = WsTestHandler;
-    tokio::spawn(async move {
-        let _ = subscriber.listen(handler).await;
-    });
-
-    // Send a message every 10s to the subscriber
-    for _ in 0..10 {
-        let _ = notify_sender
-            .send(Message::Text(
-                serde_json::to_string(&ServerMsg {
-                    msg: "Hello from the server".to_string(),
-                })
-                .unwrap(),
-            ))
-            .await;
-        // sleep for 10s
-        tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
-    }
+    let _ = subscriber.listen(handler).await;
 }

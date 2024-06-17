@@ -35,28 +35,25 @@ pub struct Subscriber<WsState> {
     pub exit: (watch::Sender<bool>, watch::Receiver<bool>),
 }
 
-pub trait ChannelHandler<WsState, R, A> {
+pub trait ChannelHandler<WsState, CM, SM, Err> {
     /// Called after a message is received from the client.
     /// The handler should process the message and update the state.
     async fn handle_client_msg(
         &mut self,
         subscriber: &mut Subscriber<WsState>,
-        message: R,
-    ) -> Result<(), WebSocketError>;
+        message: CM,
+    ) -> Result<(), Err>;
 
     /// Called after a message is received from the server.
     /// The handler should process the message and update the state.
     async fn handle_server_msg(
         &mut self,
         subscriber: &mut Subscriber<WsState>,
-        message: A,
-    ) -> Result<(), WebSocketError>;
+        message: SM,
+    ) -> Result<(), Err>;
 
     /// Called at a regular interval to update the client with the latest state.
-    async fn periodic_interval(
-        &mut self,
-        subscriber: &mut Subscriber<WsState>,
-    ) -> Result<(), WebSocketError>;
+    async fn periodic_interval(&mut self, subscriber: &mut Subscriber<WsState>) -> Result<(), Err>;
 }
 
 impl<WsState> Subscriber<WsState>
@@ -100,11 +97,11 @@ where
         Ok(())
     }
 
-    pub async fn listen<H, R, A>(&mut self, mut handler: H) -> Result<(), WebSocketError>
+    pub async fn listen<H, CM, SM, Err>(&mut self, mut handler: H) -> Result<(), Err>
     where
-        H: ChannelHandler<WsState, R, A>,
-        R: for<'a> Deserialize<'a>,
-        A: for<'a> Deserialize<'a>,
+        H: ChannelHandler<WsState, CM, SM, Err>,
+        CM: for<'a> Deserialize<'a>,
+        SM: for<'a> Deserialize<'a>,
     {
         loop {
             tokio::select! {
@@ -112,8 +109,8 @@ where
                 maybe_client_msg = self.receiver.next() => {
                     match maybe_client_msg {
                         Some(Ok(client_msg)) => {
-                        tracing::info!("👤 [CLIENT MESSAGE]");
-                            let client_msg = self.decode_msg::<R>(client_msg).await;
+                        tracing::info!("👤 [CLIENT -> SERVER]");
+                            let client_msg = self.decode_msg::<CM>(client_msg).await;
                             if let Some(client_msg) = client_msg {
                                 handler.handle_client_msg(self, client_msg).await?;
                             }
@@ -130,11 +127,11 @@ where
                     tracing::info!("🕒 [PERIODIC INTERVAL]");
                     handler.periodic_interval(self).await?;
                 },
-                // Messages from the client to the server
+                // Messages from the server to the client
                 maybe_server_msg = self.notify_receiver.recv() => {
                     if let Some(server_msg) = maybe_server_msg {
-                        tracing::info!("🥡 [SERVER MESSAGE]");
-                        let server_msg = self.decode_msg::<A>(server_msg).await;
+                        tracing::info!("🥡 [SERVER -> CLIENT]");
+                        let server_msg = self.decode_msg::<SM>(server_msg).await;
                         if let Some(sever_msg) = server_msg {
                             handler.handle_server_msg(self, sever_msg).await?;
                         }
