@@ -65,10 +65,10 @@ where
         ip_address: IpAddr,
         app_state: Arc<AppState>,
         notify_receiver: Receiver<Payload>,
+        exit_receiver: watch::Receiver<bool>,
         update_interval_in_ms: u64,
     ) -> Self {
         let (sender, receiver) = socket.split();
-        let (_, exit_rx) = watch::channel(false);
         let init_state = WsState::default();
 
         Subscriber {
@@ -81,8 +81,13 @@ where
             sender,
             receiver,
             update_interval: interval(Duration::from_millis(update_interval_in_ms)),
-            exit: exit_rx,
+            exit: exit_receiver,
         }
+    }
+
+    pub async fn channel_is_healthy(&mut self) -> bool {
+        let ping_status = self.sender.send(Message::Ping(vec![1, 2, 3])).await;
+        !ping_status.is_err()
     }
 
     pub async fn listen<H>(&mut self, mut handler: H)
@@ -110,10 +115,14 @@ where
                     handler.periodic_interval(self).await;
                 },
                 // Messages from the server to the client
-                // TODO: implementing this block stops the periodic intervals?
-                // Some(payload) = self.notify_receiver.recv() => {
-                //     tracing::info!("🥡 [SERVER PAYLOAD]");
-                //     handler.handle_server_message(self, payload).await;
+                // maybe_payload = self.notify_receiver.recv() => {
+                //     match maybe_payload {
+                //         Some(payload) => {
+                //             tracing::info!("🥡 [SERVER PAYLOAD]");
+                //             handler.handle_server_message(self, payload).await;
+                //         }
+                //         None => {}
+                //     }
                 // },
                 // Exit signal
                 _ = self.exit.changed() => {
@@ -232,12 +241,14 @@ pub async fn test_ws(
 async fn create_new_subscriber(socket: WebSocket, app_state: AppState, client_addr: SocketAddr) {
     // Channel communication between the server & the subscriber
     let (notify_sender, notify_receiver) = mpsc::channel::<ChannelCommunication>(100);
+    let (exit_sender, exit_receiver) = watch::channel(false);
 
     let mut subscriber = Subscriber::<WsState, ChannelCommunication>::new(
         socket,
         client_addr.ip(),
         Arc::new(app_state),
         notify_receiver,
+        exit_receiver,
         1000,
     );
 
@@ -250,14 +261,32 @@ async fn create_new_subscriber(socket: WebSocket, app_state: AppState, client_ad
         )))
         .await;
 
+    if !subscriber.channel_is_healthy().await {
+        exit_sender.send(true).unwrap();
+        subscriber.closed = true;
+        tracing::error!(
+            "Subscriber [{}] {} channel is not healthy. Closing the channel.",
+            subscriber.ip_address,
+            subscriber.id
+        );
+        return;
+    }
+
     tokio::spawn(async move {
         subscriber.listen(handler).await;
     });
 
-    notify_sender
-        .send(ChannelCommunication {
-            msg: String::from("Hello from the server"),
-        })
-        .await
-        .unwrap();
+    for _ in 0..5 {
+        notify_sender
+            .send(ChannelCommunication {
+                msg: String::from("Hello from the server"),
+            })
+            .await
+            .unwrap();
+        // wait 5s
+        tokio::time::sleep(Duration::from_secs(1)).await;
+    }
+
+    // close the channel after some tests
+    exit_sender.send(true).unwrap();
 }
