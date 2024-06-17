@@ -34,12 +34,16 @@ pub struct Subscriber<WsState, Payload> {
 }
 
 pub trait SubscriberHandler<WsState, Payload> {
-    async fn handle_message(&mut self, message: Payload);
-    async fn handle_payload(&mut self, payload: Payload);
+    async fn handle_client_message(&mut self, message: Payload);
+    async fn handle_server_message(
+        &mut self,
+        subscriber: &mut Subscriber<WsState, Payload>,
+        payload: Payload,
+    );
     async fn decode_and_handle_message_received(
         &mut self,
-        msg: Message,
         subscriber: &mut Subscriber<WsState, Payload>,
+        msg: Message,
     );
     async fn periodic_interval(&mut self, subscriber: &mut Subscriber<WsState, Payload>);
 }
@@ -49,9 +53,13 @@ where
     WsState: Default + std::fmt::Debug + Send + Sync + 'static,
     Payload: std::fmt::Debug + Send + Sync + 'static,
 {
-    pub fn new(socket: WebSocket, app_state: Arc<AppState>) -> Self {
+    pub fn new(
+        socket: WebSocket,
+        app_state: Arc<AppState>,
+        notify_receiver: Receiver<Payload>,
+        update_interval_in_ms: u64,
+    ) -> Self {
         let (sender, receiver) = socket.split();
-        let (_, rx) = mpsc::channel::<Payload>(1);
         let (_, exit_rx) = watch::channel(false);
 
         let init_state = WsState::default();
@@ -62,10 +70,10 @@ where
             closed: false,
             _app_state: app_state,
             _ws_state: Arc::new(init_state),
-            notify_receiver: rx,
+            notify_receiver,
             sender,
             receiver,
-            update_interval: interval(Duration::from_secs(1)),
+            update_interval: interval(Duration::from_millis(update_interval_in_ms)),
             exit: exit_rx,
         }
     }
@@ -76,10 +84,11 @@ where
     {
         loop {
             tokio::select! {
+                // Messages from the client
                 maybe_msg = self.receiver.next() => {
                     match maybe_msg {
                         Some(Ok(msg)) => {
-                            handler.decode_and_handle_message_received(msg, self).await;
+                            handler.decode_and_handle_message_received(self, msg).await;
                         }
                         Some(Err(_)) => {
                             tracing::info!("Client disconnected or error occurred. Closing the channel.");
@@ -88,17 +97,17 @@ where
                         None => {}
                     }
                 },
-                // TODO: does not work as intended
-                // maybe_payload = self.notify_receiver.recv() => {
-                //     if let Some(payload) = maybe_payload {
-                //         handler.handle_payload(payload).await;
-                //     } else {
-                //         tracing::error!("Could not receive payload");
-                //     }
-                // },
+                // Messages from the server to the client
+                Some(payload) = self.notify_receiver.recv() => {
+                    tracing::info!("🥡 [SERVER PAYLOAD]");
+                    handler.handle_server_message(self, payload).await;
+                },
+                // Periodic updates
                 _ = self.update_interval.tick() => {
+                    tracing::info!("🕒 [PERIODIC INTERVAL]");
                     handler.periodic_interval(self).await;
                 },
+                // Exit signal
                 _ = self.exit.changed() => {
                     if *self.exit.borrow() {
                         tracing::info!("Exit signal received. Closing the channel.");
@@ -125,27 +134,32 @@ pub struct ChannelCommunication {
 }
 
 impl SubscriberHandler<WsState, ChannelCommunication> for WsTestHandler {
-    async fn handle_message(&mut self, message: ChannelCommunication) {
-        // Custom logic for handling a message
-        tracing::info!("Handling message: {:?}", message);
+    async fn handle_client_message(&mut self, message: ChannelCommunication) {
+        tracing::info!("{:?}", message);
     }
 
-    async fn handle_payload(&mut self, payload: ChannelCommunication) {
-        // Custom logic for handling a payload
-        tracing::info!("Handling payload: {:?}", payload);
+    async fn handle_server_message(
+        &mut self,
+        subscriber: &mut Subscriber<WsState, ChannelCommunication>,
+        message: ChannelCommunication,
+    ) {
+        let _ = subscriber
+            .sender
+            .send(Message::Text(serde_json::to_string(&message).unwrap()))
+            .await;
     }
 
     async fn decode_and_handle_message_received(
         &mut self,
-        msg: Message,
         subscriber: &mut Subscriber<WsState, ChannelCommunication>,
+        msg: Message,
     ) {
         match msg {
             Message::Text(text) => {
                 tracing::info!("📨 [TEXT]");
                 let msg = serde_json::from_str::<ChannelCommunication>(&text);
                 if let Ok(msg) = msg {
-                    self.handle_message(msg).await;
+                    self.handle_client_message(msg).await;
                 } else {
                     tracing::error!("Could not decode message");
                 }
@@ -170,7 +184,6 @@ impl SubscriberHandler<WsState, ChannelCommunication> for WsTestHandler {
         &mut self,
         subscriber: &mut Subscriber<WsState, ChannelCommunication>,
     ) {
-        tracing::info!("🕒 [PERIODIC INTERVAL]");
         if subscriber.closed {
             // If the channel is closed, we shouldn't do anything here
             return;
@@ -198,8 +211,15 @@ pub async fn test_ws(ws: WebSocketUpgrade, State(state): State<AppState>) -> imp
 }
 
 async fn create_new_subscriber(socket: WebSocket, app_state: AppState) {
-    let mut subscriber =
-        Subscriber::<WsState, ChannelCommunication>::new(socket, Arc::new(app_state));
+    // Channel communication between the server & the subscriber
+    let (notify_sender, notify_receiver) = mpsc::channel::<ChannelCommunication>(100);
+    let mut subscriber = Subscriber::<WsState, ChannelCommunication>::new(
+        socket,
+        Arc::new(app_state),
+        notify_receiver,
+        10000,
+    );
+
     let handler = WsTestHandler;
     let _ = subscriber
         .sender
@@ -208,5 +228,15 @@ async fn create_new_subscriber(socket: WebSocket, app_state: AppState) {
             subscriber.ip_address, subscriber.id
         )))
         .await;
-    subscriber.listen(handler).await;
+
+    tokio::spawn(async move {
+        subscriber.listen(handler).await;
+    });
+
+    notify_sender
+        .send(ChannelCommunication {
+            msg: String::from("Hello from the server"),
+        })
+        .await
+        .unwrap();
 }
