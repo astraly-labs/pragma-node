@@ -1,7 +1,6 @@
 use std::fmt::Debug;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use tokio::sync::mpsc;
 
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::{ConnectInfo, State};
@@ -18,16 +17,26 @@ pub struct WsState {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-pub struct ChannelUpdateMsg {
+pub struct ClientMsg {
     pub msg: String,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+pub struct ServerMsg {
+    pub msg: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+pub struct PriceUpdate {
+    new_price: String,
+}
+
 struct WsTestHandler;
-impl ChannelHandler<WsState, ChannelUpdateMsg> for WsTestHandler {
+impl ChannelHandler<WsState, ClientMsg, ServerMsg> for WsTestHandler {
     async fn handle_client_msg(
         &mut self,
         _subscriber: &mut Subscriber<WsState>,
-        message: ChannelUpdateMsg,
+        message: ClientMsg,
     ) -> Result<(), WebSocketError> {
         tracing::info!("{:?}", message);
         Ok(())
@@ -36,11 +45,10 @@ impl ChannelHandler<WsState, ChannelUpdateMsg> for WsTestHandler {
     async fn handle_server_msg(
         &mut self,
         subscriber: &mut Subscriber<WsState>,
-        message: ChannelUpdateMsg,
+        message: ServerMsg,
     ) -> Result<(), WebSocketError> {
         let _ = subscriber
-            .channel
-            .0
+            .sender
             .send(Message::Text(serde_json::to_string(&message).unwrap()))
             .await;
         Ok(())
@@ -51,7 +59,7 @@ impl ChannelHandler<WsState, ChannelUpdateMsg> for WsTestHandler {
         &mut self,
         subscriber: &mut Subscriber<WsState>,
         msg: Message,
-    ) -> Option<ChannelUpdateMsg> {
+    ) -> Option<ClientMsg> {
         match msg {
             Message::Close(_) => {
                 tracing::info!("👋 [CLOSE]");
@@ -60,7 +68,7 @@ impl ChannelHandler<WsState, ChannelUpdateMsg> for WsTestHandler {
             }
             Message::Text(text) => {
                 tracing::info!("📨 [TEXT]");
-                let msg = serde_json::from_str::<ChannelUpdateMsg>(&text);
+                let msg = serde_json::from_str::<ClientMsg>(&text);
                 if let Ok(msg) = msg {
                     return Some(msg);
                 } else {
@@ -85,7 +93,7 @@ impl ChannelHandler<WsState, ChannelUpdateMsg> for WsTestHandler {
         &mut self,
         _subscriber: &mut Subscriber<WsState>,
         msg: Message,
-    ) -> Option<ChannelUpdateMsg> {
+    ) -> Option<ServerMsg> {
         match msg {
             Message::Close(_) => {
                 tracing::info!("👋 [CLOSE]");
@@ -94,7 +102,7 @@ impl ChannelHandler<WsState, ChannelUpdateMsg> for WsTestHandler {
             }
             Message::Text(text) => {
                 tracing::info!("📨 [TEXT]");
-                let msg = serde_json::from_str::<ChannelUpdateMsg>(&text);
+                let msg = serde_json::from_str::<ServerMsg>(&text);
                 if let Ok(msg) = msg {
                     return Some(msg);
                 } else {
@@ -122,11 +130,11 @@ impl ChannelHandler<WsState, ChannelUpdateMsg> for WsTestHandler {
         if subscriber.closed {
             return Ok(());
         }
-        let _ = subscriber
-            .channel
-            .0
-            .send(Message::Text("tic".to_string()))
-            .await;
+        if let Ok(msg) = serde_json::to_string(&PriceUpdate {
+            new_price: "100".to_string(),
+        }) {
+            let _ = subscriber.sender.send(Message::Text(msg)).await;
+        }
         Ok(())
     }
 }
@@ -152,28 +160,20 @@ pub async fn test_ws(
 
 async fn create_new_subscriber(socket: WebSocket, app_state: AppState, client_addr: SocketAddr) {
     // Channel communication between the server & the subscriber
-    let (notify_sender, notify_receiver) = mpsc::channel::<Message>(100);
-
-    let mut subscriber = match Subscriber::<WsState>::new(
-        socket,
-        client_addr.ip(),
-        Arc::new(app_state),
-        1000,
-        notify_receiver,
-    )
-    .await
-    {
-        Ok(subscriber) => subscriber,
-        Err(e) => {
-            tracing::error!("Failed to create a new subscriber. Error: {}", e);
-            return;
-        }
-    };
+    let (mut subscriber, notify_sender) =
+        match Subscriber::<WsState>::new(socket, client_addr.ip(), Arc::new(app_state), 1000).await
+        {
+            Ok(subscriber) => subscriber,
+            Err(e) => {
+                tracing::error!("Failed to create a new subscriber. Error: {}", e);
+                return;
+            }
+        };
 
     // Send a welcome message
     let _ = notify_sender
         .send(Message::Text(
-            serde_json::to_string(&ChannelUpdateMsg {
+            serde_json::to_string(&ServerMsg {
                 msg: format!(
                     "You are registered as:\n[{:?}] {}",
                     subscriber.ip_address, subscriber.id
@@ -193,7 +193,7 @@ async fn create_new_subscriber(socket: WebSocket, app_state: AppState, client_ad
     for _ in 0..10 {
         let _ = notify_sender
             .send(Message::Text(
-                serde_json::to_string(&ChannelUpdateMsg {
+                serde_json::to_string(&ServerMsg {
                     msg: "Hello from the server".to_string(),
                 })
                 .unwrap(),
