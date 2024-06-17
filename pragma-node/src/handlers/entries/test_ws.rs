@@ -103,20 +103,30 @@ pub async fn test_ws(
 
 async fn create_new_subscriber(socket: WebSocket, app_state: AppState, client_addr: SocketAddr) {
     // Channel communication between the server & the subscriber
-    let (mut subscriber, _) =
-        match Subscriber::<WsState>::new(socket, client_addr.ip(), Arc::new(app_state), 1000).await
-        {
-            Ok(subscriber) => subscriber,
-            Err(e) => {
-                tracing::error!("Failed to create a new subscriber. Error: {}", e);
-                return;
-            }
-        };
+    let update_interval_in_ms = 1000;
+    let (mut subscriber, _) = match Subscriber::<WsState>::new(
+        socket,
+        client_addr.ip(),
+        Arc::new(app_state),
+        update_interval_in_ms,
+    )
+    .await
+    {
+        Ok(subscriber) => subscriber,
+        Err(e) => {
+            tracing::error!("Failed to register subscriber: {}", e);
+            return;
+        }
+    };
 
     // Main event loop for the subscriber
     let handler = WsTestHandler;
     let status = subscriber.listen(handler).await;
     if let Err(e) = status {
-        tracing::error!("Error occurred while listening to the subscriber: {:?}", e);
+        tracing::error!(
+            "[{}] Error occurred while listening to the subscriber: {:?}",
+            subscriber.id,
+            e
+        );
     }
 }
