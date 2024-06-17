@@ -148,7 +148,7 @@ async fn main() {
 
     tracing::info!("listening on http://{}", socket_addr);
     axum::Server::bind(&socket_addr)
-        .serve(app.into_make_service())
+        .serve(app.into_make_service_with_connect_info::<SocketAddr>())
         .await
         .map_err(internal_error)
         .unwrap()

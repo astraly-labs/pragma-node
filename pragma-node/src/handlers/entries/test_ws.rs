@@ -1,10 +1,11 @@
 use std::net::IpAddr;
+use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc::{self, Receiver};
 
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
-use axum::extract::State;
+use axum::extract::{ConnectInfo, State};
 use axum::response::IntoResponse;
 use futures_util::stream::{SplitSink, SplitStream};
 use futures_util::{SinkExt, StreamExt};
@@ -23,14 +24,16 @@ use crate::AppState;
 /// It listens to the store for updates and sends them to the client.
 pub struct Subscriber<WsState, Payload> {
     pub id: Uuid,
-    pub ip_address: Option<IpAddr>,
+    pub ip_address: IpAddr,
     // TODO: what is the purpose on closed?
     pub closed: bool,
     pub _app_state: Arc<AppState>,
     pub _ws_state: Arc<WsState>,
-    // TODO: what do I use this for?
+    // client receiving messages from the server
     pub notify_receiver: Receiver<Payload>,
+    // server sending messages to the client
     pub sender: SplitSink<WebSocket, Message>,
+    // server receiving messages from the client
     pub receiver: SplitStream<WebSocket>,
     pub update_interval: Interval,
     // TODO: watches for exit but where/when is it set?
@@ -59,18 +62,18 @@ where
 {
     pub fn new(
         socket: WebSocket,
+        ip_address: IpAddr,
         app_state: Arc<AppState>,
         notify_receiver: Receiver<Payload>,
         update_interval_in_ms: u64,
     ) -> Self {
         let (sender, receiver) = socket.split();
         let (_, exit_rx) = watch::channel(false);
-
         let init_state = WsState::default();
 
         Subscriber {
             id: Uuid::new_v4(),
-            ip_address: None,
+            ip_address,
             closed: false,
             _app_state: app_state,
             _ws_state: Arc::new(init_state),
@@ -101,20 +104,21 @@ where
                         None => {}
                     }
                 },
-                // Messages from the server to the client
-                Some(payload) = self.notify_receiver.recv() => {
-                    tracing::info!("🥡 [SERVER PAYLOAD]");
-                    handler.handle_server_message(self, payload).await;
-                },
                 // Periodic updates
                 _ = self.update_interval.tick() => {
                     tracing::info!("🕒 [PERIODIC INTERVAL]");
                     handler.periodic_interval(self).await;
                 },
+                // Messages from the server to the client
+                // TODO: implementing this block stops the periodic intervals?
+                // Some(payload) = self.notify_receiver.recv() => {
+                //     tracing::info!("🥡 [SERVER PAYLOAD]");
+                //     handler.handle_server_message(self, payload).await;
+                // },
                 // Exit signal
                 _ = self.exit.changed() => {
                     if *self.exit.borrow() {
-                        tracing::info!("Exit signal received. Closing the channel.");
+                        tracing::info!("⛔ [CLOSING SIGNAL]");
                         break;
                     }
                 },
@@ -216,18 +220,25 @@ impl SubscriberHandler<WsState, ChannelCommunication> for WsTestHandler {
         )
     )
 )]
-pub async fn test_ws(ws: WebSocketUpgrade, State(state): State<AppState>) -> impl IntoResponse {
-    ws.on_upgrade(move |socket| create_new_subscriber(socket, state))
+pub async fn test_ws(
+    ws: WebSocketUpgrade,
+    State(state): State<AppState>,
+    ConnectInfo(client_addr): ConnectInfo<SocketAddr>,
+) -> impl IntoResponse {
+    tracing::info!("🔗 [IP] {:?}", client_addr);
+    ws.on_upgrade(move |socket| create_new_subscriber(socket, state, client_addr))
 }
 
-async fn create_new_subscriber(socket: WebSocket, app_state: AppState) {
+async fn create_new_subscriber(socket: WebSocket, app_state: AppState, client_addr: SocketAddr) {
     // Channel communication between the server & the subscriber
     let (notify_sender, notify_receiver) = mpsc::channel::<ChannelCommunication>(100);
+
     let mut subscriber = Subscriber::<WsState, ChannelCommunication>::new(
         socket,
+        client_addr.ip(),
         Arc::new(app_state),
         notify_receiver,
-        10000,
+        1000,
     );
 
     let handler = WsTestHandler;
