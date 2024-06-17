@@ -13,7 +13,7 @@ use crate::AppState;
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct WsState {
-    pub msg: String,
+    pub count: u32,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
@@ -31,7 +31,9 @@ pub struct PriceUpdate {
     new_price: String,
 }
 
+#[derive(thiserror::Error, Debug)]
 pub enum TestError {
+    #[error("Example error")]
     ExampleError,
 }
 
@@ -65,6 +67,12 @@ impl ChannelHandler<WsState, ClientMsg, ServerMsg, TestError> for WsTestHandler 
         if subscriber.closed {
             return Ok(());
         }
+
+        subscriber.state.count += 1;
+        if subscriber.state.count > 10 {
+            return Err(TestError::ExampleError);
+        }
+
         if let Ok(msg) = serde_json::to_string(&PriceUpdate {
             new_price: "100".to_string(),
         }) {
@@ -107,5 +115,8 @@ async fn create_new_subscriber(socket: WebSocket, app_state: AppState, client_ad
 
     // Main event loop for the subscriber
     let handler = WsTestHandler;
-    let _ = subscriber.listen(handler).await;
+    let status = subscriber.listen(handler).await;
+    if let Err(e) = status {
+        tracing::error!("Error occurred while listening to the subscriber: {:?}", e);
+    }
 }

@@ -22,12 +22,13 @@ pub enum WebSocketError {
 
 /// Subscriber is an actor that handles a single websocket connection.
 /// It listens to the store for updates and sends them to the client.
-pub struct Subscriber<WsState> {
+#[allow(dead_code)]
+pub struct Subscriber<State> {
     pub id: Uuid,
     pub ip_address: IpAddr,
     pub closed: bool,
-    pub _app_state: Arc<AppState>,
-    pub _ws_state: Arc<WsState>,
+    pub state: State,
+    pub app_state: Arc<AppState>,
     pub sender: SplitSink<WebSocket, Message>,
     pub receiver: SplitStream<WebSocket>,
     pub update_interval: Interval,
@@ -35,12 +36,12 @@ pub struct Subscriber<WsState> {
     pub exit: (watch::Sender<bool>, watch::Receiver<bool>),
 }
 
-pub trait ChannelHandler<WsState, CM, SM, Err> {
+pub trait ChannelHandler<State, CM, SM, Err> {
     /// Called after a message is received from the client.
     /// The handler should process the message and update the state.
     async fn handle_client_msg(
         &mut self,
-        subscriber: &mut Subscriber<WsState>,
+        subscriber: &mut Subscriber<State>,
         message: CM,
     ) -> Result<(), Err>;
 
@@ -48,25 +49,25 @@ pub trait ChannelHandler<WsState, CM, SM, Err> {
     /// The handler should process the message and update the state.
     async fn handle_server_msg(
         &mut self,
-        subscriber: &mut Subscriber<WsState>,
+        subscriber: &mut Subscriber<State>,
         message: SM,
     ) -> Result<(), Err>;
 
     /// Called at a regular interval to update the client with the latest state.
-    async fn periodic_interval(&mut self, subscriber: &mut Subscriber<WsState>) -> Result<(), Err>;
+    async fn periodic_interval(&mut self, subscriber: &mut Subscriber<State>) -> Result<(), Err>;
 }
 
-impl<WsState> Subscriber<WsState>
+impl<State> Subscriber<State>
 where
-    WsState: Default + Debug,
+    State: Default + Debug,
 {
+    /// Create a new subscriber tied to a websocket connection.
     pub async fn new(
         socket: WebSocket,
         ip_address: IpAddr,
         app_state: Arc<AppState>,
         update_interval_in_ms: u64,
     ) -> Result<(Self, Sender<Message>), WebSocketError> {
-        let init_state = WsState::default();
         let (sender, receiver) = socket.split();
         let (notify_sender, notify_receiver) = mpsc::channel::<Message>(32);
 
@@ -74,8 +75,8 @@ where
             id: Uuid::new_v4(),
             ip_address,
             closed: false,
-            _app_state: app_state,
-            _ws_state: Arc::new(init_state),
+            state: State::default(),
+            app_state,
             sender,
             receiver,
             update_interval: interval(Duration::from_millis(update_interval_in_ms)),
@@ -97,9 +98,11 @@ where
         Ok(())
     }
 
+    /// Listen to messages from the client and the server.
+    /// The handler is responsible for processing the messages and updating the state.
     pub async fn listen<H, CM, SM, Err>(&mut self, mut handler: H) -> Result<(), Err>
     where
-        H: ChannelHandler<WsState, CM, SM, Err>,
+        H: ChannelHandler<State, CM, SM, Err>,
         CM: for<'a> Deserialize<'a>,
         SM: for<'a> Deserialize<'a>,
     {
@@ -149,6 +152,11 @@ where
         }
     }
 
+    /// Decode the message from the client or the server.
+    /// The message is expected to be in JSON format.
+    /// If the message is not in the expected format, it will return None.
+    /// If the message is a close signal, it will return None and send a close
+    /// signal to the client.
     pub async fn decode_msg<T: for<'a> Deserialize<'a>>(&mut self, msg: Message) -> Option<T> {
         match msg {
             Message::Close(_) => {
