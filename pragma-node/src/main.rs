@@ -1,5 +1,5 @@
 use deadpool_diesel::postgres::Pool;
-use pragma_entities::connection::{ENV_POSTGRES_DATABASE_URL, ENV_TS_DATABASE_URL};
+use pragma_entities::connection::{ENV_OFFCHAIN_DATABASE_URL, ENV_ONCHAIN_DATABASE_URL};
 use starknet::signers::SigningKey;
 use std::net::SocketAddr;
 use tower_http::cors::CorsLayer;
@@ -109,13 +109,13 @@ async fn main() {
     let config = config().await;
 
     let timescale_pool =
-        pragma_entities::connection::init_pool("pragma-node-api", ENV_TS_DATABASE_URL)
-            .expect("can't init timescale (offchain db) pool");
+        pragma_entities::connection::init_pool("pragma-node-api", ENV_OFFCHAIN_DATABASE_URL)
+            .expect("can't init offchain database pool");
     pragma_entities::db::run_migrations(&timescale_pool).await;
 
     let postgres_pool =
-        pragma_entities::connection::init_pool("pragma-node-api", ENV_POSTGRES_DATABASE_URL)
-            .expect("can't init postgres (onchain db) pool");
+        pragma_entities::connection::init_pool("pragma-node-api", ENV_ONCHAIN_DATABASE_URL)
+            .expect("can't init onchain database pool");
 
     // TODO(#54): Build the signer using a builder pattern
     let pragma_signer: Option<SigningKey> = if config.is_production_mode() {

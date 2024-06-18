@@ -68,11 +68,12 @@ where
         app_state: Arc<AppState>,
         update_interval_in_ms: u64,
     ) -> Result<(Self, Sender<Message>), WebSocketError> {
+        let id = Uuid::new_v4();
         let (sender, receiver) = socket.split();
         let (notify_sender, notify_receiver) = mpsc::channel::<Message>(32);
 
         let mut subscriber = Subscriber {
-            id: Uuid::new_v4(),
+            id,
             ip_address,
             closed: false,
             state: State::default(),
