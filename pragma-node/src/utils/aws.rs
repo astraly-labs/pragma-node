@@ -10,6 +10,36 @@ pub enum AwsError {
     DeserializationError,
 }
 
+pub struct PragmaSignerBuilder {
+    is_production: bool,
+}
+
+impl PragmaSignerBuilder {
+    pub fn new() -> Self {
+        Self {
+            is_production: false,
+        }
+    }
+
+    pub fn production_mode(mut self) -> Self {
+        self.is_production = true;
+        self
+    }
+
+    pub fn non_production_mode(mut self) -> Self {
+        self.is_production = false;
+        self
+    }
+
+    pub async fn build(self) -> Option<SigningKey> {
+        if self.is_production {
+            build_pragma_signer_from_aws().await
+        } else {
+            Some(SigningKey::from_random())
+        }
+    }
+}
+
 pub async fn build_pragma_signer_from_aws() -> Option<SigningKey> {
     let aws_client = get_aws_client().await;
     let secret_json_response = get_aws_secret(&aws_client, AWS_PRAGMA_PRIVATE_KEY_SECRET)
@@ -20,11 +50,6 @@ pub async fn build_pragma_signer_from_aws() -> Option<SigningKey> {
     Some(SigningKey::from_secret_scalar(pragma_secret_key))
 }
 
-/// Builds an aws client from environment variables:
-/// - AWS_ACCESS_KEY_ID
-/// - AWS_SECRET_ACCESS_KEY
-/// See:
-/// https://docs.aws.amazon.com/sdk-for-rust/latest/dg/credentials.html
 async fn get_aws_client() -> Client {
     let aws_config = aws_config::load_from_env().await;
     aws_sdk_secretsmanager::Client::new(&aws_config)
@@ -47,8 +72,6 @@ async fn get_aws_secret(client: &Client, secret_name: &str) -> Result<String, Aw
     }
 }
 
-/// Parses the secret_json_response String, gets the STARK_PRIVATE_KEY field
-/// & returns it as a String.
 fn get_pragma_secret_key(secret_json_response: String) -> Result<String, AwsError> {
     let secret_json: serde_json::Value =
         serde_json::from_str(&secret_json_response).map_err(|_| AwsError::DeserializationError)?;
