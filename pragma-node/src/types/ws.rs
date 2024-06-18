@@ -127,7 +127,7 @@ where
                             }
                         }
                         Some(Err(_)) => {
-                            tracing::info!("Client disconnected or error occurred. Closing the channel.");
+                            tracing::info!("😶‍🌫️ Client disconnected/error occurred. Closing the channel.");
                             return Ok(());
                         },
                         None => {}
@@ -135,7 +135,6 @@ where
                 },
                 // Periodic updates
                 _ = self.update_interval.tick() => {
-                    tracing::info!("🕒 [PERIODIC INTERVAL]");
                     handler.periodic_interval(self).await?;
                 },
                 // Messages from the server to the client

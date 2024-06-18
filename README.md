@@ -132,8 +132,8 @@ PGPASSWORD=test-password pg_restore -h postgre-db -U postgres -d pragma /backup.
 
 ```bash
 export MODE=dev
-export OFFCHAIN_DATABASE_URL="postgres://postgres:test-password@0.0.0.0:5432/pragma"
-export ONCHAIN_DATABASE_URL="postgres://postgres:test-password@0.0.0.0:5433/pragma"
+export TIMESCALE_DATABASE_URL="postgres://postgres:test-password@0.0.0.0:5432/pragma"
+export POSTGRES_DATABASE_URL="postgres://postgres:test-password@0.0.0.0:5433/pragma"
 export DATABASE_MAX_CONN=5
 export TOPIC="pragma-data"
 export HOST="0.0.0.0"

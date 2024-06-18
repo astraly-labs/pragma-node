@@ -1,8 +1,8 @@
 use crate::error::ErrorKind;
 use deadpool_diesel::postgres::{Manager, Pool};
 
-pub const ENV_ONCHAIN_DATABASE_URL: &str = "ONCHAIN_DATABASE_URL";
-pub const ENV_OFFCHAIN_DATABASE_URL: &str = "OFFCHAIN_DATABASE_URL";
+pub const ENV_ONCHAIN_DATABASE_URL: &str = "POSTGRES_DATABASE_URL";
+pub const ENV_OFFCHAIN_DATABASE_URL: &str = "TIMESCALE_DATABASE_URL";
 const ENV_DATABASE_MAX_CONN: &str = "DATABASE_MAX_CONN";
 
 pub fn init_pool(app_name: &str, database_url_env: &str) -> Result<Pool, ErrorKind> {

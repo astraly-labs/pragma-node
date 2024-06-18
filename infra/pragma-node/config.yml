@@ -5,8 +5,8 @@ container_environment:
   - region: "eu-west-3"
   - prefix: "/conf/{{ SERVICE_NAME }}/{{ RUN_ENV }}"
   - keys:
-      - OFFCHAIN_DATABASE_URL
-      - ONCHAIN_DATABASE_URL
+      - TIMESCALE_DATABASE_URL
+      - POSTGRES_DATABASE_URL
       - DATABASE_MAX_CONN
       - TOPIC
       - HOST
