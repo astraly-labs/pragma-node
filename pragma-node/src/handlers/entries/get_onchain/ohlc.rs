@@ -18,7 +18,7 @@ use axum::extract::ws::{WebSocket, WebSocketUpgrade};
 
 #[utoipa::path(
     get,
-    path = "/node/v1/onchain/ohlc",
+    path = "/node/v1/onchain/ohlc/subscribe",
     responses(
         (
             status = 200,
@@ -67,56 +67,7 @@ async fn create_new_subscriber(socket: WebSocket, app_state: AppState, client_ad
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, Default)]
-struct SubscriptionState {
-    subscribed_pair: Option<String>,
-    network: Network,
-    interval: Interval,
-    is_first_update: bool,
-    ohlc_data: Vec<OHLCEntry>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct SubscriptionRequest {
-    msg_type: SubscriptionType,
-    pair: String,
-    network: Network,
-    interval: Interval,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct SubscriptionAck {
-    msg_type: SubscriptionType,
-    pair: String,
-    network: Network,
-    interval: Interval,
-}
-
 struct WsOHLCHandler;
-
-impl WsOHLCHandler {
-    async fn send_ack_message(
-        &self,
-        subscriber: &mut Subscriber<SubscriptionState>,
-        subscription: SubscriptionRequest,
-    ) -> Result<(), InfraError> {
-        if let Ok(ack_message) = serde_json::to_string(&SubscriptionAck {
-            msg_type: subscription.msg_type,
-            pair: subscription.pair,
-            network: subscription.network,
-            interval: subscription.interval,
-        }) {
-            if subscriber.send_msg(ack_message).await.is_err() {
-                let error_msg = "Message received but could not send ack message.";
-                subscriber.send_err(error_msg).await;
-            }
-        } else {
-            let error_msg = "Could not serialize ack message.";
-            subscriber.send_err(error_msg).await;
-        }
-        Ok(())
-    }
-}
 
 impl ChannelHandler<SubscriptionState, SubscriptionRequest, InfraError> for WsOHLCHandler {
     async fn handle_client_msg(
@@ -206,4 +157,53 @@ impl ChannelHandler<SubscriptionState, SubscriptionRequest, InfraError> for WsOH
 
         Ok(())
     }
+}
+
+impl WsOHLCHandler {
+    async fn send_ack_message(
+        &self,
+        subscriber: &mut Subscriber<SubscriptionState>,
+        subscription: SubscriptionRequest,
+    ) -> Result<(), InfraError> {
+        if let Ok(ack_message) = serde_json::to_string(&SubscriptionAck {
+            msg_type: subscription.msg_type,
+            pair: subscription.pair,
+            network: subscription.network,
+            interval: subscription.interval,
+        }) {
+            if subscriber.send_msg(ack_message).await.is_err() {
+                let error_msg = "Message received but could not send ack message.";
+                subscriber.send_err(error_msg).await;
+            }
+        } else {
+            let error_msg = "Could not serialize ack message.";
+            subscriber.send_err(error_msg).await;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+struct SubscriptionState {
+    subscribed_pair: Option<String>,
+    network: Network,
+    interval: Interval,
+    is_first_update: bool,
+    ohlc_data: Vec<OHLCEntry>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct SubscriptionRequest {
+    msg_type: SubscriptionType,
+    pair: String,
+    network: Network,
+    interval: Interval,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct SubscriptionAck {
+    msg_type: SubscriptionType,
+    pair: String,
+    network: Network,
+    interval: Interval,
 }

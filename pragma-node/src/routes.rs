@@ -51,7 +51,7 @@ fn onchain_routes(state: AppState) -> Router<AppState> {
         .route("/:base/:quote", get(get_onchain))
         .route("/checkpoints/:base/:quote", get(get_onchain_checkpoints))
         .route("/publishers", get(get_onchain_publishers))
-        .route("/ws/ohlc", get(subscribe_to_onchain_ohlc))
+        .route("/ohlc/subscribe", get(subscribe_to_onchain_ohlc))
         .with_state(state)
 }
 
