@@ -1,4 +1,5 @@
 use serde::Deserialize;
+use serde_json::json;
 use std::fmt::Debug;
 use std::net::IpAddr;
 use std::sync::Arc;
@@ -10,7 +11,7 @@ use axum::extract::ws::{Message, WebSocket};
 use futures_util::stream::{SplitSink, SplitStream};
 use futures_util::{SinkExt, StreamExt};
 use thiserror::Error;
-use tokio::sync::watch;
+use tokio::sync::{watch, Mutex};
 use tokio::time::{interval, Interval};
 use uuid::Uuid;
 
@@ -23,11 +24,11 @@ pub enum WebSocketError {
 /// Subscriber is an actor that handles a single websocket connection.
 /// It listens to the store for updates and sends them to the client.
 #[allow(dead_code)]
-pub struct Subscriber<State> {
+pub struct Subscriber<ChannelState> {
     pub id: Uuid,
     pub ip_address: IpAddr,
     pub closed: bool,
-    pub state: State,
+    pub state: Arc<Mutex<ChannelState>>,
     pub app_state: Arc<AppState>,
     pub sender: SplitSink<WebSocket, Message>,
     pub receiver: SplitStream<WebSocket>,
@@ -36,12 +37,12 @@ pub struct Subscriber<State> {
     pub exit: (watch::Sender<bool>, watch::Receiver<bool>),
 }
 
-pub trait ChannelHandler<State, CM, SM, Err> {
+pub trait ChannelHandler<ChannelState, CM, SM, Err> {
     /// Called after a message is received from the client.
     /// The handler should process the message and update the state.
     async fn handle_client_msg(
         &mut self,
-        subscriber: &mut Subscriber<State>,
+        subscriber: &mut Subscriber<ChannelState>,
         message: CM,
     ) -> Result<(), Err>;
 
@@ -49,23 +50,27 @@ pub trait ChannelHandler<State, CM, SM, Err> {
     /// The handler should process the message and update the state.
     async fn handle_server_msg(
         &mut self,
-        subscriber: &mut Subscriber<State>,
+        subscriber: &mut Subscriber<ChannelState>,
         message: SM,
     ) -> Result<(), Err>;
 
     /// Called at a regular interval to update the client with the latest state.
-    async fn periodic_interval(&mut self, subscriber: &mut Subscriber<State>) -> Result<(), Err>;
+    async fn periodic_interval(
+        &mut self,
+        subscriber: &mut Subscriber<ChannelState>,
+    ) -> Result<(), Err>;
 }
 
-impl<State> Subscriber<State>
+impl<ChannelState> Subscriber<ChannelState>
 where
-    State: Default + Debug,
+    ChannelState: Default + Debug,
 {
     /// Create a new subscriber tied to a websocket connection.
     pub async fn new(
         socket: WebSocket,
         ip_address: IpAddr,
         app_state: Arc<AppState>,
+        state: Option<ChannelState>,
         update_interval_in_ms: u64,
     ) -> Result<(Self, Sender<Message>), WebSocketError> {
         let id = Uuid::new_v4();
@@ -76,7 +81,7 @@ where
             id,
             ip_address,
             closed: false,
-            state: State::default(),
+            state: Arc::new(Mutex::new(state.unwrap_or_default())),
             app_state,
             sender,
             receiver,
@@ -103,7 +108,7 @@ where
     /// The handler is responsible for processing the messages and updating the state.
     pub async fn listen<H, CM, SM, Err>(&mut self, mut handler: H) -> Result<(), Err>
     where
-        H: ChannelHandler<State, CM, SM, Err>,
+        H: ChannelHandler<ChannelState, CM, SM, Err>,
         CM: for<'a> Deserialize<'a>,
         SM: for<'a> Deserialize<'a>,
     {
@@ -196,5 +201,16 @@ where
             _ => {}
         }
         None
+    }
+
+    /// Send a basic message to the client.
+    pub async fn send_msg(&mut self, msg: String) -> Result<(), axum::Error> {
+        self.sender.send(Message::Text(msg)).await
+    }
+
+    /// Send an error message to the client without closing the channel.
+    pub async fn send_err(&mut self, err: &str) {
+        let err = json!({"error": err});
+        let _ = self.sender.send(Message::Text(err.to_string())).await;
     }
 }

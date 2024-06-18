@@ -68,11 +68,11 @@ impl ChannelHandler<WsState, ClientMsg, ServerMsg, TestError> for WsTestHandler 
             return Ok(());
         }
 
-        subscriber.state.count += 1;
-        if subscriber.state.count > 10 {
+        let mut state = subscriber.state.lock().await;
+        state.count += 1;
+        if state.count > 10 {
             return Err(TestError::ExampleError);
         }
-
         if let Ok(msg) = serde_json::to_string(&PriceUpdate {
             new_price: "100".to_string(),
         }) {
@@ -108,6 +108,7 @@ async fn create_new_subscriber(socket: WebSocket, app_state: AppState, client_ad
         socket,
         client_addr.ip(),
         Arc::new(app_state),
+        None,
         update_interval_in_ms,
     )
     .await

@@ -1,19 +1,29 @@
-use std::time::Duration;
+use std::net::SocketAddr;
+use std::sync::Arc;
 
-use axum::extract::State;
+use axum::extract::{ConnectInfo, State};
 use axum::response::IntoResponse;
 use pragma_entities::InfraError;
 use serde::{Deserialize, Serialize};
 
 use pragma_common::types::{Interval, Network};
-use tokio::time::interval;
 
 use crate::infra::repositories::entry_repository::OHLCEntry;
 use crate::infra::repositories::onchain_repository::get_ohlc;
-use crate::utils::{is_onchain_existing_pair, send_err_to_socket};
+use crate::types::ws::{ChannelHandler, Subscriber};
+use crate::utils::is_onchain_existing_pair;
 use crate::AppState;
 
-use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
+use axum::extract::ws::{WebSocket, WebSocketUpgrade};
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+struct ChannelState {
+    subscribed_pair: Option<String>,
+    network: Network,
+    interval: Interval,
+    ohlc_to_compute: i64,
+    ohlc_data: Vec<OHLCEntry>,
+}
 
 #[derive(Default, Debug, Serialize, Deserialize)]
 enum SubscriptionType {
@@ -40,9 +50,6 @@ struct SubscriptionAck {
     interval: Interval,
 }
 
-/// Interval in milliseconds that the channel will update the client with the latest prices.
-const CHANNEL_UPDATE_INTERVAL_IN_MS: u64 = 500;
-
 #[utoipa::path(
     get,
     path = "/node/v1/onchain/ohlc",
@@ -57,168 +64,160 @@ const CHANNEL_UPDATE_INTERVAL_IN_MS: u64 = 500;
 pub async fn subscribe_to_onchain_ohlc(
     ws: WebSocketUpgrade,
     State(state): State<AppState>,
+    ConnectInfo(client_addr): ConnectInfo<SocketAddr>,
 ) -> impl IntoResponse {
-    ws.on_upgrade(move |socket| handle_channel(socket, state))
+    ws.on_upgrade(move |socket| create_new_subscriber(socket, state, client_addr))
 }
 
-/// Handle the WebSocket channel.
-async fn handle_channel(mut socket: WebSocket, state: AppState) {
-    let waiting_duration = Duration::from_millis(CHANNEL_UPDATE_INTERVAL_IN_MS);
-    let mut update_interval = interval(waiting_duration);
-    let mut subscribed_pair: Option<String> = None;
-    let mut network = Network::default();
-    let mut interval = Interval::default();
-
-    let mut ohlc_to_compute = 10;
-    let mut ohlc_data: Vec<OHLCEntry> = Vec::new();
-
-    //send a ping (unsupported by some browsers) just to kick things off and get a response
-    if socket.send(Message::Ping(vec![])).await.is_ok() {
-        tracing::info!("Pinged ...");
-    } else {
-        tracing::info!("Could not send ping !");
-        // no Error here since the only thing we can do is to close the connection.
-        // If we can not send messages, there is no way to salvage the statemachine anyway.
-        return;
-    }
-
-    loop {
-        tokio::select! {
-            Some(maybe_msg) = socket.recv() => {
-                // TODO: remove once we have proper top-level error handling
-                let msg = if let Ok(msg) = maybe_msg {
-                    msg
-                } else {
-                    break;
-                };
-                handle_message_received(&mut socket, &state, &mut subscribed_pair, &mut network, &mut interval, msg).await;
-            },
-            _ = update_interval.tick() => {
-                match send_ohlc_data(&mut socket, &state, &subscribed_pair, &mut ohlc_data, network, interval, ohlc_to_compute).await {
-                    Ok(_) => {
-                        // After the first request, we only get the latest interval
-                        if !ohlc_data.is_empty() {
-                            ohlc_to_compute = 1;
-                        }
-                    },
-                    Err(_) => break
-                };
-            }
-        }
-    }
-}
-
-/// Handle the message received from the client.
-/// Subscribe or unsubscribe to the pairs requested.
-async fn handle_message_received(
-    socket: &mut WebSocket,
-    state: &AppState,
-    subscribed_pair: &mut Option<String>,
-    network: &mut Network,
-    interval: &mut Interval,
-    message: Message,
-) {
-    let maybe_client_message = match message {
-        Message::Close(_) => {
-            // TODO: Send the close message to gracefully shut down the connection
-            // Otherwise the client might get an abnormal Websocket closure
-            // error.
-            return;
-        }
-        Message::Text(text) => serde_json::from_str::<SubscriptionRequest>(&text),
-        Message::Binary(data) => serde_json::from_slice::<SubscriptionRequest>(&data),
-        Message::Ping(_) => {
-            // Axum will send Pong automatically
-            return;
-        }
-        Message::Pong(_) => {
-            return;
-        }
-    };
-
-    if let Ok(subscription_msg) = maybe_client_message {
-        match subscription_msg.msg_type {
+struct WsOHLCHandler;
+impl ChannelHandler<ChannelState, SubscriptionRequest, SubscriptionAck, InfraError>
+    for WsOHLCHandler
+{
+    async fn handle_client_msg(
+        &mut self,
+        subscriber: &mut Subscriber<ChannelState>,
+        subscription: SubscriptionRequest,
+    ) -> Result<(), InfraError> {
+        match subscription.msg_type {
             SubscriptionType::Subscribe => {
                 let pair_exists = is_onchain_existing_pair(
-                    &state.onchain_pool,
-                    &subscription_msg.pair,
-                    subscription_msg.network,
+                    &subscriber.app_state.onchain_pool,
+                    &subscription.pair,
+                    subscription.network,
                 )
                 .await;
                 if !pair_exists {
                     let error_msg = "Pair does not exist in the onchain database.";
-                    send_err_to_socket(socket, error_msg).await;
-                    return;
+                    subscriber.send_err(error_msg).await;
+                    return Ok(());
                 }
-
-                *network = subscription_msg.network;
-                *subscribed_pair = Some(subscription_msg.pair.clone());
-                *interval = subscription_msg.interval;
+                let mut state = subscriber.state.lock().await;
+                *state = ChannelState {
+                    subscribed_pair: Some(subscription.pair.clone()),
+                    network: subscription.network,
+                    interval: subscription.interval,
+                    ohlc_to_compute: 10,
+                    ohlc_data: Vec::new(),
+                };
             }
             SubscriptionType::Unsubscribe => {
-                *subscribed_pair = None;
+                let mut state = subscriber.state.lock().await;
+                *state = ChannelState::default();
             }
         };
+
         // We send an ack message to the client with the subscribed pairs (so
         // the client knows which pairs are successfully subscribed).
         if let Ok(ack_message) = serde_json::to_string(&SubscriptionAck {
-            msg_type: subscription_msg.msg_type,
-            pair: subscription_msg.pair,
-            network: subscription_msg.network,
-            interval: subscription_msg.interval,
+            msg_type: subscription.msg_type,
+            pair: subscription.pair,
+            network: subscription.network,
+            interval: subscription.interval,
         }) {
-            if socket.send(Message::Text(ack_message)).await.is_err() {
+            if subscriber.send_msg(ack_message).await.is_err() {
                 let error_msg = "Message received but could not send ack message.";
-                send_err_to_socket(socket, error_msg).await;
+                subscriber.send_err(error_msg).await;
             }
         } else {
             let error_msg = "Could not serialize ack message.";
-            send_err_to_socket(socket, error_msg).await;
+            subscriber.send_err(error_msg).await;
         }
-    } else {
-        let error_msg = "Invalid message type. Please check the documentation for more info.";
-        send_err_to_socket(socket, error_msg).await;
+
+        // Trigger the first update
+        self.periodic_interval(subscriber).await?;
+        Ok(())
+    }
+
+    async fn handle_server_msg(
+        &mut self,
+        _subscriber: &mut Subscriber<ChannelState>,
+        _message: SubscriptionAck,
+    ) -> Result<(), InfraError> {
+        Ok(())
+    }
+
+    async fn periodic_interval(
+        &mut self,
+        subscriber: &mut Subscriber<ChannelState>,
+    ) -> Result<(), InfraError> {
+        let (ohlc_data, status) = {
+            let mut state = subscriber.state.lock().await;
+            if state.subscribed_pair.is_none() {
+                return Ok(());
+            }
+
+            let pair_id = state.subscribed_pair.clone().unwrap();
+            let mut ohlc_data = state.ohlc_data.clone();
+            let status = get_ohlc(
+                &mut ohlc_data,
+                &subscriber.app_state.onchain_pool,
+                state.network,
+                pair_id.clone(),
+                state.interval,
+                state.ohlc_to_compute,
+            )
+            .await;
+
+            state.ohlc_data.clone_from(&ohlc_data);
+            (ohlc_data, status)
+        };
+
+        if let Err(e) = status {
+            subscriber.send_err(&e.to_string()).await;
+            return Err(e);
+        }
+
+        match serde_json::to_string(&ohlc_data) {
+            Ok(json_response) => {
+                if subscriber.send_msg(json_response).await.is_err() {
+                    subscriber.send_err("Could not send prices.").await;
+                }
+            }
+            Err(_) => {
+                subscriber.send_err("Could not serialize prices.").await;
+            }
+        }
+
+        Ok(())
     }
 }
 
-/// Send the current median entries to the client.
-async fn send_ohlc_data(
-    socket: &mut WebSocket,
-    state: &AppState,
-    subscribed_pair: &Option<String>,
-    ohlc_data: &mut Vec<OHLCEntry>,
-    network: Network,
-    interval: Interval,
-    ohlc_to_compute: i64,
-) -> Result<(), InfraError> {
-    if subscribed_pair.is_none() {
-        return Ok(());
-    }
+/// Interval in milliseconds that the channel will update the client with the latest prices.
+const CHANNEL_UPDATE_INTERVAL_IN_MS: u64 = 60_000;
 
-    let pair_id = subscribed_pair.as_ref().unwrap();
+async fn create_new_subscriber(socket: WebSocket, app_state: AppState, client_addr: SocketAddr) {
+    let channel_state = ChannelState {
+        subscribed_pair: None,
+        network: Network::default(),
+        interval: Interval::default(),
+        ohlc_to_compute: 10,
+        ohlc_data: Vec::new(),
+    };
 
-    let entries = match get_ohlc(
-        ohlc_data,
-        &state.onchain_pool,
-        network,
-        pair_id.clone(),
-        interval,
-        ohlc_to_compute,
+    let (mut subscriber, _) = match Subscriber::<ChannelState>::new(
+        socket,
+        client_addr.ip(),
+        Arc::new(app_state),
+        Some(channel_state),
+        CHANNEL_UPDATE_INTERVAL_IN_MS,
     )
     .await
     {
-        Ok(()) => ohlc_data,
+        Ok(subscriber) => subscriber,
         Err(e) => {
-            send_err_to_socket(socket, &e.to_string()).await;
-            return Err(e);
+            tracing::error!("Failed to register subscriber: {}", e);
+            return;
         }
     };
-    if let Ok(json_response) = serde_json::to_string(&entries) {
-        if socket.send(Message::Text(json_response)).await.is_err() {
-            send_err_to_socket(socket, "Could not send prices.").await;
-        }
-    } else {
-        send_err_to_socket(socket, "Could not serialize prices.").await;
+
+    // Main event loop for the subscriber
+    let handler = WsOHLCHandler;
+    let status = subscriber.listen(handler).await;
+    if let Err(e) = status {
+        tracing::error!(
+            "[{}] Error occurred while listening to the subscriber: {:?}",
+            subscriber.id,
+            e
+        );
     }
-    Ok(())
 }
