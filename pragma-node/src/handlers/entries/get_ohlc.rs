@@ -51,7 +51,7 @@ pub async fn get_ohlc(
     }
 
     let entries =
-        entry_repository::get_ohlc(&state.timescale_pool, pair_id.clone(), interval, timestamp)
+        entry_repository::get_ohlc(&state.offchain_pool, pair_id.clone(), interval, timestamp)
             .await
             .map_err(|db_error| db_error.to_entry_error(&pair_id))?;
 

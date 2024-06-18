@@ -40,12 +40,12 @@ pub async fn get_onchain_checkpoints(
         return Err(CheckpointError::InvalidLimit(limit));
     }
 
-    let decimals = get_decimals(&state.timescale_pool, &pair_id)
+    let decimals = get_decimals(&state.offchain_pool, &pair_id)
         .await
         .map_err(CheckpointError::from)?;
 
     let checkpoints = get_checkpoints(
-        &state.postgres_pool,
+        &state.onchain_pool,
         params.network,
         pair_id.clone(),
         decimals,

@@ -22,8 +22,8 @@ mod utils;
 
 #[derive(Clone)]
 pub struct AppState {
-    timescale_pool: Pool,
-    postgres_pool: Pool,
+    offchain_pool: Pool,
+    onchain_pool: Pool,
     pragma_signer: Option<SigningKey>,
 }
 
@@ -108,12 +108,12 @@ async fn main() {
     println!("{}", ApiDoc::openapi().to_pretty_json().unwrap());
     let config = config().await;
 
-    let timescale_pool =
+    let offchain_pool =
         pragma_entities::connection::init_pool("pragma-node-api", ENV_OFFCHAIN_DATABASE_URL)
             .expect("can't init offchain database pool");
-    pragma_entities::db::run_migrations(&timescale_pool).await;
+    pragma_entities::db::run_migrations(&offchain_pool).await;
 
-    let postgres_pool =
+    let onchain_pool =
         pragma_entities::connection::init_pool("pragma-node-api", ENV_ONCHAIN_DATABASE_URL)
             .expect("can't init onchain database pool");
 
@@ -125,8 +125,8 @@ async fn main() {
     };
 
     let state = AppState {
-        timescale_pool,
-        postgres_pool,
+        offchain_pool,
+        onchain_pool,
         pragma_signer,
     };
 

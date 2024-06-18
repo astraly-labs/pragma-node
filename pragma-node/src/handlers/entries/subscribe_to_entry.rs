@@ -197,7 +197,7 @@ async fn handle_subscription_request(
     request: SubscriptionRequest,
 ) {
     let (existing_spot_pairs, existing_perp_pairs) =
-        only_existing_pairs(&state.timescale_pool, request.pairs).await;
+        only_existing_pairs(&state.offchain_pool, request.pairs).await;
     match request.msg_type {
         SubscriptionType::Subscribe => {
             subscription.add_spot_pairs(existing_spot_pairs);
@@ -309,9 +309,9 @@ async fn get_all_entries(
 
     // Compute entries concurrently
     let (index_entries, usd_mark_entries, non_usd_mark_entries) = tokio::join!(
-        index_pricer.compute(&state.timescale_pool),
-        mark_pricer_usd.compute(&state.timescale_pool),
-        mark_pricer_non_usd.compute(&state.timescale_pool)
+        index_pricer.compute(&state.offchain_pool),
+        mark_pricer_usd.compute(&state.offchain_pool),
+        mark_pricer_non_usd.compute(&state.offchain_pool)
     );
 
     let mut median_entries = vec![];

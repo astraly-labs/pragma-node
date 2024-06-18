@@ -140,7 +140,7 @@ async fn handle_message_received(
         match subscription_msg.msg_type {
             SubscriptionType::Subscribe => {
                 let pair_exists = is_onchain_existing_pair(
-                    &state.postgres_pool,
+                    &state.onchain_pool,
                     &subscription_msg.pair,
                     subscription_msg.network,
                 )
@@ -199,7 +199,7 @@ async fn send_ohlc_data(
 
     let entries = match get_ohlc(
         ohlc_data,
-        &state.postgres_pool,
+        &state.onchain_pool,
         network,
         pair_id.clone(),
         interval,

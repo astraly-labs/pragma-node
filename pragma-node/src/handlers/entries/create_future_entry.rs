@@ -39,7 +39,7 @@ pub async fn create_future_entries(
 
     let publisher_name = new_entries.entries[0].base.publisher.clone();
 
-    let publisher = publisher_repository::get(&state.timescale_pool, publisher_name.clone())
+    let publisher = publisher_repository::get(&state.offchain_pool, publisher_name.clone())
         .await
         .map_err(EntryError::InfraError)?;
 
@@ -60,7 +60,7 @@ pub async fn create_future_entries(
 
     // Fetch account address from database
     // TODO: Cache it
-    let account_address = publisher_repository::get(&state.timescale_pool, publisher_name.clone())
+    let account_address = publisher_repository::get(&state.offchain_pool, publisher_name.clone())
         .await
         .map_err(EntryError::InfraError)?
         .account_address;

@@ -53,7 +53,7 @@ pub async fn get_onchain(
     let aggregation_mode = params.aggregation.unwrap_or_default();
 
     let (aggregated_price, sources) = get_sources_and_aggregate(
-        &state.postgres_pool,
+        &state.onchain_pool,
         params.network,
         pair_id.clone(),
         timestamp,
@@ -64,11 +64,11 @@ pub async fn get_onchain(
 
     // TODO(akhercha): ⚠ gives different result than onchain oracle sometime
     let last_updated_timestamp =
-        get_last_updated_timestamp(&state.postgres_pool, params.network, pair_id.clone())
+        get_last_updated_timestamp(&state.onchain_pool, params.network, pair_id.clone())
             .await
             .map_err(|db_error| db_error.to_entry_error(&pair_id))?;
 
-    let decimals = get_decimals(&state.timescale_pool, &pair_id)
+    let decimals = get_decimals(&state.offchain_pool, &pair_id)
         .await
         .map_err(|db_error| db_error.to_entry_error(&pair_id))?;
 
