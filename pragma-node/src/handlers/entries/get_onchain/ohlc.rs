@@ -128,6 +128,9 @@ impl ChannelHandler<ChannelState, SubscriptionRequest, SubscriptionAck, InfraErr
         Ok(())
     }
 
+    /// Unused.
+    /// We don't need to handle server messages through `notify_receiver`
+    /// for this endpoint.
     async fn handle_server_msg(
         &mut self,
         _subscriber: &mut Subscriber<ChannelState>,
