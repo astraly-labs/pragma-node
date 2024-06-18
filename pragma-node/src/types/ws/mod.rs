@@ -1,3 +1,6 @@
+pub mod metrics;
+
+use metrics::{Interaction, Status};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::fmt::Debug;
@@ -90,9 +93,8 @@ where
             notify_receiver,
             exit: watch::channel(false),
         };
-
         subscriber.assert_is_healthy().await?;
-
+        metrics::record_ws_interaction(Interaction::NewConnection, Status::Success);
         Ok((subscriber, notify_sender))
     }
 
@@ -100,6 +102,7 @@ where
     async fn assert_is_healthy(&mut self) -> Result<(), WebSocketError> {
         let ping_status = self.sender.send(Message::Ping(vec![1, 2, 3])).await;
         if ping_status.is_err() {
+            metrics::record_ws_interaction(Interaction::NewConnection, Status::Error);
             return Err(WebSocketError::ChannelInitError);
         }
         Ok(())
@@ -123,11 +126,15 @@ where
                         tracing::info!("👤 [CLIENT -> SERVER]");
                             let client_msg = self.decode_msg::<CM>(client_msg).await;
                             if let Some(client_msg) = client_msg {
+                                metrics::record_ws_interaction(Interaction::ClientMessage, Status::Success);
                                 handler.handle_client_msg(self, client_msg).await?;
+                            } else {
+                                metrics::record_ws_interaction(Interaction::ClientMessage, Status::Error);
                             }
                         }
                         Some(Err(_)) => {
                             tracing::info!("😶‍🌫️ Client disconnected/error occurred. Closing the channel.");
+                            metrics::record_ws_interaction(Interaction::CloseConnection, Status::Success);
                             return Ok(());
                         },
                         None => {}
@@ -136,6 +143,7 @@ where
                 // Periodic updates
                 _ = self.update_interval.tick() => {
                     handler.periodic_interval(self).await?;
+                    metrics::record_ws_interaction(Interaction::ChannelUpdate, Status::Success);
                 },
                 // Messages from the server to the client
                 maybe_server_msg = self.notify_receiver.recv() => {
@@ -149,6 +157,7 @@ where
                     if *self.exit.1.borrow() {
                         tracing::info!("⛔ [CLOSING SIGNAL]");
                         self.closed = true;
+                        metrics::record_ws_interaction(Interaction::CloseConnection, Status::Success);
                         return Ok(());
                     }
                 },

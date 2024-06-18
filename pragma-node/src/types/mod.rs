@@ -1,4 +1,5 @@
 pub mod entries;
+pub mod pricer;
 pub mod ws;
 
 /// The number of seconds since the Unix epoch (00:00:00 UTC on 1 Jan 1970). The timestamp is
