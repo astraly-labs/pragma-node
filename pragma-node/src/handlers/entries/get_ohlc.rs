@@ -7,8 +7,8 @@ use crate::utils::PathExtractor;
 use crate::AppState;
 use pragma_entities::EntryError;
 
-use super::utils::currency_pair_to_pair_id;
 use super::GetEntryParams;
+use crate::utils::currency_pair_to_pair_id;
 
 #[utoipa::path(
         get,
@@ -51,7 +51,7 @@ pub async fn get_ohlc(
     }
 
     let entries =
-        entry_repository::get_ohlc(&state.timescale_pool, pair_id.clone(), interval, timestamp)
+        entry_repository::get_ohlc(&state.offchain_pool, pair_id.clone(), interval, timestamp)
             .await
             .map_err(|db_error| db_error.to_entry_error(&pair_id))?;
 

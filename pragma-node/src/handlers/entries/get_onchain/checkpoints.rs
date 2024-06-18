@@ -3,10 +3,10 @@ use axum::Json;
 
 use pragma_entities::CheckpointError;
 
-use crate::handlers::entries::utils::currency_pair_to_pair_id;
 use crate::handlers::entries::{GetOnchainCheckpointsParams, GetOnchainCheckpointsResponse};
 use crate::infra::repositories::entry_repository::get_decimals;
 use crate::infra::repositories::onchain_repository::get_checkpoints;
+use crate::utils::currency_pair_to_pair_id;
 use crate::utils::PathExtractor;
 use crate::AppState;
 
@@ -40,12 +40,12 @@ pub async fn get_onchain_checkpoints(
         return Err(CheckpointError::InvalidLimit(limit));
     }
 
-    let decimals = get_decimals(&state.timescale_pool, &pair_id)
+    let decimals = get_decimals(&state.offchain_pool, &pair_id)
         .await
         .map_err(CheckpointError::from)?;
 
     let checkpoints = get_checkpoints(
-        &state.postgres_pool,
+        &state.onchain_pool,
         params.network,
         pair_id.clone(),
         decimals,

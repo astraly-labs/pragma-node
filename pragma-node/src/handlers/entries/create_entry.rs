@@ -6,10 +6,10 @@ use starknet::core::crypto::{ecdsa_verify, Signature};
 use starknet::core::types::FieldElement;
 
 use crate::config::config;
-use crate::handlers::entries::types::build_publish_message;
 use crate::handlers::entries::{CreateEntryRequest, CreateEntryResponse};
 use crate::infra::kafka;
 use crate::infra::repositories::publisher_repository;
+use crate::types::entries::build_publish_message;
 use crate::utils::JsonExtractor;
 use crate::AppState;
 
@@ -38,7 +38,7 @@ pub async fn create_entries(
 
     let publisher_name = new_entries.entries[0].base.publisher.clone();
 
-    let publisher = publisher_repository::get(&state.timescale_pool, publisher_name.clone())
+    let publisher = publisher_repository::get(&state.offchain_pool, publisher_name.clone())
         .await
         .map_err(EntryError::InfraError)?;
 
@@ -59,7 +59,7 @@ pub async fn create_entries(
 
     // Fetch account address from database
     // TODO: Cache it
-    let account_address = publisher_repository::get(&state.timescale_pool, publisher_name.clone())
+    let account_address = publisher_repository::get(&state.offchain_pool, publisher_name.clone())
         .await
         .map_err(EntryError::InfraError)?
         .account_address;
@@ -123,7 +123,7 @@ pub async fn create_entries(
 
 #[cfg(test)]
 mod tests {
-    use crate::handlers::entries::types::{BaseEntry, Entry};
+    use crate::types::entries::{BaseEntry, Entry};
 
     use super::*;
     use rstest::rstest;

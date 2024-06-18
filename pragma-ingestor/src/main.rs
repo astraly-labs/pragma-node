@@ -1,6 +1,6 @@
 use deadpool_diesel::postgres::Pool;
 use dotenvy::dotenv;
-use pragma_entities::connection::ENV_TS_DATABASE_URL;
+use pragma_entities::connection::ENV_OFFCHAIN_DATABASE_URL;
 use pragma_entities::{
     adapt_infra_error, Entry, FutureEntry, InfraError, NewEntry, NewFutureEntry,
 };
@@ -21,8 +21,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         config::CONFIG.topic
     );
 
-    let pool = pragma_entities::connection::init_pool("pragma-ingestor", ENV_TS_DATABASE_URL)
-        .expect("cannot connect to database");
+    let pool = pragma_entities::connection::init_pool("pragma-ingestor", ENV_OFFCHAIN_DATABASE_URL)
+        .expect("cannot connect to offchain database");
 
     let (tx, mut rx) = mpsc::unbounded_channel::<Vec<u8>>();
     tokio::spawn(consumer::consume(tx));

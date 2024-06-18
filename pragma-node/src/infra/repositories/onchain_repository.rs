@@ -10,9 +10,9 @@ use pragma_common::types::{AggregationMode, DataType, Interval, Network};
 use pragma_entities::error::{adapt_infra_error, InfraError};
 use pragma_monitoring::models::SpotEntry;
 
-use crate::handlers::entries::utils::get_decimals_for_pair;
 use crate::handlers::entries::{Checkpoint, OnchainEntry, Publisher, PublisherEntry};
 use crate::utils::format_bigdecimal_price;
+use crate::utils::get_decimals_for_pair;
 
 use super::entry_repository::OHLCEntry;
 

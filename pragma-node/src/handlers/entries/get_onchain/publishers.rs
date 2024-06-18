@@ -25,16 +25,16 @@ pub async fn get_onchain_publishers(
     State(state): State<AppState>,
     Query(params): Query<GetOnchainPublishersParams>,
 ) -> Result<Json<GetOnchainPublishersResponse>, EntryError> {
-    let publishers = get_publishers(&state.postgres_pool, params.network)
+    let publishers = get_publishers(&state.onchain_pool, params.network)
         .await
         .map_err(EntryError::from)?;
 
-    let currencies_decimals = get_all_currencies_decimals(&state.timescale_pool)
+    let currencies_decimals = get_all_currencies_decimals(&state.offchain_pool)
         .await
         .map_err(EntryError::from)?;
 
     let publishers_with_components = get_publishers_with_components(
-        &state.postgres_pool,
+        &state.onchain_pool,
         params.network,
         params.data_type,
         currencies_decimals,

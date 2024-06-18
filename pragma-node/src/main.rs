@@ -1,9 +1,10 @@
 use deadpool_diesel::postgres::Pool;
-use pragma_entities::connection::{ENV_POSTGRES_DATABASE_URL, ENV_TS_DATABASE_URL};
+use pragma_entities::connection::{ENV_OFFCHAIN_DATABASE_URL, ENV_ONCHAIN_DATABASE_URL};
 use starknet::signers::SigningKey;
 use std::net::SocketAddr;
 use tower_http::cors::CorsLayer;
 use tower_http::trace::{DefaultMakeSpan, TraceLayer};
+use utils::PragmaSignerBuilder;
 use utoipa::openapi::security::{ApiKey, ApiKeyValue, SecurityScheme};
 use utoipa::Modify;
 use utoipa::OpenApi;
@@ -17,12 +18,13 @@ mod errors;
 mod handlers;
 mod infra;
 mod routes;
+mod types;
 mod utils;
 
 #[derive(Clone)]
 pub struct AppState {
-    timescale_pool: Pool,
-    postgres_pool: Pool,
+    offchain_pool: Pool,
+    onchain_pool: Pool,
     pragma_signer: Option<SigningKey>,
 }
 
@@ -67,10 +69,10 @@ async fn main() {
                 handlers::entries::GetOnchainOHLCResponse,
             ),
             schemas(
-                handlers::entries::types::BaseEntry,
-                handlers::entries::types::Entry,
-                handlers::entries::types::PerpEntry,
-                handlers::entries::types::FutureEntry,
+                types::entries::BaseEntry,
+                types::entries::Entry,
+                types::entries::PerpEntry,
+                types::entries::FutureEntry,
                 handlers::entries::OnchainEntry,
                 handlers::entries::Checkpoint,
                 handlers::entries::Publisher,
@@ -106,25 +108,25 @@ async fn main() {
     println!("{}", ApiDoc::openapi().to_pretty_json().unwrap());
     let config = config().await;
 
-    let timescale_pool =
-        pragma_entities::connection::init_pool("pragma-node-api", ENV_TS_DATABASE_URL)
-            .expect("can't init timescale (offchain db) pool");
-    pragma_entities::db::run_migrations(&timescale_pool).await;
+    let offchain_pool =
+        pragma_entities::connection::init_pool("pragma-node-api", ENV_OFFCHAIN_DATABASE_URL)
+            .expect("can't init offchain database pool");
+    pragma_entities::db::run_migrations(&offchain_pool).await;
 
-    let postgres_pool =
-        pragma_entities::connection::init_pool("pragma-node-api", ENV_POSTGRES_DATABASE_URL)
-            .expect("can't init postgres (onchain db) pool");
+    let onchain_pool =
+        pragma_entities::connection::init_pool("pragma-node-api", ENV_ONCHAIN_DATABASE_URL)
+            .expect("can't init onchain database pool");
 
-    // TODO(#54): Build the signer using a builder pattern
-    let pragma_signer: Option<SigningKey> = if config.is_production_mode() {
-        utils::build_pragma_signer_from_aws().await
+    let builder = if config.is_production_mode() {
+        PragmaSignerBuilder::new().production_mode()
     } else {
-        Some(SigningKey::from_random())
+        PragmaSignerBuilder::new().non_production_mode()
     };
+    let pragma_signer = builder.build().await;
 
     let state = AppState {
-        timescale_pool,
-        postgres_pool,
+        offchain_pool,
+        onchain_pool,
         pragma_signer,
     };
 
@@ -147,7 +149,7 @@ async fn main() {
 
     tracing::info!("listening on http://{}", socket_addr);
     axum::Server::bind(&socket_addr)
-        .serve(app.into_make_service())
+        .serve(app.into_make_service_with_connect_info::<SocketAddr>())
         .await
         .map_err(internal_error)
         .unwrap()

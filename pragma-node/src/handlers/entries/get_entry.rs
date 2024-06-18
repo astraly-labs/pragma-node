@@ -9,8 +9,8 @@ use crate::infra::repositories::entry_repository::{self, MedianEntry};
 use crate::utils::PathExtractor;
 use crate::AppState;
 
-use super::utils::{big_decimal_price_to_hex, currency_pair_to_pair_id};
 use super::GetEntryParams;
+use crate::utils::{big_decimal_price_to_hex, currency_pair_to_pair_id};
 
 #[utoipa::path(
     get,
@@ -60,7 +60,7 @@ pub async fn get_entry(
     }
 
     let (entry, decimals) = entry_repository::routing(
-        &state.timescale_pool,
+        &state.offchain_pool,
         pair_id.clone(),
         interval,
         timestamp,

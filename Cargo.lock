@@ -2313,6 +2313,7 @@ dependencies = [
  "diesel_migrations",
  "dotenvy",
  "envy",
+ "futures-util",
  "lazy_static",
  "pragma-common",
  "pragma-entities",

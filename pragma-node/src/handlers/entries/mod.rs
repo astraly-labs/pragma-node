@@ -6,8 +6,6 @@ pub mod get_ohlc;
 pub mod get_onchain;
 pub mod get_volatility;
 pub mod subscribe_to_entry;
-pub mod types;
-pub mod utils;
 
 pub use create_entry::create_entries;
 pub use create_future_entry::create_future_entries;
@@ -23,9 +21,10 @@ use utoipa::{IntoParams, ToSchema};
 use pragma_common::types::{AggregationMode, DataType, Interval, Network};
 
 use crate::{
-    handlers::entries::types::{Entry, FutureEntry},
     infra::repositories::entry_repository::OHLCEntry,
-    utils::{doc_examples, UnixTimestamp},
+    types::entries::{Entry, FutureEntry},
+    types::UnixTimestamp,
+    utils::doc_examples,
 };
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]

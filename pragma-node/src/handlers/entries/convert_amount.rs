@@ -11,7 +11,7 @@ use crate::utils::PathExtractor;
 use crate::AppState;
 use pragma_entities::EntryError;
 
-use super::utils::compute_median_price_and_time;
+use crate::utils::compute_median_price_and_time;
 use super::ConvertAmountResponse;
 
 /// Converts a currency pair to a pair id.

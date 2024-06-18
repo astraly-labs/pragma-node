@@ -1,4 +1,4 @@
-use crate::utils::types::UnixTimestamp;
+use crate::types::UnixTimestamp;
 
 /// Example value for a unix timestamp
 pub fn timestamp_example() -> UnixTimestamp {

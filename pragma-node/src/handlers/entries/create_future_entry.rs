@@ -5,7 +5,8 @@ use pragma_entities::{EntryError, NewFutureEntry, PublisherError};
 use starknet::core::crypto::{ecdsa_verify, Signature};
 use starknet::core::types::FieldElement;
 
-use super::{types::build_publish_message, CreateFutureEntryRequest, CreateFutureEntryResponse};
+use super::{CreateFutureEntryRequest, CreateFutureEntryResponse};
+use crate::types::entries::build_publish_message;
 
 use crate::config::config;
 use crate::infra::kafka;
@@ -38,7 +39,7 @@ pub async fn create_future_entries(
 
     let publisher_name = new_entries.entries[0].base.publisher.clone();
 
-    let publisher = publisher_repository::get(&state.timescale_pool, publisher_name.clone())
+    let publisher = publisher_repository::get(&state.offchain_pool, publisher_name.clone())
         .await
         .map_err(EntryError::InfraError)?;
 
@@ -59,7 +60,7 @@ pub async fn create_future_entries(
 
     // Fetch account address from database
     // TODO: Cache it
-    let account_address = publisher_repository::get(&state.timescale_pool, publisher_name.clone())
+    let account_address = publisher_repository::get(&state.offchain_pool, publisher_name.clone())
         .await
         .map_err(EntryError::InfraError)?
         .account_address;
@@ -139,7 +140,7 @@ mod tests {
     use super::*;
     use rstest::rstest;
 
-    use crate::handlers::entries::types::{FutureEntry, PerpEntry};
+    use crate::types::entries::{FutureEntry, PerpEntry};
 
     #[rstest]
     fn test_build_publish_message_empty() {

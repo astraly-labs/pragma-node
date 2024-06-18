@@ -9,7 +9,7 @@ use crate::utils::PathExtractor;
 use crate::AppState;
 use pragma_entities::{error::InfraError, EntryError, VolatilityError};
 
-use super::utils::{compute_volatility, currency_pair_to_pair_id};
+use crate::utils::{compute_volatility, currency_pair_to_pair_id};
 
 /// Volatility query
 #[derive(Deserialize, IntoParams)]
@@ -49,7 +49,7 @@ pub async fn get_volatility(
 
     // Fetch entries between start and end timestamps
     let entries = entry_repository::get_entries_between(
-        &state.timescale_pool,
+        &state.offchain_pool,
         pair_id.clone(),
         volatility_query.start,
         volatility_query.end,
@@ -65,7 +65,7 @@ pub async fn get_volatility(
         return Err(EntryError::UnknownPairId(pair_id));
     }
 
-    let decimals = entry_repository::get_decimals(&state.timescale_pool, &pair_id)
+    let decimals = entry_repository::get_decimals(&state.offchain_pool, &pair_id)
         .await
         .map_err(|db_error| match db_error {
             InfraError::InternalServerError => EntryError::InternalServerError,
