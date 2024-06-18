@@ -21,7 +21,7 @@ struct ChannelState {
     subscribed_pair: Option<String>,
     network: Network,
     interval: Interval,
-    ohlc_to_compute: i64,
+    is_first_update: bool,
     ohlc_data: Vec<OHLCEntry>,
 }
 
@@ -96,7 +96,7 @@ impl ChannelHandler<ChannelState, SubscriptionRequest, SubscriptionAck, InfraErr
                     subscribed_pair: Some(subscription.pair.clone()),
                     network: subscription.network,
                     interval: subscription.interval,
-                    ohlc_to_compute: 10,
+                    is_first_update: true,
                     ohlc_data: Vec::new(),
                 };
             }
@@ -145,15 +145,22 @@ impl ChannelHandler<ChannelState, SubscriptionRequest, SubscriptionAck, InfraErr
             return Ok(());
         }
 
+        let ohlc_to_compute = if state.is_first_update {
+            state.is_first_update = false;
+            10
+        } else {
+            1
+        };
         let pair_id = state.subscribed_pair.clone().unwrap();
         let mut ohlc_data = state.ohlc_data.clone();
+
         let status = get_ohlc(
             &mut ohlc_data,
             &subscriber.app_state.onchain_pool,
             state.network,
             pair_id.clone(),
             state.interval,
-            state.ohlc_to_compute,
+            ohlc_to_compute,
         )
         .await;
 
@@ -184,19 +191,11 @@ impl ChannelHandler<ChannelState, SubscriptionRequest, SubscriptionAck, InfraErr
 const CHANNEL_UPDATE_INTERVAL_IN_MS: u64 = 1000; // 1 second
 
 async fn create_new_subscriber(socket: WebSocket, app_state: AppState, client_addr: SocketAddr) {
-    let channel_state = ChannelState {
-        subscribed_pair: None,
-        network: Network::default(),
-        interval: Interval::default(),
-        ohlc_to_compute: 10,
-        ohlc_data: Vec::new(),
-    };
-
     let (mut subscriber, _) = match Subscriber::<ChannelState>::new(
         socket,
         client_addr.ip(),
         Arc::new(app_state),
-        Some(channel_state),
+        None,
         CHANNEL_UPDATE_INTERVAL_IN_MS,
     )
     .await
