@@ -61,6 +61,31 @@ pub async fn subscribe_to_onchain_ohlc(
 }
 
 struct WsOHLCHandler;
+
+impl WsOHLCHandler {
+    async fn send_ack_message(
+        &self,
+        subscriber: &mut Subscriber<SubscriptionState>,
+        subscription: SubscriptionRequest,
+    ) -> Result<(), InfraError> {
+        if let Ok(ack_message) = serde_json::to_string(&SubscriptionAck {
+            msg_type: subscription.msg_type,
+            pair: subscription.pair,
+            network: subscription.network,
+            interval: subscription.interval,
+        }) {
+            if subscriber.send_msg(ack_message).await.is_err() {
+                let error_msg = "Message received but could not send ack message.";
+                subscriber.send_err(error_msg).await;
+            }
+        } else {
+            let error_msg = "Could not serialize ack message.";
+            subscriber.send_err(error_msg).await;
+        }
+        Ok(())
+    }
+}
+
 impl ChannelHandler<SubscriptionState, SubscriptionRequest, InfraError> for WsOHLCHandler {
     async fn handle_client_msg(
         &mut self,
@@ -94,25 +119,8 @@ impl ChannelHandler<SubscriptionState, SubscriptionRequest, InfraError> for WsOH
                 *state = SubscriptionState::default();
             }
         };
-
-        // We send an ack message to the client with the subscribed pairs (so
-        // the client knows which pairs are successfully subscribed).
-        if let Ok(ack_message) = serde_json::to_string(&SubscriptionAck {
-            msg_type: subscription.msg_type,
-            pair: subscription.pair,
-            network: subscription.network,
-            interval: subscription.interval,
-        }) {
-            if subscriber.send_msg(ack_message).await.is_err() {
-                let error_msg = "Message received but could not send ack message.";
-                subscriber.send_err(error_msg).await;
-            }
-        } else {
-            let error_msg = "Could not serialize ack message.";
-            subscriber.send_err(error_msg).await;
-        }
-
-        // Trigger the first update
+        self.send_ack_message(subscriber, subscription).await?;
+        // Trigger the first update manually
         self.periodic_interval(subscriber).await?;
         Ok(())
     }
