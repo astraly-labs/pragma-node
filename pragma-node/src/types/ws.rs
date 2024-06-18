@@ -1,4 +1,4 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::fmt::Debug;
 use std::net::IpAddr;
@@ -14,6 +14,15 @@ use thiserror::Error;
 use tokio::sync::{watch, Mutex};
 use tokio::time::{interval, Interval};
 use uuid::Uuid;
+
+#[derive(Default, Debug, Serialize, Deserialize)]
+pub enum SubscriptionType {
+    #[serde(rename = "subscribe")]
+    #[default]
+    Subscribe,
+    #[serde(rename = "unsubscribe")]
+    Unsubscribe,
+}
 
 #[derive(Debug, Error)]
 pub enum WebSocketError {
@@ -37,21 +46,13 @@ pub struct Subscriber<ChannelState> {
     pub exit: (watch::Sender<bool>, watch::Receiver<bool>),
 }
 
-pub trait ChannelHandler<ChannelState, CM, SM, Err> {
+pub trait ChannelHandler<ChannelState, CM, Err> {
     /// Called after a message is received from the client.
     /// The handler should process the message and update the state.
     async fn handle_client_msg(
         &mut self,
         subscriber: &mut Subscriber<ChannelState>,
         message: CM,
-    ) -> Result<(), Err>;
-
-    /// Called after a message is received from the server.
-    /// The handler should process the message and update the state.
-    async fn handle_server_msg(
-        &mut self,
-        subscriber: &mut Subscriber<ChannelState>,
-        message: SM,
     ) -> Result<(), Err>;
 
     /// Called at a regular interval to update the client with the latest state.
@@ -106,11 +107,10 @@ where
 
     /// Listen to messages from the client and the server.
     /// The handler is responsible for processing the messages and updating the state.
-    pub async fn listen<H, CM, SM, Err>(&mut self, mut handler: H) -> Result<(), Err>
+    pub async fn listen<H, CM, Err>(&mut self, mut handler: H) -> Result<(), Err>
     where
-        H: ChannelHandler<ChannelState, CM, SM, Err>,
+        H: ChannelHandler<ChannelState, CM, Err>,
         CM: for<'a> Deserialize<'a>,
-        SM: for<'a> Deserialize<'a>,
     {
         let tracing_span = tracing::span!(tracing::Level::INFO, "subscriber", id = %self.id);
         let _tracing_guard = tracing_span.enter();
@@ -142,10 +142,7 @@ where
                 maybe_server_msg = self.notify_receiver.recv() => {
                     if let Some(server_msg) = maybe_server_msg {
                         tracing::info!("🥡 [SERVER -> CLIENT]");
-                        let server_msg = self.decode_msg::<SM>(server_msg).await;
-                        if let Some(sever_msg) = server_msg {
-                            handler.handle_server_msg(self, sever_msg).await?;
-                        }
+                        let _ = self.sender.send(server_msg).await;
                     }
                 },
                 // Exit signal

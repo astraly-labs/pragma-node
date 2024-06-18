@@ -10,7 +10,7 @@ use pragma_common::types::{Interval, Network};
 
 use crate::infra::repositories::entry_repository::OHLCEntry;
 use crate::infra::repositories::onchain_repository::get_ohlc;
-use crate::types::ws::{ChannelHandler, Subscriber};
+use crate::types::ws::{ChannelHandler, Subscriber, SubscriptionType};
 use crate::utils::is_onchain_existing_pair;
 use crate::AppState;
 
@@ -23,15 +23,6 @@ struct ChannelState {
     interval: Interval,
     is_first_update: bool,
     ohlc_data: Vec<OHLCEntry>,
-}
-
-#[derive(Default, Debug, Serialize, Deserialize)]
-enum SubscriptionType {
-    #[serde(rename = "subscribe")]
-    #[default]
-    Subscribe,
-    #[serde(rename = "unsubscribe")]
-    Unsubscribe,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -70,9 +61,7 @@ pub async fn subscribe_to_onchain_ohlc(
 }
 
 struct WsOHLCHandler;
-impl ChannelHandler<ChannelState, SubscriptionRequest, SubscriptionAck, InfraError>
-    for WsOHLCHandler
-{
+impl ChannelHandler<ChannelState, SubscriptionRequest, InfraError> for WsOHLCHandler {
     async fn handle_client_msg(
         &mut self,
         subscriber: &mut Subscriber<ChannelState>,
@@ -125,17 +114,6 @@ impl ChannelHandler<ChannelState, SubscriptionRequest, SubscriptionAck, InfraErr
 
         // Trigger the first update
         self.periodic_interval(subscriber).await?;
-        Ok(())
-    }
-
-    /// Unused.
-    /// We don't need to handle server messages through `notify_receiver`
-    /// for this endpoint.
-    async fn handle_server_msg(
-        &mut self,
-        _subscriber: &mut Subscriber<ChannelState>,
-        _message: SubscriptionAck,
-    ) -> Result<(), InfraError> {
         Ok(())
     }
 

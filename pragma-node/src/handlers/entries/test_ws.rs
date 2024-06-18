@@ -38,25 +38,13 @@ pub enum TestError {
 }
 
 struct WsTestHandler;
-impl ChannelHandler<WsState, ClientMsg, ServerMsg, TestError> for WsTestHandler {
+impl ChannelHandler<WsState, ClientMsg, TestError> for WsTestHandler {
     async fn handle_client_msg(
         &mut self,
         _subscriber: &mut Subscriber<WsState>,
         message: ClientMsg,
     ) -> Result<(), TestError> {
         tracing::info!("{:?}", message);
-        Ok(())
-    }
-
-    async fn handle_server_msg(
-        &mut self,
-        subscriber: &mut Subscriber<WsState>,
-        message: ServerMsg,
-    ) -> Result<(), TestError> {
-        let _ = subscriber
-            .sender
-            .send(Message::Text(serde_json::to_string(&message).unwrap()))
-            .await;
         Ok(())
     }
 
