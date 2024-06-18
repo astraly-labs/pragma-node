@@ -17,7 +17,7 @@ use crate::AppState;
 use axum::extract::ws::{WebSocket, WebSocketUpgrade};
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
-struct ChannelState {
+struct SubscriptionState {
     subscribed_pair: Option<String>,
     network: Network,
     interval: Interval,
@@ -61,10 +61,10 @@ pub async fn subscribe_to_onchain_ohlc(
 }
 
 struct WsOHLCHandler;
-impl ChannelHandler<ChannelState, SubscriptionRequest, InfraError> for WsOHLCHandler {
+impl ChannelHandler<SubscriptionState, SubscriptionRequest, InfraError> for WsOHLCHandler {
     async fn handle_client_msg(
         &mut self,
-        subscriber: &mut Subscriber<ChannelState>,
+        subscriber: &mut Subscriber<SubscriptionState>,
         subscription: SubscriptionRequest,
     ) -> Result<(), InfraError> {
         match subscription.msg_type {
@@ -81,7 +81,7 @@ impl ChannelHandler<ChannelState, SubscriptionRequest, InfraError> for WsOHLCHan
                     return Ok(());
                 }
                 let mut state = subscriber.state.lock().await;
-                *state = ChannelState {
+                *state = SubscriptionState {
                     subscribed_pair: Some(subscription.pair.clone()),
                     network: subscription.network,
                     interval: subscription.interval,
@@ -91,7 +91,7 @@ impl ChannelHandler<ChannelState, SubscriptionRequest, InfraError> for WsOHLCHan
             }
             SubscriptionType::Unsubscribe => {
                 let mut state = subscriber.state.lock().await;
-                *state = ChannelState::default();
+                *state = SubscriptionState::default();
             }
         };
 
@@ -119,7 +119,7 @@ impl ChannelHandler<ChannelState, SubscriptionRequest, InfraError> for WsOHLCHan
 
     async fn periodic_interval(
         &mut self,
-        subscriber: &mut Subscriber<ChannelState>,
+        subscriber: &mut Subscriber<SubscriptionState>,
     ) -> Result<(), InfraError> {
         let mut state = subscriber.state.lock().await;
         if state.subscribed_pair.is_none() {
@@ -172,7 +172,7 @@ impl ChannelHandler<ChannelState, SubscriptionRequest, InfraError> for WsOHLCHan
 const CHANNEL_UPDATE_INTERVAL_IN_MS: u64 = 1000; // 1 second
 
 async fn create_new_subscriber(socket: WebSocket, app_state: AppState, client_addr: SocketAddr) {
-    let (mut subscriber, _) = match Subscriber::<ChannelState>::new(
+    let (mut subscriber, _) = match Subscriber::<SubscriptionState>::new(
         socket,
         client_addr.ip(),
         Arc::new(app_state),
