@@ -112,6 +112,8 @@ where
         CM: for<'a> Deserialize<'a>,
         SM: for<'a> Deserialize<'a>,
     {
+        let tracing_span = tracing::span!(tracing::Level::INFO, "subscriber", id = %self.id);
+        let _tracing_guard = tracing_span.enter();
         loop {
             tokio::select! {
                 // Messages from the client
@@ -184,7 +186,9 @@ where
                 if let Ok(msg) = msg {
                     return Some(msg);
                 } else {
-                    tracing::error!("😱 Could not decode message from client");
+                    let err =
+                        "⛔ Incorrect message. Please check the documentation for more information.";
+                    self.send_err(err).await;
                     return None;
                 }
             }
