@@ -22,15 +22,17 @@ pub async fn run_metrics_server() {
 }
 
 async fn root_handler() -> impl IntoResponse {
-    "<a href=\"/metrics\">/metrics</a>".to_string()
+    let html_content = "<a href=\"/metrics\">/metrics</a>";
+    Response::builder()
+        .header("Content-Type", "text/html")
+        .body(Body::from(html_content))
+        .unwrap()
 }
 
 async fn metrics_handler() -> impl IntoResponse {
     let mut buffer = vec![];
     let encoder = TextEncoder::new();
     let metric_families = prometheus::gather();
-
-    tracing::info!("Huh: {:?}", metric_families);
 
     encoder.encode(&metric_families, &mut buffer).unwrap();
 

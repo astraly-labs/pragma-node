@@ -126,15 +126,21 @@ where
                         tracing::info!("👤 [CLIENT -> SERVER]");
                             let client_msg = self.decode_msg::<CM>(client_msg).await;
                             if let Some(client_msg) = client_msg {
-                                metrics::record_ws_interaction(Interaction::ClientMessage, Status::Success);
-                                handler.handle_client_msg(self, client_msg).await?;
-                            } else {
-                                metrics::record_ws_interaction(Interaction::ClientMessage, Status::Error);
+                                let status = handler.handle_client_msg(self, client_msg).await;
+                                match status {
+                                    Ok(_) => {
+                                        metrics::record_ws_interaction(Interaction::ClientMessage, Status::Success);
+                                    },
+                                    Err(e) => {
+                                        metrics::record_ws_interaction(Interaction::ClientMessage, Status::Error);
+                                        metrics::record_ws_interaction(Interaction::CloseConnection, Status::Success);
+                                        return Err(e);
+                                    }
+                                }
                             }
                         }
                         Some(Err(_)) => {
                             tracing::info!("😶‍🌫️ Client disconnected/error occurred. Closing the channel.");
-                            metrics::record_ws_interaction(Interaction::CloseConnection, Status::Success);
                             return Ok(());
                         },
                         None => {}
@@ -142,8 +148,17 @@ where
                 },
                 // Periodic updates
                 _ = self.update_interval.tick() => {
-                    handler.periodic_interval(self).await?;
-                    metrics::record_ws_interaction(Interaction::ChannelUpdate, Status::Success);
+                    let status = handler.periodic_interval(self).await;
+                    match status {
+                        Ok(_) => {
+                            metrics::record_ws_interaction(Interaction::ChannelUpdate, Status::Success);
+                        },
+                        Err(e) => {
+                            metrics::record_ws_interaction(Interaction::ChannelUpdate, Status::Error);
+                            metrics::record_ws_interaction(Interaction::CloseConnection, Status::Success);
+                            return Err(e);
+                        }
+                    }
                 },
                 // Messages from the server to the client
                 maybe_server_msg = self.notify_receiver.recv() => {
@@ -155,9 +170,9 @@ where
                 // Exit signal
                 _ = self.exit.1.changed() => {
                     if *self.exit.1.borrow() {
+                        metrics::record_ws_interaction(Interaction::CloseConnection, Status::Success);
                         tracing::info!("⛔ [CLOSING SIGNAL]");
                         self.closed = true;
-                        metrics::record_ws_interaction(Interaction::CloseConnection, Status::Success);
                         return Ok(());
                     }
                 },
@@ -175,6 +190,8 @@ where
                 tracing::info!("📨 [CLOSE]");
                 if self.exit.0.send(true).is_ok() {
                     self.closed = true;
+                } else {
+                    metrics::record_ws_interaction(Interaction::CloseConnection, Status::Error);
                 }
             }
             Message::Text(text) => {
