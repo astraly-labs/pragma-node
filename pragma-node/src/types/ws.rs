@@ -160,24 +160,16 @@ where
         }
     }
 
-    /// Decode the message from the client or the server.
+    /// Decode the message into the expected type.
     /// The message is expected to be in JSON format.
     /// If the message is not in the expected format, it will return None.
-    /// If the message is a close signal, it will return None and send a close
-    /// signal to the client.
+    /// If the message is a close signal, it will return None and send a close signal to the client.
     pub async fn decode_msg<T: for<'a> Deserialize<'a>>(&mut self, msg: Message) -> Option<T> {
         match msg {
             Message::Close(_) => {
                 tracing::info!("📨 [CLOSE]");
-                match self.exit.0.send(true) {
-                    Ok(_) => {
-                        self.closed = true;
-                        return None;
-                    }
-                    Err(_) => {
-                        tracing::error!("😱 Could not send close signal");
-                        return None;
-                    }
+                if self.exit.0.send(true).is_ok() {
+                    self.closed = true;
                 }
             }
             Message::Text(text) => {
@@ -186,10 +178,7 @@ where
                 if let Ok(msg) = msg {
                     return Some(msg);
                 } else {
-                    let err =
-                        "⛔ Incorrect message. Please check the documentation for more information.";
-                    self.send_err(err).await;
-                    return None;
+                    self.send_err("⛔ Incorrect message. Please check the documentation for more information.").await;
                 }
             }
             Message::Binary(payload) => {
@@ -198,16 +187,16 @@ where
                 if let Ok(msg) = maybe_msg {
                     return Some(msg);
                 } else {
-                    tracing::error!("😱 Could not decode message from server");
-                    return None;
+                    self.send_err("⛔ Incorrect message. Please check the documentation for more information.").await;
                 }
             }
+            // Ignore pings and pongs messages
             _ => {}
         }
         None
     }
 
-    /// Send a basic message to the client.
+    /// Send a message to the client.
     pub async fn send_msg(&mut self, msg: String) -> Result<(), axum::Error> {
         self.sender.send(Message::Text(msg)).await
     }
