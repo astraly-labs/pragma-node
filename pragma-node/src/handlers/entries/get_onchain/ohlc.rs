@@ -140,27 +140,25 @@ impl ChannelHandler<ChannelState, SubscriptionRequest, SubscriptionAck, InfraErr
         &mut self,
         subscriber: &mut Subscriber<ChannelState>,
     ) -> Result<(), InfraError> {
-        let (ohlc_data, status) = {
-            let mut state = subscriber.state.lock().await;
-            if state.subscribed_pair.is_none() {
-                return Ok(());
-            }
+        let mut state = subscriber.state.lock().await;
+        if state.subscribed_pair.is_none() {
+            return Ok(());
+        }
 
-            let pair_id = state.subscribed_pair.clone().unwrap();
-            let mut ohlc_data = state.ohlc_data.clone();
-            let status = get_ohlc(
-                &mut ohlc_data,
-                &subscriber.app_state.onchain_pool,
-                state.network,
-                pair_id.clone(),
-                state.interval,
-                state.ohlc_to_compute,
-            )
-            .await;
+        let pair_id = state.subscribed_pair.clone().unwrap();
+        let mut ohlc_data = state.ohlc_data.clone();
+        let status = get_ohlc(
+            &mut ohlc_data,
+            &subscriber.app_state.onchain_pool,
+            state.network,
+            pair_id.clone(),
+            state.interval,
+            state.ohlc_to_compute,
+        )
+        .await;
 
-            state.ohlc_data.clone_from(&ohlc_data);
-            (ohlc_data, status)
-        };
+        state.ohlc_data.clone_from(&ohlc_data);
+        drop(state);
 
         if let Err(e) = status {
             subscriber.send_err(&e.to_string()).await;
@@ -183,7 +181,7 @@ impl ChannelHandler<ChannelState, SubscriptionRequest, SubscriptionAck, InfraErr
 }
 
 /// Interval in milliseconds that the channel will update the client with the latest prices.
-const CHANNEL_UPDATE_INTERVAL_IN_MS: u64 = 60_000;
+const CHANNEL_UPDATE_INTERVAL_IN_MS: u64 = 1000; // 1 second
 
 async fn create_new_subscriber(socket: WebSocket, app_state: AppState, client_addr: SocketAddr) {
     let channel_state = ChannelState {
