@@ -6,14 +6,12 @@ pub use signing::sign_data;
 pub use signing::starkex::StarkexPrice;
 pub use signing::typed_data::TypedData;
 
-use axum::extract::ws::{Message, WebSocket};
 use bigdecimal::num_bigint::ToBigInt;
 use bigdecimal::{BigDecimal, ToPrimitive};
 use chrono::NaiveDateTime;
 use deadpool_diesel::postgres::Pool;
 use pragma_common::types::Network;
 use pragma_entities::{Entry, FutureEntry};
-use serde_json::json;
 use std::collections::HashMap;
 
 use crate::infra::repositories::{
@@ -192,16 +190,6 @@ pub(crate) async fn only_existing_pairs(
         .collect::<Vec<String>>();
 
     (spot_pairs, perp_pairs)
-}
-
-/// Send an error message to the client.
-/// (Does not close the connection)
-pub(crate) async fn send_err_to_socket(socket: &mut WebSocket, error: &str) {
-    let error_msg = json!({ "error": error }).to_string();
-    tracing::error!("Sending back an error to client: {}", error);
-    if socket.send(Message::Text(error_msg)).await.is_err() {
-        tracing::error!("Client already disconnected. Could not send error message.");
-    }
 }
 
 #[cfg(test)]

@@ -16,6 +16,57 @@ use crate::AppState;
 
 use axum::extract::ws::{WebSocket, WebSocketUpgrade};
 
+#[utoipa::path(
+    get,
+    path = "/node/v1/onchain/ohlc",
+    responses(
+        (
+            status = 200,
+            description = "Subscribe to a list of OHLC entries",
+            body = [SubscribeToEntryResponse]
+        )
+    )
+)]
+pub async fn subscribe_to_onchain_ohlc(
+    ws: WebSocketUpgrade,
+    State(state): State<AppState>,
+    ConnectInfo(client_addr): ConnectInfo<SocketAddr>,
+) -> impl IntoResponse {
+    ws.on_upgrade(move |socket| create_new_subscriber(socket, state, client_addr))
+}
+
+/// Interval in milliseconds that the channel will update the client with the latest prices.
+const CHANNEL_UPDATE_INTERVAL_IN_MS: u64 = 1000; // 1 second
+
+async fn create_new_subscriber(socket: WebSocket, app_state: AppState, client_addr: SocketAddr) {
+    let (mut subscriber, _) = match Subscriber::<SubscriptionState>::new(
+        socket,
+        client_addr.ip(),
+        Arc::new(app_state),
+        None,
+        CHANNEL_UPDATE_INTERVAL_IN_MS,
+    )
+    .await
+    {
+        Ok(subscriber) => subscriber,
+        Err(e) => {
+            tracing::error!("Failed to register subscriber: {}", e);
+            return;
+        }
+    };
+
+    // Main event loop for the subscriber
+    let handler = WsOHLCHandler;
+    let status = subscriber.listen(handler).await;
+    if let Err(e) = status {
+        tracing::error!(
+            "[{}] Error occurred while listening to the subscriber: {:?}",
+            subscriber.id,
+            e
+        );
+    }
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 struct SubscriptionState {
     subscribed_pair: Option<String>,
@@ -39,25 +90,6 @@ struct SubscriptionAck {
     pair: String,
     network: Network,
     interval: Interval,
-}
-
-#[utoipa::path(
-    get,
-    path = "/node/v1/onchain/ohlc",
-    responses(
-        (
-            status = 200,
-            description = "Subscribe to a list of OHLC entries",
-            body = [SubscribeToEntryResponse]
-        )
-    )
-)]
-pub async fn subscribe_to_onchain_ohlc(
-    ws: WebSocketUpgrade,
-    State(state): State<AppState>,
-    ConnectInfo(client_addr): ConnectInfo<SocketAddr>,
-) -> impl IntoResponse {
-    ws.on_upgrade(move |socket| create_new_subscriber(socket, state, client_addr))
 }
 
 struct WsOHLCHandler;
@@ -173,37 +205,5 @@ impl ChannelHandler<SubscriptionState, SubscriptionRequest, InfraError> for WsOH
         }
 
         Ok(())
-    }
-}
-
-/// Interval in milliseconds that the channel will update the client with the latest prices.
-const CHANNEL_UPDATE_INTERVAL_IN_MS: u64 = 1000; // 1 second
-
-async fn create_new_subscriber(socket: WebSocket, app_state: AppState, client_addr: SocketAddr) {
-    let (mut subscriber, _) = match Subscriber::<SubscriptionState>::new(
-        socket,
-        client_addr.ip(),
-        Arc::new(app_state),
-        None,
-        CHANNEL_UPDATE_INTERVAL_IN_MS,
-    )
-    .await
-    {
-        Ok(subscriber) => subscriber,
-        Err(e) => {
-            tracing::error!("Failed to register subscriber: {}", e);
-            return;
-        }
-    };
-
-    // Main event loop for the subscriber
-    let handler = WsOHLCHandler;
-    let status = subscriber.listen(handler).await;
-    if let Err(e) = status {
-        tracing::error!(
-            "[{}] Error occurred while listening to the subscriber: {:?}",
-            subscriber.id,
-            e
-        );
     }
 }
