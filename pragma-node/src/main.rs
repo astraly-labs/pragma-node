@@ -51,6 +51,6 @@ async fn main() {
 
     tokio::join!(
         servers::app::run_app_server(config, state.clone()),
-        servers::metrics::run_metrics_server()
+        servers::metrics::run_metrics_server(config)
     );
 }

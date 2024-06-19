@@ -6,19 +6,21 @@ use axum::{routing::get, Router};
 use prometheus::{Encoder, TextEncoder};
 use std::net::SocketAddr;
 
-pub async fn run_metrics_server() {
+use crate::config::Config;
+
+pub async fn run_metrics_server(config: &Config) {
     let app = Router::new()
         .route("/", get(root_handler))
         .route("/metrics", get(metrics_handler));
 
-    let port = std::env::var("METRICS_PORT")
-        .unwrap_or_else(|_| "8080".to_string())
-        .parse::<u16>()
-        .unwrap();
-    let addr = SocketAddr::from(([0, 0, 0, 0], port));
+    let host = config.server_host();
+    let port = config.metrics_port();
 
-    tracing::info!("🖨 Metrics available at http://0.0.0.0:{}", port);
-    Server::bind(&addr)
+    let address = format!("{}:{}", host, port);
+    let socket_addr: SocketAddr = address.parse().unwrap();
+
+    tracing::info!("🖨  Metrics available at http://{}", socket_addr);
+    Server::bind(&socket_addr)
         .serve(app.into_make_service())
         .await
         .unwrap();
