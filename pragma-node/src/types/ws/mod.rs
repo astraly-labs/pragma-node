@@ -31,6 +31,8 @@ pub enum SubscriptionType {
 pub enum WebSocketError {
     #[error("could not create a channel with the client")]
     ChannelInitError,
+    #[error("could not decode client message: {0}")]
+    MessageDecodeError(String),
 }
 
 /// Subscriber is an actor that handles a single websocket connection.
@@ -123,21 +125,8 @@ where
                 maybe_client_msg = self.receiver.next() => {
                     match maybe_client_msg {
                         Some(Ok(client_msg)) => {
-                        tracing::info!("👤 [CLIENT -> SERVER]");
-                            let client_msg = self.decode_msg::<CM>(client_msg).await;
-                            if let Some(client_msg) = client_msg {
-                                let status = handler.handle_client_msg(self, client_msg).await;
-                                match status {
-                                    Ok(_) => {
-                                        metrics::record_ws_interaction(Interaction::ClientMessage, Status::Success);
-                                    },
-                                    Err(e) => {
-                                        metrics::record_ws_interaction(Interaction::ClientMessage, Status::Error);
-                                        metrics::record_ws_interaction(Interaction::CloseConnection, Status::Success);
-                                        return Err(e);
-                                    }
-                                }
-                            }
+                            tracing::info!("👤 [CLIENT -> SERVER]");
+                            handler = self.decode_and_handle(handler, client_msg).await?;
                         }
                         Some(Err(_)) => {
                             tracing::info!("😶‍🌫️ Client disconnected/error occurred. Closing the channel.");
@@ -180,11 +169,57 @@ where
         }
     }
 
+    /// Called after a message is received from the client.
+    /// The handler should process the message and update the state.
+    /// If the handler returns an error, the connection will be closed.
+    async fn decode_and_handle<H, CM, Err>(
+        &mut self,
+        mut handler: H,
+        client_msg: Message,
+    ) -> Result<H, Err>
+    where
+        H: ChannelHandler<ChannelState, CM, Err>,
+        CM: for<'a> Deserialize<'a>,
+    {
+        let status_decoded_msg = self.decode_msg::<CM>(client_msg).await;
+        if let Ok(maybe_client_msg) = status_decoded_msg {
+            if let Some(client_msg) = maybe_client_msg {
+                metrics::record_ws_interaction(Interaction::ClientMessageDecode, Status::Success);
+                let status = handler.handle_client_msg(self, client_msg).await;
+                match status {
+                    Ok(_) => {
+                        metrics::record_ws_interaction(
+                            Interaction::ClientMessageProcess,
+                            Status::Success,
+                        );
+                    }
+                    Err(e) => {
+                        metrics::record_ws_interaction(
+                            Interaction::ClientMessageProcess,
+                            Status::Error,
+                        );
+                        metrics::record_ws_interaction(
+                            Interaction::CloseConnection,
+                            Status::Success,
+                        );
+                        return Err(e);
+                    }
+                }
+            }
+        } else {
+            metrics::record_ws_interaction(Interaction::ClientMessageDecode, Status::Error);
+        }
+        Ok(handler)
+    }
+
     /// Decode the message into the expected type.
     /// The message is expected to be in JSON format.
     /// If the message is not in the expected format, it will return None.
     /// If the message is a close signal, it will return None and send a close signal to the client.
-    pub async fn decode_msg<T: for<'a> Deserialize<'a>>(&mut self, msg: Message) -> Option<T> {
+    async fn decode_msg<T: for<'a> Deserialize<'a>>(
+        &mut self,
+        msg: Message,
+    ) -> Result<Option<T>, WebSocketError> {
         match msg {
             Message::Close(_) => {
                 tracing::info!("📨 [CLOSE]");
@@ -198,24 +233,26 @@ where
                 tracing::info!("📨 [TEXT]");
                 let msg = serde_json::from_str::<T>(&text);
                 if let Ok(msg) = msg {
-                    return Some(msg);
+                    return Ok(Some(msg));
                 } else {
                     self.send_err("⛔ Incorrect message. Please check the documentation for more information.").await;
+                    return Err(WebSocketError::MessageDecodeError(text));
                 }
             }
             Message::Binary(payload) => {
                 tracing::info!("📨 [BINARY]");
                 let maybe_msg = serde_json::from_slice::<T>(&payload);
                 if let Ok(msg) = maybe_msg {
-                    return Some(msg);
+                    return Ok(Some(msg));
                 } else {
                     self.send_err("⛔ Incorrect message. Please check the documentation for more information.").await;
+                    return Err(WebSocketError::MessageDecodeError(format!("{:?}", payload)));
                 }
             }
             // Ignore pings and pongs messages
             _ => {}
         }
-        None
+        Ok(None)
     }
 
     /// Send a message to the client.

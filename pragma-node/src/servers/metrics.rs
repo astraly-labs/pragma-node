@@ -19,7 +19,7 @@ pub async fn run_metrics_server(config: &Config) {
     let address = format!("{}:{}", host, port);
     let socket_addr: SocketAddr = address.parse().unwrap();
 
-    tracing::info!("🖨  Metrics available at http://{}", socket_addr);
+    tracing::info!("🖨  Metrics available at http://{}/metrics", socket_addr);
     Server::bind(&socket_addr)
         .serve(app.into_make_service())
         .await
