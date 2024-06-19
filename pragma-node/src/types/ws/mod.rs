@@ -126,6 +126,7 @@ where
                     match maybe_client_msg {
                         Some(Ok(client_msg)) => {
                             tracing::info!("👤 [CLIENT -> SERVER]");
+                            tracing::info!("{:?}", client_msg);
                             handler = self.decode_and_handle(handler, client_msg).await?;
                         }
                         Some(Err(_)) => {
@@ -153,6 +154,7 @@ where
                 maybe_server_msg = self.notify_receiver.recv() => {
                     if let Some(server_msg) = maybe_server_msg {
                         tracing::info!("🥡 [SERVER -> CLIENT]");
+                        tracing::info!("{:?}", server_msg);
                         let _ = self.sender.send(server_msg).await;
                     }
                 },
