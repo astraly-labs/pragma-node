@@ -11,10 +11,13 @@ pub async fn run_metrics_server() {
         .route("/", get(root_handler))
         .route("/metrics", get(metrics_handler));
 
-    let port = String::from("8080").parse::<u16>().unwrap();
+    let port = std::env::var("METRICS_PORT")
+        .unwrap_or_else(|_| "8080".to_string())
+        .parse::<u16>()
+        .unwrap();
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
 
-    tracing::info!("metrics on http://0.0.0.0:8080");
+    tracing::info!("🖨 Metrics available at http://0.0.0.0:{}", port);
     Server::bind(&addr)
         .serve(app.into_make_service())
         .await

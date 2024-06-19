@@ -101,7 +101,7 @@ pub async fn run_app_server(config: &Config, state: AppState) {
     let address = format!("{}:{}", host, port);
     let socket_addr: SocketAddr = address.parse().unwrap();
 
-    tracing::info!("listening on http://{}", socket_addr);
+    tracing::info!("🚀 API started at http://{}", socket_addr);
     tokio::spawn(async move {
         axum::Server::bind(&socket_addr)
             .serve(app.into_make_service_with_connect_info::<SocketAddr>())

@@ -11,4 +11,5 @@ container_environment:
       - TOPIC
       - HOST
       - PORT
+      - METRICS_PORT
       - KAFKA_BROKERS

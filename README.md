@@ -138,6 +138,7 @@ export DATABASE_MAX_CONN=5
 export TOPIC="pragma-data"
 export HOST="0.0.0.0"
 export PORT=3000
+export METRICS_PORT=8080
 export KAFKA_BROKERS="0.0.0.0:9092"
 ```
 
