@@ -14,8 +14,10 @@ pub enum Interaction {
     NewConnection,
     #[strum(to_string = "Close Connection")]
     CloseConnection,
-    #[strum(to_string = "Client Message")]
-    ClientMessage,
+    #[strum(to_string = "Client Message Decoding")]
+    ClientMessageDecode,
+    #[strum(to_string = "Client Message Processing")]
+    ClientMessageProcess,
     #[strum(to_string = "Channel Update")]
     ChannelUpdate,
 }
