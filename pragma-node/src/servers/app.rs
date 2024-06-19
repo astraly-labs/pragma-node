@@ -84,7 +84,6 @@ pub async fn run_app_server(config: &Config, state: AppState) {
         )
     )]
     struct ApiDoc;
-    println!("{}", ApiDoc::openapi().to_pretty_json().unwrap());
 
     let app = app_router::<ApiDoc>(state.clone())
         .with_state(state)
