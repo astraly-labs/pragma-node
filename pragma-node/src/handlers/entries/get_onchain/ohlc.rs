@@ -36,7 +36,7 @@ pub async fn subscribe_to_onchain_ohlc(
 }
 
 /// Interval in milliseconds that the channel will update the client with the latest prices.
-const CHANNEL_UPDATE_INTERVAL_IN_MS: u64 = 1000; // 1 second
+const CHANNEL_UPDATE_INTERVAL_IN_MS: u64 = 30000; // 30 seconds
 
 async fn create_new_subscriber(socket: WebSocket, app_state: AppState, client_addr: SocketAddr) {
     let (mut subscriber, _) = match Subscriber::<SubscriptionState>::new(
