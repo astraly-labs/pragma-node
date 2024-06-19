@@ -1,6 +1,6 @@
 use lazy_static::lazy_static;
-
 use prometheus::{opts, register_gauge_vec, GaugeVec};
+use std::string::ToString;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Labels {
@@ -8,38 +8,24 @@ pub struct Labels {
     pub status: Status,
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+#[derive(strum::Display, Clone, Debug, Hash, PartialEq, Eq)]
 pub enum Interaction {
+    #[strum(to_string = "New Connection")]
     NewConnection,
+    #[strum(to_string = "Close Connection")]
     CloseConnection,
+    #[strum(to_string = "Client Message")]
     ClientMessage,
+    #[strum(to_string = "Channel Update")]
     ChannelUpdate,
 }
 
-impl Interaction {
-    fn as_str(&self) -> &'static str {
-        match self {
-            Interaction::NewConnection => "New Connection",
-            Interaction::CloseConnection => "Close Connection",
-            Interaction::ClientMessage => "Client Message",
-            Interaction::ChannelUpdate => "Channel Update",
-        }
-    }
-}
-
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+#[derive(strum::Display, Clone, Debug, Hash, PartialEq, Eq)]
 pub enum Status {
+    #[strum(to_string = "Success")]
     Success,
+    #[strum(to_string = "Error")]
     Error,
-}
-
-impl Status {
-    fn as_str(&self) -> &'static str {
-        match self {
-            Status::Success => "Success",
-            Status::Error => "Error",
-        }
-    }
 }
 
 lazy_static! {
@@ -52,6 +38,6 @@ lazy_static! {
 
 pub fn record_ws_interaction(interaction: Interaction, status: Status) {
     WS_INTERACTIONS
-        .with_label_values(&[interaction.as_str(), status.as_str()])
+        .with_label_values(&[&interaction.to_string(), &status.to_string()])
         .inc();
 }
