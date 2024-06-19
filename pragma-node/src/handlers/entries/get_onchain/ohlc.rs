@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use pragma_common::types::{Interval, Network};
 
 use crate::infra::repositories::entry_repository::OHLCEntry;
-use crate::infra::repositories::onchain_repository::get_ohlc;
+use crate::infra::repositories::onchain_repository;
 use crate::types::ws::{ChannelHandler, Subscriber, SubscriptionType};
 use crate::utils::is_onchain_existing_pair;
 use crate::AppState;
@@ -126,7 +126,7 @@ impl ChannelHandler<SubscriptionState, SubscriptionRequest, InfraError> for WsOH
         let pair_id = state.subscribed_pair.clone().unwrap();
         let mut ohlc_data = state.ohlc_data.clone();
 
-        let status = get_ohlc(
+        let status = onchain_repository::get_ohlc(
             &mut ohlc_data,
             &subscriber.app_state.onchain_pool,
             state.network,

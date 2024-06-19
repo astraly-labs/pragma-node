@@ -2318,6 +2318,7 @@ dependencies = [
  "pragma-common",
  "pragma-entities",
  "pragma-monitoring",
+ "prometheus",
  "rdkafka",
  "rstest",
  "serde",

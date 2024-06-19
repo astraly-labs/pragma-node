@@ -13,8 +13,8 @@ use pragma_entities::EntryError;
 
 use crate::handlers::entries::SubscribeToEntryResponse;
 use crate::infra::repositories::entry_repository::MedianEntryWithComponents;
+use crate::types::pricer::{IndexPricer, MarkPricer, Pricer};
 use crate::types::ws::{ChannelHandler, Subscriber, SubscriptionType};
-use crate::utils::pricing::{IndexPricer, MarkPricer, Pricer};
 use crate::utils::{sign_data, StarkexPrice};
 use crate::AppState;
 
