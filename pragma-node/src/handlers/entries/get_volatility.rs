@@ -7,7 +7,7 @@ use crate::handlers::entries::GetVolatilityResponse;
 use crate::infra::repositories::entry_repository::{self, MedianEntry};
 use crate::utils::PathExtractor;
 use crate::AppState;
-use pragma_entities::{error::InfraError, EntryError, VolatilityError};
+use pragma_entities::{EntryError, VolatilityError};
 
 use crate::utils::{compute_volatility, currency_pair_to_pair_id};
 
@@ -54,24 +54,13 @@ pub async fn get_volatility(
         volatility_query.start,
         volatility_query.end,
     )
-    .await
-    .map_err(|db_error| match db_error {
-        InfraError::InternalServerError => EntryError::InternalServerError,
-        InfraError::NotFound => EntryError::NotFound(pair_id.clone()),
-        InfraError::InvalidTimeStamp => EntryError::InvalidTimestamp,
-    })?;
+    .await?;
 
     if entries.is_empty() {
         return Err(EntryError::UnknownPairId(pair_id));
     }
 
-    let decimals = entry_repository::get_decimals(&state.offchain_pool, &pair_id)
-        .await
-        .map_err(|db_error| match db_error {
-            InfraError::InternalServerError => EntryError::InternalServerError,
-            InfraError::NotFound => EntryError::NotFound(pair_id.clone()),
-            InfraError::InvalidTimeStamp => EntryError::InvalidTimestamp,
-        })?;
+    let decimals = entry_repository::get_decimals(&state.offchain_pool, &pair_id).await?;
 
     Ok(Json(adapt_entry_to_entry_response(
         pair_id, &entries, decimals,

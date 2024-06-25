@@ -1,15 +1,22 @@
 use deadpool_diesel::InteractError;
-use std::fmt::{self, Debug};
+use std::{
+    fmt::{self, Debug},
+    num::TryFromIntError,
+};
 use thiserror::Error;
 use utoipa::ToSchema;
 
 use crate::models::entry_error::EntryError;
 
-#[derive(Debug, ToSchema)]
+#[derive(Debug, ToSchema, thiserror::Error)]
 pub enum InfraError {
     InternalServerError,
     NotFound,
     InvalidTimeStamp,
+    #[error(transparent)]
+    NonZeroU32Conversion(#[from] TryFromIntError),
+    #[error(transparent)]
+    AxumError(#[from] axum::Error),
 }
 
 impl InfraError {
@@ -18,6 +25,8 @@ impl InfraError {
             InfraError::InternalServerError => EntryError::InternalServerError,
             InfraError::NotFound => EntryError::NotFound(pair_id.to_string()),
             InfraError::InvalidTimeStamp => EntryError::InvalidTimestamp,
+            InfraError::NonZeroU32Conversion(_) => EntryError::InternalServerError,
+            InfraError::AxumError(_) => EntryError::InternalServerError,
         }
     }
 }
@@ -43,6 +52,8 @@ impl fmt::Display for InfraError {
             InfraError::NotFound => write!(f, "Not found"),
             InfraError::InternalServerError => write!(f, "Internal server error"),
             InfraError::InvalidTimeStamp => write!(f, "Invalid timestamp"),
+            InfraError::NonZeroU32Conversion(e) => write!(f, "Non zero u32 conversion {e}"),
+            InfraError::AxumError(e) => write!(f, "Axum error {e}"),
         }
     }
 }
