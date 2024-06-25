@@ -22,7 +22,9 @@ diesel_migrations = "2"
 dotenvy = "0.15"
 envy = "0.4.2"
 futures-util = "0.3.30"
+governor = { version = "0.6.0" }
 lazy_static = "1.4.0"
+nonzero_ext = { version = "0.3.0" }
 pragma-common = { path = "../pragma-common", version = "1.0.0" }
 pragma-entities = { path = "../pragma-entities", version = "1.0.0" }
 pragma-monitoring = { git = "https://github.com/astraly-labs/pragma-monitoring", rev = "fab5233" }

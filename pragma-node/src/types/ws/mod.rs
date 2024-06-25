@@ -1,6 +1,8 @@
 pub mod metrics;
 
+use governor::{DefaultKeyedRateLimiter, Quota, RateLimiter};
 use metrics::{Interaction, Status};
+use nonzero_ext::nonzero;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::fmt::Debug;
@@ -48,8 +50,13 @@ pub struct Subscriber<ChannelState> {
     pub receiver: SplitStream<WebSocket>,
     pub update_interval: Interval,
     pub notify_receiver: Receiver<Message>,
+    pub rate_limiter: DefaultKeyedRateLimiter<IpAddr>,
     pub exit: (watch::Sender<bool>, watch::Receiver<bool>),
 }
+
+/// The maximum number of bytes that can be sent per second per IP address.
+/// If the limit is exceeded, the connection is closed.
+const BYTES_LIMIT_PER_IP_PER_SECOND: u32 = 256 * 1024; // 256 KiB
 
 pub trait ChannelHandler<ChannelState, CM, Err> {
     /// Called after a message is received from the client.
@@ -93,9 +100,15 @@ where
             receiver,
             update_interval: interval(Duration::from_millis(update_interval_in_ms)),
             notify_receiver,
+            rate_limiter: RateLimiter::dashmap(Quota::per_second(nonzero!(
+                BYTES_LIMIT_PER_IP_PER_SECOND
+            ))),
             exit: watch::channel(false),
         };
         subscriber.assert_is_healthy().await?;
+        // Retain the recent rate limit data for the IP addresses to
+        // prevent the rate limiter size from growing indefinitely.
+        subscriber.rate_limiter.retain_recent();
         metrics::record_ws_interaction(Interaction::NewConnection, Status::Success);
         Ok((subscriber, notify_sender))
     }

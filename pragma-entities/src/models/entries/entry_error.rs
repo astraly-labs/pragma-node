@@ -49,6 +49,8 @@ impl From<InfraError> for EntryError {
             InfraError::InternalServerError => Self::InternalServerError,
             InfraError::NotFound => Self::NotFound("Unknown".to_string()),
             InfraError::InvalidTimeStamp => Self::InternalServerError,
+            InfraError::NonZeroU32Conversion(_) => Self::InternalServerError,
+            InfraError::AxumError(_) => Self::InternalServerError,
         }
     }
 }

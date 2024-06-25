@@ -20,6 +20,8 @@ pub enum Interaction {
     ClientMessageProcess,
     #[strum(to_string = "Channel Update")]
     ChannelUpdate,
+    #[strum(to_string = "Rate Limit Exceeded")]
+    RateLimit,
 }
 
 #[derive(strum::Display, Clone, Debug, Hash, PartialEq, Eq)]
