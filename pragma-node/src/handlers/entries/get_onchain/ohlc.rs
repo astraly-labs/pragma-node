@@ -149,28 +149,7 @@ impl ChannelHandler<SubscriptionState, SubscriptionRequest, InfraError> for WsOH
 
         match serde_json::to_string(&ohlc_data) {
             Ok(json_response) => {
-                let ip_addr = subscriber.ip_address;
-
-                // Close the connection if rate limit is exceeded.
-                if subscriber.rate_limiter.check_key_n(
-                    &subscriber.ip_address,
-                    NonZeroU32::new(json_response.len().try_into()?)
-                        .ok_or(InfraError::InternalServerError)?,
-                ) != Ok(Ok(()))
-                {
-                    tracing::info!(
-                        subscriber_id = %subscriber.id,
-                        ip = %ip_addr,
-                        "Rate limit exceeded. Closing connection.",
-                    );
-
-                    metrics::record_ws_interaction(Interaction::RateLimit, Status::Error);
-
-                    subscriber.send_err("Rate limit exceeded.").await;
-                    subscriber.sender.close().await?;
-                    subscriber.closed = true;
-                    return Ok(());
-                }
+                self.check_rate_limit(subscriber, &json_response).await?;
 
                 if subscriber.send_msg(json_response).await.is_err() {
                     subscriber.send_err("Could not send prices.").await;
@@ -205,6 +184,34 @@ impl WsOHLCHandler {
             let error_msg = "Could not serialize ack message.";
             subscriber.send_err(error_msg).await;
         }
+        Ok(())
+    }
+
+    async fn check_rate_limit(
+        &self,
+        subscriber: &mut Subscriber<SubscriptionState>,
+        message: &str,
+    ) -> Result<(), InfraError> {
+        let ip_addr = subscriber.ip_address;
+        // Close the connection if rate limit is exceeded.
+        if subscriber.rate_limiter.check_key_n(
+            &ip_addr,
+            NonZeroU32::new(message.len().try_into()?).ok_or(InfraError::InternalServerError)?,
+        ) != Ok(Ok(()))
+        {
+            tracing::info!(
+                subscriber_id = %subscriber.id,
+                ip = %ip_addr,
+                "Rate limit exceeded. Closing connection.",
+            );
+
+            metrics::record_ws_interaction(Interaction::RateLimit, Status::Error);
+
+            subscriber.send_err("Rate limit exceeded.").await;
+            subscriber.sender.close().await?;
+            subscriber.closed = true;
+        }
+
         Ok(())
     }
 }

@@ -7,7 +7,7 @@ use crate::handlers::entries::GetVolatilityResponse;
 use crate::infra::repositories::entry_repository::{self, MedianEntry};
 use crate::utils::PathExtractor;
 use crate::AppState;
-use pragma_entities::{error::InfraError, EntryError, VolatilityError};
+use pragma_entities::{EntryError, VolatilityError};
 
 use crate::utils::{compute_volatility, currency_pair_to_pair_id};
 
