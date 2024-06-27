@@ -21,7 +21,7 @@ use pragma_entities::{
     Currency, Entry, NewEntry,
 };
 
-// Retrieve the postgres table name based on the network and data type.
+// Retrieve the timescale table based on the network and data type.
 fn get_table_suffix(data_type: DataType) -> Result<&'static str, InfraError> {
     match data_type {
         DataType::SpotEntry => Ok(""),
@@ -30,7 +30,7 @@ fn get_table_suffix(data_type: DataType) -> Result<&'static str, InfraError> {
     }
 }
 
-// Retrieve the postgres table name based on the network and data type.
+// Retrieve the timeframe specifier based on the interval and aggregation mode.
 fn get_interval_specifier(interval: Interval, is_twap: bool) -> Result<&'static str, InfraError> {
     match interval {
         Interval::OneMinute => Ok("1_min"),
@@ -319,7 +319,6 @@ pub async fn get_twap_price(
         get_interval_specifier(interval, true)?,
         get_table_suffix(data_type)?
     );
-    tracing::info!("get twap req :{}", sql_request);
 
     let date_time = DateTime::from_timestamp(time, 0).ok_or(InfraError::InvalidTimeStamp)?;
 
@@ -374,8 +373,6 @@ pub async fn get_median_price(
         get_interval_specifier(interval, false)?,
         get_table_suffix(data_type)?
     );
-
-    tracing::info!("get median req :{}", sql_request);
 
     let date_time = DateTime::from_timestamp(time, 0).ok_or(InfraError::InvalidTimeStamp)?;
 

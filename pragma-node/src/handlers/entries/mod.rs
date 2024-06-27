@@ -133,12 +133,12 @@ pub struct Checkpoint {
 
 #[derive(Default, Debug, Deserialize, ToSchema, Clone, Copy)]
 pub enum EntryType {
-    #[serde(rename = "SPOT")]
+    #[serde(rename = "spot")]
     #[default]
     Spot,
-    #[serde(rename = "PERP")]
+    #[serde(rename = "perp")]
     Perp,
-    #[serde(rename = "FUTURE")]
+    #[serde(rename = "future")]
     Future,
 }
 
@@ -146,8 +146,8 @@ impl From<EntryType> for DataType {
     fn from(value: EntryType) -> Self {
         match value {
             EntryType::Spot => DataType::SpotEntry,
-            EntryType::Perp => DataType::PerpEntry,
             EntryType::Future => DataType::FutureEntry,
+            EntryType::Perp => DataType::PerpEntry,
         }
     }
 }
@@ -177,7 +177,7 @@ impl Default for GetEntryParams {
             interval: Some(Interval::default()),
             routing: Some(false),
             aggregation: Some(AggregationMode::default()),
-            entry_type: Some(EntryType::Spot),
+            entry_type: Some(EntryType::default()),
         }
     }
 }
