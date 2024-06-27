@@ -131,6 +131,27 @@ pub struct Checkpoint {
     pub sender_address: String,
 }
 
+#[derive(Default, Debug, Deserialize, ToSchema, Clone, Copy)]
+pub enum EntryType {
+    #[serde(rename = "SPOT")]
+    #[default]
+    Spot,
+    #[serde(rename = "PERP")]
+    Perp,
+    #[serde(rename = "FUTURE")]
+    Future,
+}
+
+impl From<EntryType> for DataType {
+    fn from(value: EntryType) -> Self {
+        match value {
+            EntryType::Spot => DataType::SpotEntry,
+            EntryType::Perp => DataType::PerpEntry,
+            EntryType::Future => DataType::FutureEntry,
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct GetOnchainCheckpointsResponse(pub Vec<Checkpoint>);
 
@@ -146,6 +167,7 @@ pub struct GetEntryParams {
     pub interval: Option<Interval>,
     pub routing: Option<bool>,
     pub aggregation: Option<AggregationMode>,
+    pub entry_type: Option<EntryType>,
 }
 
 impl Default for GetEntryParams {
@@ -155,6 +177,7 @@ impl Default for GetEntryParams {
             interval: Some(Interval::default()),
             routing: Some(false),
             aggregation: Some(AggregationMode::default()),
+            entry_type: Some(EntryType::Spot),
         }
     }
 }

@@ -1,7 +1,7 @@
 use axum::extract::{Query, State};
 use axum::Json;
 
-use pragma_common::types::{AggregationMode, Interval};
+use pragma_common::types::{AggregationMode, DataType, Interval};
 use pragma_entities::EntryError;
 
 use crate::handlers::entries::GetEntryResponse;
@@ -53,6 +53,12 @@ pub async fn get_entry(
         AggregationMode::Twap
     };
 
+    let data_type = if let Some(entry_type) = params.entry_type {
+        DataType::from(entry_type)
+    } else {
+        DataType::SpotEntry
+    };
+
     let is_routing = params.routing.unwrap_or(false);
 
     if timestamp > now {
@@ -66,6 +72,7 @@ pub async fn get_entry(
         timestamp,
         is_routing,
         aggregation_mode,
+        data_type,
     )
     .await
     .map_err(|e| e.to_entry_error(&pair_id))?;

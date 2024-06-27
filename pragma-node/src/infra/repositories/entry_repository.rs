@@ -7,6 +7,12 @@ use diesel::sql_types::{Double, Jsonb, VarChar};
 use diesel::{ExpressionMethods, QueryDsl, Queryable, RunQueryDsl};
 use serde::{Deserialize, Serialize};
 
+use crate::handlers::entries::constants::{
+    INITAL_INTERVAL_IN_MS, INTERVAL_INCREMENT_IN_MS, MAX_INTERVAL_WITHOUT_ENTRIES,
+    MINIMUM_NUMBER_OF_PUBLISHERS,
+};
+use crate::handlers::entries::{AssetOraclePrice, SignedPublisherPrice};
+use crate::utils::{convert_via_quote, normalize_to_decimals, StarkexPrice};
 use pragma_common::types::{AggregationMode, ConversionError, DataType, Interval};
 use pragma_entities::dto;
 use pragma_entities::{
@@ -15,12 +21,27 @@ use pragma_entities::{
     Currency, Entry, NewEntry,
 };
 
-use crate::handlers::entries::constants::{
-    INITAL_INTERVAL_IN_MS, INTERVAL_INCREMENT_IN_MS, MAX_INTERVAL_WITHOUT_ENTRIES,
-    MINIMUM_NUMBER_OF_PUBLISHERS,
-};
-use crate::handlers::entries::{AssetOraclePrice, SignedPublisherPrice};
-use crate::utils::{convert_via_quote, normalize_to_decimals, StarkexPrice};
+// Retrieve the postgres table name based on the network and data type.
+fn get_table_suffix(data_type: DataType) -> Result<&'static str, InfraError> {
+    match data_type {
+        DataType::SpotEntry => Ok(""),
+        DataType::FutureEntry => Ok("_future"),
+        _ => Err(InfraError::InternalServerError),
+    }
+}
+
+// Retrieve the postgres table name based on the network and data type.
+fn get_interval_specifier(interval: Interval, is_twap: bool) -> Result<&'static str, InfraError> {
+    match interval {
+        Interval::OneMinute => Ok("1_min"),
+        Interval::FifteenMinutes => Ok("15_min"),
+        Interval::OneHour if is_twap => Ok("1_hour"),
+        Interval::OneHour if !is_twap => Ok("1_h"),
+        Interval::TwoHours if is_twap => Ok("2_hours"),
+        Interval::TwoHours if !is_twap => Ok("2_h"),
+        _ => Err(InfraError::InternalServerError),
+    }
+}
 
 pub async fn _insert(
     pool: &deadpool_diesel::postgres::Pool,
@@ -90,9 +111,11 @@ pub async fn routing(
     timestamp: i64,
     is_routing: bool,
     agg_mode: AggregationMode,
+    data_type: DataType,
 ) -> Result<(MedianEntry, u32), InfraError> {
     if pair_id_exist(pool, pair_id.clone()).await? || !is_routing {
-        return get_price_decimals(pool, pair_id, interval, timestamp, agg_mode).await;
+        return get_price_and_decimals(pool, pair_id, interval, timestamp, agg_mode, data_type)
+            .await;
     }
 
     let [base, quote]: [&str; 2] = pair_id
@@ -101,7 +124,9 @@ pub async fn routing(
         .try_into()
         .map_err(|_| InfraError::InternalServerError)?;
 
-    match find_alternative_pair_price(pool, base, quote, interval, timestamp, agg_mode).await {
+    match find_alternative_pair_price(pool, base, quote, interval, timestamp, agg_mode, data_type)
+        .await
+    {
         Ok(result) => Ok(result),
         Err(_) => Err(InfraError::NotFound),
     }
@@ -166,6 +191,7 @@ async fn find_alternative_pair_price(
     interval: Interval,
     timestamp: i64,
     agg_mode: AggregationMode,
+    data_type: DataType,
 ) -> Result<(MedianEntry, u32), InfraError> {
     let conn = pool.get().await.map_err(adapt_infra_error)?;
 
@@ -182,10 +208,24 @@ async fn find_alternative_pair_price(
         if pair_id_exist(pool, base_alt_pair.clone()).await?
             && pair_id_exist(pool, alt_quote_pair.clone()).await?
         {
-            let base_alt_result =
-                get_price_decimals(pool, base_alt_pair, interval, timestamp, agg_mode).await?;
-            let alt_quote_result =
-                get_price_decimals(pool, alt_quote_pair, interval, timestamp, agg_mode).await?;
+            let base_alt_result = get_price_and_decimals(
+                pool,
+                base_alt_pair,
+                interval,
+                timestamp,
+                agg_mode,
+                data_type,
+            )
+            .await?;
+            let alt_quote_result = get_price_and_decimals(
+                pool,
+                alt_quote_pair,
+                interval,
+                timestamp,
+                agg_mode,
+                data_type,
+            )
+            .await?;
 
             return calculate_rebased_price(base_alt_result, alt_quote_result);
         }
@@ -209,18 +249,21 @@ async fn pair_id_exist(
     Ok(res)
 }
 
-async fn get_price_decimals(
+async fn get_price_and_decimals(
     pool: &deadpool_diesel::postgres::Pool,
     pair_id: String,
     interval: Interval,
     timestamp: i64,
     agg_mode: AggregationMode,
+    data_type: DataType,
 ) -> Result<(MedianEntry, u32), InfraError> {
     let entry = match agg_mode {
         AggregationMode::Median => {
-            get_median_price(pool, pair_id.clone(), interval, timestamp).await?
+            get_median_price(pool, pair_id.clone(), interval, timestamp, data_type).await?
         }
-        AggregationMode::Twap => get_twap_price(pool, pair_id.clone(), interval, timestamp).await?,
+        AggregationMode::Twap => {
+            get_twap_price(pool, pair_id.clone(), interval, timestamp, data_type).await?
+        }
         AggregationMode::Mean => Err(InfraError::InternalServerError)?,
     };
 
@@ -252,19 +295,19 @@ pub async fn get_twap_price(
     pair_id: String,
     interval: Interval,
     time: i64,
+    data_type: DataType,
 ) -> Result<MedianEntry, InfraError> {
     let conn = pool.get().await.map_err(adapt_infra_error)?;
 
-    let raw_sql = match interval {
-        Interval::OneMinute => {
-            r#"
+    let sql_request: String = format!(
+        r#"
         -- query the materialized realtime view
         SELECT
             bucket AS time,
             price_twap AS median_price,
             num_sources
         FROM
-            twap_1_min_agg
+            twap_{}_agg{}
         WHERE
             pair_id = $1
             AND
@@ -272,69 +315,17 @@ pub async fn get_twap_price(
         ORDER BY
             time DESC
         LIMIT 1;
-    "#
-        }
-        Interval::FifteenMinutes => {
-            r#"
-        -- query the materialized realtime view
-        SELECT
-            bucket AS time,
-            price_twap AS median_price,
-            num_sources
-        FROM
-            twap_15_min_agg
-        WHERE
-            pair_id = $1
-            AND
-            bucket <= $2
-        ORDER BY
-            time DESC
-        LIMIT 1;
-    "#
-        }
-        Interval::OneHour => {
-            r#"
-        -- query the materialized realtime view
-        SELECT
-            bucket AS time,
-            price_twap AS median_price,
-            num_sources
-        FROM
-            twap_1_hour_agg
-        WHERE
-            pair_id = $1
-            AND
-            bucket <= $2
-        ORDER BY
-            time DESC
-        LIMIT 1;
-    "#
-        }
-        Interval::TwoHours => {
-            r#"
-            -- query the materialized realtime view
-        SELECT
-            bucket AS time,
-            price_twap AS median_price,
-            num_sources
-        FROM
-            twap_2_hours_agg
-        WHERE
-            pair_id = $1
-            AND
-            bucket <= $2
-        ORDER BY
-            time DESC
-        LIMIT 1;
-    "#
-        }
-    };
+    "#,
+        get_interval_specifier(interval, true)?,
+        get_table_suffix(data_type)?
+    );
+    tracing::info!("get twap req :{}", sql_request);
 
     let date_time = DateTime::from_timestamp(time, 0).ok_or(InfraError::InvalidTimeStamp)?;
 
     let raw_entry = conn
         .interact(move |conn| {
-            diesel::sql_query(raw_sql)
+            diesel::sql_query(&sql_request)
                 .bind::<diesel::sql_types::Text, _>(pair_id)
                 .bind::<diesel::sql_types::Timestamptz, _>(date_time)
                 .load::<MedianEntryRaw>(conn)
@@ -359,19 +350,19 @@ pub async fn get_median_price(
     pair_id: String,
     interval: Interval,
     time: i64,
+    data_type: DataType,
 ) -> Result<MedianEntry, InfraError> {
     let conn = pool.get().await.map_err(adapt_infra_error)?;
 
-    let raw_sql = match interval {
-        Interval::OneMinute => {
-            r#"
+    let sql_request: String = format!(
+        r#"
         -- query the materialized realtime view
         SELECT
             bucket AS time,
             median_price,
             num_sources
         FROM
-            price_1_min_agg
+            price_{}_agg{}
         WHERE
             pair_id = $1
             AND
@@ -379,69 +370,18 @@ pub async fn get_median_price(
         ORDER BY
             time DESC
         LIMIT 1;
-    "#
-        }
-        Interval::FifteenMinutes => {
-            r#"
-        -- query the materialized realtime view
-        SELECT
-            bucket AS time,
-            median_price,
-            num_sources
-        FROM
-            price_15_min_agg
-        WHERE
-            pair_id = $1
-            AND
-            bucket <= $2
-        ORDER BY
-            time DESC
-        LIMIT 1;
-    "#
-        }
-        Interval::OneHour => {
-            r#"
-        -- query the materialized realtime view
-        SELECT
-            bucket AS time,
-            median_price,
-            num_sources
-        FROM
-            price_1_h_agg
-        WHERE
-            pair_id = $1
-            AND
-            bucket <= $2
-        ORDER BY
-            time DESC
-        LIMIT 1;
-    "#
-        }
-        Interval::TwoHours => {
-            r#"
-            -- query the materialized realtime view
-        SELECT
-            bucket AS time,
-            median_price,
-            num_sources
-        FROM
-            price_2_h_agg
-        WHERE
-            pair_id = $1
-            AND
-            bucket <= $2
-        ORDER BY
-            time DESC
-        LIMIT 1;
-    "#
-        }
-    };
+    "#,
+        get_interval_specifier(interval, false)?,
+        get_table_suffix(data_type)?
+    );
+
+    tracing::info!("get median req :{}", sql_request);
 
     let date_time = DateTime::from_timestamp(time, 0).ok_or(InfraError::InvalidTimeStamp)?;
 
     let raw_entry = conn
         .interact(move |conn| {
-            diesel::sql_query(raw_sql)
+            diesel::sql_query(&sql_request)
                 .bind::<diesel::sql_types::Text, _>(pair_id)
                 .bind::<diesel::sql_types::Timestamptz, _>(date_time)
                 .load::<MedianEntryRaw>(conn)
