@@ -1,5 +1,6 @@
 use axum::extract::{Query, State};
 use axum::Json;
+use chrono::{DateTime,Utc};
 
 use pragma_common::types::{AggregationMode, DataType, Interval};
 use pragma_entities::EntryError;
@@ -59,6 +60,16 @@ pub async fn get_entry(
         DataType::SpotEntry
     };
 
+    let expiry = if let Some(expiry) = params.expiry {
+        let expiry_dt = expiry.parse::<DateTime<Utc>>();
+        match  expiry_dt {
+            Ok(expiry_dt) => expiry_dt.format("%Y-%m-%d %H:%M:%S%:z").to_string(), 
+            Err(_) => return Err(EntryError::InvalidExpiry),
+        }
+    } else {
+        String::default()
+    };
+
     let is_routing = params.routing.unwrap_or(false);
 
     if timestamp > now {
@@ -73,6 +84,7 @@ pub async fn get_entry(
         is_routing,
         aggregation_mode,
         data_type,
+        expiry,
     )
     .await
     .map_err(|e| e.to_entry_error(&pair_id))?;

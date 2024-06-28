@@ -168,6 +168,7 @@ pub struct GetEntryParams {
     pub routing: Option<bool>,
     pub aggregation: Option<AggregationMode>,
     pub entry_type: Option<EntryType>,
+    pub expiry: Option<String>,
 }
 
 impl Default for GetEntryParams {
@@ -178,6 +179,7 @@ impl Default for GetEntryParams {
             routing: Some(false),
             aggregation: Some(AggregationMode::default()),
             entry_type: Some(EntryType::default()),
+            expiry: None,
         }
     }
 }

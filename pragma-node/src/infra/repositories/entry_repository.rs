@@ -22,6 +22,16 @@ use pragma_entities::{
 };
 
 // Retrieve the timescale table based on the network and data type.
+fn get_expiration_timestamp(data_type: DataType, expiry: String) -> Result<String, InfraError> {
+    match data_type {
+        DataType::SpotEntry => Ok(String::default()),
+        DataType::FutureEntry if expiry.len() == 0 => Ok(String::from("AND\n\t\texpiration_timestamp is null")),
+        DataType::FutureEntry if expiry.len() > 0 => Ok(format!("AND\n\texpiration_timestamp = '{}'",expiry)),
+        _ => Err(InfraError::InternalServerError),
+    }
+}
+
+// Retrieve the timescale table based on the network and data type.
 fn get_table_suffix(data_type: DataType) -> Result<&'static str, InfraError> {
     match data_type {
         DataType::SpotEntry => Ok(""),
@@ -112,9 +122,10 @@ pub async fn routing(
     is_routing: bool,
     agg_mode: AggregationMode,
     data_type: DataType,
+    expiry: String,
 ) -> Result<(MedianEntry, u32), InfraError> {
     if pair_id_exist(pool, pair_id.clone()).await? || !is_routing {
-        return get_price_and_decimals(pool, pair_id, interval, timestamp, agg_mode, data_type)
+        return get_price_and_decimals(pool, pair_id, interval, timestamp, agg_mode, data_type, expiry)
             .await;
     }
 
@@ -124,7 +135,7 @@ pub async fn routing(
         .try_into()
         .map_err(|_| InfraError::InternalServerError)?;
 
-    match find_alternative_pair_price(pool, base, quote, interval, timestamp, agg_mode, data_type)
+    match find_alternative_pair_price(pool, base, quote, interval, timestamp, agg_mode, data_type, expiry)
         .await
     {
         Ok(result) => Ok(result),
@@ -192,6 +203,7 @@ async fn find_alternative_pair_price(
     timestamp: i64,
     agg_mode: AggregationMode,
     data_type: DataType,
+    expiry: String,
 ) -> Result<(MedianEntry, u32), InfraError> {
     let conn = pool.get().await.map_err(adapt_infra_error)?;
 
@@ -215,6 +227,7 @@ async fn find_alternative_pair_price(
                 timestamp,
                 agg_mode,
                 data_type,
+                expiry.clone(),
             )
             .await?;
             let alt_quote_result = get_price_and_decimals(
@@ -224,6 +237,7 @@ async fn find_alternative_pair_price(
                 timestamp,
                 agg_mode,
                 data_type,
+                expiry.clone(),
             )
             .await?;
 
@@ -256,13 +270,14 @@ async fn get_price_and_decimals(
     timestamp: i64,
     agg_mode: AggregationMode,
     data_type: DataType,
+    expiry: String,
 ) -> Result<(MedianEntry, u32), InfraError> {
     let entry = match agg_mode {
         AggregationMode::Median => {
-            get_median_price(pool, pair_id.clone(), interval, timestamp, data_type).await?
+            get_median_price(pool, pair_id.clone(), interval, timestamp, data_type, expiry).await?
         }
         AggregationMode::Twap => {
-            get_twap_price(pool, pair_id.clone(), interval, timestamp, data_type).await?
+            get_twap_price(pool, pair_id.clone(), interval, timestamp, data_type, expiry).await?
         }
         AggregationMode::Mean => Err(InfraError::InternalServerError)?,
     };
@@ -296,6 +311,7 @@ pub async fn get_twap_price(
     interval: Interval,
     time: i64,
     data_type: DataType,
+    expiry: String
 ) -> Result<MedianEntry, InfraError> {
     let conn = pool.get().await.map_err(adapt_infra_error)?;
 
@@ -312,12 +328,14 @@ pub async fn get_twap_price(
             pair_id = $1
             AND
             bucket <= $2
+            {}
         ORDER BY
             time DESC
         LIMIT 1;
     "#,
         get_interval_specifier(interval, true)?,
-        get_table_suffix(data_type)?
+        get_table_suffix(data_type)?,
+        get_expiration_timestamp(data_type, expiry)?,
     );
 
     let date_time = DateTime::from_timestamp(time, 0).ok_or(InfraError::InvalidTimeStamp)?;
@@ -350,6 +368,7 @@ pub async fn get_median_price(
     interval: Interval,
     time: i64,
     data_type: DataType,
+    expiry: String,
 ) -> Result<MedianEntry, InfraError> {
     let conn = pool.get().await.map_err(adapt_infra_error)?;
 
@@ -366,12 +385,14 @@ pub async fn get_median_price(
             pair_id = $1
             AND
             bucket <= $2
+            {}
         ORDER BY
             time DESC
         LIMIT 1;
     "#,
         get_interval_specifier(interval, false)?,
-        get_table_suffix(data_type)?
+        get_table_suffix(data_type)?,
+        get_expiration_timestamp(data_type, expiry)?,
     );
 
     let date_time = DateTime::from_timestamp(time, 0).ok_or(InfraError::InvalidTimeStamp)?;
