@@ -26,10 +26,10 @@ use pragma_entities::{
 fn get_expiration_timestamp(data_type: DataType, expiry: String) -> Result<String, InfraError> {
     match data_type {
         DataType::SpotEntry => Ok(String::default()),
-        DataType::FutureEntry if expiry.len() == 0 => {
+        DataType::FutureEntry if expiry.is_empty() => {
             Ok(String::from("AND\n\t\texpiration_timestamp is null"))
         }
-        DataType::FutureEntry if expiry.len() > 0 => {
+        DataType::FutureEntry if !expiry.is_empty() => {
             Ok(format!("AND\n\texpiration_timestamp = '{}'", expiry))
         }
         _ => Err(InfraError::InternalServerError),
@@ -921,14 +921,13 @@ pub async fn get_expiries_list(
 ) -> Result<Vec<NaiveDateTime>, InfraError> {
     let conn = pool.get().await.map_err(adapt_infra_error)?;
 
-    let sql_request: String = format!(
-        r#"
+    let sql_request: String = r#"
         SELECT DISTINCT expiration_timestamp
         FROM future_entries
         WHERE pair_id = $1 AND expiration_timestamp IS NOT NULL
         ORDER BY expiration_timestamp;
         "#
-    );
+    .to_string();
 
     let raw_exp = conn
         .interact(move |conn| {
