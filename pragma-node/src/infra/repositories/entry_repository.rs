@@ -119,6 +119,12 @@ pub struct MedianEntryRaw {
     pub num_sources: i64,
 }
 
+#[derive(Serialize, QueryableByName, Clone, Debug)]
+pub struct ExpiriesListRaw {
+    #[diesel(sql_type = diesel::sql_types::Timestamptz)]
+    pub expiration_timestamp: NaiveDateTime,
+}
+
 pub async fn routing(
     pool: &deadpool_diesel::postgres::Pool,
     is_routing: bool,
@@ -907,4 +913,37 @@ pub async fn get_current_median_entries_with_components(
     };
 
     Ok(median_entries)
+}
+
+pub async fn get_expiries_list(
+    pool: &deadpool_diesel::postgres::Pool,
+    pair_id: String,
+) -> Result<Vec<NaiveDateTime>, InfraError> {
+    let conn = pool.get().await.map_err(adapt_infra_error)?;
+
+    let sql_request: String = format!(
+        r#"
+        SELECT DISTINCT expiration_timestamp
+        FROM future_entries
+        WHERE pair_id = $1 AND expiration_timestamp IS NOT NULL
+        ORDER BY expiration_timestamp;
+        "#
+    );
+
+    let raw_exp = conn
+        .interact(move |conn| {
+            diesel::sql_query(&sql_request)
+                .bind::<diesel::sql_types::Text, _>(pair_id)
+                .load::<ExpiriesListRaw>(conn)
+        })
+        .await
+        .map_err(adapt_infra_error)?
+        .map_err(adapt_infra_error)?;
+
+    let expiries: Vec<NaiveDateTime> = raw_exp
+        .into_iter()
+        .map(|r| r.expiration_timestamp)
+        .collect();
+
+    Ok(expiries)
 }
