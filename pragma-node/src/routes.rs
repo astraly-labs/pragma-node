@@ -10,7 +10,8 @@ use crate::handlers::entries::get_onchain::{
     publishers::get_onchain_publishers,
 };
 use crate::handlers::entries::{
-    create_entries, create_future_entries, get_entry, get_ohlc, get_volatility, subscribe_to_entry,
+    create_entries, create_future_entries, get_entry, get_expiries, get_ohlc, get_volatility,
+    subscribe_to_entry,
 };
 use crate::AppState;
 
@@ -42,6 +43,7 @@ fn data_routes(state: AppState) -> Router<AppState> {
         .route("/publish", post(create_entries))
         .route("/publish_future", post(create_future_entries))
         .route("/:base/:quote", get(get_entry))
+        .route("/:base/:quote/get_expiries", get(get_expiries))
         .route("/subscribe", get(subscribe_to_entry))
         .with_state(state)
 }

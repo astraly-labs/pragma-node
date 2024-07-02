@@ -31,6 +31,8 @@ pub enum EntryError {
     Unauthorized,
     #[error("invalid timestamp")]
     InvalidTimestamp,
+    #[error("invalid expiry")]
+    InvalidExpiry,
     #[error("publisher error: {0}")]
     PublisherError(#[from] PublisherError),
     #[error("pair id invalid: {0}")]
@@ -75,6 +77,7 @@ impl IntoResponse for EntryError {
                 "Unauthorized publisher".to_string(),
             ),
             Self::InvalidTimestamp => (StatusCode::BAD_REQUEST, "Invalid timestamp".to_string()),
+            Self::InvalidExpiry => (StatusCode::BAD_REQUEST, "Invalid expiry".to_string()),
             Self::PublisherError(err) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 format!("Publisher error: {}", err),

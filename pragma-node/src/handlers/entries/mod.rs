@@ -2,6 +2,7 @@ pub mod constants;
 pub mod create_entry;
 pub mod create_future_entry;
 pub mod get_entry;
+pub mod get_expiries;
 pub mod get_ohlc;
 pub mod get_onchain;
 pub mod get_volatility;
@@ -10,6 +11,7 @@ pub mod subscribe_to_entry;
 pub use create_entry::create_entries;
 pub use create_future_entry::create_future_entries;
 pub use get_entry::get_entry;
+pub use get_expiries::get_expiries;
 pub use get_ohlc::get_ohlc;
 pub use get_volatility::get_volatility;
 pub use subscribe_to_entry::subscribe_to_entry;
@@ -131,6 +133,27 @@ pub struct Checkpoint {
     pub sender_address: String,
 }
 
+#[derive(Default, Debug, Deserialize, ToSchema, Clone, Copy)]
+pub enum EntryType {
+    #[serde(rename = "spot")]
+    #[default]
+    Spot,
+    #[serde(rename = "perp")]
+    Perp,
+    #[serde(rename = "future")]
+    Future,
+}
+
+impl From<EntryType> for DataType {
+    fn from(value: EntryType) -> Self {
+        match value {
+            EntryType::Spot => DataType::SpotEntry,
+            EntryType::Future => DataType::FutureEntry,
+            EntryType::Perp => DataType::PerpEntry,
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct GetOnchainCheckpointsResponse(pub Vec<Checkpoint>);
 
@@ -146,6 +169,8 @@ pub struct GetEntryParams {
     pub interval: Option<Interval>,
     pub routing: Option<bool>,
     pub aggregation: Option<AggregationMode>,
+    pub entry_type: Option<EntryType>,
+    pub expiry: Option<String>,
 }
 
 impl Default for GetEntryParams {
@@ -155,6 +180,8 @@ impl Default for GetEntryParams {
             interval: Some(Interval::default()),
             routing: Some(false),
             aggregation: Some(AggregationMode::default()),
+            entry_type: Some(EntryType::default()),
+            expiry: None,
         }
     }
 }
