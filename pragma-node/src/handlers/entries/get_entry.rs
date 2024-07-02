@@ -1,6 +1,6 @@
 use axum::extract::{Query, State};
 use axum::Json;
-use chrono::{DateTime,Utc};
+use chrono::{DateTime, Utc};
 
 use pragma_common::types::{AggregationMode, DataType, Interval};
 use pragma_entities::EntryError;
@@ -12,6 +12,15 @@ use crate::AppState;
 
 use super::GetEntryParams;
 use crate::utils::{big_decimal_price_to_hex, currency_pair_to_pair_id};
+
+#[derive(Default, Clone)]
+pub struct RoutingDatas {
+    pub interval: Interval,
+    pub timestamp: i64,
+    pub aggregation_mode: AggregationMode,
+    pub data_type: DataType,
+    pub expiry: String,
+}
 
 #[utoipa::path(
     get,
@@ -32,38 +41,40 @@ pub async fn get_entry(
 ) -> Result<Json<GetEntryResponse>, EntryError> {
     tracing::info!("Received get entry request for pair {:?}", pair);
     // Construct pair id
+    let mut routing_datas = RoutingDatas::default();
+
     let pair_id = currency_pair_to_pair_id(&pair.0, &pair.1);
 
     let now = chrono::Utc::now().timestamp();
 
-    let timestamp = if let Some(timestamp) = params.timestamp {
+    routing_datas.timestamp = if let Some(timestamp) = params.timestamp {
         timestamp
     } else {
         now
     };
 
-    let interval = if let Some(interval) = params.interval {
+    routing_datas.interval = if let Some(interval) = params.interval {
         interval
     } else {
         Interval::TwoHours
     };
 
-    let aggregation_mode = if let Some(aggregation_mode) = params.aggregation {
+    routing_datas.aggregation_mode = if let Some(aggregation_mode) = params.aggregation {
         aggregation_mode
     } else {
         AggregationMode::Twap
     };
 
-    let data_type = if let Some(entry_type) = params.entry_type {
+    routing_datas.data_type = if let Some(entry_type) = params.entry_type {
         DataType::from(entry_type)
     } else {
         DataType::SpotEntry
     };
 
-    let expiry = if let Some(expiry) = params.expiry {
+    routing_datas.expiry = if let Some(expiry) = params.expiry {
         let expiry_dt = expiry.parse::<DateTime<Utc>>();
-        match  expiry_dt {
-            Ok(expiry_dt) => expiry_dt.format("%Y-%m-%d %H:%M:%S%:z").to_string(), 
+        match expiry_dt {
+            Ok(expiry_dt) => expiry_dt.format("%Y-%m-%d %H:%M:%S%:z").to_string(),
             Err(_) => return Err(EntryError::InvalidExpiry),
         }
     } else {
@@ -72,22 +83,18 @@ pub async fn get_entry(
 
     let is_routing = params.routing.unwrap_or(false);
 
-    if timestamp > now {
+    if routing_datas.timestamp > now {
         return Err(EntryError::InvalidTimestamp);
     }
 
     let (entry, decimals) = entry_repository::routing(
         &state.offchain_pool,
-        pair_id.clone(),
-        interval,
-        timestamp,
         is_routing,
-        aggregation_mode,
-        data_type,
-        expiry,
+        pair_id.clone(),
+        routing_datas,
     )
     .await
-    .map_err(|e| e.to_entry_error(&pair_id))?;
+    .map_err(|e| e.to_entry_error(&(pair_id)))?;
 
     Ok(Json(adapt_entry_to_entry_response(
         pair_id, &entry, decimals,
