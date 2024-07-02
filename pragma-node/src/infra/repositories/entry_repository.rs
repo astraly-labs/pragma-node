@@ -11,7 +11,7 @@ use crate::handlers::entries::constants::{
     INITAL_INTERVAL_IN_MS, INTERVAL_INCREMENT_IN_MS, MAX_INTERVAL_WITHOUT_ENTRIES,
     MINIMUM_NUMBER_OF_PUBLISHERS,
 };
-use crate::handlers::entries::get_entry::RoutingDatas;
+use crate::handlers::entries::get_entry::RoutingParams;
 use crate::handlers::entries::{AssetOraclePrice, SignedPublisherPrice};
 use crate::utils::{convert_via_quote, normalize_to_decimals, StarkexPrice};
 use pragma_common::types::{AggregationMode, ConversionError, DataType, Interval};
@@ -129,7 +129,7 @@ pub async fn routing(
     pool: &deadpool_diesel::postgres::Pool,
     is_routing: bool,
     pair_id: String,
-    routing_datas: RoutingDatas,
+    routing_datas: RoutingParams,
 ) -> Result<(MedianEntry, u32), InfraError> {
     if pair_id_exist(pool, pair_id.clone()).await? || !is_routing {
         return get_price_and_decimals(pool, pair_id, routing_datas).await;
@@ -203,7 +203,7 @@ async fn find_alternative_pair_price(
     pool: &deadpool_diesel::postgres::Pool,
     base: &str,
     quote: &str,
-    routing_datas: RoutingDatas,
+    routing_datas: RoutingParams,
 ) -> Result<(MedianEntry, u32), InfraError> {
     let conn = pool.get().await.map_err(adapt_infra_error)?;
 
@@ -250,7 +250,7 @@ async fn pair_id_exist(
 async fn get_price_and_decimals(
     pool: &deadpool_diesel::postgres::Pool,
     pair_id: String,
-    routing_datas: RoutingDatas,
+    routing_datas: RoutingParams,
 ) -> Result<(MedianEntry, u32), InfraError> {
     let entry = match routing_datas.aggregation_mode {
         AggregationMode::Median => get_median_price(pool, pair_id.clone(), routing_datas).await?,
@@ -284,7 +284,7 @@ pub async fn get_all_currencies_decimals(
 pub async fn get_twap_price(
     pool: &deadpool_diesel::postgres::Pool,
     pair_id: String,
-    routing_datas: RoutingDatas,
+    routing_datas: RoutingParams,
 ) -> Result<MedianEntry, InfraError> {
     let conn = pool.get().await.map_err(adapt_infra_error)?;
 
@@ -339,7 +339,7 @@ pub async fn get_twap_price(
 pub async fn get_median_price(
     pool: &deadpool_diesel::postgres::Pool,
     pair_id: String,
-    routing_datas: RoutingDatas,
+    routing_datas: RoutingParams,
 ) -> Result<MedianEntry, InfraError> {
     let conn = pool.get().await.map_err(adapt_infra_error)?;
 
