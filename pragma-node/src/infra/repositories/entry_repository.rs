@@ -530,9 +530,8 @@ pub async fn get_ohlc(
 ) -> Result<Vec<OHLCEntry>, InfraError> {
     let conn = pool.get().await.map_err(adapt_infra_error)?;
 
-    let raw_sql = match interval {
-        Interval::OneMinute => {
-            r#"
+    let raw_sql = format!(
+        r#"
         -- query the materialized realtime view
         SELECT
             bucket AS time,
@@ -541,7 +540,7 @@ pub async fn get_ohlc(
             low,
             close
         FROM
-            one_minute_candle
+            {}_candle_new
         WHERE
             pair_id = $1
             AND
@@ -549,69 +548,9 @@ pub async fn get_ohlc(
         ORDER BY
             time DESC
         LIMIT 10000;
-    "#
-        }
-        Interval::FifteenMinutes => {
-            r#"
-        -- query the materialized realtime view
-        SELECT
-            bucket AS time,
-            open,
-            high,
-            low,
-            close
-        FROM
-            fifteen_minute_candle
-        WHERE
-            pair_id = $1
-            AND
-            bucket <= $2
-        ORDER BY
-            time DESC
-        LIMIT 10000;
-    "#
-        }
-        Interval::OneHour => {
-            r#"
-        -- query the materialized realtime view
-        SELECT
-            bucket AS time,
-            open,
-            high,
-            low,
-            close
-        FROM
-            one_hour_candle
-        WHERE
-            pair_id = $1
-            AND
-            bucket <= $2
-        ORDER BY
-            time DESC
-        LIMIT 10000;
-    "#
-        }
-        Interval::TwoHours => {
-            r#"
-            -- query the materialized realtime view
-        SELECT
-            bucket AS time,
-            open,
-            high,
-            low,
-            close
-        FROM
-            two_hour_candle
-        WHERE
-            pair_id = $1
-            AND
-            bucket <= $2
-        ORDER BY
-            time DESC
-        LIMIT 10000;
-    "#
-        }
-    };
+    "#,
+        get_interval_specifier(interval, false)?
+    );
 
     let date_time = DateTime::from_timestamp(time, 0).ok_or(InfraError::InvalidTimeStamp)?;
 
