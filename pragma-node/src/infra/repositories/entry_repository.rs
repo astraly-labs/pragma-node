@@ -129,10 +129,10 @@ pub async fn routing(
     pool: &deadpool_diesel::postgres::Pool,
     is_routing: bool,
     pair_id: String,
-    routing_datas: RoutingParams,
+    routing_params: RoutingParams,
 ) -> Result<(MedianEntry, u32), InfraError> {
     if pair_id_exist(pool, pair_id.clone()).await? || !is_routing {
-        return get_price_and_decimals(pool, pair_id, routing_datas).await;
+        return get_price_and_decimals(pool, pair_id, routing_params).await;
     }
 
     let [base, quote]: [&str; 2] = pair_id
@@ -141,7 +141,7 @@ pub async fn routing(
         .try_into()
         .map_err(|_| InfraError::InternalServerError)?;
 
-    match find_alternative_pair_price(pool, base, quote, routing_datas).await {
+    match find_alternative_pair_price(pool, base, quote, routing_params).await {
         Ok(result) => Ok(result),
         Err(_) => Err(InfraError::NotFound),
     }
@@ -203,7 +203,7 @@ async fn find_alternative_pair_price(
     pool: &deadpool_diesel::postgres::Pool,
     base: &str,
     quote: &str,
-    routing_datas: RoutingParams,
+    routing_params: RoutingParams,
 ) -> Result<(MedianEntry, u32), InfraError> {
     let conn = pool.get().await.map_err(adapt_infra_error)?;
 
@@ -221,9 +221,9 @@ async fn find_alternative_pair_price(
             && pair_id_exist(pool, alt_quote_pair.clone()).await?
         {
             let base_alt_result =
-                get_price_and_decimals(pool, base_alt_pair, routing_datas.clone()).await?;
+                get_price_and_decimals(pool, base_alt_pair, routing_params.clone()).await?;
             let alt_quote_result =
-                get_price_and_decimals(pool, alt_quote_pair, routing_datas).await?;
+                get_price_and_decimals(pool, alt_quote_pair, routing_params).await?;
 
             return calculate_rebased_price(base_alt_result, alt_quote_result);
         }
@@ -250,11 +250,11 @@ async fn pair_id_exist(
 async fn get_price_and_decimals(
     pool: &deadpool_diesel::postgres::Pool,
     pair_id: String,
-    routing_datas: RoutingParams,
+    routing_params: RoutingParams,
 ) -> Result<(MedianEntry, u32), InfraError> {
-    let entry = match routing_datas.aggregation_mode {
-        AggregationMode::Median => get_median_price(pool, pair_id.clone(), routing_datas).await?,
-        AggregationMode::Twap => get_twap_price(pool, pair_id.clone(), routing_datas).await?,
+    let entry = match routing_params.aggregation_mode {
+        AggregationMode::Median => get_median_price(pool, pair_id.clone(), routing_params).await?,
+        AggregationMode::Twap => get_twap_price(pool, pair_id.clone(), routing_params).await?,
         AggregationMode::Mean => Err(InfraError::InternalServerError)?,
     };
 
@@ -284,7 +284,7 @@ pub async fn get_all_currencies_decimals(
 pub async fn get_twap_price(
     pool: &deadpool_diesel::postgres::Pool,
     pair_id: String,
-    routing_datas: RoutingParams,
+    routing_params: RoutingParams,
 ) -> Result<MedianEntry, InfraError> {
     let conn = pool.get().await.map_err(adapt_infra_error)?;
 
@@ -306,13 +306,13 @@ pub async fn get_twap_price(
             time DESC
         LIMIT 1;
     "#,
-        get_interval_specifier(routing_datas.interval, true)?,
-        get_table_suffix(routing_datas.data_type)?,
-        get_expiration_timestamp(routing_datas.data_type, routing_datas.expiry)?,
+        get_interval_specifier(routing_params.interval, true)?,
+        get_table_suffix(routing_params.data_type)?,
+        get_expiration_timestamp(routing_params.data_type, routing_params.expiry)?,
     );
 
-    let date_time =
-        DateTime::from_timestamp(routing_datas.timestamp, 0).ok_or(InfraError::InvalidTimeStamp)?;
+    let date_time = DateTime::from_timestamp(routing_params.timestamp, 0)
+        .ok_or(InfraError::InvalidTimeStamp)?;
 
     let raw_entry = conn
         .interact(move |conn| {
@@ -339,7 +339,7 @@ pub async fn get_twap_price(
 pub async fn get_median_price(
     pool: &deadpool_diesel::postgres::Pool,
     pair_id: String,
-    routing_datas: RoutingParams,
+    routing_params: RoutingParams,
 ) -> Result<MedianEntry, InfraError> {
     let conn = pool.get().await.map_err(adapt_infra_error)?;
 
@@ -361,13 +361,13 @@ pub async fn get_median_price(
             time DESC
         LIMIT 1;
     "#,
-        get_interval_specifier(routing_datas.interval, false)?,
-        get_table_suffix(routing_datas.data_type)?,
-        get_expiration_timestamp(routing_datas.data_type, routing_datas.expiry)?,
+        get_interval_specifier(routing_params.interval, false)?,
+        get_table_suffix(routing_params.data_type)?,
+        get_expiration_timestamp(routing_params.data_type, routing_params.expiry)?,
     );
 
-    let date_time =
-        DateTime::from_timestamp(routing_datas.timestamp, 0).ok_or(InfraError::InvalidTimeStamp)?;
+    let date_time = DateTime::from_timestamp(routing_params.timestamp, 0)
+        .ok_or(InfraError::InvalidTimeStamp)?;
 
     let raw_entry = conn
         .interact(move |conn| {
