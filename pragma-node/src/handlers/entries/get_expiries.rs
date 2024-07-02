@@ -4,13 +4,12 @@ use chrono::NaiveDateTime;
 
 use pragma_entities::EntryError;
 
-use crate::handlers::entries::GetEntryResponse;
-use crate::infra::repositories::entry_repository::{self, MedianEntry};
+use crate::infra::repositories::entry_repository;
 use crate::utils::PathExtractor;
 use crate::AppState;
 
 use super::GetEntryParams;
-use crate::utils::{big_decimal_price_to_hex, currency_pair_to_pair_id};
+use crate::utils::currency_pair_to_pair_id;
 
 #[utoipa::path(
     get,
@@ -40,18 +39,4 @@ pub async fn get_expiries(
     tracing::info!("expiries are {:#?}", req_result);
 
     Ok(Json(req_result))
-}
-
-fn adapt_entry_to_entry_response(
-    pair_id: String,
-    entry: &MedianEntry,
-    decimals: u32,
-) -> GetEntryResponse {
-    GetEntryResponse {
-        pair_id,
-        timestamp: entry.time.and_utc().timestamp_millis() as u64,
-        num_sources_aggregated: entry.num_sources as usize,
-        price: big_decimal_price_to_hex(&entry.median_price),
-        decimals,
-    }
 }

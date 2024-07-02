@@ -1,6 +1,6 @@
 use axum::extract::{Query, State};
 use axum::Json;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDateTime, Utc};
 
 use pragma_common::types::{AggregationMode, DataType, Interval};
 use pragma_entities::EntryError;
@@ -13,7 +13,7 @@ use crate::AppState;
 use super::GetEntryParams;
 use crate::utils::{big_decimal_price_to_hex, currency_pair_to_pair_id};
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 pub struct RoutingDatas {
     pub interval: Interval,
     pub timestamp: i64,
@@ -72,7 +72,8 @@ pub async fn get_entry(
     };
 
     routing_datas.expiry = if let Some(expiry) = params.expiry {
-        let expiry_dt = expiry.parse::<DateTime<Utc>>();
+        let expiry_dt = NaiveDateTime::parse_from_str(&expiry, "%Y-%m-%dT%H:%M:%S")
+            .map(|naive| DateTime::<Utc>::from_naive_utc_and_offset(naive, Utc));
         match expiry_dt {
             Ok(expiry_dt) => expiry_dt.format("%Y-%m-%d %H:%M:%S%:z").to_string(),
             Err(_) => return Err(EntryError::InvalidExpiry),
