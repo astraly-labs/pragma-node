@@ -35,7 +35,7 @@ services:
       - TOPIC=pragma-data
       - KAFKA_BROKERS=pragma-kafka:9092
       - OFFCHAIN_DATABASE_URL=postgres://postgres:test-password@offchain-db:5432/pragma
-      - ONCHAIN_DATABASE_URL=postgres://postgres:test-password@onchain-db:5432/pragma
+      - ONCHAIN_DATABASE_URL=postgres://postgres:test-password@onchain-db:5433/pragma
     depends_on:
       pragma-kafka:
         condition: service_healthy
@@ -168,7 +168,7 @@ services:
       - TOPIC=pragma-data
       - GROUP_ID=pragma-data
       - OFFCHAIN_DATABASE_URL=postgres://postgres:test-password@timescale-db:5432/pragma
-      - ONCHAIN_DATABASE_URL=postgres://postgres:test-password@postgre-db:5432/pragma
+      - ONCHAIN_DATABASE_URL=postgres://postgres:test-password@postgre-db:5433/pragma
     depends_on:
       pragma-kafka:
         condition: service_healthy

@@ -2,14 +2,14 @@
 CREATE MATERIALIZED VIEW mainnet_future_1_day_candle
 WITH (timescaledb.continuous) AS
     SELECT
-        time_bucket('1 day', timestamp) AS bucket,
+        time_bucket('1 day',bucket) AS ohlc_bucket,
         pair_id,
-        FIRST(price, timestamp) AS "open",
-        MAX(price) AS high,
-        MIN(price) AS low,
-        LAST(price, timestamp) AS "close"
-    FROM mainnet_future_entry
-    GROUP BY bucket, pair_id
+        FIRST(median_price, bucket) AS "open",
+        MAX(median_price) AS high,
+        MIN(median_price) AS low,
+        LAST(median_price, bucket) AS "close"
+    FROM mainnet_future_price_10_s_agg
+    GROUP BY ohlc_bucket, pair_id
     WITH NO DATA;
 
 
@@ -22,14 +22,14 @@ SELECT add_continuous_aggregate_policy('mainnet_future_1_day_candle',
 CREATE MATERIALIZED VIEW mainnet_future_1_hour_candle
 WITH (timescaledb.continuous) AS
     SELECT
-        time_bucket('1 hour', timestamp) AS bucket,
+        time_bucket('1 hour',bucket) AS ohlc_bucket,
         pair_id,
-        FIRST(price, timestamp) AS "open",
-        MAX(price) AS high,
-        MIN(price) AS low,
-        LAST(price, timestamp) AS "close"
-    FROM mainnet_future_entry
-    GROUP BY bucket, pair_id
+        FIRST(median_price, bucket) AS "open",
+        MAX(median_price) AS high,
+        MIN(median_price) AS low,
+        LAST(median_price, bucket) AS "close"
+    FROM mainnet_future_price_10_s_agg
+    GROUP BY ohlc_bucket, pair_id
     WITH NO DATA;
 
 SELECT add_continuous_aggregate_policy('mainnet_future_1_hour_candle',
@@ -41,14 +41,14 @@ SELECT add_continuous_aggregate_policy('mainnet_future_1_hour_candle',
 CREATE MATERIALIZED VIEW mainnet_future_15_min_candle
 WITH (timescaledb.continuous) AS
     SELECT
-        time_bucket('15 minutes', timestamp) AS bucket,
+        time_bucket('15 minutes',bucket) AS ohlc_bucket,
         pair_id,
-        FIRST(price, timestamp)::numeric AS "open",
-        MAX(price)::numeric AS high,
-        MIN(price)::numeric AS low,
-        LAST(price, timestamp)::numeric AS "close"
-    FROM mainnet_future_entry
-    GROUP BY bucket, pair_id
+        FIRST(median_price, bucket)::numeric AS "open",
+        MAX(median_price)::numeric AS high,
+        MIN(median_price)::numeric AS low,
+        LAST(median_price, bucket)::numeric AS "close"
+    FROM mainnet_future_price_10_s_agg
+    GROUP BY ohlc_bucket, pair_id
     WITH NO DATA;
 
 SELECT add_continuous_aggregate_policy('mainnet_future_15_min_candle',
@@ -60,14 +60,14 @@ SELECT add_continuous_aggregate_policy('mainnet_future_15_min_candle',
 CREATE MATERIALIZED VIEW mainnet_future_5_min_candle
 WITH (timescaledb.continuous) AS
     SELECT
-        time_bucket('5 minutes', timestamp) AS bucket,
+        time_bucket('5 minutes',bucket) AS ohlc_bucket,
         pair_id,
-        FIRST(price, timestamp) AS "open",
-        MAX(price) AS high,
-        MIN(price) AS low,
-        LAST(price, timestamp) AS "close"
-    FROM mainnet_future_entry
-    GROUP BY bucket, pair_id
+        FIRST(median_price, bucket) AS "open",
+        MAX(median_price) AS high,
+        MIN(median_price) AS low,
+        LAST(median_price, bucket) AS "close"
+    FROM mainnet_future_price_10_s_agg
+    GROUP BY ohlc_bucket, pair_id
     WITH NO DATA;
 
 SELECT add_continuous_aggregate_policy('mainnet_future_5_min_candle',
@@ -79,14 +79,14 @@ SELECT add_continuous_aggregate_policy('mainnet_future_5_min_candle',
 CREATE MATERIALIZED VIEW mainnet_future_1_min_candle
 WITH (timescaledb.continuous) AS
     SELECT
-        time_bucket('1 minute', timestamp) AS bucket,
+        time_bucket('1 minute',bucket) AS ohlc_bucket,
         pair_id,
-        FIRST(price, timestamp) AS "open",
-        MAX(price) AS high,
-        MIN(price) AS low,
-        LAST(price, timestamp) AS "close"
-    FROM mainnet_future_entry
-    GROUP BY bucket, pair_id
+        FIRST(median_price, bucket) AS "open",
+        MAX(median_price) AS high,
+        MIN(median_price) AS low,
+        LAST(median_price, bucket) AS "close"
+    FROM mainnet_future_price_10_s_agg
+    GROUP BY ohlc_bucket, pair_id
     WITH NO DATA;
 
 SELECT add_continuous_aggregate_policy('mainnet_future_1_min_candle',

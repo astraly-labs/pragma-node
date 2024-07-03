@@ -43,7 +43,7 @@ fn data_routes(state: AppState) -> Router<AppState> {
         .route("/publish", post(create_entries))
         .route("/publish_future", post(create_future_entries))
         .route("/:base/:quote", get(get_entry))
-        .route("/:base/:quote/get_expiries", get(get_expiries))
+        .route("/:base/:quote/future_expiries", get(get_expiries))
         .route("/subscribe", get(subscribe_to_entry))
         .with_state(state)
 }
