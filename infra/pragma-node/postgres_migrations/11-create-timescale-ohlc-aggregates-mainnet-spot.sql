@@ -1,8 +1,8 @@
--- 1 day candle
-CREATE MATERIALIZED VIEW mainnet_spot_1_day_candle
+-- 2 hours candle
+CREATE MATERIALIZED VIEW mainnet_spot_2_hours_candle
 WITH (timescaledb.continuous) AS
     SELECT
-        time_bucket('1 day', bucket) AS ohlc_bucket,
+        time_bucket('2 hours', bucket) AS ohlc_bucket,
         pair_id,
         FIRST(median_price, bucket) AS "open",
         MAX(median_price) AS high,
@@ -12,11 +12,10 @@ WITH (timescaledb.continuous) AS
     GROUP BY ohlc_bucket, pair_id
     WITH NO DATA;
 
-
-SELECT add_continuous_aggregate_policy('mainnet_spot_1_day_candle',
-    start_offset => INTERVAL '3 days',
-    end_offset => INTERVAL '1 day',
-    schedule_interval => INTERVAL '1 day');
+SELECT add_continuous_aggregate_policy('mainnet_spot_2_hours_candle',
+    start_offset => INTERVAL '6 hours',
+    end_offset => INTERVAL '2 hours',
+    schedule_interval => INTERVAL '2 hours');
 
 -- 1 hour candle
 CREATE MATERIALIZED VIEW mainnet_spot_1_hour_candle

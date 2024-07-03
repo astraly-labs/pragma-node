@@ -49,7 +49,10 @@ fn get_table_suffix(data_type: DataType) -> Result<&'static str, InfraError> {
 }
 
 // Retrieve the timeframe specifier based on the interval and aggregation mode.
-fn get_interval_specifier(interval: Interval, is_twap: bool) -> Result<&'static str, InfraError> {
+pub fn get_interval_specifier(
+    interval: Interval,
+    is_twap: bool,
+) -> Result<&'static str, InfraError> {
     match interval {
         Interval::OneMinute => Ok("1_min"),
         Interval::FifteenMinutes => Ok("15_min"),

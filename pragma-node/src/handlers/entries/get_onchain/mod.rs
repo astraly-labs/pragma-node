@@ -41,6 +41,7 @@ pub async fn get_onchain(
 
     let pair_id: String = currency_pair_to_pair_id(&pair.0, &pair.1);
     let now = chrono::Utc::now().timestamp() as u64;
+    let aggregation_mode = params.aggregation.unwrap_or_default();
     let timestamp = if let Some(timestamp) = params.timestamp {
         if timestamp > now {
             return Err(EntryError::InvalidTimestamp);
@@ -49,8 +50,6 @@ pub async fn get_onchain(
     } else {
         now
     };
-
-    let aggregation_mode = params.aggregation.unwrap_or_default();
 
     let (aggregated_price, sources) = get_sources_and_aggregate(
         &state.onchain_pool,
