@@ -534,17 +534,17 @@ pub async fn get_ohlc(
         r#"
         -- query the materialized realtime view
         SELECT
-            bucket AS time,
+            ohlc_bucket AS time,
             open,
             high,
             low,
             close
         FROM
-            {}_candle_new
+            new_{}_candle
         WHERE
             pair_id = $1
             AND
-            bucket <= $2
+            ohlc_bucket <= $2
         ORDER BY
             time DESC
         LIMIT 10000;

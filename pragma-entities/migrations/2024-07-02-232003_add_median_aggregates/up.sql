@@ -10,8 +10,6 @@ FROM entries
 GROUP BY bucket, pair_id
 WITH NO DATA;
 
-CALL refresh_continuous_aggregate('price_10_s_agg', NULL, localtimestamp - INTERVAL '1 day');
-
 SELECT add_continuous_aggregate_policy('price_10_s_agg',
   start_offset => INTERVAL '1 day',
   end_offset => INTERVAL '10 seconds',
