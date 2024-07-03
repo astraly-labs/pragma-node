@@ -22,8 +22,11 @@ use pragma_entities::{
     Currency, Entry, NewEntry,
 };
 
-// Retrieve the timescale table based on the network and data type.
-fn get_expiration_timestamp(data_type: DataType, expiry: String) -> Result<String, InfraError> {
+// SQL statement used to filter the expiration timestamp for future entries
+fn get_expiration_timestamp_filter(
+    data_type: DataType,
+    expiry: String,
+) -> Result<String, InfraError> {
     match data_type {
         DataType::SpotEntry => Ok(String::default()),
         DataType::FutureEntry if expiry.is_empty() => {
@@ -46,7 +49,10 @@ fn get_table_suffix(data_type: DataType) -> Result<&'static str, InfraError> {
 }
 
 // Retrieve the timeframe specifier based on the interval and aggregation mode.
-fn get_interval_specifier(interval: Interval, is_twap: bool) -> Result<&'static str, InfraError> {
+pub fn get_interval_specifier(
+    interval: Interval,
+    is_twap: bool,
+) -> Result<&'static str, InfraError> {
     match interval {
         Interval::OneMinute => Ok("1_min"),
         Interval::FifteenMinutes => Ok("15_min"),
@@ -308,7 +314,7 @@ pub async fn get_twap_price(
     "#,
         get_interval_specifier(routing_params.interval, true)?,
         get_table_suffix(routing_params.data_type)?,
-        get_expiration_timestamp(routing_params.data_type, routing_params.expiry)?,
+        get_expiration_timestamp_filter(routing_params.data_type, routing_params.expiry)?,
     );
 
     let date_time = DateTime::from_timestamp(routing_params.timestamp, 0)
@@ -363,7 +369,7 @@ pub async fn get_median_price(
     "#,
         get_interval_specifier(routing_params.interval, false)?,
         get_table_suffix(routing_params.data_type)?,
-        get_expiration_timestamp(routing_params.data_type, routing_params.expiry)?,
+        get_expiration_timestamp_filter(routing_params.data_type, routing_params.expiry)?,
     );
 
     let date_time = DateTime::from_timestamp(routing_params.timestamp, 0)

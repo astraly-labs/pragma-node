@@ -1,18 +1,21 @@
 services:
-  postgre-db:
-    image: postgres
+  onchain-db:
+    image: timescale/timescaledb-ha:pg14-latest
     restart: always
-    environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=test-password
-      - POSTGRES_DB=pragma
-      - POSTGRES_LISTEN_ADDRESSES=*
-      - PGPORT=5433
-    # Automatically run the migrations on the database
-    volumes:
-      - ./infra/pragma-node/postgres_migrations:/docker-entrypoint-initdb.d
+    user: postgres
+    secrets:
+      - db-password
     networks:
       - pragma-db-network
+    volumes:
+      # Automatically runs the migrations on the database
+      - ./infra/pragma-node/postgres_migrations:/docker-entrypoint-initdb.d
+      - onchain-db-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=pragma
+      - POSTGRES_PASSWORD_FILE=/run/secrets/db-password
+      - POSTGRES_LISTEN_ADDRESSES=*
+      - PGPORT=5433
     ports:
       - "5433:5433"
     expose:
@@ -23,7 +26,7 @@ services:
       timeout: 5s
       retries: 5
 
-  timescale-db:
+  offchain-db:
     image: timescale/timescaledb-ha:pg14-latest
     restart: always
     user: postgres
@@ -32,12 +35,11 @@ services:
     networks:
       - pragma-db-network
     volumes:
-      - timescale-db-data:/var/lib/postgresql/data
+      - offchain-db-data:/var/lib/postgresql/data
     environment:
       - POSTGRES_DB=pragma
       - POSTGRES_PASSWORD_FILE=/run/secrets/db-password
       - POSTGRES_LISTEN_ADDRESSES=*
-
     ports:
       - "5432:5432"
     expose:
@@ -101,8 +103,8 @@ services:
   pragma-ingestor-1:
     container_name: "pragma-ingestor-1"
     environment:
-      - TIMESCALE_DATABASE_URL=postgres://postgres:test-password@172.17.0.1:5432/pragma
-      - POSTGRES_DATABASE_URL=postgres://postgres:test-password@172.17.0.1:5433/pragma
+      - OFFCHAIN_DATABASE_URL=postgres://postgres:test-password@172.17.0.1:5432/pragma
+      - ONCHAIN_DATABASE_URL=postgres://postgres:test-password@172.17.0.1:5433/pragma
       - DATABASE_MAX_CONN=5
       - BROKERS=172.17.0.1:9092
       - TOPIC=pragma-data
@@ -110,7 +112,7 @@ services:
     depends_on:
       pragma-kafka:
         condition: service_healthy
-      timescale-db:
+      offchain-db:
         condition: service_healthy
     networks:
       - pragma-kafka-network
@@ -124,8 +126,8 @@ networks:
   pragma-zookeeper-network:
 
 volumes:
-  timescale-db-data:
-  postgre-db-data:
+  offchain-db-data:
+  onchain-db-data:
   pragma_zookeeper_data:
   pragma_zookeeper_logs:
 

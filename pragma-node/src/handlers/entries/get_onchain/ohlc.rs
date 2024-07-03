@@ -10,7 +10,6 @@ use serde::{Deserialize, Serialize};
 
 use pragma_common::types::{Interval, Network};
 
-use crate::infra::repositories::entry_repository::OHLCEntry;
 use crate::infra::repositories::onchain_repository;
 use crate::types::ws::metrics::{self, Interaction, Status};
 use crate::types::ws::{ChannelHandler, Subscriber, SubscriptionType};
@@ -97,7 +96,6 @@ impl ChannelHandler<SubscriptionState, SubscriptionRequest, InfraError> for WsOH
                     network: subscription.network,
                     interval: subscription.interval,
                     is_first_update: true,
-                    ohlc_data: Vec::new(),
                 };
             }
             SubscriptionType::Unsubscribe => {
@@ -127,10 +125,8 @@ impl ChannelHandler<SubscriptionState, SubscriptionRequest, InfraError> for WsOH
             1
         };
         let pair_id = state.subscribed_pair.clone().unwrap();
-        let mut ohlc_data = state.ohlc_data.clone();
 
-        let status = onchain_repository::get_ohlc(
-            &mut ohlc_data,
+        let ohlc_data_res = onchain_repository::get_ohlc(
             &subscriber.app_state.onchain_pool,
             state.network,
             pair_id.clone(),
@@ -138,16 +134,14 @@ impl ChannelHandler<SubscriptionState, SubscriptionRequest, InfraError> for WsOH
             ohlc_to_compute,
         )
         .await;
-
-        state.ohlc_data.clone_from(&ohlc_data);
         drop(state);
 
-        if let Err(e) = status {
+        if let Err(e) = ohlc_data_res {
             subscriber.send_err(&e.to_string()).await;
             return Err(e);
         }
 
-        match serde_json::to_string(&ohlc_data) {
+        match serde_json::to_string(&ohlc_data_res.unwrap()) {
             Ok(json_response) => {
                 self.check_rate_limit(subscriber, &json_response).await?;
 
@@ -222,7 +216,6 @@ struct SubscriptionState {
     network: Network,
     interval: Interval,
     is_first_update: bool,
-    ohlc_data: Vec<OHLCEntry>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

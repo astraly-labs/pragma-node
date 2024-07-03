@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
 use bigdecimal::BigDecimal;
-use chrono::{Duration, NaiveDateTime, Utc};
 use deadpool_diesel::postgres::Pool;
 use diesel::sql_types::{BigInt, Integer, Numeric, Text, Timestamp, VarChar};
 use diesel::{Queryable, QueryableByName, RunQueryDsl};
@@ -11,14 +10,15 @@ use pragma_entities::error::{adapt_infra_error, InfraError};
 use pragma_monitoring::models::SpotEntry;
 
 use crate::handlers::entries::{Checkpoint, OnchainEntry, Publisher, PublisherEntry};
+use crate::infra::repositories::entry_repository::{
+    get_interval_specifier, OHLCEntry, OHLCEntryRaw,
+};
 use crate::utils::format_bigdecimal_price;
 use crate::utils::get_decimals_for_pair;
 
-use super::entry_repository::OHLCEntry;
-
 const BACKWARD_TIMESTAMP_INTERVAL: &str = "1 hour";
 
-// Retrieve the postgres table name based on the network and data type.
+// Retrieve the onchain table name based on the network and data type.
 fn get_table_name(network: Network, data_type: DataType) -> Result<&'static str, InfraError> {
     let table = match (network, data_type) {
         (Network::Testnet, DataType::SpotEntry) => "spot_entry",
@@ -28,6 +28,24 @@ fn get_table_name(network: Network, data_type: DataType) -> Result<&'static str,
         _ => return Err(InfraError::InternalServerError),
     };
     Ok(table)
+}
+
+// Retrieve the onchain table name for the OHLC based on network, datatype & interval.
+fn get_ohlc_table_name(
+    network: Network,
+    data_type: DataType,
+    interval: Interval,
+) -> Result<String, InfraError> {
+    let prefix_name = match (network, data_type) {
+        (Network::Testnet, DataType::SpotEntry) => "spot",
+        (Network::Mainnet, DataType::SpotEntry) => "mainnet_spot",
+        (Network::Testnet, DataType::FutureEntry) => "future",
+        (Network::Mainnet, DataType::FutureEntry) => "mainnet_future",
+        _ => return Err(InfraError::InternalServerError),
+    };
+    let interval_specifier = get_interval_specifier(interval, true)?;
+    let table_name = format!("{prefix_name}_{interval_specifier}_candle");
+    Ok(table_name)
 }
 
 #[derive(Queryable, QueryableByName)]
@@ -526,190 +544,54 @@ pub async fn get_publishers_with_components(
     Ok(publishers_response)
 }
 
-// --- onchain OHLC ---
-
+// Only works for Spot for now - since we only store spot entries on chain.
 pub async fn get_ohlc(
-    ohlc_data: &mut Vec<OHLCEntry>,
     pool: &Pool,
     network: Network,
     pair_id: String,
     interval: Interval,
     data_to_retrieve: i64,
-) -> Result<(), InfraError> {
-    let now = Utc::now().naive_utc();
-    let aligned_current_timestamp = interval.align_timestamp(now);
-    let start_timestamp = if data_to_retrieve > 1 {
-        aligned_current_timestamp
-            - Duration::minutes(interval.to_minutes() * (data_to_retrieve * 10))
-    } else {
-        aligned_current_timestamp
-    };
-
-    let entries = get_entries_from_timestamp(pool, network, &pair_id, start_timestamp).await?;
-    update_ohlc_data(
-        ohlc_data,
-        entries,
-        interval,
-        now,
-        start_timestamp,
-        data_to_retrieve == 1,
-    );
-
-    Ok(())
-}
-
-async fn get_entries_from_timestamp(
-    pool: &Pool,
-    network: Network,
-    pair_id: &str,
-    start_timestamp: NaiveDateTime,
-) -> Result<Vec<SpotEntry>, InfraError> {
+) -> Result<Vec<OHLCEntry>, InfraError> {
     let raw_sql = format!(
         r#"
-            SELECT
-                *
-            FROM
-                {table_name}
-            WHERE
-                pair_id = '{pair_id}'
-                AND timestamp >= '{start_timestamp}'
-            ORDER BY
-                timestamp
-            ASC
+        SELECT
+            ohlc_bucket AS time,
+            open,
+            high,
+            low,
+            close
+        FROM
+            {table_name}
+        WHERE
+            pair_id = $1
+        ORDER BY
+            time DESC
+        LIMIT {data_to_retrieve};
         "#,
-        table_name = get_table_name(network, DataType::SpotEntry)?,
-        pair_id = pair_id,
-        start_timestamp = start_timestamp
+        table_name = get_ohlc_table_name(network, DataType::SpotEntry, interval)?,
     );
 
     let conn = pool.get().await.map_err(adapt_infra_error)?;
-    let entries: Vec<SpotEntry> = conn
-        .interact(move |conn| diesel::sql_query(raw_sql).load::<SpotEntry>(conn))
+    let raw_entries = conn
+        .interact(move |conn| {
+            diesel::sql_query(raw_sql)
+                .bind::<diesel::sql_types::Text, _>(pair_id)
+                .load::<OHLCEntryRaw>(conn)
+        })
         .await
         .map_err(adapt_infra_error)?
         .map_err(adapt_infra_error)?;
+
+    let entries: Vec<OHLCEntry> = raw_entries
+        .into_iter()
+        .map(|raw_entry| OHLCEntry {
+            time: raw_entry.time,
+            open: raw_entry.open,
+            high: raw_entry.high,
+            low: raw_entry.low,
+            close: raw_entry.close,
+        })
+        .collect();
+
     Ok(entries)
-}
-
-/// Compute the OHLC data from the entries for the given interval.
-///
-/// The function updates the `ohlc_data` vector with the computed OHLC entries
-/// between the `start_timestamp` and the current timestamp.
-/// - for the first call, the olhc_data vector is empty and will be populated
-///   by multiple OHLC entries - depending on start_timestamp.
-/// - for the next calls, the function will update the last OHLC entry in the vector
-///   until it closes the current interval. (for example, current timetamp is
-///   23h17 and interval is 15mn: we will update this last non finished interval
-///   between 23h15 & 23h17).
-/// - at some point, current timestamp will close the current interval and
-///   we will lock this last interval, for example in our last example 23h15
-///   to 23h30, if it's 23h30m03s now, we close the 23h15->23h30 interval
-///   and start a new one from 23h30 to 23h30m03s (current time).
-fn update_ohlc_data(
-    ohlc_data: &mut Vec<OHLCEntry>,
-    entries: Vec<SpotEntry>,
-    interval: Interval,
-    now: NaiveDateTime,
-    mut start_timestamp: NaiveDateTime,
-    only_update_last: bool,
-) {
-    let interval_duration = Duration::minutes(interval.to_minutes());
-
-    // Remove the last not complete interval to update it.
-    // This is because the last entry correspond to the interval
-    // closing with current timestamp (so not complete yet).
-    if only_update_last {
-        ohlc_data.pop();
-    }
-
-    while start_timestamp < now {
-        let mut end_current_interval = start_timestamp + interval_duration;
-        let mut ohlc_end_interval = std::cmp::min(end_current_interval, now);
-
-        let last_ohlc_entry: Option<&OHLCEntry> = ohlc_data.last();
-
-        // If the current time slipped into a new interval, we move
-        // start_timestamp to the previous interval - so that we
-        // don't miss the last complete interval
-        if let Some(last_ohlc_entry) = last_ohlc_entry {
-            if only_update_last && (ohlc_end_interval - last_ohlc_entry.time) > interval_duration {
-                start_timestamp = last_ohlc_entry.time;
-                ohlc_end_interval = interval.align_timestamp(ohlc_end_interval);
-                end_current_interval = start_timestamp + interval_duration;
-            }
-        }
-
-        // get all price entries for the delimited interval
-        let entries_for_interval =
-            get_entries_for_interval(&entries, start_timestamp, ohlc_end_interval);
-
-        // & compute ohlc from either price entries / last OHLC computed if no entries
-        // are available for the current interval
-        let maybe_ohlc =
-            compute_ohlc_from_entries(&entries_for_interval, ohlc_end_interval, last_ohlc_entry);
-        if let Some(ohlc) = maybe_ohlc {
-            ohlc_data.push(ohlc);
-        }
-
-        // & increase the timestamp for the next interval
-        start_timestamp = end_current_interval;
-    }
-}
-
-fn compute_ohlc_from_entries(
-    entries: &[&SpotEntry],
-    end_interval: NaiveDateTime,
-    last_ohlc_computed: Option<&OHLCEntry>,
-) -> Option<OHLCEntry> {
-    if entries.is_empty() && last_ohlc_computed.is_none() {
-        return None;
-    }
-
-    if !entries.is_empty() {
-        // Safe to unwrap since we checked that entries is not empty
-        Some(OHLCEntry {
-            open: entries.first().unwrap().price.clone(),
-            high: entries
-                .iter()
-                .map(|entry| entry.price.clone())
-                .max()
-                .unwrap(),
-            low: entries
-                .iter()
-                .map(|entry| entry.price.clone())
-                .min()
-                .unwrap(),
-            close: entries.last().unwrap().price.clone(),
-            time: end_interval,
-        })
-    } else if last_ohlc_computed.is_some() {
-        // If no data is available for the current interval and we have
-        // a last OHLC computed, we use the last close price as the
-        // OHLC values for the current interval.
-        let last_ohlc_computed = last_ohlc_computed.unwrap();
-        Some(OHLCEntry {
-            open: last_ohlc_computed.close.clone(),
-            high: last_ohlc_computed.close.clone(),
-            low: last_ohlc_computed.close.clone(),
-            close: last_ohlc_computed.close.clone(),
-            time: end_interval,
-        })
-    } else {
-        None
-    }
-}
-
-/// Get all entries for a given interval.
-/// The interval is defined by the start_timestamp and the end_current_interval.
-fn get_entries_for_interval(
-    entries: &[SpotEntry],
-    start_timestamp: NaiveDateTime,
-    end_current_interval: NaiveDateTime,
-) -> Vec<&SpotEntry> {
-    entries
-        .iter()
-        .filter(|entry| {
-            (entry.timestamp >= start_timestamp) && (entry.timestamp <= end_current_interval)
-        })
-        .collect::<Vec<&SpotEntry>>()
 }
