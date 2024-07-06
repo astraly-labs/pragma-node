@@ -119,7 +119,7 @@ impl ChannelHandler<SubscriptionState, SubscriptionRequest, InfraError> for WsOH
             return Ok(());
         }
 
-        let ohlc_to_compute = if state.is_first_update {
+        let ohlc_to_retrieve = if state.is_first_update {
             state.is_first_update = false;
             state.candles_to_get
         } else {
@@ -132,7 +132,7 @@ impl ChannelHandler<SubscriptionState, SubscriptionRequest, InfraError> for WsOH
             state.network,
             pair_id.clone(),
             state.interval,
-            ohlc_to_compute,
+            ohlc_to_retrieve,
         )
         .await;
         drop(state);
