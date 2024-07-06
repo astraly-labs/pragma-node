@@ -96,6 +96,7 @@ impl ChannelHandler<SubscriptionState, SubscriptionRequest, InfraError> for WsOH
                     network: subscription.network,
                     interval: subscription.interval,
                     is_first_update: true,
+                    candles_to_get: subscription.candles_to_get.unwrap_or(10),
                 };
             }
             SubscriptionType::Unsubscribe => {
@@ -120,7 +121,7 @@ impl ChannelHandler<SubscriptionState, SubscriptionRequest, InfraError> for WsOH
 
         let ohlc_to_compute = if state.is_first_update {
             state.is_first_update = false;
-            10
+            state.candles_to_get
         } else {
             1
         };
@@ -216,6 +217,7 @@ struct SubscriptionState {
     network: Network,
     interval: Interval,
     is_first_update: bool,
+    candles_to_get: u64,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -224,6 +226,7 @@ struct SubscriptionRequest {
     pair: String,
     network: Network,
     interval: Interval,
+    candles_to_get: Option<u64>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
