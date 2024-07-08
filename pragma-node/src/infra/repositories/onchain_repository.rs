@@ -570,7 +570,7 @@ pub async fn get_ohlc(
     network: Network,
     pair_id: String,
     interval: Interval,
-    data_to_retrieve: i64,
+    data_to_retrieve: u64,
 ) -> Result<Vec<OHLCEntry>, InfraError> {
     let raw_sql = format!(
         r#"
