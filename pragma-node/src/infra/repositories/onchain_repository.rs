@@ -399,8 +399,10 @@ async fn get_all_publishers_updates(
     // Try to retrieve the latest available cached value, and return it if it exists
     let maybe_cached_value = publishers_updates_cache.get(&publishers_list).await;
     if let Some(cached_value) = maybe_cached_value {
+        tracing::debug!("Found a cached value for publishers: {publishers_list} - using it.");
         return Ok(cached_value);
     }
+    tracing::debug!("No cache found for publishers: {publishers_list}, fetching the database.");
 
     // ... else, fetch the value from the database
     let raw_sql = format!(
