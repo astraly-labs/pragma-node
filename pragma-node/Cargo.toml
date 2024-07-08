@@ -24,6 +24,7 @@ envy = "0.4.2"
 futures-util = "0.3.30"
 governor = { version = "0.6.0" }
 lazy_static = "1.4.0"
+moka = { version = "0.12", features = ["future"] }
 nonzero_ext = { version = "0.3.0" }
 pragma-common = { path = "../pragma-common", version = "1.0.0" }
 pragma-entities = { path = "../pragma-entities", version = "1.0.0" }
@@ -44,7 +45,6 @@ url = "2.5.0"
 utoipa = "4"
 utoipa-swagger-ui = { version = "4", features = ["axum"] }
 uuid = { version = "1.4", features = ["fast-rng", "v4", "serde"] }
-moka = { version = "0.12", features = ["future"] }
 
 [dev-dependencies]
 rstest = "0.18.2"
