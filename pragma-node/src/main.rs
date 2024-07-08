@@ -1,9 +1,20 @@
 use deadpool_diesel::postgres::Pool;
-use pragma_entities::connection::{ENV_OFFCHAIN_DATABASE_URL, ENV_ONCHAIN_DATABASE_URL};
+use moka::future::Cache;
 use starknet::signers::SigningKey;
+use std::collections::HashMap;
+use std::time::Duration;
+
+use pragma_entities::connection::{ENV_OFFCHAIN_DATABASE_URL, ENV_ONCHAIN_DATABASE_URL};
+
 use utils::PragmaSignerBuilder;
 
 use crate::config::config;
+use crate::handlers::entries::constants::{
+    PUBLISHERS_UDPATES_CACHE_TIME_TO_IDLE_IN_SECONDS,
+    PUBLISHERS_UDPATES_CACHE_TIME_TO_LIVE_IN_SECONDS,
+};
+
+use crate::infra::repositories::onchain_repository::RawPublisherUpdates;
 
 mod config;
 mod errors;
@@ -19,6 +30,7 @@ pub struct AppState {
     offchain_pool: Pool,
     onchain_pool: Pool,
     pragma_signer: Option<SigningKey>,
+    publishers_updates_cache: Cache<String, HashMap<String, RawPublisherUpdates>>,
 }
 
 #[tokio::main]
@@ -43,10 +55,20 @@ async fn main() {
     };
     let pragma_signer = signer_builder.build().await;
 
+    let publishers_updates_cache = Cache::builder()
+        .time_to_live(Duration::from_secs(
+            PUBLISHERS_UDPATES_CACHE_TIME_TO_LIVE_IN_SECONDS,
+        )) // 30 minutes
+        .time_to_idle(Duration::from_secs(
+            PUBLISHERS_UDPATES_CACHE_TIME_TO_IDLE_IN_SECONDS,
+        )) // 5 minutes
+        .build();
+
     let state = AppState {
         offchain_pool,
         onchain_pool,
         pragma_signer,
+        publishers_updates_cache,
     };
 
     tokio::join!(

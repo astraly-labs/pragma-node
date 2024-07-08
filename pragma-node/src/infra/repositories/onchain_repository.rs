@@ -5,6 +5,7 @@ use deadpool_diesel::postgres::Pool;
 use diesel::sql_types::{BigInt, Integer, Numeric, Text, Timestamp, VarChar};
 use diesel::{Queryable, QueryableByName, RunQueryDsl};
 
+use moka::future::Cache;
 use pragma_common::types::{AggregationMode, DataType, Interval, Network};
 use pragma_entities::error::{adapt_infra_error, InfraError};
 use pragma_monitoring::models::SpotEntry;
@@ -375,7 +376,7 @@ impl RawLastPublisherEntryForPair {
     }
 }
 
-#[derive(Debug, Queryable, QueryableByName)]
+#[derive(Debug, Clone, Queryable, QueryableByName)]
 pub struct RawPublisherUpdates {
     #[diesel(sql_type = VarChar)]
     pub publisher: String,
@@ -391,8 +392,17 @@ async fn get_all_publishers_updates(
     pool: &Pool,
     table_name: &str,
     publishers_names: Vec<String>,
+    publishers_updates_cache: Cache<String, HashMap<String, RawPublisherUpdates>>,
 ) -> Result<HashMap<String, RawPublisherUpdates>, InfraError> {
     let publishers_list = publishers_names.join("','");
+
+    // Try to retrieve the latest available cached value, and return it if it exists
+    let maybe_cached_value = publishers_updates_cache.get(&publishers_list).await;
+    if let Some(cached_value) = maybe_cached_value {
+        return Ok(cached_value);
+    }
+
+    // ... else, fetch the value from the database
     let raw_sql = format!(
         r#"
         SELECT 
@@ -418,10 +428,15 @@ async fn get_all_publishers_updates(
         .map_err(adapt_infra_error)?
         .map_err(adapt_infra_error)?;
 
-    let updates = updates
+    let updates: HashMap<String, RawPublisherUpdates> = updates
         .into_iter()
         .map(|update| (update.publisher.clone(), update))
         .collect();
+
+    // Update the cache with the latest value for the publishers
+    publishers_updates_cache
+        .insert(publishers_list.clone(), updates.clone())
+        .await;
 
     Ok(updates)
 }
@@ -515,11 +530,14 @@ pub async fn get_publishers_with_components(
     data_type: DataType,
     currencies: HashMap<String, BigDecimal>,
     publishers: Vec<RawPublisher>,
+    publishers_updates_cache: Cache<String, HashMap<String, RawPublisherUpdates>>,
 ) -> Result<Vec<Publisher>, InfraError> {
     let table_name = get_table_name(network, data_type)?;
     let publisher_names = publishers.iter().map(|p| p.name.clone()).collect();
 
-    let updates = get_all_publishers_updates(pool, table_name, publisher_names).await?;
+    let updates =
+        get_all_publishers_updates(pool, table_name, publisher_names, publishers_updates_cache)
+            .await?;
     let mut publishers_response = Vec::with_capacity(publishers.len());
 
     for publisher in publishers.iter() {

@@ -44,6 +44,7 @@ url = "2.5.0"
 utoipa = "4"
 utoipa-swagger-ui = { version = "4", features = ["axum"] }
 uuid = { version = "1.4", features = ["fast-rng", "v4", "serde"] }
+moka = { version = "0.12", features = ["future"] }
 
 [dev-dependencies]
 rstest = "0.18.2"
