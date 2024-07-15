@@ -33,6 +33,8 @@ SELECT add_continuous_aggregate_policy('price_1_week_agg',
   end_offset => INTERVAL '1 week',
   schedule_interval => INTERVAL '1 week');
 
+-- aggregate future
+
 CREATE MATERIALIZED VIEW price_1_day_agg_future
 WITH (timescaledb.continuous, timescaledb.materialized_only = false)
 AS SELECT 
@@ -67,6 +69,7 @@ SELECT add_continuous_aggregate_policy('price_1_week_agg_future',
   end_offset => INTERVAL '1 week',
   schedule_interval => INTERVAL '1 week');
 
+
 -- twap
 CREATE MATERIALIZED VIEW twap_1_day_agg
 WITH (timescaledb.continuous, timescaledb.materialized_only = false)
@@ -100,7 +103,8 @@ SELECT add_continuous_aggregate_policy('twap_1_week_agg',
   end_offset => INTERVAL '1 week',
   schedule_interval => INTERVAL '1 week');
 
--- 1min TWAP
+-- twap future
+
 CREATE MATERIALIZED VIEW twap_1_day_agg_future
 WITH (timescaledb.continuous, timescaledb.materialized_only = false)
 AS SELECT 
@@ -112,6 +116,7 @@ AS SELECT
 FROM future_entries
 GROUP BY bucket, pair_id, expiration_timestamp
 WITH NO DATA;
+
 
 SELECT add_continuous_aggregate_policy('twap_1_day_agg_future',
   start_offset => NULL,
