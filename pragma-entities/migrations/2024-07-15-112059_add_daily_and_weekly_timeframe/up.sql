@@ -1,7 +1,7 @@
 -- Your SQL goes here
 
 -- aggregate
-CREATE MATERIALIZED VIEW price_1_d_agg
+CREATE MATERIALIZED VIEW price_1_day_agg
 WITH (timescaledb.continuous, timescaledb.materialized_only = false)
 AS SELECT 
     pair_id,
@@ -12,12 +12,12 @@ FROM entries
 GROUP BY bucket, pair_id
 WITH NO DATA;
 
-SELECT add_continuous_aggregate_policy('price_1_d_agg',
+SELECT add_continuous_aggregate_policy('price_1_day_agg',
   start_offset => NULL,
   end_offset => INTERVAL '1 day',
   schedule_interval => INTERVAL '1 day');
 
-CREATE MATERIALIZED VIEW price_1_w_agg
+CREATE MATERIALIZED VIEW price_1_week_agg
 WITH (timescaledb.continuous, timescaledb.materialized_only = false)
 AS SELECT 
     pair_id,
@@ -28,12 +28,12 @@ FROM entries
 GROUP BY bucket, pair_id
 WITH NO DATA;
 
-SELECT add_continuous_aggregate_policy('price_1_w_agg',
+SELECT add_continuous_aggregate_policy('price_1_week_agg',
   start_offset => NULL,
   end_offset => INTERVAL '1 week',
   schedule_interval => INTERVAL '1 week');
 
-CREATE MATERIALIZED VIEW price_1_d_agg_future
+CREATE MATERIALIZED VIEW price_1_day_agg_future
 WITH (timescaledb.continuous, timescaledb.materialized_only = false)
 AS SELECT 
     pair_id,
@@ -45,12 +45,12 @@ FROM future_entries
 GROUP BY bucket, pair_id, expiration_timestamp
 WITH NO DATA;
 
-SELECT add_continuous_aggregate_policy('price_1_d_agg_future',
+SELECT add_continuous_aggregate_policy('price_1_day_agg_future',
   start_offset => NULL,
   end_offset => INTERVAL '1 day',
   schedule_interval => INTERVAL '1 day');
 
-CREATE MATERIALIZED VIEW price_1_w_agg_future
+CREATE MATERIALIZED VIEW price_1_week_agg_future
 WITH (timescaledb.continuous, timescaledb.materialized_only = false)
 AS SELECT 
     pair_id,
@@ -62,7 +62,7 @@ FROM future_entries
 GROUP BY bucket, pair_id, expiration_timestamp
 WITH NO DATA;
 
-SELECT add_continuous_aggregate_policy('price_1_w_agg_future',
+SELECT add_continuous_aggregate_policy('price_1_week_agg_future',
   start_offset => NULL,
   end_offset => INTERVAL '1 week',
   schedule_interval => INTERVAL '1 week');
