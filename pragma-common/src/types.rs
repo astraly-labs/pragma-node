@@ -53,6 +53,10 @@ pub enum Interval {
     OneHour,
     #[serde(rename = "2h")]
     TwoHours,
+    #[serde(rename = "1d")]
+    OneDay,
+    #[serde(rename = "1w")]
+    OneWeek,
 }
 
 impl Interval {
@@ -62,6 +66,8 @@ impl Interval {
             Interval::FifteenMinutes => 15,
             Interval::OneHour => 60,
             Interval::TwoHours => 120,
+            Interval::OneDay => 1400,
+            Interval::OneWeek => 10080,
         }
     }
 
