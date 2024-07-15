@@ -148,6 +148,7 @@ impl ChannelHandler<SubscriptionState, SubscriptionRequest, InfraError> for WsOH
 
                 if subscriber.send_msg(json_response).await.is_err() {
                     subscriber.send_err("Could not send prices.").await;
+                    return Err(InfraError::InternalServerError);
                 }
             }
             Err(_) => {

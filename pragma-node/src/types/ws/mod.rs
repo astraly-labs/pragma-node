@@ -35,6 +35,8 @@ pub enum WebSocketError {
     ChannelInitError,
     #[error("could not decode client message: {0}")]
     MessageDecodeError(String),
+    #[error("could not close the channel")]
+    ChannelCloseError,
 }
 
 /// Subscriber is an actor that handles a single websocket connection.
@@ -174,9 +176,10 @@ where
                 // Exit signal
                 _ = self.exit.1.changed() => {
                     if *self.exit.1.borrow() {
+                        self.sender.close().await.ok();
+                        self.closed = true;
                         metrics::record_ws_interaction(Interaction::CloseConnection, Status::Success);
                         tracing::info!("⛔ [CLOSING SIGNAL]");
-                        self.closed = true;
                         return Ok(());
                     }
                 },
@@ -239,6 +242,10 @@ where
             Message::Close(_) => {
                 tracing::info!("📨 [CLOSE]");
                 if self.exit.0.send(true).is_ok() {
+                    self.sender
+                        .close()
+                        .await
+                        .map_err(|_| WebSocketError::ChannelCloseError)?;
                     self.closed = true;
                 } else {
                     metrics::record_ws_interaction(Interaction::CloseConnection, Status::Error);
