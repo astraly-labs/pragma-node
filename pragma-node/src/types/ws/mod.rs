@@ -32,11 +32,11 @@ pub enum SubscriptionType {
 #[derive(Debug, Error)]
 pub enum WebSocketError {
     #[error("could not create a channel with the client")]
-    ChannelInitError,
+    ChannelInit,
     #[error("could not decode client message: {0}")]
-    MessageDecodeError(String),
+    MessageDecode(String),
     #[error("could not close the channel")]
-    ChannelCloseError,
+    ChannelClose,
 }
 
 /// Subscriber is an actor that handles a single websocket connection.
@@ -120,7 +120,7 @@ where
         let ping_status = self.sender.send(Message::Ping(vec![1, 2, 3])).await;
         if ping_status.is_err() {
             metrics::record_ws_interaction(Interaction::NewConnection, Status::Error);
-            return Err(WebSocketError::ChannelInitError);
+            return Err(WebSocketError::ChannelInit);
         }
         Ok(())
     }
@@ -245,7 +245,7 @@ where
                     self.sender
                         .close()
                         .await
-                        .map_err(|_| WebSocketError::ChannelCloseError)?;
+                        .map_err(|_| WebSocketError::ChannelClose)?;
                     self.closed = true;
                 } else {
                     metrics::record_ws_interaction(Interaction::CloseConnection, Status::Error);
@@ -258,7 +258,7 @@ where
                     return Ok(Some(msg));
                 } else {
                     self.send_err("⛔ Incorrect message. Please check the documentation for more information.").await;
-                    return Err(WebSocketError::MessageDecodeError(text));
+                    return Err(WebSocketError::MessageDecode(text));
                 }
             }
             Message::Binary(payload) => {
@@ -268,7 +268,7 @@ where
                     return Ok(Some(msg));
                 } else {
                     self.send_err("⛔ Incorrect message. Please check the documentation for more information.").await;
-                    return Err(WebSocketError::MessageDecodeError(format!("{:?}", payload)));
+                    return Err(WebSocketError::MessageDecode(format!("{:?}", payload)));
                 }
             }
             // Ignore pings and pongs messages
