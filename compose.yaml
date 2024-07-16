@@ -72,6 +72,8 @@ services:
       - ./infra/pragma-node/postgres_migrations/10-create-timescale-ohlc-aggregates-future.sql:/docker-entrypoint-initdb.d/10-create-timescale-ohlc-aggregates-future.sql
       - ./infra/pragma-node/postgres_migrations/11-create-timescale-ohlc-aggregates-mainnet-spot.sql:/docker-entrypoint-initdb.d/11-create-timescale-ohlc-aggregates-mainnet-spot.sql
       - ./infra/pragma-node/postgres_migrations/12-create-timescale-ohlc-aggregates-mainnet-future.sql:/docker-entrypoint-initdb.d/12-create-timescale-ohlc-aggregates-mainnet-future.sql
+      - ./infra/pragma-node/postgres_migrations/13-add-weekly-and-daily-median-aggregates.sql:/docker-entrypoint-initdb.d/13-add-weekly-and-daily-median-aggregates.sql
+      - ./infra/pragma-node/postgres_migrations/14-add-weekly-and-daily-ohlc-aggregates.sql:/docker-entrypoint-initdb.d/14-add-weekly-and-daily-ohlc-aggregates.sql
       - onchain-db-data:/var/lib/postgresql/data
     environment:
       - POSTGRES_DB=pragma

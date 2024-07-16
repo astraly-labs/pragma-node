@@ -60,6 +60,8 @@ pub fn get_interval_specifier(
         Interval::OneHour if !is_twap => Ok("1_h"),
         Interval::TwoHours if is_twap => Ok("2_hours"),
         Interval::TwoHours if !is_twap => Ok("2_h"),
+        Interval::OneDay => Ok("1_day"),
+        Interval::OneWeek => Ok("1_week"),
         _ => Err(InfraError::InternalServerError),
     }
 }

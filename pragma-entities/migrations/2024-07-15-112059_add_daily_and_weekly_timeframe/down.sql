@@ -1,0 +1,11 @@
+-- This file should undo anything in `up.sql`
+DROP MATERIALIZED VIEW IF EXISTS twap_1_day_agg;
+DROP MATERIALIZED VIEW IF EXISTS twap_1_day_agg_future;
+DROP MATERIALIZED VIEW IF EXISTS price_1_day_agg;
+DROP MATERIALIZED VIEW IF EXISTS price_1_day_agg_future;
+
+DROP MATERIALIZED VIEW IF EXISTS twap_1_week_agg;
+DROP MATERIALIZED VIEW IF EXISTS twap_1_week_agg_future;
+DROP MATERIALIZED VIEW IF EXISTS price_1_week_agg;
+DROP MATERIALIZED VIEW IF EXISTS price_1_week_agg_future;
+DROP MATERIALIZED VIEW IF EXISTS 1_week_candle;
