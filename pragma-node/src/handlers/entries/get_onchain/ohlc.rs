@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use pragma_common::types::{Interval, Network};
 
 use crate::infra::repositories::onchain_repository;
-use crate::types::ws::metrics::{self, Interaction, Status};
+use crate::types::ws::metrics::{Interaction, Status};
 use crate::types::ws::{ChannelHandler, Subscriber, SubscriptionType};
 use crate::utils::is_onchain_existing_pair;
 use crate::AppState;
@@ -201,7 +201,9 @@ impl WsOHLCHandler {
                 "Rate limit exceeded. Closing connection.",
             );
 
-            metrics::record_ws_interaction(Interaction::RateLimit, Status::Error);
+            subscriber
+                .metrics
+                .record_interaction(Interaction::RateLimit, Status::Error);
 
             subscriber.send_err("Rate limit exceeded.").await;
             subscriber.sender.close().await?;
