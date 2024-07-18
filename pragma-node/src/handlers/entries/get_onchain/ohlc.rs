@@ -201,10 +201,7 @@ impl WsOHLCHandler {
                 "Rate limit exceeded. Closing connection.",
             );
 
-            subscriber
-                .app_state
-                .ws_metrics
-                .record_interaction(Interaction::RateLimit, Status::Error);
+            subscriber.record_metric(Interaction::RateLimit, Status::Error);
 
             subscriber.send_err("Rate limit exceeded.").await;
             subscriber.sender.close().await?;
