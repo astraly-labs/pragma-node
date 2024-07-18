@@ -8,14 +8,17 @@ use diesel::{Queryable, QueryableByName, RunQueryDsl};
 use moka::future::Cache;
 use pragma_common::types::{AggregationMode, DataType, Interval, Network};
 use pragma_entities::error::{adapt_infra_error, InfraError};
+use pragma_entities::Currency;
 use pragma_monitoring::models::SpotEntry;
 
 use crate::handlers::entries::{Checkpoint, OnchainEntry, Publisher, PublisherEntry};
 use crate::infra::repositories::entry_repository::{
     get_interval_specifier, OHLCEntry, OHLCEntryRaw,
 };
-use crate::utils::format_bigdecimal_price;
 use crate::utils::get_decimals_for_pair;
+use crate::utils::{convert_via_quote, format_bigdecimal_price, normalize_to_decimals};
+
+use super::entry_repository::get_decimals;
 
 const BACKWARD_TIMESTAMP_INTERVAL: &str = "1 hour";
 
@@ -131,6 +134,117 @@ fn build_sql_query(
     Ok(complete_sql_query)
 }
 
+pub fn onchain_pair_exist(existing_pair_list: &Vec<EntryPairId>, pair_id: &String) -> bool {
+    existing_pair_list
+        .iter()
+        .any(|entry| entry == pair_id.as_str())
+}
+
+fn calculate_rebased_price(
+    base_result: (BigDecimal, u32),
+    quote_result: (BigDecimal, u32),
+) -> Result<(BigDecimal, u32), InfraError> {
+    let (base_price, base_decimals) = base_result;
+    let (quote_price, quote_decimals) = quote_result;
+
+    if quote_price == BigDecimal::from(0) {
+        return Err(InfraError::InternalServerError);
+    }
+
+    let (rebase_price, decimals) = if base_decimals < quote_decimals {
+        let normalized_base_price =
+            normalize_to_decimals(base_price, base_decimals, quote_decimals);
+        (
+            convert_via_quote(normalized_base_price, quote_price, quote_decimals)?,
+            quote_decimals,
+        )
+    } else {
+        let normalized_quote_price =
+            normalize_to_decimals(quote_price, quote_decimals, base_decimals);
+        (
+            convert_via_quote(base_price, normalized_quote_price, base_decimals)?,
+            base_decimals,
+        )
+    };
+
+    Ok((rebase_price, decimals))
+}
+
+pub async fn routing(
+    onchain_pool: &Pool,
+    offchain_pool: &Pool,
+    network: Network,
+    pair_id: String,
+    timestamp: u64,
+    aggregation_mode: AggregationMode,
+    is_routing: bool,
+) -> Result<(BigDecimal, Vec<OnchainEntry>, Vec<String>, Option<u32>), InfraError> {
+    // retrieve pair list
+    let existing_pair_list = get_existing_pairs(onchain_pool, network).await?;
+    //check if pair exist
+    if onchain_pair_exist(&existing_pair_list, &pair_id) || is_routing == false {
+        let (price, sources) = get_sources_and_aggregate(
+            onchain_pool,
+            network,
+            pair_id.clone(),
+            timestamp,
+            aggregation_mode,
+        )
+        .await?;
+        return Ok((price, sources, vec![pair_id], None));
+    }
+    //else
+    let offchain_conn = offchain_pool.get().await.map_err(adapt_infra_error)?;
+
+    let alternative_currencies = offchain_conn
+        .interact(Currency::get_abstract_all)
+        .await
+        .map_err(adapt_infra_error)?
+        .map_err(adapt_infra_error)?;
+    //check if a common asset exist
+    let (base, quote) = pair_id.split_once('/').unwrap_or(("", ""));
+    for alt_currency in alternative_currencies {
+        let base_alt_pair = format!("{}/{}", base, alt_currency);
+        let alt_quote_pair = format!("{}/{}", quote, alt_currency);
+
+        if onchain_pair_exist(&existing_pair_list, &base_alt_pair)
+            && onchain_pair_exist(&existing_pair_list, &alt_quote_pair)
+        {
+            let mut base_alt_result = get_sources_and_aggregate(
+                onchain_pool,
+                network,
+                base_alt_pair.clone(),
+                timestamp,
+                aggregation_mode,
+            )
+            .await?;
+            let base_alt_decimal = get_decimals(offchain_pool, &base_alt_pair).await?;
+            let alt_quote_result = get_sources_and_aggregate(
+                onchain_pool,
+                network,
+                alt_quote_pair.clone(),
+                timestamp,
+                aggregation_mode,
+            )
+            .await?;
+            let alt_quote_decimal = get_decimals(offchain_pool, &alt_quote_pair).await?;
+
+            let rebased_price = calculate_rebased_price(
+                (base_alt_result.0, base_alt_decimal),
+                (alt_quote_result.0, alt_quote_decimal),
+            )?;
+            base_alt_result.1.extend(alt_quote_result.1);
+            return Ok((
+                rebased_price.0,
+                base_alt_result.1,
+                vec![base_alt_pair, alt_quote_pair],
+                Some(rebased_price.1),
+            ));
+        }
+    }
+    Ok((BigDecimal::from(0), vec![], vec![], None))
+}
+
 // TODO(akhercha): Only works for Spot entries
 pub async fn get_sources_and_aggregate(
     pool: &Pool,
@@ -203,10 +317,22 @@ pub async fn get_last_updated_timestamp(
     Ok(most_recent_entry.timestamp.and_utc().timestamp() as u64)
 }
 
-#[derive(Queryable, QueryableByName)]
+#[derive(Queryable, QueryableByName, PartialEq, Debug)]
 pub struct EntryPairId {
     #[diesel(sql_type = VarChar)]
     pub pair_id: String,
+}
+
+impl PartialEq<str> for EntryPairId {
+    fn eq(&self, other: &str) -> bool {
+        self.pair_id == other
+    }
+}
+
+impl PartialEq<String> for EntryPairId {
+    fn eq(&self, other: &String) -> bool {
+        self.pair_id == other.as_str()
+    }
 }
 
 // TODO(0xevolve): Only works for Spot entries

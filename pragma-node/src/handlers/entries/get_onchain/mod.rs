@@ -9,9 +9,7 @@ use pragma_entities::EntryError;
 
 use crate::handlers::entries::{GetOnchainParams, GetOnchainResponse};
 use crate::infra::repositories::entry_repository::get_decimals;
-use crate::infra::repositories::onchain_repository::{
-    get_last_updated_timestamp, get_sources_and_aggregate,
-};
+use crate::infra::repositories::onchain_repository::{get_last_updated_timestamp, routing};
 use crate::utils::{format_bigdecimal_price, PathExtractor};
 use crate::AppState;
 
@@ -38,6 +36,7 @@ pub async fn get_onchain(
     Query(params): Query<GetOnchainParams>,
 ) -> Result<Json<GetOnchainResponse>, EntryError> {
     tracing::info!("Received get onchain entry request for pair {:?}", pair);
+    let is_routing = params.routing.unwrap_or(false);
 
     let pair_id: String = currency_pair_to_pair_id(&pair.0, &pair.1);
     let now = chrono::Utc::now().timestamp() as u64;
@@ -51,25 +50,36 @@ pub async fn get_onchain(
         now
     };
 
-    let (aggregated_price, sources) = get_sources_and_aggregate(
+    let (aggregated_price, sources, pair_used, price_decimals) = routing(
         &state.onchain_pool,
+        &state.offchain_pool,
         params.network,
         pair_id.clone(),
         timestamp,
         aggregation_mode,
+        is_routing,
     )
     .await
     .map_err(|db_error| db_error.to_entry_error(&pair_id))?;
 
-    // TODO(akhercha): ⚠ gives different result than onchain oracle sometime
-    let last_updated_timestamp =
-        get_last_updated_timestamp(&state.onchain_pool, params.network, pair_id.clone())
+    let mut last_updated_timestamp = 0;
+    for pair in pair_used {
+        let last_timestamp = get_last_updated_timestamp(&state.onchain_pool, params.network, pair)
             .await
             .map_err(|db_error| db_error.to_entry_error(&pair_id))?;
+        last_updated_timestamp = if last_timestamp > last_updated_timestamp {
+            last_timestamp
+        } else {
+            last_updated_timestamp
+        };
+    }
 
-    let decimals = get_decimals(&state.offchain_pool, &pair_id)
-        .await
-        .map_err(|db_error| db_error.to_entry_error(&pair_id))?;
+    let decimals = match price_decimals {
+        Some(dec) => dec,
+        None => get_decimals(&state.offchain_pool, &pair_id)
+            .await
+            .map_err(|db_error| db_error.to_entry_error(&pair_id))?,
+    };
 
     Ok(Json(adapt_entries_to_onchain_response(
         pair_id,

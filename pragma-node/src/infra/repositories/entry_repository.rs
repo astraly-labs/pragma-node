@@ -155,7 +155,7 @@ pub async fn routing(
     }
 }
 
-fn calculate_rebased_price(
+pub fn calculate_rebased_price(
     base_result: (MedianEntry, u32),
     quote_result: (MedianEntry, u32),
 ) -> Result<(MedianEntry, u32), InfraError> {
