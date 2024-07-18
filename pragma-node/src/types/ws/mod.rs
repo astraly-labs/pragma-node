@@ -111,7 +111,7 @@ where
         // Retain the recent rate limit data for the IP addresses to
         // prevent the rate limiter size from growing indefinitely.
         subscriber.rate_limiter.retain_recent();
-        metrics::record_ws_interaction(Interaction::NewConnection, Status::Success);
+        subscriber.record_metric(Interaction::NewConnection, Status::Success);
         Ok((subscriber, notify_sender))
     }
 
@@ -119,7 +119,7 @@ where
     async fn assert_is_healthy(&mut self) -> Result<(), WebSocketError> {
         let ping_status = self.sender.send(Message::Ping(vec![1, 2, 3])).await;
         if ping_status.is_err() {
-            metrics::record_ws_interaction(Interaction::NewConnection, Status::Error);
+            self.record_metric(Interaction::NewConnection, Status::Error);
             return Err(WebSocketError::ChannelInit);
         }
         Ok(())
@@ -156,11 +156,11 @@ where
                     let status = handler.periodic_interval(self).await;
                     match status {
                         Ok(_) => {
-                            metrics::record_ws_interaction(Interaction::ChannelUpdate, Status::Success);
+                            self.record_metric(Interaction::ChannelUpdate, Status::Success);
                         },
                         Err(e) => {
-                            metrics::record_ws_interaction(Interaction::ChannelUpdate, Status::Error);
-                            metrics::record_ws_interaction(Interaction::CloseConnection, Status::Success);
+                            self.record_metric(Interaction::ChannelUpdate, Status::Error);
+                            self.record_metric(Interaction::CloseConnection, Status::Success);
                             return Err(e);
                         }
                     }
@@ -178,7 +178,7 @@ where
                     if *self.exit.1.borrow() {
                         self.sender.close().await.ok();
                         self.closed = true;
-                        metrics::record_ws_interaction(Interaction::CloseConnection, Status::Success);
+                        self.record_metric(Interaction::CloseConnection, Status::Success);
                         tracing::info!("⛔ [CLOSING SIGNAL]");
                         return Ok(());
                     }
@@ -202,30 +202,21 @@ where
         let status_decoded_msg = self.decode_msg::<CM>(client_msg).await;
         if let Ok(maybe_client_msg) = status_decoded_msg {
             if let Some(client_msg) = maybe_client_msg {
-                metrics::record_ws_interaction(Interaction::ClientMessageDecode, Status::Success);
+                self.record_metric(Interaction::ClientMessageDecode, Status::Success);
                 let status = handler.handle_client_msg(self, client_msg).await;
                 match status {
                     Ok(_) => {
-                        metrics::record_ws_interaction(
-                            Interaction::ClientMessageProcess,
-                            Status::Success,
-                        );
+                        self.record_metric(Interaction::ClientMessageProcess, Status::Success);
                     }
                     Err(e) => {
-                        metrics::record_ws_interaction(
-                            Interaction::ClientMessageProcess,
-                            Status::Error,
-                        );
-                        metrics::record_ws_interaction(
-                            Interaction::CloseConnection,
-                            Status::Success,
-                        );
+                        self.record_metric(Interaction::ClientMessageProcess, Status::Error);
+                        self.record_metric(Interaction::CloseConnection, Status::Success);
                         return Err(e);
                     }
                 }
             }
         } else {
-            metrics::record_ws_interaction(Interaction::ClientMessageDecode, Status::Error);
+            self.record_metric(Interaction::ClientMessageDecode, Status::Error);
         }
         Ok(handler)
     }
@@ -248,7 +239,7 @@ where
                         .map_err(|_| WebSocketError::ChannelClose)?;
                     self.closed = true;
                 } else {
-                    metrics::record_ws_interaction(Interaction::CloseConnection, Status::Error);
+                    self.record_metric(Interaction::CloseConnection, Status::Error);
                 }
             }
             Message::Text(text) => {
@@ -286,5 +277,12 @@ where
     pub async fn send_err(&mut self, err: &str) {
         let err = json!({"error": err});
         let _ = self.sender.send(Message::Text(err.to_string())).await;
+    }
+
+    /// Records a web socket metric.
+    pub fn record_metric(&self, interaction: Interaction, status: Status) {
+        self.app_state
+            .ws_metrics
+            .record_interaction(interaction, status);
     }
 }
