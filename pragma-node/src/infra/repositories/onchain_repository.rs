@@ -134,10 +134,8 @@ fn build_sql_query(
     Ok(complete_sql_query)
 }
 
-pub fn onchain_pair_exist(existing_pair_list: &Vec<EntryPairId>, pair_id: &String) -> bool {
-    existing_pair_list
-        .iter()
-        .any(|entry| entry == pair_id.as_str())
+pub fn onchain_pair_exist(existing_pair_list: &Vec<EntryPairId>, pair_id: &str) -> bool {
+    existing_pair_list.iter().any(|entry| entry == pair_id)
 }
 
 fn calculate_rebased_price(
@@ -179,10 +177,9 @@ pub async fn routing(
     aggregation_mode: AggregationMode,
     is_routing: bool,
 ) -> Result<(BigDecimal, Vec<OnchainEntry>, Vec<String>, Option<u32>), InfraError> {
-    // retrieve pair list
     let existing_pair_list = get_existing_pairs(onchain_pool, network).await?;
-    //check if pair exist
-    if onchain_pair_exist(&existing_pair_list, &pair_id) || is_routing == false {
+
+    if onchain_pair_exist(&existing_pair_list, &pair_id) || !is_routing {
         let (price, sources) = get_sources_and_aggregate(
             onchain_pool,
             network,
@@ -193,7 +190,7 @@ pub async fn routing(
         .await?;
         return Ok((price, sources, vec![pair_id], None));
     }
-    //else
+
     let offchain_conn = offchain_pool.get().await.map_err(adapt_infra_error)?;
 
     let alternative_currencies = offchain_conn
@@ -201,8 +198,8 @@ pub async fn routing(
         .await
         .map_err(adapt_infra_error)?
         .map_err(adapt_infra_error)?;
-    //check if a common asset exist
     let (base, quote) = pair_id.split_once('/').unwrap_or(("", ""));
+
     for alt_currency in alternative_currencies {
         let base_alt_pair = format!("{}/{}", base, alt_currency);
         let alt_quote_pair = format!("{}/{}", quote, alt_currency);
