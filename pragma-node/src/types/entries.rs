@@ -156,7 +156,9 @@ where
     let mut raw_message_json = serde_json::json!({
         "domain": {
             "name": "Pragma",
-            "version": "1"
+            "version": "1",
+            "chainId": "1",
+            "revision": "0"
         },
         "primaryType": "Request",
         "message": {
@@ -166,7 +168,9 @@ where
         "types": {
             "StarkNetDomain": [
                 {"name": "name", "type": "felt"},
-                {"name": "version", "type": "felt"}
+                {"name": "version", "type": "felt"},
+                {"name": "chainId", "type": "felt"},
+                {"name": "revision", "type": "felt"}
             ],
             "Request": [
                 {"name": "action", "type": "felt"},

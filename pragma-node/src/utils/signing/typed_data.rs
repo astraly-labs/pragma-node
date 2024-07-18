@@ -14,7 +14,9 @@ use std::{
 pub struct StarkNetDomain {
     pub name: Option<String>,
     pub version: Option<String>,
-    pub chain_id: Option<Value>, // Using Value to represent either String or Number
+    #[serde(rename = "chainId")]
+    pub chain_id: Option<String>,
+    pub revision: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -30,7 +32,8 @@ pub struct DomainType {
     pub name: String,
     pub version: String,
     #[serde(rename = "chainId")]
-    pub chain_id: Option<u64>,
+    pub chain_id: String,
+    pub revision: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
