@@ -3,7 +3,8 @@
     "StarkNetDomain": [
       { "name": "name", "type": "felt" },
       { "name": "version", "type": "felt" },
-      { "name": "chainId", "type": "felt" }
+      { "name": "chainId", "type": "felt" },
+      { "name": "revision", "type": "felt" }
     ],
     "Person": [
       { "name": "name", "type": "felt" },
@@ -19,7 +20,8 @@
   "domain": {
     "name": "StarkNet Mail",
     "version": "1",
-    "chainId": 1
+    "chainId": "1",
+    "revision": "0"
   },
   "message": {
     "from": {

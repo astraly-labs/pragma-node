@@ -445,7 +445,7 @@ mod tests {
     #[case(
         TD,
         "StarkNetDomain",
-        "0x1bfc207425a47a5dfa1a50a4f5241203f50624ca5fdf5e18755765416b8e288"
+        "0x25b2a6be3b4f788a40d183c71287277bf6cc227fc52398ad813b8d79fb711af"
     )]
     #[case(
         TD,
@@ -520,7 +520,7 @@ mod tests {
         let result = typed_data.struct_hash("StarkNetDomain", &json_map);
         assert_eq!(
             format!("{:#x}", result),
-            "0x54833b121883a3e3aebff48ec08a962f5742e5f7b973469c1f8f4f55d470b07"
+            "0x791677d28015bfb506ef968e44b486659cdd6306095da0a259336151130a78c"
         );
     }
 
@@ -576,22 +576,22 @@ mod tests {
     #[case(
         TD,
         "0xcd2a3d9f938e13cd947ec05abc7fe734df8dd826",
-        "0x6fcff244f63e38b9d88b9e3378d44757710d1b244282b435cb472053c8d78d0"
+        "0x2c3252719b4b7fb49b96f68ea62d64f6be54562826e93a978250fd99155bccd"
     )]
     #[case(
         TD_STRING,
         "0xcd2a3d9f938e13cd947ec05abc7fe734df8dd826",
-        "0x691b977ee0ee645647336f01d724274731f544ad0d626b078033d2541ee641d"
+        "0x7b2cac6cf11869d9a72e2492f270be9d09d5b87c92a74162fa9ce3d74a4b78c"
     )]
     #[case(
         TD_FELT_ARR,
-        "0xcd2a3d9f938e13cd947ec05abc7fe734df8dd826",
-        "0x30ab43ef724b08c3b0a9bbe425e47c6173470be75d1d4c55fd5bf9309896bce"
+        "0x22d46b6e8e12c06cbce8828cec76e8f6416e54bda8bf77ac0bd64c242e423bb",
+        "0x89b087967a494d99895ca3800a580700d7f277f30ae8d26d671fa4864bf294"
     )]
     #[case(
         TD_STRUCT_ARR,
         "0xcd2a3d9f938e13cd947ec05abc7fe734df8dd826",
-        "0x5914ed2764eca2e6a41eb037feefd3d2e33d9af6225a9e7fe31ac943ff712c"
+        "0x243a96015b473247fd3fb82a30aee0a036edc95017ba85a17029e1afbf3c92d"
     )]
     fn test_message_hash(
         #[case] example: &str,
