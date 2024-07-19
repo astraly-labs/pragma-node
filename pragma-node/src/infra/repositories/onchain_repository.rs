@@ -18,9 +18,17 @@ use crate::infra::repositories::entry_repository::{
 use crate::utils::get_decimals_for_pair;
 use crate::utils::{convert_via_quote, format_bigdecimal_price, normalize_to_decimals};
 
+
 use super::entry_repository::get_decimals;
 
 const BACKWARD_TIMESTAMP_INTERVAL: &str = "1 hour";
+
+pub struct RawOnchainData{
+    pub price : BigDecimal,
+    pub decimal : u32,
+    pub sources : Vec<OnchainEntry>,
+    pub pair_used : Vec<String>,
+}
 
 // Retrieve the onchain table name based on the network and data type.
 fn get_table_name(network: Network, data_type: DataType) -> Result<&'static str, InfraError> {
@@ -134,7 +142,7 @@ fn build_sql_query(
     Ok(complete_sql_query)
 }
 
-pub fn onchain_pair_exist(existing_pair_list: &Vec<EntryPairId>, pair_id: &str) -> bool {
+pub fn onchain_pair_exist(existing_pair_list: &[EntryPairId], pair_id: &str) -> bool {
     existing_pair_list.iter().any(|entry| entry == pair_id)
 }
 
@@ -176,10 +184,10 @@ pub async fn routing(
     timestamp: u64,
     aggregation_mode: AggregationMode,
     is_routing: bool,
-) -> Result<(BigDecimal, Vec<OnchainEntry>, Vec<String>, Option<u32>), InfraError> {
+) -> Result<RawOnchainData, InfraError> {
     let existing_pair_list = get_existing_pairs(onchain_pool, network).await?;
 
-    if onchain_pair_exist(&existing_pair_list, &pair_id) || !is_routing {
+    if onchain_pair_exist(&existing_pair_list, &pair_id) {
         let (price, sources) = get_sources_and_aggregate(
             onchain_pool,
             network,
@@ -188,7 +196,11 @@ pub async fn routing(
             aggregation_mode,
         )
         .await?;
-        return Ok((price, sources, vec![pair_id], None));
+        let decimal = get_decimals(&offchain_pool, &pair_id).await?;
+        return Ok(RawOnchainData{price, decimal, sources, pair_used : vec![pair_id]});
+    }
+    if !is_routing {
+        return Err(InfraError::NotFound);
     }
 
     let offchain_conn = offchain_pool.get().await.map_err(adapt_infra_error)?;
@@ -198,7 +210,7 @@ pub async fn routing(
         .await
         .map_err(adapt_infra_error)?
         .map_err(adapt_infra_error)?;
-    let (base, quote) = pair_id.split_once('/').unwrap_or(("", ""));
+    let (base, quote) = pair_id.split_once('/').unwrap();
 
     for alt_currency in alternative_currencies {
         let base_alt_pair = format!("{}/{}", base, alt_currency);
@@ -231,15 +243,15 @@ pub async fn routing(
                 (alt_quote_result.0, alt_quote_decimal),
             )?;
             base_alt_result.1.extend(alt_quote_result.1);
-            return Ok((
-                rebased_price.0,
-                base_alt_result.1,
-                vec![base_alt_pair, alt_quote_pair],
-                Some(rebased_price.1),
-            ));
+            return Ok(RawOnchainData{
+                price : rebased_price.0,
+                decimal : rebased_price.1,
+                sources : base_alt_result.1,
+                pair_used : vec![base_alt_pair, alt_quote_pair],
+        });
         }
     }
-    Ok((BigDecimal::from(0), vec![], vec![], None))
+    Err(InfraError::NotFound)
 }
 
 // TODO(akhercha): Only works for Spot entries
@@ -265,7 +277,7 @@ pub async fn get_sources_and_aggregate(
         .map_err(adapt_infra_error)?;
 
     if raw_entries.is_empty() {
-        return Ok((BigDecimal::from(0), vec![]));
+        return Err(InfraError::NotFound);
     }
 
     let aggregated_price = raw_entries.first().unwrap().aggregated_price.clone();
