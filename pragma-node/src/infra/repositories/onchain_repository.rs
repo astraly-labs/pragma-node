@@ -214,6 +214,8 @@ pub async fn routing(
         .await
         .map_err(adapt_infra_error)?
         .map_err(adapt_infra_error)?;
+
+    // safe unwrap since we construct the pairs string in calling function 
     let (base, quote) = pair_id.split_once('/').unwrap();
 
     for alt_currency in alternative_currencies {
