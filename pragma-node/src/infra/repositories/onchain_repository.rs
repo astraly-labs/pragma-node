@@ -303,21 +303,21 @@ pub async fn get_last_updated_timestamp(
     network: Network,
     pairs: Vec<String>,
 ) -> Result<u64, InfraError> {
+    let pair_list = format!("('{}')", pairs.join("','"));
     let raw_sql = format!(
         r#"
         SELECT
             timestamp
         FROM
-            {table_name}
+            {}
         WHERE
-            pair_id IN {pair_list}
+            pair_id IN {}
         ORDER BY timestamp DESC
         LIMIT 1;
     "#,
-        table_name = get_table_name(network, DataType::SpotEntry)?,
-        pair_list = format!("('{}')", pairs.join("','")),
+        get_table_name(network, DataType::SpotEntry)?,
+        pair_list,
     );
-    println!("pairs {:#?}", pairs);
     let conn = pool.get().await.map_err(adapt_infra_error)?;
     let raw_entry = conn
         .interact(move |conn| diesel::sql_query(raw_sql).load::<EntryTimestamp>(conn))
