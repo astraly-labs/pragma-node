@@ -196,7 +196,7 @@ pub async fn routing(
             aggregation_mode,
         )
         .await?;
-        let decimal = get_decimals(&offchain_pool, &pair_id).await?;
+        let decimal = get_decimals(offchain_pool, &pair_id).await?;
         return Ok(RawOnchainData{price, decimal, sources, pair_used : vec![pair_id]});
     }
     if !is_routing {
