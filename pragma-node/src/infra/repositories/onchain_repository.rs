@@ -18,16 +18,15 @@ use crate::infra::repositories::entry_repository::{
 use crate::utils::get_decimals_for_pair;
 use crate::utils::{convert_via_quote, format_bigdecimal_price, normalize_to_decimals};
 
-
 use super::entry_repository::get_decimals;
 
 const BACKWARD_TIMESTAMP_INTERVAL: &str = "1 hour";
 
-pub struct RawOnchainData{
-    pub price : BigDecimal,
-    pub decimal : u32,
-    pub sources : Vec<OnchainEntry>,
-    pub pair_used : Vec<String>,
+pub struct RawOnchainData {
+    pub price: BigDecimal,
+    pub decimal: u32,
+    pub sources: Vec<OnchainEntry>,
+    pub pair_used: Vec<String>,
 }
 
 // Retrieve the onchain table name based on the network and data type.
@@ -197,7 +196,12 @@ pub async fn routing(
         )
         .await?;
         let decimal = get_decimals(offchain_pool, &pair_id).await?;
-        return Ok(RawOnchainData{price, decimal, sources, pair_used : vec![pair_id]});
+        return Ok(RawOnchainData {
+            price,
+            decimal,
+            sources,
+            pair_used: vec![pair_id],
+        });
     }
     if !is_routing {
         return Err(InfraError::NotFound);
@@ -243,12 +247,12 @@ pub async fn routing(
                 (alt_quote_result.0, alt_quote_decimal),
             )?;
             base_alt_result.1.extend(alt_quote_result.1);
-            return Ok(RawOnchainData{
-                price : rebased_price.0,
-                decimal : rebased_price.1,
-                sources : base_alt_result.1,
-                pair_used : vec![base_alt_pair, alt_quote_pair],
-        });
+            return Ok(RawOnchainData {
+                price: rebased_price.0,
+                decimal: rebased_price.1,
+                sources: base_alt_result.1,
+                pair_used: vec![base_alt_pair, alt_quote_pair],
+            });
         }
     }
     Err(InfraError::NotFound)
