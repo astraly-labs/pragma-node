@@ -215,7 +215,7 @@ pub async fn routing(
         .map_err(adapt_infra_error)?
         .map_err(adapt_infra_error)?;
 
-    // safe unwrap since we construct the pairs string in calling function 
+    // safe unwrap since we construct the pairs string in calling function
     let (base, quote) = pair_id.split_once('/').unwrap();
 
     for alt_currency in alternative_currencies {
@@ -301,7 +301,7 @@ struct EntryTimestamp {
 pub async fn get_last_updated_timestamp(
     pool: &Pool,
     network: Network,
-    pair_id: String,
+    pairs: Vec<String>,
 ) -> Result<u64, InfraError> {
     let raw_sql = format!(
         r#"
@@ -310,18 +310,18 @@ pub async fn get_last_updated_timestamp(
         FROM
             {table_name}
         WHERE
-            pair_id = $1
+            pair_id IN {pair_list}
         ORDER BY timestamp DESC
         LIMIT 1;
     "#,
-        table_name = get_table_name(network, DataType::SpotEntry)?
+        table_name = get_table_name(network, DataType::SpotEntry)?,
+        pair_list = format!("('{}')", pairs.join("','")),
     );
-
+    println!("pairs {:#?}", pairs);
     let conn = pool.get().await.map_err(adapt_infra_error)?;
     let raw_entry = conn
         .interact(move |conn| {
             diesel::sql_query(raw_sql)
-                .bind::<diesel::sql_types::Text, _>(pair_id)
                 .load::<EntryTimestamp>(conn)
         })
         .await
