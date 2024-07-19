@@ -320,10 +320,7 @@ pub async fn get_last_updated_timestamp(
     println!("pairs {:#?}", pairs);
     let conn = pool.get().await.map_err(adapt_infra_error)?;
     let raw_entry = conn
-        .interact(move |conn| {
-            diesel::sql_query(raw_sql)
-                .load::<EntryTimestamp>(conn)
-        })
+        .interact(move |conn| diesel::sql_query(raw_sql).load::<EntryTimestamp>(conn))
         .await
         .map_err(adapt_infra_error)?
         .map_err(adapt_infra_error)?;

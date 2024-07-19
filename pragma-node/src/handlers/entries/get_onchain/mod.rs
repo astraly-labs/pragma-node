@@ -62,9 +62,10 @@ pub async fn get_onchain(
     .map_err(|db_error| db_error.to_entry_error(&pair_id))?;
 
     // TODO(akhercha): ⚠ gives different result than onchain oracle sometime
-    let last_updated_timestamp = get_last_updated_timestamp(&state.onchain_pool, params.network, raw_data.pair_used)
-    .await
-    .map_err(|db_error| db_error.to_entry_error(&pair_id))?;
+    let last_updated_timestamp =
+        get_last_updated_timestamp(&state.onchain_pool, params.network, raw_data.pair_used)
+            .await
+            .map_err(|db_error| db_error.to_entry_error(&pair_id))?;
 
     Ok(Json(adapt_entries_to_onchain_response(
         pair_id,
