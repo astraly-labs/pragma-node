@@ -585,8 +585,8 @@ mod tests {
     )]
     #[case(
         TD_FELT_ARR,
-        "0x22d46b6e8e12c06cbce8828cec76e8f6416e54bda8bf77ac0bd64c242e423bb",
-        "0x89b087967a494d99895ca3800a580700d7f277f30ae8d26d671fa4864bf294"
+        "0xcd2a3d9f938e13cd947ec05abc7fe734df8dd826",
+        "0x22d46b6e8e12c06cbce8828cec76e8f6416e54bda8bf77ac0bd64c242e423bb"
     )]
     #[case(
         TD_STRUCT_ARR,
