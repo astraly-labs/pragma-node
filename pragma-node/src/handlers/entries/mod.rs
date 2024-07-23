@@ -78,6 +78,7 @@ pub struct GetOnchainParams {
     pub network: Network,
     pub aggregation: Option<AggregationMode>,
     pub timestamp: Option<u64>,
+    pub routing: Option<bool>,
 }
 
 impl Default for GetOnchainParams {
@@ -86,6 +87,7 @@ impl Default for GetOnchainParams {
             network: Network::default(),
             aggregation: None,
             timestamp: Some(chrono::Utc::now().timestamp() as u64),
+            routing: None,
         }
     }
 }

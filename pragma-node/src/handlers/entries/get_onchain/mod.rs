@@ -8,11 +8,8 @@ use bigdecimal::BigDecimal;
 use pragma_entities::EntryError;
 
 use crate::handlers::entries::{GetOnchainParams, GetOnchainResponse};
-use crate::infra::repositories::entry_repository::get_decimals;
-use crate::infra::repositories::onchain_repository::{
-    get_last_updated_timestamp, get_sources_and_aggregate,
-};
-use crate::utils::{format_bigdecimal_price, PathExtractor};
+use crate::infra::repositories::onchain_repository::{get_last_updated_timestamp, routing};
+use crate::utils::{big_decimal_price_to_hex, PathExtractor};
 use crate::AppState;
 
 use super::OnchainEntry;
@@ -38,6 +35,7 @@ pub async fn get_onchain(
     Query(params): Query<GetOnchainParams>,
 ) -> Result<Json<GetOnchainResponse>, EntryError> {
     tracing::info!("Received get onchain entry request for pair {:?}", pair);
+    let is_routing = params.routing.unwrap_or(false);
 
     let pair_id: String = currency_pair_to_pair_id(&pair.0, &pair.1);
     let now = chrono::Utc::now().timestamp() as u64;
@@ -51,31 +49,29 @@ pub async fn get_onchain(
         now
     };
 
-    let (aggregated_price, sources) = get_sources_and_aggregate(
+    let raw_data = routing(
         &state.onchain_pool,
+        &state.offchain_pool,
         params.network,
         pair_id.clone(),
         timestamp,
         aggregation_mode,
+        is_routing,
     )
     .await
     .map_err(|db_error| db_error.to_entry_error(&pair_id))?;
 
     // TODO(akhercha): ⚠ gives different result than onchain oracle sometime
     let last_updated_timestamp =
-        get_last_updated_timestamp(&state.onchain_pool, params.network, pair_id.clone())
+        get_last_updated_timestamp(&state.onchain_pool, params.network, raw_data.pair_used)
             .await
             .map_err(|db_error| db_error.to_entry_error(&pair_id))?;
 
-    let decimals = get_decimals(&state.offchain_pool, &pair_id)
-        .await
-        .map_err(|db_error| db_error.to_entry_error(&pair_id))?;
-
     Ok(Json(adapt_entries_to_onchain_response(
         pair_id,
-        decimals,
-        sources,
-        aggregated_price,
+        raw_data.decimal,
+        raw_data.sources,
+        raw_data.price,
         last_updated_timestamp,
     )))
 }
@@ -90,7 +86,7 @@ fn adapt_entries_to_onchain_response(
     GetOnchainResponse {
         pair_id,
         last_updated_timestamp,
-        price: format_bigdecimal_price(aggregated_price, decimals),
+        price: big_decimal_price_to_hex(&aggregated_price),
         decimals,
         nb_sources_aggregated: sources.len() as u32,
         // Only asset type used for now is Crypto
