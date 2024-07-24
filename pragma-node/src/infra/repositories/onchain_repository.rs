@@ -11,6 +11,7 @@ use pragma_entities::error::{adapt_infra_error, InfraError};
 use pragma_entities::Currency;
 use pragma_monitoring::models::SpotEntry;
 
+use crate::handlers;
 use crate::handlers::entries::{Checkpoint, OnchainEntry, Publisher, PublisherEntry};
 use crate::infra::repositories::entry_repository::{
     get_interval_specifier, OHLCEntry, OHLCEntryRaw,
@@ -99,9 +100,28 @@ fn get_aggregation_query(aggregation_mode: AggregationMode) -> Result<&'static s
     Ok(query)
 }
 
+fn get_timestamp_interval(timestamp: handlers::entries::Timestamp) -> String {
+    match timestamp {
+        handlers::entries::Timestamp::Single(timestamp) => {
+            format!(
+                "(to_timestamp({:?}) - INTERVAL '{:?}') AND to_timestamp({:?})",
+                timestamp, BACKWARD_TIMESTAMP_INTERVAL, timestamp
+            )
+        }
+        handlers::entries::Timestamp::Range(time_range) => {
+            format!(
+                "to_timestamp({:?} AND to_timestamp({:?})",
+                time_range.start(),
+                time_range.end()
+            )
+        }
+    }
+}
+
 fn build_sql_query(
     network: Network,
     aggregation_mode: AggregationMode,
+    timestamp: handlers::entries::Timestamp,
 ) -> Result<String, InfraError> {
     let aggregation_query = get_aggregation_query(aggregation_mode)?;
     let complete_sql_query = format!(
@@ -114,7 +134,7 @@ fn build_sql_query(
                 {table_name}
             WHERE 
                 pair_id = $1 
-                AND timestamp BETWEEN (to_timestamp($2) - INTERVAL '{backward_interval}') AND to_timestamp($2)
+                AND timestamp BETWEEN {time_interval}
         ),
         FilteredEntries AS (
             SELECT *
@@ -135,7 +155,7 @@ fn build_sql_query(
             FE.timestamp DESC;
     "#,
         table_name = get_table_name(network, DataType::SpotEntry)?,
-        backward_interval = BACKWARD_TIMESTAMP_INTERVAL,
+        time_interval = get_timestamp_interval(timestamp),
         aggregation_subquery = aggregation_query
     );
     Ok(complete_sql_query)
@@ -180,7 +200,7 @@ pub async fn routing(
     offchain_pool: &Pool,
     network: Network,
     pair_id: String,
-    timestamp: u64,
+    timestamp: handlers::entries::Timestamp,
     aggregation_mode: AggregationMode,
     is_routing: bool,
 ) -> Result<RawOnchainData, InfraError> {
@@ -229,7 +249,7 @@ pub async fn routing(
                 onchain_pool,
                 network,
                 base_alt_pair.clone(),
-                timestamp,
+                timestamp.clone(),
                 aggregation_mode,
             )
             .await?;
@@ -265,17 +285,16 @@ pub async fn get_sources_and_aggregate(
     pool: &Pool,
     network: Network,
     pair_id: String,
-    timestamp: u64,
+    timestamp: handlers::entries::Timestamp,
     aggregation_mode: AggregationMode,
 ) -> Result<(BigDecimal, Vec<OnchainEntry>), InfraError> {
-    let raw_sql = build_sql_query(network, aggregation_mode)?;
+    let raw_sql = build_sql_query(network, aggregation_mode, timestamp)?;
 
     let conn = pool.get().await.map_err(adapt_infra_error)?;
     let raw_entries = conn
         .interact(move |conn| {
             diesel::sql_query(raw_sql)
                 .bind::<Text, _>(pair_id)
-                .bind::<BigInt, _>(timestamp as i64)
                 .load::<SpotEntryWithAggregatedPrice>(conn)
         })
         .await
