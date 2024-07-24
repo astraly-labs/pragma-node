@@ -8,6 +8,8 @@ pub mod get_onchain;
 pub mod get_volatility;
 pub mod subscribe_to_entry;
 
+use std::collections::HashMap;
+
 pub use create_entry::create_entries;
 pub use create_future_entry::create_future_entries;
 pub use get_entry::get_entry;
@@ -110,6 +112,7 @@ pub struct GetOnchainResponse {
     nb_sources_aggregated: u32,
     asset_type: String,
     components: Vec<OnchainEntry>,
+    variations: HashMap<Interval, f32>,
 }
 
 #[derive(Debug, Deserialize, IntoParams, ToSchema)]

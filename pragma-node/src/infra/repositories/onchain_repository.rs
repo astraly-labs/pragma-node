@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use bigdecimal::BigDecimal;
+use bigdecimal::{BigDecimal, ToPrimitive, Zero};
 use deadpool_diesel::postgres::Pool;
 use diesel::sql_types::{BigInt, Integer, Numeric, Text, Timestamp, VarChar};
 use diesel::{Queryable, QueryableByName, RunQueryDsl};
@@ -327,6 +327,73 @@ pub async fn get_last_updated_timestamp(
 
     let most_recent_entry = raw_entry.first().ok_or(InfraError::NotFound)?;
     Ok(most_recent_entry.timestamp.and_utc().timestamp() as u64)
+}
+
+#[derive(QueryableByName)]
+struct VariationEntry {
+    #[diesel(sql_type = Numeric)]
+    open: BigDecimal,
+}
+
+pub async fn get_variations(
+    pool: &Pool,
+    network: Network,
+    pair_id: String,
+) -> Result<HashMap<Interval, f32>, InfraError> {
+    let intervals = vec![Interval::OneHour, Interval::OneDay, Interval::OneWeek];
+
+    let mut variations = HashMap::new();
+
+    for interval in intervals {
+        let ohlc_table_name = get_ohlc_table_name(network, DataType::SpotEntry, interval)?;
+        let raw_sql = format!(
+            r#"
+            WITH recent_entries AS (
+                SELECT
+                    open,
+                    ROW_NUMBER() OVER (ORDER BY time DESC) as rn
+                FROM
+                    {table_name}
+                WHERE
+                    pair_id = $1
+                ORDER BY
+                    time DESC
+                LIMIT 2
+            )
+            SELECT
+                open
+            FROM
+                recent_entries
+            WHERE
+                rn IN (1, 2)
+            ORDER BY
+                rn ASC;
+            "#,
+            table_name = ohlc_table_name
+        );
+
+        let conn = pool.get().await.map_err(adapt_infra_error)?;
+        let p = pair_id.clone();
+        let raw_entries: Vec<VariationEntry> = conn
+            .interact(move |conn| diesel::sql_query(raw_sql).bind::<Text, _>(p).load(conn))
+            .await
+            .map_err(adapt_infra_error)?
+            .map_err(adapt_infra_error)?;
+
+        if raw_entries.len() == 2 {
+            let previous_open = &raw_entries[0].open;
+            let current_open = &raw_entries[1].open;
+
+            if !previous_open.is_zero() {
+                let variation = (current_open - previous_open) / previous_open;
+                if let Some(variation_f32) = variation.to_f32() {
+                    variations.insert(interval, variation_f32);
+                }
+            }
+        }
+    }
+
+    Ok(variations)
 }
 
 #[derive(Queryable, QueryableByName, PartialEq, Debug)]

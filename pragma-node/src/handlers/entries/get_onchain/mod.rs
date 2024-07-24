@@ -2,13 +2,18 @@ pub mod checkpoints;
 pub mod ohlc;
 pub mod publishers;
 
+use std::collections::HashMap;
+
 use axum::extract::{Query, State};
 use axum::Json;
 use bigdecimal::BigDecimal;
+use pragma_common::types::Interval;
 use pragma_entities::EntryError;
 
 use crate::handlers::entries::{GetOnchainParams, GetOnchainResponse};
-use crate::infra::repositories::onchain_repository::{get_last_updated_timestamp, routing};
+use crate::infra::repositories::onchain_repository::{
+    get_last_updated_timestamp, get_variations, routing,
+};
 use crate::utils::{big_decimal_price_to_hex, PathExtractor};
 use crate::AppState;
 
@@ -67,12 +72,17 @@ pub async fn get_onchain(
             .await
             .map_err(|db_error| db_error.to_entry_error(&pair_id))?;
 
+    let variations = get_variations(&state.onchain_pool, params.network, pair_id.clone())
+        .await
+        .map_err(|db_error| db_error.to_entry_error(&pair_id))?;
+
     Ok(Json(adapt_entries_to_onchain_response(
         pair_id,
         raw_data.decimal,
         raw_data.sources,
         raw_data.price,
         last_updated_timestamp,
+        variations,
     )))
 }
 
@@ -82,6 +92,7 @@ fn adapt_entries_to_onchain_response(
     sources: Vec<OnchainEntry>,
     aggregated_price: BigDecimal,
     last_updated_timestamp: u64,
+    variations: HashMap<Interval, f32>,
 ) -> GetOnchainResponse {
     GetOnchainResponse {
         pair_id,
@@ -92,5 +103,6 @@ fn adapt_entries_to_onchain_response(
         // Only asset type used for now is Crypto
         asset_type: "Crypto".to_string(),
         components: sources,
+        variations,
     }
 }
