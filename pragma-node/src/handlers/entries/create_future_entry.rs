@@ -73,7 +73,17 @@ pub async fn create_future_entries(
         account_address
     );
 
-    let message_hash = build_publish_message(&new_entries.entries)?.message_hash(account_address);
+    let published_message = match build_publish_message(&new_entries.entries, None) {
+        Ok(message) => message,
+        Err(_) => {
+            // If the new version fails, try the legacy version
+            match build_publish_message(&new_entries.entries, Some(true)) {
+                Ok(message) => message,
+                Err(err) => panic!("Failed to build publish message: {:?}", err),
+            }
+        }
+    };
+    let message_hash = published_message.message_hash(account_address);
     let signature = Signature {
         r: new_entries.signature[0],
         s: new_entries.signature[1],
@@ -145,7 +155,7 @@ mod tests {
     #[rstest]
     fn test_build_publish_message_empty() {
         let entries: Vec<PerpEntry> = vec![];
-        let typed_data = build_publish_message(&entries).unwrap();
+        let typed_data = build_publish_message(&entries, None).unwrap();
         assert_eq!(typed_data.primary_type, "Request");
         assert_eq!(typed_data.domain.name, "Pragma");
         assert_eq!(typed_data.domain.version, "1");
@@ -153,7 +163,7 @@ mod tests {
         assert_eq!(typed_data.message.entries, entries);
 
         let entries: Vec<FutureEntry> = vec![];
-        let typed_data = build_publish_message(&entries).unwrap();
+        let typed_data = build_publish_message(&entries, None).unwrap();
         assert_eq!(typed_data.primary_type, "Request");
         assert_eq!(typed_data.domain.name, "Pragma");
         assert_eq!(typed_data.domain.version, "1");

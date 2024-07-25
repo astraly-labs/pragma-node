@@ -116,7 +116,10 @@ pub struct PublishMessage<E: EntryTrait + Serialize> {
     pub entries: Vec<E>,
 }
 
-pub fn build_publish_message<E>(entries: &[E]) -> Result<TypedData<PublishMessage<E>>, EntryError>
+pub fn build_publish_message<E>(
+    entries: &[E],
+    is_legacy: Option<bool>,
+) -> Result<TypedData<PublishMessage<E>>, EntryError>
 where
     E: EntryTrait + Serialize + for<'a> Deserialize<'a>,
 {
@@ -153,42 +156,77 @@ where
         })
         .collect::<Vec<_>>();
 
-    let mut raw_message_json = serde_json::json!({
-        "domain": {
-            "name": "Pragma",
-            "version": "1",
-            "chainId": "1",
-            "revision": "0"
-        },
-        "primaryType": "Request",
-        "message": {
-            "action": "Publish",
-            "entries": raw_entries
-        },
-        "types": {
-            "StarkNetDomain": [
-                {"name": "name", "type": "felt"},
-                {"name": "version", "type": "felt"},
-                {"name": "chainId", "type": "felt"},
-                {"name": "revision", "type": "felt"}
-            ],
-            "Request": [
-                {"name": "action", "type": "felt"},
-                {"name": "entries", "type": "Entry*"}
-            ],
-            "Entry": [
-                {"name": "base", "type": "Base"},
-                {"name": "pair_id", "type": "felt"},
-                {"name": "price", "type": "felt"},
-                {"name": "volume", "type": "felt"},
-            ],
-            "Base": [
-                {"name": "publisher", "type": "felt"},
-                {"name": "source", "type": "felt"},
-                {"name": "timestamp", "type": "felt"}
-            ]
-        }
-    });
+    let mut raw_message_json = if is_legacy.unwrap_or(false) {
+        serde_json::json!({
+            "domain": {
+                "name": "Pragma",
+                "version": "1"
+            },
+            "primaryType": "Request",
+            "message": {
+                "action": "Publish",
+                "entries": raw_entries
+            },
+            "types": {
+                "StarkNetDomain": [
+                    {"name": "name", "type": "felt"},
+                    {"name": "version", "type": "felt"}
+                ],
+                "Request": [
+                    {"name": "action", "type": "felt"},
+                    {"name": "entries", "type": "Entry*"}
+                ],
+                "Entry": [
+                    {"name": "base", "type": "Base"},
+                    {"name": "pair_id", "type": "felt"},
+                    {"name": "price", "type": "felt"},
+                    {"name": "volume", "type": "felt"},
+                ],
+                "Base": [
+                    {"name": "publisher", "type": "felt"},
+                    {"name": "source", "type": "felt"},
+                    {"name": "timestamp", "type": "felt"}
+                ]
+            }
+        })
+    } else {
+        serde_json::json!({
+            "domain": {
+                "name": "Pragma",
+                "version": "1",
+                "chainId": "1",
+                "revision": "0"
+            },
+            "primaryType": "Request",
+            "message": {
+                "action": "Publish",
+                "entries": raw_entries
+            },
+            "types": {
+                "StarknetDomain": [
+                    {"name": "name", "type": "felt"},
+                    {"name": "version", "type": "felt"},
+                    {"name": "chainId", "type": "felt"},
+                    {"name": "revision", "type": "felt"}
+                ],
+                "Request": [
+                    {"name": "action", "type": "felt"},
+                    {"name": "entries", "type": "Entry*"}
+                ],
+                "Entry": [
+                    {"name": "base", "type": "Base"},
+                    {"name": "pair_id", "type": "felt"},
+                    {"name": "price", "type": "felt"},
+                    {"name": "volume", "type": "felt"},
+                ],
+                "Base": [
+                    {"name": "publisher", "type": "felt"},
+                    {"name": "source", "type": "felt"},
+                    {"name": "timestamp", "type": "felt"}
+                ]
+            }
+        })
+    };
 
     // Add the expiration timestamp for the future entries
     if is_future {

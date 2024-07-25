@@ -72,7 +72,16 @@ pub async fn create_entries(
         account_address
     );
 
-    let published_message = build_publish_message(&new_entries.entries)?;
+    let published_message = match build_publish_message(&new_entries.entries, None) {
+        Ok(message) => message,
+        Err(_) => {
+            // If the new version fails, try the legacy version
+            match build_publish_message(&new_entries.entries, Some(true)) {
+                Ok(message) => message,
+                Err(err) => panic!("Failed to build publish message: {:?}", err),
+            }
+        }
+    };
     let message_hash = published_message.message_hash(account_address);
 
     let signature = Signature {
@@ -131,7 +140,7 @@ mod tests {
     #[rstest]
     fn test_build_publish_message_empty() {
         let entries: Vec<Entry> = vec![];
-        let typed_data = build_publish_message(&entries).unwrap();
+        let typed_data = build_publish_message(&entries, None).unwrap();
 
         assert_eq!(typed_data.primary_type, "Request");
         assert_eq!(typed_data.domain.name, "Pragma");
@@ -153,7 +162,7 @@ mod tests {
             price: 0,
             volume: 0,
         }];
-        let typed_data = build_publish_message(&entries).unwrap();
+        let typed_data = build_publish_message(&entries, None).unwrap();
 
         assert_eq!(typed_data.primary_type, "Request");
         assert_eq!(typed_data.domain.name, "Pragma");
