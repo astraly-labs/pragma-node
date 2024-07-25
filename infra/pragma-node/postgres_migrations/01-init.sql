@@ -111,7 +111,7 @@ CREATE TABLE vrf_requests (
     updated_at_tx character varying(255),
     status numeric,
     minimum_block_number numeric,
-    _cursor bigint,
+    _cursor int8range,
     data_id character varying(255)
 );
 
