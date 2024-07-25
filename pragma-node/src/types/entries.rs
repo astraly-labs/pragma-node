@@ -116,6 +116,7 @@ pub struct PublishMessage<E: EntryTrait + Serialize> {
     pub entries: Vec<E>,
 }
 
+// TODO: Remove this legacy handling while every publishers are on the 2.0 version.
 pub fn build_publish_message<E>(
     entries: &[E],
     is_legacy: Option<bool>,
@@ -156,6 +157,12 @@ where
         })
         .collect::<Vec<_>>();
 
+    // We recently updated our Pragma-SDK. This included a breaking change for how we
+    // sign the entries before publishing them.
+    // We want to support our publishers who are still on the older version and
+    // encourage them to upgrade before removing this legacy code. Until then,
+    // we support both methods.
+    // TODO: Remove this legacy handling while every publishers are on the 2.0 version.
     let mut raw_message_json = if is_legacy.unwrap_or(false) {
         serde_json::json!({
             "domain": {

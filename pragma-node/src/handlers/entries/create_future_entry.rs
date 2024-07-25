@@ -73,14 +73,17 @@ pub async fn create_future_entries(
         account_address
     );
 
+    // We recently updated our Pragma-SDK. This included a breaking change for how we
+    // sign the entries before publishing them.
+    // We want to support our publishers who are still on the older version and
+    // encourage them to upgrade before removing this legacy code. Until then,
+    // we support both methods.
+    // TODO: Remove this legacy handling while every publishers are on the 2.0 version.
     let published_message = match build_publish_message(&new_entries.entries, None) {
         Ok(message) => message,
         Err(_) => {
             // If the new version fails, try the legacy version
-            match build_publish_message(&new_entries.entries, Some(true)) {
-                Ok(message) => message,
-                Err(err) => panic!("Failed to build publish message: {:?}", err),
-            }
+            build_publish_message(&new_entries.entries, Some(true))?
         }
     };
     let message_hash = published_message.message_hash(account_address);
