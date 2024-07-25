@@ -50,7 +50,6 @@ pub fn assert_signature_is_valid<T>(
 ) -> Result<Signature, EntryError>
 where
     T: SignedRequest,
-    <T as SignedRequest>::EntryType: EntryTrait,
     for<'de> <T as SignedRequest>::EntryType: EntryTrait + Serialize + Deserialize<'de>,
 {
     let published_message = build_publish_message(request.entries(), is_legacy)?;
