@@ -2,9 +2,9 @@ pub use aws::PragmaSignerBuilder;
 pub use conversion::{convert_via_quote, format_bigdecimal_price, normalize_to_decimals};
 pub use custom_extractors::json_extractor::JsonExtractor;
 pub use custom_extractors::path_extractor::PathExtractor;
-pub use signing::sign_data;
 pub use signing::starkex::StarkexPrice;
 pub use signing::typed_data::TypedData;
+pub use signing::{assert_signature_is_valid, sign_data};
 
 use bigdecimal::num_bigint::ToBigInt;
 use bigdecimal::{BigDecimal, ToPrimitive};

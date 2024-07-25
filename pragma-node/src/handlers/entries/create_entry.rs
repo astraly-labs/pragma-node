@@ -2,15 +2,13 @@ use axum::extract::State;
 use axum::Json;
 use chrono::{DateTime, Utc};
 use pragma_entities::{EntryError, NewEntry, PublisherError};
-use starknet::core::crypto::{ecdsa_verify, Signature};
 use starknet::core::types::FieldElement;
 
 use crate::config::config;
 use crate::handlers::entries::{CreateEntryRequest, CreateEntryResponse};
 use crate::infra::kafka;
 use crate::infra::repositories::publisher_repository;
-use crate::types::entries::build_publish_message;
-use crate::utils::JsonExtractor;
+use crate::utils::{assert_signature_is_valid, JsonExtractor};
 use crate::AppState;
 
 #[utoipa::path(
@@ -78,25 +76,16 @@ pub async fn create_entries(
     // encourage them to upgrade before removing this legacy code. Until then,
     // we support both methods.
     // TODO: Remove this legacy handling while every publishers are on the 2.0 version.
-    let published_message = match build_publish_message(&new_entries.entries, None) {
-        Ok(message) => message,
-        Err(_) => {
-            // If the new version fails, try the legacy version
-            build_publish_message(&new_entries.entries, Some(true))?
-        }
-    };
-    let message_hash = published_message.message_hash(account_address);
-
-    let signature = Signature {
-        r: new_entries.signature[0],
-        s: new_entries.signature[1],
-    };
-    if !ecdsa_verify(&public_key, &message_hash, &signature)
-        .map_err(EntryError::InvalidSignature)?
-    {
-        tracing::error!("Invalid signature for message hash {:?}", &message_hash);
-        return Err(EntryError::Unauthorized);
-    }
+    let signature =
+        match assert_signature_is_valid(&new_entries, &account_address, &public_key, None) {
+            Ok(signature) => signature,
+            Err(_) => {
+                tracing::debug!(
+                    "assert_signature_is_valid failed. Trying again with legacy signature..."
+                );
+                assert_signature_is_valid(&new_entries, &account_address, &public_key, Some(true))?
+            }
+        };
 
     let new_entries_db = new_entries
         .entries
@@ -135,7 +124,7 @@ pub async fn create_entries(
 
 #[cfg(test)]
 mod tests {
-    use crate::types::entries::{BaseEntry, Entry};
+    use crate::types::entries::{build_publish_message, BaseEntry, Entry};
 
     use super::*;
     use rstest::rstest;

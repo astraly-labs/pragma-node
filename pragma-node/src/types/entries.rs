@@ -126,6 +126,7 @@ where
 {
     // TODO(akhercha): ugly, refine
     let mut is_future = false;
+    let is_legacy = is_legacy.unwrap_or(false);
 
     // Construct the raw string with placeholders for the entries
     let raw_entries: Vec<_> = entries
@@ -163,7 +164,7 @@ where
     // encourage them to upgrade before removing this legacy code. Until then,
     // we support both methods.
     // TODO: Remove this legacy handling while every publishers are on the 2.0 version.
-    let mut raw_message_json = if is_legacy.unwrap_or(false) {
+    let mut raw_message_json = if is_legacy {
         serde_json::json!({
             "domain": {
                 "name": "Pragma",
@@ -210,7 +211,7 @@ where
                 "entries": raw_entries
             },
             "types": {
-                "StarknetDomain": [
+                "StarkNetDomain": [
                     {"name": "name", "type": "felt"},
                     {"name": "version", "type": "felt"},
                     {"name": "chainId", "type": "felt"},

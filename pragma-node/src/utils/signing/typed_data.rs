@@ -32,8 +32,8 @@ pub struct DomainType {
     pub name: String,
     pub version: String,
     #[serde(rename = "chainId")]
-    pub chain_id: String,
-    pub revision: String,
+    pub chain_id: Option<String>,
+    pub revision: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
