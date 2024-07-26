@@ -41,7 +41,10 @@ pub fn sign_data(signer: &SigningKey, data: &impl Signable) -> Result<String, Si
     Ok(format!("0x{:}", signature))
 }
 
-/// Assert that a Signature is correct
+/// Assert that a signature (passed with the request for creating new
+/// entries) is correctly signed by the publisher and in a valid format.
+/// NOTE: the [is_legacy] parameter can be set to True for signatures
+/// that uses our SDK before version 2.0.
 pub fn assert_signature_is_valid<T>(
     request: &T,
     account_address: &FieldElement,
