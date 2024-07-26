@@ -33,7 +33,7 @@ pub async fn get_onchain(
     State(state): State<AppState>,
     PathExtractor(pair): PathExtractor<(String, String)>,
     Query(params): Query<GetOnchainParams>,
-) -> Result<Json<GetOnchainResponse>, EntryError> {
+) -> Result<Json<Vec<GetOnchainResponse>>, EntryError> {
     tracing::info!("Received get onchain entry request for pair {:?}", pair);
     let is_routing = params.routing.unwrap_or(false);
 
@@ -75,18 +75,25 @@ pub async fn get_onchain(
     .map_err(|db_error| db_error.to_entry_error(&pair_id))?;
 
     // TODO(akhercha): ⚠ gives different result than onchain oracle sometime
-    let last_updated_timestamp =
-        get_last_updated_timestamp(&state.onchain_pool, params.network, raw_data.pair_used)
-            .await
-            .map_err(|db_error| db_error.to_entry_error(&pair_id))?;
+    let last_updated_timestamp = get_last_updated_timestamp(
+        &state.onchain_pool,
+        params.network,
+        raw_data[0].pair_used.clone(),
+    )
+    .await
+    .map_err(|db_error| db_error.to_entry_error(&pair_id))?;
 
-    Ok(Json(adapt_entries_to_onchain_response(
-        pair_id,
-        raw_data.decimal,
-        raw_data.sources,
-        raw_data.price,
-        last_updated_timestamp,
-    )))
+    let mut api_result: Vec<GetOnchainResponse> = Vec::new();
+    for entries in raw_data {
+        api_result.push(adapt_entries_to_onchain_response(
+            pair_id.clone(),
+            entries.decimal,
+            entries.sources,
+            entries.price,
+            last_updated_timestamp,
+        ));
+    }
+    Ok(Json(api_result))
 }
 
 fn adapt_entries_to_onchain_response(

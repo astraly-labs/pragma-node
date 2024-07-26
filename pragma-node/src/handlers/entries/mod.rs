@@ -130,7 +130,7 @@ impl Default for GetOnchainParams {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Serialize, Deserialize, ToSchema, Clone)]
 pub struct OnchainEntry {
     pub publisher: String,
     pub source: String,
