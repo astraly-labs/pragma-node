@@ -9,7 +9,7 @@ use super::{CreateFutureEntryRequest, CreateFutureEntryResponse};
 use crate::config::config;
 use crate::infra::kafka;
 use crate::infra::repositories::publisher_repository;
-use crate::utils::{assert_signature_is_valid, JsonExtractor};
+use crate::utils::{assert_legacy_signature_is_valid, assert_signature_is_valid, JsonExtractor};
 use crate::AppState;
 
 #[utoipa::path(
@@ -77,16 +77,15 @@ pub async fn create_future_entries(
     // encourage them to upgrade before removing this legacy code. Until then,
     // we support both methods.
     // TODO: Remove this legacy handling while every publishers are on the 2.0 version.
-    let signature =
-        match assert_signature_is_valid(&new_entries, &account_address, &public_key, None) {
-            Ok(signature) => signature,
-            Err(_) => {
-                tracing::debug!(
-                    "assert_signature_is_valid failed. Trying again with legacy signature..."
-                );
-                assert_signature_is_valid(&new_entries, &account_address, &public_key, Some(true))?
-            }
-        };
+    let signature = match assert_signature_is_valid(&new_entries, &account_address, &public_key) {
+        Ok(signature) => signature,
+        Err(_) => {
+            tracing::debug!(
+                "assert_signature_is_valid failed. Trying again with legacy signature..."
+            );
+            assert_legacy_signature_is_valid(&new_entries, &account_address, &public_key)?
+        }
+    };
 
     let new_entries_db = new_entries
         .entries
