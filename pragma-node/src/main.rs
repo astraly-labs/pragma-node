@@ -76,15 +76,14 @@ async fn main() {
 
     // Create the Metrics registry
     let metrics_registry = MetricsRegistry::new();
-    let ws_metrics =
-        Arc::new(WsMetrics::new(&metrics_registry).expect("Failed to create WsMetrics"));
+    let ws_metrics = WsMetrics::new(&metrics_registry).expect("Failed to create WsMetrics");
 
     let state = AppState {
         offchain_pool,
         onchain_pool,
         publishers_updates_cache,
         pragma_signer,
-        ws_metrics,
+        ws_metrics: Arc::new(ws_metrics),
     };
 
     tokio::join!(

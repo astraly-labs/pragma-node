@@ -2,16 +2,15 @@ use axum::extract::State;
 use axum::Json;
 use chrono::{DateTime, Utc};
 use pragma_entities::{EntryError, NewFutureEntry, PublisherError};
-use starknet::core::crypto::{ecdsa_verify, Signature};
 use starknet::core::types::FieldElement;
 
 use super::{CreateFutureEntryRequest, CreateFutureEntryResponse};
-use crate::types::entries::build_publish_message;
 
 use crate::config::config;
 use crate::infra::kafka;
 use crate::infra::repositories::publisher_repository;
-use crate::utils::JsonExtractor;
+use crate::types::entries::FutureEntry;
+use crate::utils::{assert_request_signature_is_valid, JsonExtractor};
 use crate::AppState;
 
 #[utoipa::path(
@@ -73,18 +72,11 @@ pub async fn create_future_entries(
         account_address
     );
 
-    let message_hash = build_publish_message(&new_entries.entries)?.message_hash(account_address);
-    let signature = Signature {
-        r: new_entries.signature[0],
-        s: new_entries.signature[1],
-    };
-
-    if !ecdsa_verify(&public_key, &message_hash, &signature)
-        .map_err(EntryError::InvalidSignature)?
-    {
-        tracing::error!("Invalid signature for message hash {:?}", &message_hash);
-        return Err(EntryError::Unauthorized);
-    }
+    let signature = assert_request_signature_is_valid::<CreateFutureEntryRequest, FutureEntry>(
+        &new_entries,
+        &account_address,
+        &public_key,
+    )?;
 
     let new_entries_db = new_entries
         .entries
@@ -137,15 +129,14 @@ pub async fn create_future_entries(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use rstest::rstest;
 
-    use crate::types::entries::{FutureEntry, PerpEntry};
+    use crate::types::entries::{build_publish_message, FutureEntry, PerpEntry};
 
     #[rstest]
     fn test_build_publish_message_empty() {
         let entries: Vec<PerpEntry> = vec![];
-        let typed_data = build_publish_message(&entries).unwrap();
+        let typed_data = build_publish_message(&entries, None).unwrap();
         assert_eq!(typed_data.primary_type, "Request");
         assert_eq!(typed_data.domain.name, "Pragma");
         assert_eq!(typed_data.domain.version, "1");
@@ -153,7 +144,7 @@ mod tests {
         assert_eq!(typed_data.message.entries, entries);
 
         let entries: Vec<FutureEntry> = vec![];
-        let typed_data = build_publish_message(&entries).unwrap();
+        let typed_data = build_publish_message(&entries, None).unwrap();
         assert_eq!(typed_data.primary_type, "Request");
         assert_eq!(typed_data.domain.name, "Pragma");
         assert_eq!(typed_data.domain.version, "1");

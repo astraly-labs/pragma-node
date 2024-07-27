@@ -33,8 +33,20 @@ use crate::{
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct CreateEntryRequest {
-    signature: Vec<FieldElement>,
-    entries: Vec<Entry>,
+    pub signature: Vec<FieldElement>,
+    pub entries: Vec<Entry>,
+}
+
+impl AsRef<[FieldElement]> for CreateEntryRequest {
+    fn as_ref(&self) -> &[FieldElement] {
+        &self.signature
+    }
+}
+
+impl AsRef<[Entry]> for CreateEntryRequest {
+    fn as_ref(&self) -> &[Entry] {
+        &self.entries
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
@@ -44,8 +56,20 @@ pub struct CreateEntryResponse {
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct CreateFutureEntryRequest {
-    signature: Vec<FieldElement>,
-    entries: Vec<FutureEntry>,
+    pub signature: Vec<FieldElement>,
+    pub entries: Vec<FutureEntry>,
+}
+
+impl AsRef<[FieldElement]> for CreateFutureEntryRequest {
+    fn as_ref(&self) -> &[FieldElement] {
+        &self.signature
+    }
+}
+
+impl AsRef<[FutureEntry]> for CreateFutureEntryRequest {
+    fn as_ref(&self) -> &[FutureEntry] {
+        &self.entries
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]

@@ -116,12 +116,17 @@ pub struct PublishMessage<E: EntryTrait + Serialize> {
     pub entries: Vec<E>,
 }
 
-pub fn build_publish_message<E>(entries: &[E]) -> Result<TypedData<PublishMessage<E>>, EntryError>
+// TODO: Remove this legacy handling while every publishers are on the 2.0 version.
+pub fn build_publish_message<E>(
+    entries: &[E],
+    is_legacy: Option<bool>,
+) -> Result<TypedData<PublishMessage<E>>, EntryError>
 where
     E: EntryTrait + Serialize + for<'a> Deserialize<'a>,
 {
     // TODO(akhercha): ugly, refine
     let mut is_future = false;
+    let is_legacy = is_legacy.unwrap_or(false);
 
     // Construct the raw string with placeholders for the entries
     let raw_entries: Vec<_> = entries
@@ -153,38 +158,83 @@ where
         })
         .collect::<Vec<_>>();
 
-    let mut raw_message_json = serde_json::json!({
-        "domain": {
-            "name": "Pragma",
-            "version": "1"
-        },
-        "primaryType": "Request",
-        "message": {
-            "action": "Publish",
-            "entries": raw_entries
-        },
-        "types": {
-            "StarkNetDomain": [
-                {"name": "name", "type": "felt"},
-                {"name": "version", "type": "felt"}
-            ],
-            "Request": [
-                {"name": "action", "type": "felt"},
-                {"name": "entries", "type": "Entry*"}
-            ],
-            "Entry": [
-                {"name": "base", "type": "Base"},
-                {"name": "pair_id", "type": "felt"},
-                {"name": "price", "type": "felt"},
-                {"name": "volume", "type": "felt"},
-            ],
-            "Base": [
-                {"name": "publisher", "type": "felt"},
-                {"name": "source", "type": "felt"},
-                {"name": "timestamp", "type": "felt"}
-            ]
-        }
-    });
+    // We recently updated our Pragma-SDK. This included a breaking change for how we
+    // sign the entries before publishing them.
+    // We want to support our publishers who are still on the older version and
+    // encourage them to upgrade before removing this legacy code. Until then,
+    // we support both methods.
+    // TODO: Remove this legacy handling while every publishers are on the 2.0 version.
+    let mut raw_message_json = if is_legacy {
+        serde_json::json!({
+            "domain": {
+                "name": "Pragma",
+                "version": "1"
+            },
+            "primaryType": "Request",
+            "message": {
+                "action": "Publish",
+                "entries": raw_entries
+            },
+            "types": {
+                "StarkNetDomain": [
+                    {"name": "name", "type": "felt"},
+                    {"name": "version", "type": "felt"}
+                ],
+                "Request": [
+                    {"name": "action", "type": "felt"},
+                    {"name": "entries", "type": "Entry*"}
+                ],
+                "Entry": [
+                    {"name": "base", "type": "Base"},
+                    {"name": "pair_id", "type": "felt"},
+                    {"name": "price", "type": "felt"},
+                    {"name": "volume", "type": "felt"},
+                ],
+                "Base": [
+                    {"name": "publisher", "type": "felt"},
+                    {"name": "source", "type": "felt"},
+                    {"name": "timestamp", "type": "felt"}
+                ]
+            }
+        })
+    } else {
+        serde_json::json!({
+            "domain": {
+                "name": "Pragma",
+                "version": "1",
+                "chainId": "1",
+                "revision": "0"
+            },
+            "primaryType": "Request",
+            "message": {
+                "action": "Publish",
+                "entries": raw_entries
+            },
+            "types": {
+                "StarkNetDomain": [
+                    {"name": "name", "type": "felt"},
+                    {"name": "version", "type": "felt"},
+                    {"name": "chainId", "type": "felt"},
+                    {"name": "revision", "type": "felt"}
+                ],
+                "Request": [
+                    {"name": "action", "type": "felt"},
+                    {"name": "entries", "type": "Entry*"}
+                ],
+                "Entry": [
+                    {"name": "base", "type": "Base"},
+                    {"name": "pair_id", "type": "felt"},
+                    {"name": "price", "type": "felt"},
+                    {"name": "volume", "type": "felt"},
+                ],
+                "Base": [
+                    {"name": "publisher", "type": "felt"},
+                    {"name": "source", "type": "felt"},
+                    {"name": "timestamp", "type": "felt"}
+                ]
+            }
+        })
+    };
 
     // Add the expiration timestamp for the future entries
     if is_future {
