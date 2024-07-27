@@ -120,7 +120,7 @@ where
     E: EntryTrait + Serialize + for<'de> Deserialize<'de>,
 {
     let entries: &[E] = new_entries_request.as_ref();
-    let published_message = build_publish_message(entries, None)?;
+    let published_message = build_publish_message(entries, Some(true))?;
     let message_hash = published_message.message_hash(*account_address);
 
     let signature_slice: &[FieldElement] = new_entries_request.as_ref();
