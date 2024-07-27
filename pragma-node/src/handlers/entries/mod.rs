@@ -29,27 +29,20 @@ use crate::{
     utils::doc_examples,
 };
 
-pub trait SignedRequest {
-    type EntryType;
-
-    fn signature(&self) -> &Vec<FieldElement>;
-    fn entries(&self) -> &Vec<Self::EntryType>;
-}
-
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct CreateEntryRequest {
     pub signature: Vec<FieldElement>,
     pub entries: Vec<Entry>,
 }
 
-impl SignedRequest for CreateEntryRequest {
-    type EntryType = Entry;
-
-    fn signature(&self) -> &Vec<FieldElement> {
+impl AsRef<[FieldElement]> for CreateEntryRequest {
+    fn as_ref(&self) -> &[FieldElement] {
         &self.signature
     }
+}
 
-    fn entries(&self) -> &Vec<Self::EntryType> {
+impl AsRef<[Entry]> for CreateEntryRequest {
+    fn as_ref(&self) -> &[Entry] {
         &self.entries
     }
 }
@@ -65,14 +58,14 @@ pub struct CreateFutureEntryRequest {
     pub entries: Vec<FutureEntry>,
 }
 
-impl SignedRequest for CreateFutureEntryRequest {
-    type EntryType = FutureEntry;
-
-    fn signature(&self) -> &Vec<FieldElement> {
+impl AsRef<[FieldElement]> for CreateFutureEntryRequest {
+    fn as_ref(&self) -> &[FieldElement] {
         &self.signature
     }
+}
 
-    fn entries(&self) -> &Vec<Self::EntryType> {
+impl AsRef<[FutureEntry]> for CreateFutureEntryRequest {
+    fn as_ref(&self) -> &[FutureEntry] {
         &self.entries
     }
 }

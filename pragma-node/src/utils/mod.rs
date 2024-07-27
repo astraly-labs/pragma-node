@@ -4,7 +4,7 @@ pub use custom_extractors::json_extractor::JsonExtractor;
 pub use custom_extractors::path_extractor::PathExtractor;
 pub use signing::starkex::StarkexPrice;
 pub use signing::typed_data::TypedData;
-pub use signing::{assert_legacy_signature_is_valid, assert_signature_is_valid, sign_data};
+pub use signing::{assert_request_signature_is_valid, sign_data};
 
 use bigdecimal::num_bigint::ToBigInt;
 use bigdecimal::{BigDecimal, ToPrimitive};
