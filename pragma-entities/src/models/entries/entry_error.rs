@@ -27,8 +27,8 @@ pub enum EntryError {
     InvalidSignature(EcdsaVerifyError),
     #[error("could not sign price")]
     InvalidSigner,
-    #[error("unauthorized request")]
-    Unauthorized,
+    #[error("unauthorized request: {0}")]
+    Unauthorized(String),
     #[error("invalid timestamp")]
     InvalidTimestamp,
     #[error("invalid expiry")]
@@ -72,9 +72,9 @@ impl IntoResponse for EntryError {
                 StatusCode::BAD_REQUEST,
                 format!("Invalid signature: {}", err),
             ),
-            Self::Unauthorized => (
+            Self::Unauthorized(reason) => (
                 StatusCode::UNAUTHORIZED,
-                "Unauthorized publisher".to_string(),
+                format!("Unauthorized publisher: {}", reason),
             ),
             Self::InvalidTimestamp => (StatusCode::BAD_REQUEST, "Invalid timestamp".to_string()),
             Self::InvalidExpiry => (StatusCode::BAD_REQUEST, "Invalid expiry".to_string()),

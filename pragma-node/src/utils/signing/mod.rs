@@ -99,8 +99,10 @@ where
     };
 
     if !ecdsa_verify(public_key, &message_hash, &signature).map_err(EntryError::InvalidSignature)? {
-        tracing::error!("Invalid signature for message hash {:?}", &message_hash);
-        return Err(EntryError::Unauthorized);
+        return Err(EntryError::Unauthorized(format!(
+            "Invalid signature for message hash {:?}",
+            &message_hash
+        )));
     }
     Ok(signature)
 }
@@ -130,8 +132,10 @@ where
     };
 
     if !ecdsa_verify(public_key, &message_hash, &signature).map_err(EntryError::InvalidSignature)? {
-        tracing::error!("Invalid signature for message hash {:?}", &message_hash);
-        return Err(EntryError::Unauthorized);
+        return Err(EntryError::Unauthorized(format!(
+            "Invalid signature for message hash {:?}",
+            &message_hash
+        )));
     }
     Ok(signature)
 }
