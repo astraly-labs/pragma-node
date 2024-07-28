@@ -1,4 +1,4 @@
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::ops::RangeInclusive;
 use utoipa::ToSchema;
 
@@ -89,26 +89,40 @@ impl From<u64> for TimestampParam {
     }
 }
 
-pub mod timestamp_serde {
-    use super::*;
-    use serde::{self, Deserialize, Deserializer};
-
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<TimestampParam>, D::Error>
+impl<'de> Deserialize<'de> for TimestampParam {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
-        let s: Option<String> = Option::deserialize(deserializer)?;
-        if let Some(s) = s {
-            if let Some((start, end)) = s.split_once(',') {
-                let start = start.parse().map_err(serde::de::Error::custom)?;
-                let end = end.parse().map_err(serde::de::Error::custom)?;
-                Ok(Some(TimestampParam::Range(start..=end)))
-            } else {
-                let ts = s.parse().map_err(serde::de::Error::custom)?;
-                Ok(Some(TimestampParam::Single(ts)))
-            }
+        let s: String = Deserialize::deserialize(deserializer)?;
+        if let Some((start, end)) = s.split_once(',') {
+            let start = start.parse().map_err(serde::de::Error::custom)?;
+            let end = end.parse().map_err(serde::de::Error::custom)?;
+            Ok(TimestampParam::Range(start..=end))
         } else {
-            Ok(None)
+            let ts = s.parse().map_err(serde::de::Error::custom)?;
+            Ok(TimestampParam::Single(ts))
         }
+    }
+}
+
+pub fn deserialize_option_timestamp_param<'de, D>(
+    deserializer: D,
+) -> Result<Option<TimestampParam>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s: Option<String> = Option::deserialize(deserializer)?;
+    if let Some(s) = s {
+        if let Some((start, end)) = s.split_once(',') {
+            let start = start.parse().map_err(serde::de::Error::custom)?;
+            let end = end.parse().map_err(serde::de::Error::custom)?;
+            Ok(Some(TimestampParam::Range(start..=end)))
+        } else {
+            let ts = s.parse().map_err(serde::de::Error::custom)?;
+            Ok(Some(TimestampParam::Single(ts)))
+        }
+    } else {
+        Ok(None)
     }
 }

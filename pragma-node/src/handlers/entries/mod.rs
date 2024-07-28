@@ -14,14 +14,16 @@ pub use get_entry::get_entry;
 pub use get_expiries::get_expiries;
 pub use get_ohlc::get_ohlc;
 pub use get_volatility::get_volatility;
-use pragma_common::types::timestamp_serde;
 pub use subscribe_to_entry::subscribe_to_entry;
 
 use serde::{Deserialize, Serialize};
 use starknet::core::types::FieldElement;
 use utoipa::{IntoParams, ToSchema};
 
-use pragma_common::types::{AggregationMode, DataType, Interval, Network, TimestampParam};
+use pragma_common::types::{
+    deserialize_option_timestamp_param, AggregationMode, DataType, Interval, Network,
+    TimestampParam,
+};
 
 use crate::{
     infra::repositories::entry_repository::OHLCEntry,
@@ -79,7 +81,7 @@ pub struct GetOnchainParams {
     pub network: Network,
     pub aggregation: Option<AggregationMode>,
     pub routing: Option<bool>,
-    #[serde(default, with = "timestamp_serde")]
+    #[serde(deserialize_with = "deserialize_option_timestamp_param")]
     pub timestamp: Option<TimestampParam>,
 }
 
