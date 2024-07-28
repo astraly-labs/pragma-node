@@ -41,13 +41,13 @@ pub async fn get_onchain(
     let now = chrono::Utc::now().timestamp() as u64;
     let aggregation_mode = params.aggregation.unwrap_or_default();
     let timestamp = match params.timestamp {
-        Some(handlers::entries::Timestamp::Single(ts)) => {
+        Some(handlers::entries::TimestampParam::Single(ts)) => {
             if ts > now {
                 return Err(EntryError::InvalidTimestamp);
             }
-            handlers::entries::Timestamp::Single(ts)
+            handlers::entries::TimestampParam::Single(ts)
         }
-        Some(handlers::entries::Timestamp::Range(range)) => {
+        Some(handlers::entries::TimestampParam::Range(range)) => {
             // Check if start is after end
             if range.start() > range.end() {
                 return Err(EntryError::InvalidTimestamp);
@@ -57,9 +57,9 @@ pub async fn get_onchain(
             if *range.end() > now {
                 return Err(EntryError::InvalidTimestamp);
             }
-            handlers::entries::Timestamp::Range(range)
+            handlers::entries::TimestampParam::Range(range)
         }
-        None => handlers::entries::Timestamp::Single(now),
+        None => handlers::entries::TimestampParam::Single(now),
     };
 
     let raw_data = routing(
@@ -78,7 +78,7 @@ pub async fn get_onchain(
     let last_updated_timestamp = get_last_updated_timestamp(
         &state.onchain_pool,
         params.network,
-        raw_data.first().pair_used.clone(),
+        raw_data[0].pair_used.clone(),
     )
     .await
     .map_err(|db_error| db_error.to_entry_error(&pair_id))?;

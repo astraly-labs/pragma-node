@@ -14,14 +14,14 @@ pub use get_entry::get_entry;
 pub use get_expiries::get_expiries;
 pub use get_ohlc::get_ohlc;
 pub use get_volatility::get_volatility;
+use pragma_common::types::timestamp_serde;
 pub use subscribe_to_entry::subscribe_to_entry;
 
 use serde::{Deserialize, Serialize};
 use starknet::core::types::FieldElement;
-use std::ops::RangeInclusive;
 use utoipa::{IntoParams, ToSchema};
 
-use pragma_common::types::{AggregationMode, DataType, Interval, Network};
+use pragma_common::types::{AggregationMode, DataType, Interval, Network, TimestampParam};
 
 use crate::{
     infra::repositories::entry_repository::OHLCEntry,
@@ -80,43 +80,7 @@ pub struct GetOnchainParams {
     pub aggregation: Option<AggregationMode>,
     pub routing: Option<bool>,
     #[serde(default, with = "timestamp_serde")]
-    pub timestamp: Option<Timestamp>,
-}
-
-#[derive(Debug, Clone)]
-pub enum Timestamp {
-    Single(u64),
-    Range(RangeInclusive<u64>),
-}
-
-impl From<u64> for Timestamp {
-    fn from(ts: u64) -> Self {
-        Timestamp::Single(ts)
-    }
-}
-
-mod timestamp_serde {
-    use super::*;
-    use serde::{self, Deserialize, Deserializer};
-
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<Timestamp>, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let s: Option<String> = Option::deserialize(deserializer)?;
-        if let Some(s) = s {
-            if let Some((start, end)) = s.split_once(',') {
-                let start = start.parse().map_err(serde::de::Error::custom)?;
-                let end = end.parse().map_err(serde::de::Error::custom)?;
-                Ok(Some(Timestamp::Range(start..=end)))
-            } else {
-                let ts = s.parse().map_err(serde::de::Error::custom)?;
-                Ok(Some(Timestamp::Single(ts)))
-            }
-        } else {
-            Ok(None)
-        }
-    }
+    pub timestamp: Option<TimestampParam>,
 }
 
 impl Default for GetOnchainParams {
@@ -124,7 +88,7 @@ impl Default for GetOnchainParams {
         Self {
             network: Network::default(),
             aggregation: None,
-            timestamp: Some(Timestamp::from(chrono::Utc::now().timestamp() as u64)),
+            timestamp: Some(TimestampParam::from(chrono::Utc::now().timestamp() as u64)),
             routing: None,
         }
     }

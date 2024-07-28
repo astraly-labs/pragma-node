@@ -6,12 +6,11 @@ use diesel::sql_types::{BigInt, Integer, Numeric, Text, Timestamp, VarChar};
 use diesel::{Queryable, QueryableByName, RunQueryDsl};
 
 use moka::future::Cache;
-use pragma_common::types::{AggregationMode, DataType, Interval, Network};
+use pragma_common::types::{AggregationMode, DataType, Interval, Network, TimestampParam};
 use pragma_entities::error::{adapt_infra_error, InfraError};
 use pragma_entities::Currency;
 use pragma_monitoring::models::SpotEntry;
 
-use crate::handlers;
 use crate::handlers::entries::{Checkpoint, OnchainEntry, Publisher, PublisherEntry};
 use crate::infra::repositories::entry_repository::{
     get_interval_specifier, OHLCEntry, OHLCEntryRaw,
@@ -83,10 +82,10 @@ impl From<SpotEntryWithAggregatedPrice> for OnchainEntry {
 impl From<&SpotEntryWithAggregatedPrice> for OnchainEntry {
     fn from(entry: &SpotEntryWithAggregatedPrice) -> Self {
         OnchainEntry {
-            publisher: entry.spot_entry.publisher.to_owned(),
-            source: entry.spot_entry.source.to_owned(),
+            publisher: entry.spot_entry.publisher.clone(),
+            source: entry.spot_entry.source.clone(),
             price: entry.spot_entry.price.to_string(),
-            tx_hash: entry.spot_entry.transaction_hash.to_owned(),
+            tx_hash: entry.spot_entry.transaction_hash.clone(),
             timestamp: entry.spot_entry.timestamp.and_utc().timestamp() as u64,
         }
     }
@@ -131,12 +130,12 @@ fn get_aggregation_query(
 fn build_sql_query(
     network: Network,
     aggregation_mode: AggregationMode,
-    timestamp: handlers::entries::Timestamp,
+    timestamp: TimestampParam,
 ) -> Result<String, InfraError> {
     let table_name = get_table_name(network, DataType::SpotEntry)?;
 
     let complete_sql_query = match timestamp {
-        handlers::entries::Timestamp::Single(ts) => {
+        TimestampParam::Single(ts) => {
             let ts_str = ts.to_string();
             let aggregation_query = get_aggregation_query(aggregation_mode, false)?;
             format!(
@@ -175,7 +174,7 @@ fn build_sql_query(
                 ts_str = ts_str
             )
         }
-        handlers::entries::Timestamp::Range(range) => {
+        TimestampParam::Range(range) => {
             let start_ts = range.start().to_string();
             let end_ts = range.end().to_string();
             let aggregation_query = get_aggregation_query(aggregation_mode, true)?;
@@ -280,7 +279,7 @@ pub async fn routing(
     offchain_pool: &Pool,
     network: Network,
     pair_id: String,
-    timestamp: handlers::entries::Timestamp,
+    timestamp: TimestampParam,
     aggregation_mode: AggregationMode,
     is_routing: bool,
 ) -> Result<Vec<RawOnchainData>, InfraError> {
@@ -385,7 +384,7 @@ pub async fn get_sources_and_aggregate(
     pool: &Pool,
     network: Network,
     pair_id: String,
-    timestamp: handlers::entries::Timestamp,
+    timestamp: TimestampParam,
     aggregation_mode: AggregationMode,
 ) -> Result<Vec<AggPriceAndEntries>, InfraError> {
     let raw_sql = build_sql_query(network, aggregation_mode, timestamp)?;
