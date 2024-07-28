@@ -78,12 +78,12 @@ pub async fn get_onchain(
     let last_updated_timestamp = get_last_updated_timestamp(
         &state.onchain_pool,
         params.network,
-        raw_data[0].pair_used.clone(),
+        raw_data.first().pair_used.clone(),
     )
     .await
     .map_err(|db_error| db_error.to_entry_error(&pair_id))?;
 
-    let mut api_result: Vec<GetOnchainResponse> = Vec::new();
+    let mut api_result: Vec<GetOnchainResponse> = Vec::with_capacity(raw_data.len());
     for entries in raw_data {
         api_result.push(adapt_entries_to_onchain_response(
             pair_id.clone(),
