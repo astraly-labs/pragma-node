@@ -399,27 +399,9 @@ pub struct AggPriceAndEntries {
     entries: Vec<OnchainEntry>,
 }
 
-// TODO(akhercha): Only works for Spot entries
-pub async fn get_sources_and_aggregate(
-    pool: &Pool,
-    network: Network,
-    pair_id: String,
-    timestamp: TimestampParam,
-    aggregation_mode: AggregationMode,
+fn group_entries_per_aggprice(
+    raw_entries: Vec<SpotEntryWithAggregatedPrice>,
 ) -> Result<Vec<AggPriceAndEntries>, InfraError> {
-    let raw_sql = build_sql_query(network, aggregation_mode, timestamp)?;
-
-    let conn = pool.get().await.map_err(adapt_infra_error)?;
-    let raw_entries = conn
-        .interact(move |conn| {
-            diesel::sql_query(raw_sql)
-                .bind::<Text, _>(pair_id)
-                .load::<SpotEntryWithAggregatedPrice>(conn)
-        })
-        .await
-        .map_err(adapt_infra_error)?
-        .map_err(adapt_infra_error)?;
-
     if raw_entries.is_empty() {
         return Err(InfraError::NotFound);
     }
@@ -443,6 +425,30 @@ pub async fn get_sources_and_aggregate(
     }
 
     Ok(result)
+}
+
+// TODO(akhercha): Only works for Spot entries
+pub async fn get_sources_and_aggregate(
+    pool: &Pool,
+    network: Network,
+    pair_id: String,
+    timestamp: TimestampParam,
+    aggregation_mode: AggregationMode,
+) -> Result<Vec<AggPriceAndEntries>, InfraError> {
+    let raw_sql = build_sql_query(network, aggregation_mode, timestamp)?;
+
+    let conn = pool.get().await.map_err(adapt_infra_error)?;
+    let raw_entries = conn
+        .interact(move |conn| {
+            diesel::sql_query(raw_sql)
+                .bind::<Text, _>(pair_id)
+                .load::<SpotEntryWithAggregatedPrice>(conn)
+        })
+        .await
+        .map_err(adapt_infra_error)?
+        .map_err(adapt_infra_error)?;
+
+    group_entries_per_aggprice(raw_entries)
 }
 
 #[derive(Queryable, QueryableByName)]
