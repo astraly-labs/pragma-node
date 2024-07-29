@@ -60,6 +60,11 @@ pub(crate) fn get_decimals_for_pair(
     std::cmp::min(base_decimals, quote_decimals)
 }
 
+/// Returns the mid price between two prices.
+pub fn get_mid_price(low: &BigDecimal, high: &BigDecimal) -> BigDecimal {
+    (low + high) / BigDecimal::from(2)
+}
+
 /// Computes the median price and time from a list of entries.
 /// The median price is computed as the median of the median prices of each entry.
 /// The median time is computed as the median of the times of each entry.

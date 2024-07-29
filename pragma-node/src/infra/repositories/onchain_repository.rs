@@ -15,8 +15,10 @@ use crate::handlers::entries::{Checkpoint, OnchainEntry, Publisher, PublisherEnt
 use crate::infra::repositories::entry_repository::{
     get_interval_specifier, OHLCEntry, OHLCEntryRaw,
 };
-use crate::utils::get_decimals_for_pair;
-use crate::utils::{convert_via_quote, format_bigdecimal_price, normalize_to_decimals};
+use crate::utils::{
+    convert_via_quote, format_bigdecimal_price, get_decimals_for_pair, get_mid_price,
+    normalize_to_decimals,
+};
 
 use super::entry_repository::get_decimals;
 
@@ -332,7 +334,9 @@ pub async fn get_last_updated_timestamp(
 #[derive(QueryableByName)]
 struct VariationEntry {
     #[diesel(sql_type = Numeric)]
-    open: BigDecimal,
+    low: BigDecimal,
+    #[diesel(sql_type = Numeric)]
+    high: BigDecimal,
 }
 
 pub async fn get_variations(
@@ -350,8 +354,10 @@ pub async fn get_variations(
             r#"
             WITH recent_entries AS (
                 SELECT
-                    open,
-                    ROW_NUMBER() OVER (ORDER BY time DESC) as rn
+                    ohlc_bucket AS time,
+                    low,
+                    high,
+                    ROW_NUMBER() OVER (ORDER BY ohlc_bucket DESC) as rn
                 FROM
                     {table_name}
                 WHERE
@@ -361,7 +367,8 @@ pub async fn get_variations(
                 LIMIT 2
             )
             SELECT
-                open
+                low,
+                high
             FROM
                 recent_entries
             WHERE
@@ -381,11 +388,11 @@ pub async fn get_variations(
             .map_err(adapt_infra_error)?;
 
         if raw_entries.len() == 2 {
-            let previous_open = &raw_entries[0].open;
-            let current_open = &raw_entries[1].open;
+            let previous_open = get_mid_price(&raw_entries[0].low, &raw_entries[0].high);
+            let current_open = get_mid_price(&raw_entries[1].low, &raw_entries[1].high);
 
             if !previous_open.is_zero() {
-                let variation = (current_open - previous_open) / previous_open;
+                let variation = (current_open - previous_open.clone()) / previous_open;
                 if let Some(variation_f32) = variation.to_f32() {
                     variations.insert(interval, variation_f32);
                 }

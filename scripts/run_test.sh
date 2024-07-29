@@ -6,7 +6,7 @@ command_exists() {
 }
 
 # Check for required commands
-for cmd in docker docker-compose git cargo apibara; do
+for cmd in docker docker-compose git cargo apibara cargo-watch; do
     if ! command_exists $cmd; then
         echo "Error: $cmd is not installed. Please install it and try again."
         exit 1
@@ -82,4 +82,4 @@ export KAFKA_BROKERS="0.0.0.0:9092"
 
 # Step 4: Start the Pragma Node service
 echo "Starting Pragma Node service..."
-cargo run --bin pragma-node
+cargo watch -x "run --bin pragma-node"
