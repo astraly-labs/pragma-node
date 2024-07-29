@@ -91,7 +91,20 @@ The project follows a modular structure to keep the code organized and maintaina
 
 ## Development
 
-For faster iterations, you can deploy every needed services required by `pragma-node` using `compose.dev.yaml` & Docker compose:
+Simply run the setup script using
+
+```bash
+sh scripts/run_dev.sh
+```
+
+You will be prompted to either use the `indexer-service` repository or use a backup file.
+When using the `indexer` option, make sure you've clone the indexer-service repository at the same level than this repo.
+
+```bash
+git clone git@github.com:astraly-labs/indexer-service.git
+```
+
+If you want to do the full flow manually, do the following
 
 ### 1. Start the services:
 

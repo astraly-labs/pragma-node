@@ -42,7 +42,7 @@ pub enum DataType {
 }
 
 // Supported Aggregation Intervals
-#[derive(Default, Debug, Serialize, Deserialize, ToSchema, Clone, Copy)]
+#[derive(Default, Debug, Serialize, Deserialize, ToSchema, Clone, Copy, Eq, PartialEq, Hash)]
 pub enum Interval {
     #[serde(rename = "1min")]
     #[default]

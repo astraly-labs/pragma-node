@@ -8,6 +8,8 @@ pub mod get_onchain;
 pub mod get_volatility;
 pub mod subscribe_to_entry;
 
+use std::collections::HashMap;
+
 pub use create_entry::create_entries;
 pub use create_future_entry::create_future_entries;
 pub use get_entry::get_entry;
@@ -31,8 +33,20 @@ use crate::{
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct CreateEntryRequest {
-    signature: Vec<FieldElement>,
-    entries: Vec<Entry>,
+    pub signature: Vec<FieldElement>,
+    pub entries: Vec<Entry>,
+}
+
+impl AsRef<[FieldElement]> for CreateEntryRequest {
+    fn as_ref(&self) -> &[FieldElement] {
+        &self.signature
+    }
+}
+
+impl AsRef<[Entry]> for CreateEntryRequest {
+    fn as_ref(&self) -> &[Entry] {
+        &self.entries
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
@@ -42,8 +56,20 @@ pub struct CreateEntryResponse {
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct CreateFutureEntryRequest {
-    signature: Vec<FieldElement>,
-    entries: Vec<FutureEntry>,
+    pub signature: Vec<FieldElement>,
+    pub entries: Vec<FutureEntry>,
+}
+
+impl AsRef<[FieldElement]> for CreateFutureEntryRequest {
+    fn as_ref(&self) -> &[FieldElement] {
+        &self.signature
+    }
+}
+
+impl AsRef<[FutureEntry]> for CreateFutureEntryRequest {
+    fn as_ref(&self) -> &[FutureEntry] {
+        &self.entries
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
@@ -110,6 +136,7 @@ pub struct GetOnchainResponse {
     nb_sources_aggregated: u32,
     asset_type: String,
     components: Vec<OnchainEntry>,
+    variations: HashMap<Interval, f32>,
 }
 
 #[derive(Debug, Deserialize, IntoParams, ToSchema)]

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use bigdecimal::BigDecimal;
+use bigdecimal::{BigDecimal, ToPrimitive, Zero};
 use deadpool_diesel::postgres::Pool;
 use diesel::sql_types::{BigInt, Integer, Numeric, Text, Timestamp, VarChar};
 use diesel::{Queryable, QueryableByName, RunQueryDsl};
@@ -17,7 +17,10 @@ use crate::infra::repositories::entry_repository::{
 };
 use crate::types::TimestampParam;
 use crate::utils::get_decimals_for_pair;
-use crate::utils::{convert_via_quote, format_bigdecimal_price, normalize_to_decimals};
+use crate::utils::{
+    convert_via_quote, format_bigdecimal_price, get_decimals_for_pair, get_mid_price,
+    normalize_to_decimals,
+};
 
 use super::entry_repository::get_decimals;
 
@@ -487,6 +490,78 @@ pub async fn get_last_updated_timestamp(
 
     let most_recent_entry = raw_entry.first().ok_or(InfraError::NotFound)?;
     Ok(most_recent_entry.timestamp.and_utc().timestamp() as u64)
+}
+
+#[derive(QueryableByName)]
+struct VariationEntry {
+    #[diesel(sql_type = Numeric)]
+    low: BigDecimal,
+    #[diesel(sql_type = Numeric)]
+    high: BigDecimal,
+}
+
+pub async fn get_variations(
+    pool: &Pool,
+    network: Network,
+    pair_id: String,
+) -> Result<HashMap<Interval, f32>, InfraError> {
+    let intervals = vec![Interval::OneHour, Interval::OneDay, Interval::OneWeek];
+
+    let mut variations = HashMap::new();
+
+    for interval in intervals {
+        let ohlc_table_name = get_ohlc_table_name(network, DataType::SpotEntry, interval)?;
+        let raw_sql = format!(
+            r#"
+            WITH recent_entries AS (
+                SELECT
+                    ohlc_bucket AS time,
+                    low,
+                    high,
+                    ROW_NUMBER() OVER (ORDER BY ohlc_bucket DESC) as rn
+                FROM
+                    {table_name}
+                WHERE
+                    pair_id = $1
+                ORDER BY
+                    time DESC
+                LIMIT 2
+            )
+            SELECT
+                low,
+                high
+            FROM
+                recent_entries
+            WHERE
+                rn IN (1, 2)
+            ORDER BY
+                rn ASC;
+            "#,
+            table_name = ohlc_table_name
+        );
+
+        let conn = pool.get().await.map_err(adapt_infra_error)?;
+        let p = pair_id.clone();
+        let raw_entries: Vec<VariationEntry> = conn
+            .interact(move |conn| diesel::sql_query(raw_sql).bind::<Text, _>(p).load(conn))
+            .await
+            .map_err(adapt_infra_error)?
+            .map_err(adapt_infra_error)?;
+
+        if raw_entries.len() == 2 {
+            let previous_open = get_mid_price(&raw_entries[0].low, &raw_entries[0].high);
+            let current_open = get_mid_price(&raw_entries[1].low, &raw_entries[1].high);
+
+            if !previous_open.is_zero() {
+                let variation = (current_open - previous_open.clone()) / previous_open;
+                if let Some(variation_f32) = variation.to_f32() {
+                    variations.insert(interval, variation_f32);
+                }
+            }
+        }
+    }
+
+    Ok(variations)
 }
 
 #[derive(Queryable, QueryableByName, PartialEq, Debug)]

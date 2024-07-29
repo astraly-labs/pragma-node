@@ -2,9 +2,9 @@ pub use aws::PragmaSignerBuilder;
 pub use conversion::{convert_via_quote, format_bigdecimal_price, normalize_to_decimals};
 pub use custom_extractors::json_extractor::JsonExtractor;
 pub use custom_extractors::path_extractor::PathExtractor;
-pub use signing::sign_data;
 pub use signing::starkex::StarkexPrice;
 pub use signing::typed_data::TypedData;
+pub use signing::{assert_request_signature_is_valid, sign_data};
 
 use bigdecimal::num_bigint::ToBigInt;
 use bigdecimal::{BigDecimal, ToPrimitive};
@@ -58,6 +58,11 @@ pub(crate) fn get_decimals_for_pair(
         None => 8,
     };
     std::cmp::min(base_decimals, quote_decimals)
+}
+
+/// Returns the mid price between two prices.
+pub fn get_mid_price(low: &BigDecimal, high: &BigDecimal) -> BigDecimal {
+    (low + high) / BigDecimal::from(2)
 }
 
 /// Computes the median price and time from a list of entries.
