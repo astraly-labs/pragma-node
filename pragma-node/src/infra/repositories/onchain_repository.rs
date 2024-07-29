@@ -275,6 +275,37 @@ fn calculate_rebased_price(
     Ok((rebase_price, decimals))
 }
 
+fn compute_multiple_rebased_price(
+    base_alt_result: &mut Vec<AggPriceAndEntries>,
+    quote_alt_result: &Vec<AggPriceAndEntries>,
+    alt_pairs: Vec<String>,
+    base_alt_decimal: u32,
+    quote_alt_decimal: u32,
+) -> Result<Vec<RawOnchainData>, InfraError> {
+    if quote_alt_result.len() != base_alt_result.len() {
+        return Err(InfraError::RoutingError);
+    }
+
+    let mut result: Vec<RawOnchainData> = Vec::new();
+
+    for (i, base) in base_alt_result.iter_mut().enumerate() {
+        let quote = &quote_alt_result[i];
+        let rebased_price = calculate_rebased_price(
+            (base.aggregated_price.to_owned(), base_alt_decimal),
+            (quote.aggregated_price.to_owned(), quote_alt_decimal),
+        )?;
+        base.entries.extend(quote.entries.to_owned());
+        result.push(RawOnchainData {
+            price: rebased_price.0,
+            decimal: rebased_price.1,
+            sources: base.entries.clone(),
+            pair_used: alt_pairs.clone(),
+        });
+    }
+
+    Ok(result)
+}
+
 pub async fn routing(
     onchain_pool: &Pool,
     offchain_pool: &Pool,
@@ -338,7 +369,7 @@ pub async fn routing(
             )
             .await?;
             let base_alt_decimal = get_decimals(offchain_pool, &base_alt_pair).await?;
-            let alt_quote_result = get_sources_and_aggregate(
+            let quote_alt_result = get_sources_and_aggregate(
                 onchain_pool,
                 network,
                 alt_quote_pair.clone(),
@@ -346,29 +377,17 @@ pub async fn routing(
                 aggregation_mode,
             )
             .await?;
-            let alt_quote_decimal = get_decimals(offchain_pool, &alt_quote_pair).await?;
+            let quote_alt_decimal = get_decimals(offchain_pool, &alt_quote_pair).await?;
 
-            if alt_quote_result.len() != base_alt_result.len() {
-                return Err(InfraError::RoutingError);
-            }
-            let mut result: Vec<RawOnchainData> = Vec::new();
+            let result = compute_multiple_rebased_price(
+                &mut base_alt_result,
+                &quote_alt_result,
+                vec![base_alt_pair, alt_quote_pair],
+                base_alt_decimal,
+                quote_alt_decimal,
+            );
 
-            for (i, base) in base_alt_result.iter_mut().enumerate() {
-                let quote = &alt_quote_result[i];
-                let rebased_price = calculate_rebased_price(
-                    (base.aggregated_price.to_owned(), base_alt_decimal),
-                    (quote.aggregated_price.to_owned(), alt_quote_decimal),
-                )?;
-                base.entries.extend(quote.entries.to_owned());
-                result.push(RawOnchainData {
-                    price: rebased_price.0,
-                    decimal: rebased_price.1,
-                    sources: base.entries.to_owned(),
-                    pair_used: vec![base_alt_pair.clone(), alt_quote_pair.clone()],
-                });
-            }
-
-            return Ok(result);
+            return result;
         }
     }
     Err(InfraError::NotFound)
