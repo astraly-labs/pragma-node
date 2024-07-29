@@ -33,6 +33,8 @@ pub enum EntryError {
     InvalidTimestamp,
     #[error("invalid expiry")]
     InvalidExpiry,
+    #[error("missing data for routing on pair: {0}")]
+    MissingData(String),
     #[error("publisher error: {0}")]
     PublisherError(#[from] PublisherError),
     #[error("pair id invalid: {0}")]
@@ -50,6 +52,7 @@ impl From<InfraError> for EntryError {
         match error {
             InfraError::InternalServerError => Self::InternalServerError,
             InfraError::NotFound => Self::NotFound("Unknown".to_string()),
+            InfraError::RoutingError => Self::MissingData("Not enough data".to_string()),
             InfraError::InvalidTimeStamp => Self::InternalServerError,
             InfraError::NonZeroU32Conversion(_) => Self::InternalServerError,
             InfraError::AxumError(_) => Self::InternalServerError,
@@ -63,6 +66,10 @@ impl IntoResponse for EntryError {
             Self::NotFound(pair_id) => (
                 StatusCode::NOT_FOUND,
                 format!("EntryModel with pair id {} has not been found", pair_id),
+            ),
+            Self::MissingData(pair_id) => (
+                StatusCode::NOT_FOUND,
+                format!("Not enough data on pair {} to perform routing", pair_id),
             ),
             Self::InfraError(db_error) => (
                 StatusCode::INTERNAL_SERVER_ERROR,

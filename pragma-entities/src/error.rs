@@ -11,6 +11,7 @@ use crate::models::entry_error::EntryError;
 #[derive(Debug, ToSchema, thiserror::Error)]
 pub enum InfraError {
     InternalServerError,
+    RoutingError,
     NotFound,
     InvalidTimeStamp,
     #[error(transparent)]
@@ -24,6 +25,7 @@ impl InfraError {
         match self {
             InfraError::InternalServerError => EntryError::InternalServerError,
             InfraError::NotFound => EntryError::NotFound(pair_id.to_string()),
+            InfraError::RoutingError => EntryError::MissingData(pair_id.to_string()),
             InfraError::InvalidTimeStamp => EntryError::InvalidTimestamp,
             InfraError::NonZeroU32Conversion(_) => EntryError::InternalServerError,
             InfraError::AxumError(_) => EntryError::InternalServerError,
@@ -50,6 +52,7 @@ impl fmt::Display for InfraError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             InfraError::NotFound => write!(f, "Not found"),
+            InfraError::RoutingError => write!(f, "Routing Error"),
             InfraError::InternalServerError => write!(f, "Internal server error"),
             InfraError::InvalidTimeStamp => write!(f, "Invalid timestamp"),
             InfraError::NonZeroU32Conversion(e) => write!(f, "Non zero u32 conversion {e}"),

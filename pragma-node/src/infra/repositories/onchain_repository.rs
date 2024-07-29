@@ -349,7 +349,7 @@ pub async fn routing(
             let alt_quote_decimal = get_decimals(offchain_pool, &alt_quote_pair).await?;
 
             if alt_quote_result.len() != base_alt_result.len() {
-                return Err(InfraError::InternalServerError);
+                return Err(InfraError::RoutingError);
             }
             let mut result: Vec<RawOnchainData> = Vec::new();
 
