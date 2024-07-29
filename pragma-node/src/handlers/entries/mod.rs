@@ -20,15 +20,12 @@ use serde::{Deserialize, Serialize};
 use starknet::core::types::FieldElement;
 use utoipa::{IntoParams, ToSchema};
 
-use pragma_common::types::{
-    deserialize_option_timestamp_param, AggregationMode, DataType, Interval, Network,
-    TimestampParam,
-};
+use pragma_common::types::{AggregationMode, DataType, Interval, Network};
 
 use crate::{
     infra::repositories::entry_repository::OHLCEntry,
     types::entries::{Entry, FutureEntry},
-    types::UnixTimestamp,
+    types::{TimestampParam, UnixTimestamp},
     utils::doc_examples,
 };
 
@@ -81,7 +78,6 @@ pub struct GetOnchainParams {
     pub network: Network,
     pub aggregation: Option<AggregationMode>,
     pub routing: Option<bool>,
-    #[serde(deserialize_with = "deserialize_option_timestamp_param")]
     pub timestamp: Option<TimestampParam>,
 }
 

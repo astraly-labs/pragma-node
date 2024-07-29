@@ -6,7 +6,7 @@ use diesel::sql_types::{BigInt, Integer, Numeric, Text, Timestamp, VarChar};
 use diesel::{Queryable, QueryableByName, RunQueryDsl};
 
 use moka::future::Cache;
-use pragma_common::types::{AggregationMode, DataType, Interval, Network, TimestampParam};
+use pragma_common::types::{AggregationMode, DataType, Interval, Network};
 use pragma_entities::error::{adapt_infra_error, InfraError};
 use pragma_entities::Currency;
 use pragma_monitoring::models::SpotEntry;
@@ -15,6 +15,7 @@ use crate::handlers::entries::{Checkpoint, OnchainEntry, Publisher, PublisherEnt
 use crate::infra::repositories::entry_repository::{
     get_interval_specifier, OHLCEntry, OHLCEntryRaw,
 };
+use crate::types::TimestampParam;
 use crate::utils::get_decimals_for_pair;
 use crate::utils::{convert_via_quote, format_bigdecimal_price, normalize_to_decimals};
 
