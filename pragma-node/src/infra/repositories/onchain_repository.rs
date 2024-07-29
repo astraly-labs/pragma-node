@@ -16,7 +16,6 @@ use crate::infra::repositories::entry_repository::{
     get_interval_specifier, OHLCEntry, OHLCEntryRaw,
 };
 use crate::types::TimestampParam;
-use crate::utils::get_decimals_for_pair;
 use crate::utils::{
     convert_via_quote, format_bigdecimal_price, get_decimals_for_pair, get_mid_price,
     normalize_to_decimals,

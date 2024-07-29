@@ -80,7 +80,7 @@ pub async fn get_onchain(
             entries.sources,
             entries.price,
             last_updated_timestamp,
-            variations,
+            variations.clone(),
         ));
     }
     Ok(Json(api_result))
