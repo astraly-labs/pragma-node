@@ -9,3 +9,7 @@ infra/db/password.txt
 
 # Vscode workspaces
 *.code-workspace
+
+# Indexer
+indexer.log
+run_indexer.sh

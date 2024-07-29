@@ -14,7 +14,8 @@ RUN cargo install --path .
 
 FROM debian:bookworm-slim
 
-RUN apt-get update && apt-get install -y libpq-dev bash
+RUN apt-get clean && apt-get update
+RUN apt-get install -y libpq-dev bash
 
 RUN groupadd pragma
 
