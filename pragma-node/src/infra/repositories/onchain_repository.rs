@@ -276,8 +276,8 @@ fn calculate_rebased_price(
 }
 
 fn compute_multiple_rebased_price(
-    base_alt_result: &mut Vec<AggPriceAndEntries>,
-    quote_alt_result: &Vec<AggPriceAndEntries>,
+    base_alt_result: &mut [AggPriceAndEntries],
+    quote_alt_result: &[AggPriceAndEntries],
     alt_pairs: Vec<String>,
     base_alt_decimal: u32,
     quote_alt_decimal: u32,
