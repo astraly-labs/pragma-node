@@ -14,6 +14,7 @@ use crate::handlers::entries::{GetOnchainParams, GetOnchainResponse};
 use crate::infra::repositories::onchain_repository::{
     get_last_updated_timestamp, get_variations, routing,
 };
+use crate::types::TimestampParam;
 use crate::utils::{big_decimal_price_to_hex, PathExtractor};
 use crate::AppState;
 
@@ -38,21 +39,13 @@ pub async fn get_onchain(
     State(state): State<AppState>,
     PathExtractor(pair): PathExtractor<(String, String)>,
     Query(params): Query<GetOnchainParams>,
-) -> Result<Json<GetOnchainResponse>, EntryError> {
+) -> Result<Json<Vec<GetOnchainResponse>>, EntryError> {
     tracing::info!("Received get onchain entry request for pair {:?}", pair);
     let is_routing = params.routing.unwrap_or(false);
 
     let pair_id: String = currency_pair_to_pair_id(&pair.0, &pair.1);
-    let now = chrono::Utc::now().timestamp() as u64;
     let aggregation_mode = params.aggregation.unwrap_or_default();
-    let timestamp = if let Some(timestamp) = params.timestamp {
-        if timestamp > now {
-            return Err(EntryError::InvalidTimestamp);
-        }
-        timestamp
-    } else {
-        now
-    };
+    let timestamp = TimestampParam::from_api_parameter(params.timestamp)?;
 
     let raw_data = routing(
         &state.onchain_pool,
@@ -67,23 +60,30 @@ pub async fn get_onchain(
     .map_err(|db_error| db_error.to_entry_error(&pair_id))?;
 
     // TODO(akhercha): ⚠ gives different result than onchain oracle sometime
-    let last_updated_timestamp =
-        get_last_updated_timestamp(&state.onchain_pool, params.network, raw_data.pair_used)
-            .await
-            .map_err(|db_error| db_error.to_entry_error(&pair_id))?;
-
+    let last_updated_timestamp = get_last_updated_timestamp(
+        &state.onchain_pool,
+        params.network,
+        raw_data[0].pair_used.clone(),
+    )
+    .await
+    .map_err(|db_error| db_error.to_entry_error(&pair_id))?;
     let variations = get_variations(&state.onchain_pool, params.network, pair_id.clone())
         .await
         .map_err(|db_error| db_error.to_entry_error(&pair_id))?;
 
-    Ok(Json(adapt_entries_to_onchain_response(
-        pair_id,
-        raw_data.decimal,
-        raw_data.sources,
-        raw_data.price,
-        last_updated_timestamp,
-        variations,
-    )))
+    let mut api_result: Vec<GetOnchainResponse> = Vec::with_capacity(raw_data.len());
+
+    for entries in raw_data {
+        api_result.push(adapt_entries_to_onchain_response(
+            pair_id.clone(),
+            entries.decimal,
+            entries.sources,
+            entries.price,
+            last_updated_timestamp,
+            variations.clone(),
+        ));
+    }
+    Ok(Json(api_result))
 }
 
 fn adapt_entries_to_onchain_response(

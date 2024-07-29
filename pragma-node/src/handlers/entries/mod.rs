@@ -27,7 +27,7 @@ use pragma_common::types::{AggregationMode, DataType, Interval, Network};
 use crate::{
     infra::repositories::entry_repository::OHLCEntry,
     types::entries::{Entry, FutureEntry},
-    types::UnixTimestamp,
+    types::{TimestampParam, UnixTimestamp},
     utils::doc_examples,
 };
 
@@ -103,8 +103,8 @@ pub struct GetVolatilityResponse {
 pub struct GetOnchainParams {
     pub network: Network,
     pub aggregation: Option<AggregationMode>,
-    pub timestamp: Option<u64>,
     pub routing: Option<bool>,
+    pub timestamp: Option<TimestampParam>,
 }
 
 impl Default for GetOnchainParams {
@@ -112,13 +112,13 @@ impl Default for GetOnchainParams {
         Self {
             network: Network::default(),
             aggregation: None,
-            timestamp: Some(chrono::Utc::now().timestamp() as u64),
+            timestamp: Some(TimestampParam::from(chrono::Utc::now().timestamp() as u64)),
             routing: None,
         }
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Serialize, Deserialize, ToSchema, Clone)]
 pub struct OnchainEntry {
     pub publisher: String,
     pub source: String,
