@@ -1,3 +1,4 @@
+use pragma_entities::EntryError;
 use serde::{Deserialize, Deserializer};
 use std::ops::RangeInclusive;
 
@@ -19,6 +20,35 @@ pub enum TimestampParam {
 impl From<u64> for TimestampParam {
     fn from(ts: u64) -> Self {
         TimestampParam::Single(ts)
+    }
+}
+
+impl TimestampParam {
+    pub fn from_api_parameter(
+        ts_param: Option<TimestampParam>,
+    ) -> Result<TimestampParam, EntryError> {
+        let now = chrono::Utc::now().timestamp() as u64;
+        match ts_param {
+            Some(TimestampParam::Single(ts)) => {
+                if ts > now {
+                    return Err(EntryError::InvalidTimestamp);
+                }
+                Ok(TimestampParam::Single(ts))
+            }
+            Some(TimestampParam::Range(range)) => {
+                // Check if start is after end
+                if range.start() > range.end() {
+                    return Err(EntryError::InvalidTimestamp);
+                }
+
+                // Check if end is in the future
+                if *range.end() > now {
+                    return Err(EntryError::InvalidTimestamp);
+                }
+                Ok(TimestampParam::Range(range))
+            }
+            None => Ok(TimestampParam::Single(now)),
+        }
     }
 }
 

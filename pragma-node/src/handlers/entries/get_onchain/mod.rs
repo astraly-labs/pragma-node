@@ -9,8 +9,9 @@ use pragma_entities::EntryError;
 
 use crate::handlers::entries::{GetOnchainParams, GetOnchainResponse};
 use crate::infra::repositories::onchain_repository::{get_last_updated_timestamp, routing};
+use crate::types::TimestampParam;
 use crate::utils::{big_decimal_price_to_hex, PathExtractor};
-use crate::{handlers, AppState};
+use crate::AppState;
 
 use super::OnchainEntry;
 use crate::utils::currency_pair_to_pair_id;
@@ -38,29 +39,8 @@ pub async fn get_onchain(
     let is_routing = params.routing.unwrap_or(false);
 
     let pair_id: String = currency_pair_to_pair_id(&pair.0, &pair.1);
-    let now = chrono::Utc::now().timestamp() as u64;
     let aggregation_mode = params.aggregation.unwrap_or_default();
-    let timestamp = match params.timestamp {
-        Some(handlers::entries::TimestampParam::Single(ts)) => {
-            if ts > now {
-                return Err(EntryError::InvalidTimestamp);
-            }
-            handlers::entries::TimestampParam::Single(ts)
-        }
-        Some(handlers::entries::TimestampParam::Range(range)) => {
-            // Check if start is after end
-            if range.start() > range.end() {
-                return Err(EntryError::InvalidTimestamp);
-            }
-
-            // Check if end is in the future
-            if *range.end() > now {
-                return Err(EntryError::InvalidTimestamp);
-            }
-            handlers::entries::TimestampParam::Range(range)
-        }
-        None => handlers::entries::TimestampParam::Single(now),
-    };
+    let timestamp = TimestampParam::from_api_parameter(params.timestamp)?;
 
     let raw_data = routing(
         &state.onchain_pool,
