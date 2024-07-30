@@ -42,6 +42,7 @@ pub async fn get_onchain(
 ) -> Result<Json<Vec<GetOnchainResponse>>, EntryError> {
     tracing::info!("Received get onchain entry request for pair {:?}", pair);
     let is_routing = params.routing.unwrap_or(false);
+    let with_components = params.components.unwrap_or(true);
 
     let pair_id: String = currency_pair_to_pair_id(&pair.0, &pair.1);
     let aggregation_mode = params.aggregation.unwrap_or_default();
@@ -52,7 +53,7 @@ pub async fn get_onchain(
         &state.offchain_pool,
         params.network,
         pair_id.clone(),
-        timestamp,
+        timestamp.clone(),
         aggregation_mode,
         is_routing,
     )
@@ -67,9 +68,17 @@ pub async fn get_onchain(
     )
     .await
     .map_err(|db_error| db_error.to_entry_error(&pair_id))?;
-    let variations = get_variations(&state.onchain_pool, params.network, pair_id.clone())
-        .await
-        .map_err(|db_error| db_error.to_entry_error(&pair_id))?;
+
+    // We only compute variations if the timestamp is not a range
+    let variations = match timestamp {
+        TimestampParam::Single(_) => {
+            let v = get_variations(&state.onchain_pool, params.network, pair_id.clone())
+                .await
+                .map_err(|db_error| db_error.to_entry_error(&pair_id))?;
+            Some(v)
+        }
+        TimestampParam::Range(_) => None,
+    };
 
     let mut api_result: Vec<GetOnchainResponse> = Vec::with_capacity(raw_data.len());
 
@@ -81,6 +90,7 @@ pub async fn get_onchain(
             entries.price,
             last_updated_timestamp,
             variations.clone(),
+            with_components,
         ));
     }
     Ok(Json(api_result))
@@ -92,7 +102,8 @@ fn adapt_entries_to_onchain_response(
     sources: Vec<OnchainEntry>,
     aggregated_price: BigDecimal,
     last_updated_timestamp: u64,
-    variations: HashMap<Interval, f32>,
+    variations: Option<HashMap<Interval, f32>>,
+    with_components: bool,
 ) -> GetOnchainResponse {
     GetOnchainResponse {
         pair_id,
@@ -102,7 +113,7 @@ fn adapt_entries_to_onchain_response(
         nb_sources_aggregated: sources.len() as u32,
         // Only asset type used for now is Crypto
         asset_type: "Crypto".to_string(),
-        components: sources,
+        components: with_components.then_some(sources),
         variations,
     }
 }
