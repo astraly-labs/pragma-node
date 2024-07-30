@@ -6,7 +6,7 @@ command_exists() {
 }
 
 # Check for required commands
-for cmd in docker docker-compose git cargo apibara cargo-watch; do
+for cmd in docker git cargo apibara cargo-watch; do
     if ! command_exists $cmd; then
         echo "Error: $cmd is not installed. Please install it and try again."
         exit 1
@@ -62,8 +62,8 @@ EOF
 elif [ "$fill_method" = "backup" ]; then
     echo "Using backup..."
     read -p "Enter the path to your backup file: " backup_path
-    docker cp "$backup_path" onchain-db:/backup.sql
-    docker exec -it onchain-db bash -c "PGPASSWORD=test-password pg_restore -h postgre-db -U postgres -d pragma /backup.sql"
+    docker cp "$backup_path" pragma-node-onchain-db-1:/backup.sql
+    docker exec -it pragma-node-onchain-db-1 bash -c "PGPASSWORD=test-password pg_restore -h onchain-db -U postgres -d pragma /backup.sql"
 else
     echo "Invalid option. Skipping database fill."
 fi
