@@ -105,6 +105,7 @@ pub struct GetOnchainParams {
     pub aggregation: Option<AggregationMode>,
     pub routing: Option<bool>,
     pub timestamp: Option<TimestampParam>,
+    pub components: Option<bool>,
 }
 
 impl Default for GetOnchainParams {
@@ -114,6 +115,7 @@ impl Default for GetOnchainParams {
             aggregation: None,
             timestamp: Some(TimestampParam::from(chrono::Utc::now().timestamp() as u64)),
             routing: None,
+            components: None,
         }
     }
 }
@@ -135,8 +137,8 @@ pub struct GetOnchainResponse {
     decimals: u32,
     nb_sources_aggregated: u32,
     asset_type: String,
-    components: Vec<OnchainEntry>,
-    variations: HashMap<Interval, f32>,
+    components: Option<Vec<OnchainEntry>>,
+    variations: Option<HashMap<Interval, f32>>,
 }
 
 #[derive(Debug, Deserialize, IntoParams, ToSchema)]
