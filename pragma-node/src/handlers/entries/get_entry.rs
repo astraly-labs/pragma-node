@@ -111,8 +111,16 @@ pub async fn get_entry(
     .await
     .map_err(|e| e.to_entry_error(&(pair_id)))?;
 
+    let last_updated_timestamp: NaiveDateTime =
+        entry_repository::get_last_updated_timestamp(&state.offchain_pool, pair_id.to_owned())
+            .await?
+            .unwrap_or(entry.time);
+
     Ok(Json(adapt_entry_to_entry_response(
-        pair_id, &entry, decimals,
+        pair_id,
+        &entry,
+        decimals,
+        last_updated_timestamp,
     )))
 }
 
@@ -120,10 +128,11 @@ fn adapt_entry_to_entry_response(
     pair_id: String,
     entry: &MedianEntry,
     decimals: u32,
+    last_updated_timestamp: NaiveDateTime,
 ) -> GetEntryResponse {
     GetEntryResponse {
         pair_id,
-        timestamp: entry.time.and_utc().timestamp_millis() as u64,
+        timestamp: last_updated_timestamp.and_utc().timestamp_millis() as u64,
         num_sources_aggregated: entry.num_sources as usize,
         price: big_decimal_price_to_hex(&entry.median_price),
         decimals,

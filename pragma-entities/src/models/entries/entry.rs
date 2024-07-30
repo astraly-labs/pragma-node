@@ -5,8 +5,8 @@ use bigdecimal::BigDecimal;
 use diesel::internal::derives::multiconnection::chrono::NaiveDateTime;
 use diesel::upsert::excluded;
 use diesel::{
-    AsChangeset, ExpressionMethods, Insertable, PgConnection, PgTextExpressionMethods, QueryDsl,
-    Queryable, RunQueryDsl, Selectable, SelectableHelper,
+    AsChangeset, ExpressionMethods, Insertable, OptionalExtension, PgConnection,
+    PgTextExpressionMethods, QueryDsl, Queryable, RunQueryDsl, Selectable, SelectableHelper,
 };
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -100,5 +100,17 @@ impl Entry {
             .select(entries::pair_id)
             .distinct()
             .load::<String>(conn)
+    }
+
+    pub fn get_last_updated_timestamp(
+        conn: &mut PgConnection,
+        pair: String,
+    ) -> DieselResult<Option<chrono::NaiveDateTime>> {
+        entries::table
+            .filter(entries::pair_id.eq(pair))
+            .select(entries::timestamp)
+            .order(entries::timestamp.desc())
+            .first(conn)
+            .optional()
     }
 }

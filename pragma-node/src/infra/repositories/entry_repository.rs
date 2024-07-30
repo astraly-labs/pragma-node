@@ -489,6 +489,17 @@ pub async fn get_decimals(
     Ok(decimals)
 }
 
+pub async fn get_last_updated_timestamp(
+    pool: &deadpool_diesel::postgres::Pool,
+    pair_id: String,
+) -> Result<Option<NaiveDateTime>, InfraError> {
+    let conn = pool.get().await.map_err(adapt_infra_error)?;
+    conn.interact(|conn| Entry::get_last_updated_timestamp(conn, pair_id))
+        .await
+        .map_err(adapt_infra_error)?
+        .map_err(adapt_infra_error)
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Queryable)]
 pub struct OHLCEntry {
     pub time: NaiveDateTime,
