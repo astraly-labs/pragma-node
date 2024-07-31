@@ -1,16 +1,20 @@
-FROM rust:1.79 as builder
+FROM rust:1.80 as builder
 
-WORKDIR /home/pragma-ingestor
+# Install additional dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libssl-dev \
+    pkg-config \
+    libclang-dev \
+    cmake
 
-COPY pragma-ingestor/. .
+WORKDIR /home/pragma
 
-RUN mkdir /home/pragma-entities
+# Copy the entire project
+COPY . .
 
-COPY pragma-entities/. /home/pragma-entities/.
-COPY pragma-common/. /home/pragma-common/.
-
-ENV CARGO_HOME="/home/pragma-ingestor/"
-RUN cargo install --path .
+# Build the project
+RUN cargo build --release --bin pragma-ingestor
 
 FROM debian:bookworm-slim
 
@@ -18,14 +22,13 @@ RUN apt-get clean && apt-get update
 RUN apt-get install -y libpq-dev bash
 
 RUN groupadd pragma
-
 RUN useradd -G pragma ingestor
 
 USER ingestor:pragma
 
 WORKDIR /home/pragma-ingestor
 
-COPY --from=builder --chown=ingestor:pragma  /home/pragma-ingestor/bin/pragma-ingestor /usr/local/bin/pragma-ingestor
-# COPY infra/pragma-ingestor/config/.env.example .env
+# Copy the built binary from the builder stage
+COPY --from=builder --chown=ingestor:pragma /home/pragma/target/release/pragma-ingestor /usr/local/bin/pragma-ingestor
 
 CMD ["pragma-ingestor"]

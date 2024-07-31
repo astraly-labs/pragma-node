@@ -43,10 +43,10 @@ impl Pricer for IndexPricer {
 /// Computes the mark price for a list of pairs.
 /// The mark price can be computed with two methods:
 /// 1. if the quote asset is USD, we just return the median price of the recent
-/// perp entries.
+///    perp entries.
 /// 2. if the quote asset is a stablecoin, we compute the median price of the
-/// spot stablecoin/USD pairs and then we divide the median price of the perp
-/// pairs by the median price of the stablecoin.
+///    spot stablecoin/USD pairs and then we divide the median price of the perp
+///    pairs by the median price of the stablecoin.
 pub struct MarkPricer {
     pairs: Vec<String>,
     pair_type: DataType,

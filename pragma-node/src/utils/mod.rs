@@ -149,8 +149,7 @@ pub(crate) fn big_decimal_price_to_hex(price: &BigDecimal) -> String {
 /// TODO: handle future pairs?
 /// A list of pairs can contains:
 /// - Spot pairs: formatted as usual (e.g. "BTC/USD")
-/// - Perpetual pairs: usual pair with a mark suffix (e.g. "BTC/USD:MARK")
-/// Returns two lists of pairs: spot pairs & perpetual pairs.
+/// - Perpetual pairs: usual pair with a mark suffix (e.g. "BTC/USD:MARK").
 pub(crate) async fn only_existing_pairs(
     pool: &Pool,
     pairs: Vec<String>,

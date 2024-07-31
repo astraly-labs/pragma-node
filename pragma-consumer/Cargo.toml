@@ -1,5 +1,5 @@
 [package]
-name = "pragma-ingestor"
+name = "pragma-consumer"
 version = "0.1.0"
 edition = "2021"
 
@@ -20,5 +20,5 @@ toml = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 
-pragma-common = { path = "../pragma-common", version = "1.0.0" }
-pragma-entities = { path = "../pragma-entities", version = "1.0.0" }
+pragma-common = { path = "../pragma-common" }
+pragma-entities = { path = "../pragma-entities" }
