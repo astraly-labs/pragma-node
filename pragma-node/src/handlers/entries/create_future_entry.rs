@@ -2,7 +2,7 @@ use axum::extract::State;
 use axum::Json;
 use chrono::{DateTime, Utc};
 use pragma_entities::{EntryError, NewFutureEntry, PublisherError};
-use starknet::core::types::Felt;
+use starknet::core::types::FieldElement;
 
 use super::{CreateFutureEntryRequest, CreateFutureEntryResponse};
 
@@ -48,7 +48,7 @@ pub async fn create_future_entries(
     // Fetch public key from database
     // TODO: Fetch it from contract
     let public_key = publisher.active_key;
-    let public_key = Felt::from_hex(&public_key)
+    let public_key = FieldElement::from_hex_be(&public_key)
         .map_err(|_| EntryError::PublisherError(PublisherError::InvalidKey(public_key)))?;
 
     tracing::info!(
@@ -63,7 +63,7 @@ pub async fn create_future_entries(
         .await
         .map_err(EntryError::InfraError)?
         .account_address;
-    let account_address = Felt::from_hex(&account_address)
+    let account_address = FieldElement::from_hex_be(&account_address)
         .map_err(|_| EntryError::PublisherError(PublisherError::InvalidAddress(account_address)))?;
 
     tracing::info!(

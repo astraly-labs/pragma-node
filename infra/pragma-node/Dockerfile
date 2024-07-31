@@ -1,34 +1,30 @@
 FROM rust:1.80 as builder
 
-WORKDIR /home/pragma-node
+WORKDIR /home/pragma
 
-COPY pragma-node/. .
+# Copy the entire project
+COPY . .
 
-RUN mkdir /home/pragma-entities
-RUN mkdir /home/pragma-common
-
-COPY pragma-entities/. /home/pragma-entities/.
-COPY pragma-common/. /home/pragma-common/.
-
-ENV CARGO_HOME="/home/pragma-node/"
-RUN cargo install --path .
+# Build the project
+RUN cargo build --release --bin pragma-node
 
 FROM debian:bookworm-slim
 
 # Install necessary packages including CA certificates
-RUN apt-get clean && apt-get update
-RUN apt-get update && apt-get install -y libpq-dev libssl-dev ca-certificates bash && rm -rf /var/lib/apt/lists/*
-RUN update-ca-certificates
+RUN apt-get clean && apt-get update && \
+    apt-get install -y libpq-dev libssl-dev ca-certificates bash && \
+    rm -rf /var/lib/apt/lists/* && \
+    update-ca-certificates
 
 RUN groupadd pragma
-
 RUN useradd -G pragma node
 
 USER node:pragma
 
 WORKDIR /home/pragma-node
 
-COPY --from=builder --chown=node:pragma /home/pragma-node/bin/pragma-node /usr/local/bin/pragma-node
+# Copy the built binary from the builder stage
+COPY --from=builder --chown=node:pragma /home/pragma/target/release/pragma-node /usr/local/bin/pragma-node
 
 EXPOSE 3000
 

@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use starknet::{
     core::{
         crypto::{ecdsa_verify, EcdsaSignError, Signature},
-        types::Felt,
+        types::FieldElement,
     },
     signers::SigningKey,
 };
@@ -24,7 +24,7 @@ pub enum SigningError {
 }
 
 pub trait Signable {
-    fn try_get_hash(&self) -> Result<Felt, ConversionError>;
+    fn try_get_hash(&self) -> Result<FieldElement, ConversionError>;
 }
 
 /// Sign the passed data with the signer & return the signature 0x prefixed.
@@ -43,11 +43,11 @@ pub fn sign_data(signer: &SigningKey, data: &impl Signable) -> Result<String, Si
 /// If it is, we return the signature.
 pub fn assert_request_signature_is_valid<R, E>(
     new_entries_request: &R,
-    publisher_account: &Felt,
-    publisher_public_key: &Felt,
+    publisher_account: &FieldElement,
+    publisher_public_key: &FieldElement,
 ) -> Result<Signature, EntryError>
 where
-    R: AsRef<[Felt]> + AsRef<[E]>,
+    R: AsRef<[FieldElement]> + AsRef<[E]>,
     E: EntryTrait + Serialize + for<'de> Deserialize<'de>,
 {
     // We recently updated our Pragma-SDK. This included a breaking change for how we
@@ -81,18 +81,18 @@ where
 /// Returns the signature if it is correct.
 fn assert_signature_is_valid<R, E>(
     new_entries_request: &R,
-    account_address: &Felt,
-    public_key: &Felt,
+    account_address: &FieldElement,
+    public_key: &FieldElement,
 ) -> Result<Signature, EntryError>
 where
-    R: AsRef<[Felt]> + AsRef<[E]>,
+    R: AsRef<[FieldElement]> + AsRef<[E]>,
     E: EntryTrait + Serialize + for<'de> Deserialize<'de>,
 {
     let entries: &[E] = new_entries_request.as_ref();
     let published_message = build_publish_message(entries, None)?;
     let message_hash = published_message.message_hash(*account_address);
 
-    let signature_slice: &[Felt] = new_entries_request.as_ref();
+    let signature_slice: &[FieldElement] = new_entries_request.as_ref();
     let signature = Signature {
         r: signature_slice[0],
         s: signature_slice[1],
@@ -114,18 +114,18 @@ where
 /// TODO: Remove this function when we stop supporting the old format
 fn assert_legacy_signature_is_valid<R, E>(
     new_entries_request: &R,
-    account_address: &Felt,
-    public_key: &Felt,
+    account_address: &FieldElement,
+    public_key: &FieldElement,
 ) -> Result<Signature, EntryError>
 where
-    R: AsRef<[Felt]> + AsRef<[E]>,
+    R: AsRef<[FieldElement]> + AsRef<[E]>,
     E: EntryTrait + Serialize + for<'de> Deserialize<'de>,
 {
     let entries: &[E] = new_entries_request.as_ref();
     let published_message = build_publish_message(entries, Some(true))?;
     let message_hash = published_message.message_hash(*account_address);
 
-    let signature_slice: &[Felt] = new_entries_request.as_ref();
+    let signature_slice: &[FieldElement] = new_entries_request.as_ref();
     let signature = Signature {
         r: signature_slice[0],
         s: signature_slice[1],

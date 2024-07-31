@@ -19,7 +19,7 @@ pub use get_volatility::get_volatility;
 pub use subscribe_to_entry::subscribe_to_entry;
 
 use serde::{Deserialize, Serialize};
-use starknet::core::types::Felt;
+use starknet::core::types::FieldElement;
 use utoipa::{IntoParams, ToSchema};
 
 use pragma_common::types::{AggregationMode, DataType, Interval, Network};
@@ -33,12 +33,12 @@ use crate::{
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct CreateEntryRequest {
-    pub signature: Vec<Felt>,
+    pub signature: Vec<FieldElement>,
     pub entries: Vec<Entry>,
 }
 
-impl AsRef<[Felt]> for CreateEntryRequest {
-    fn as_ref(&self) -> &[Felt] {
+impl AsRef<[FieldElement]> for CreateEntryRequest {
+    fn as_ref(&self) -> &[FieldElement] {
         &self.signature
     }
 }
@@ -56,12 +56,12 @@ pub struct CreateEntryResponse {
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct CreateFutureEntryRequest {
-    pub signature: Vec<Felt>,
+    pub signature: Vec<FieldElement>,
     pub entries: Vec<FutureEntry>,
 }
 
-impl AsRef<[Felt]> for CreateFutureEntryRequest {
-    fn as_ref(&self) -> &[Felt] {
+impl AsRef<[FieldElement]> for CreateFutureEntryRequest {
+    fn as_ref(&self) -> &[FieldElement] {
         &self.signature
     }
 }

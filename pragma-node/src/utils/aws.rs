@@ -1,5 +1,5 @@
 use aws_sdk_secretsmanager::Client;
-use starknet::{core::types::Felt, signers::SigningKey};
+use starknet::{core::types::FieldElement, signers::SigningKey};
 
 const AWS_PRAGMA_PRIVATE_KEY_SECRET: &str = "pragma-secret-key";
 const AWS_JSON_STARK_PRIVATE_KEY_FIELD: &str = "STARK_PRIVATE_KEY";
@@ -46,7 +46,7 @@ pub async fn build_pragma_signer_from_aws() -> Option<SigningKey> {
         .await
         .ok()?;
     let pragma_secret_key: String = get_pragma_secret_key(secret_json_response).ok()?;
-    let pragma_secret_key = Felt::from_hex(&pragma_secret_key).ok()?;
+    let pragma_secret_key = FieldElement::from_hex_be(&pragma_secret_key).ok()?;
     Some(SigningKey::from_secret_scalar(pragma_secret_key))
 }
 
