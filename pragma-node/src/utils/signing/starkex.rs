@@ -1,7 +1,5 @@
 use bigdecimal::{BigDecimal, ToPrimitive};
-use starknet::core::{
-    crypto::pedersen_hash, types::FieldElement, utils::cairo_short_string_to_felt,
-};
+use starknet::core::{crypto::pedersen_hash, types::Felt, utils::cairo_short_string_to_felt};
 
 use pragma_common::types::ConversionError;
 
@@ -32,9 +30,7 @@ impl StarkexPrice {
         let oracle_as_hex = format!("{:x}", oracle_name);
         let pair_id =
             cairo_short_string_to_felt(&pair_id).map_err(|_| ConversionError::FeltConversion)?;
-        let pair_id: u128 = pair_id
-            .try_into()
-            .map_err(|_| ConversionError::U128Conversion)?;
+        let pair_id: u128 = pair_id.to_u128().ok_or(ConversionError::U128Conversion)?;
         let pair_as_hex = format!("{:0<width$x}", pair_id, width = 32);
         Ok(format!("0x{}{}", pair_as_hex, oracle_as_hex))
     }
@@ -43,21 +39,21 @@ impl StarkexPrice {
     pub fn build_external_asset_id(
         oracle_name: &str,
         pair_id: &str,
-    ) -> Result<FieldElement, ConversionError> {
+    ) -> Result<Felt, ConversionError> {
         let external_asset_id = Self::get_oracle_asset_id(oracle_name, pair_id)?;
-        FieldElement::from_hex_be(&external_asset_id).map_err(|_| ConversionError::FeltConversion)
+        Felt::from_hex(&external_asset_id).map_err(|_| ConversionError::FeltConversion)
     }
 
     /// Builds the second number for the hash computation based on timestamp and price.
     pub fn build_second_number(
         timestamp: u128,
         price: &BigDecimal,
-    ) -> Result<FieldElement, ConversionError> {
+    ) -> Result<Felt, ConversionError> {
         let price = price.to_u128().ok_or(ConversionError::U128Conversion)?;
         let price_as_hex = format!("{:x}", price);
         let timestamp_as_hex = format!("{:x}", timestamp);
         let v = format!("0x{}{}", price_as_hex, timestamp_as_hex);
-        FieldElement::from_hex_be(&v).map_err(|_| ConversionError::FeltConversion)
+        Felt::from_hex(&v).map_err(|_| ConversionError::FeltConversion)
     }
 }
 
@@ -78,7 +74,7 @@ impl Signable for StarkexPrice {
     ///
     /// See:
     /// https://docs.starkware.co/starkex/perpetual/becoming-an-oracle-provider-for-starkex.html#signing_prices
-    fn try_get_hash(&self) -> Result<FieldElement, ConversionError> {
+    fn try_get_hash(&self) -> Result<Felt, ConversionError> {
         let first_number = Self::build_external_asset_id(&self.oracle_name, &self.pair_id)?;
         let second_number = Self::build_second_number(self.timestamp as u128, &self.price)?;
         Ok(pedersen_hash(&first_number, &second_number))
@@ -168,7 +164,7 @@ mod tests {
             price: price.clone(),
         };
         let hashed_data = starkex_price.try_get_hash().expect("Could not build hash");
-        let expected_data = FieldElement::from_hex_be(expected_hash).unwrap();
+        let expected_data = Felt::from_hex(expected_hash).unwrap();
         assert_eq!(
             hashed_data, expected_data,
             "Hashes do not match for oracle_name: {}, pair_id: {}, price: {}, timestamp: {}",

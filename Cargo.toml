@@ -1,3 +1,59 @@
 [workspace]
-members = ["pragma-node", "pragma-ingestor", "pragma-entities", "pragma-common"]
 resolver = "2"
+members = [
+  "pragma-node",
+  "pragma-ingestor",
+  "pragma-entities",
+  "pragma-common",
+  "pragma-consumer",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["Pragma Labs <support@pragma.build>"]
+
+[workspace.dependencies]
+aws-config = { version = "1.5.1", features = ["behavior-version-latest"] }
+aws-sdk-secretsmanager = "1.32.0"
+axum = { version = "0.6", features = ["macros", "ws", "tokio"] }
+axum-macros = "0.3"
+diesel = { version = "2.1", features = [
+  "postgres",
+  "extras",
+  "postgres_backend",
+  "serde_json",
+] }
+bigdecimal = { version = "0.4.1", features = ["serde"] }
+diesel_migrations = "2"
+deadpool-diesel = { version = "0.4", features = ["postgres"] }
+futures-util = "0.3.30"
+governor = { version = "0.6.0" }
+dotenvy = "0.15.7"
+envy = "0.4.2"
+chrono = { version = "0.4.26", features = ["serde"] }
+lazy_static = "1.4.0"
+serde = { version = "1.0", features = ["derive"] }
+moka = { version = "0.12", features = ["future"] }
+prometheus = "0.13.4"
+nonzero_ext = { version = "0.3.0" }
+serde_json = { version = "1.0", features = ["arbitrary_precision"] }
+starknet = "0.11.0"
+rdkafka = "0.36.0"
+time = "0.3.29"
+thiserror = "1.0.49"
+strum = { version = "0.25.0", features = ["derive"] }
+tracing = "0.1"
+url = "2.5.0"
+tower-http = { version = "0.4.0", features = ["fs", "trace", "cors"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tokio = { version = "1.11.0", features = ["full"] }
+toml = "0.8.8"
+utoipa = "4"
+utoipa-swagger-ui = { version = "4", features = ["axum"] }
+uuid = { version = "1.4", features = ["fast-rng", "v4", "serde"] }
+
+pragma-monitoring = { git = "https://github.com/astraly-labs/pragma-monitoring", branch = "main" }
+
+# Test dependencies
+rstest = "0.18.2"

@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use starknet::core::{
     crypto::compute_hash_on_elements,
-    types::FieldElement,
+    types::Felt,
     utils::{cairo_short_string_to_felt, get_selector_from_name},
 };
 use std::{
@@ -71,23 +71,23 @@ where
     /// # Returns
     ///
     /// * The encoded value.
-    fn encode_value(&self, type_name: &str, value: &Value) -> Result<FieldElement, &'static str> {
+    fn encode_value(&self, type_name: &str, value: &Value) -> Result<Felt, &'static str> {
         if Self::is_pointer(type_name) {
             if let Value::Array(arr) = value {
                 let type_name = Self::strip_pointer(type_name);
 
                 if self.is_struct(&type_name) {
                     // Assuming you have a method called `struct_hash` similar to the Python version
-                    let hashes: Vec<FieldElement> = arr
+                    let hashes: Vec<Felt> = arr
                         .iter()
                         .map(|data| self.struct_hash(&type_name, data.as_object().unwrap()))
                         .collect();
                     // Assuming you have a method called `compute_hash_on_elements`
                     Ok(compute_hash_on_elements(&hashes))
                 } else {
-                    let hashes: Vec<FieldElement> = arr
+                    let hashes: Vec<Felt> = arr
                         .iter()
-                        .map(|val| FieldElement::from_str(&get_hex(val).unwrap()).unwrap())
+                        .map(|val| Felt::from_str(&get_hex(val).unwrap()).unwrap())
                         .collect();
                     Ok(compute_hash_on_elements(&hashes))
                 }
@@ -101,7 +101,7 @@ where
                 return Err("Expected an object for struct type");
             }
         } else {
-            return Ok(FieldElement::from_str(&get_hex(value).unwrap()).unwrap());
+            return Ok(Felt::from_str(&get_hex(value).unwrap()).unwrap());
         }
     }
 
@@ -195,7 +195,7 @@ where
     /// # Returns
     ///
     /// * The encoded data.
-    fn encode_data(&self, type_name: &str, data: &Map<String, Value>) -> Vec<FieldElement> {
+    fn encode_data(&self, type_name: &str, data: &Map<String, Value>) -> Vec<Felt> {
         self.types[type_name]
             .iter()
             .map(|param| self.encode_value(&param.type_, &data[&param.name]).unwrap())
@@ -212,12 +212,12 @@ where
     /// # Returns
     ///
     /// * The hash of the struct.
-    pub fn struct_hash(&self, type_name: &str, data: &Map<String, Value>) -> FieldElement {
+    pub fn struct_hash(&self, type_name: &str, data: &Map<String, Value>) -> Felt {
         let type_hash = self.type_hash(type_name);
         let encoded_data = self.encode_data(type_name, data).to_vec();
         let elements = std::iter::once(type_hash)
             .chain(encoded_data)
-            .collect::<Vec<FieldElement>>();
+            .collect::<Vec<Felt>>();
 
         compute_hash_on_elements(&elements)
     }
@@ -231,7 +231,7 @@ where
     /// # Returns
     ///
     /// * The hash of the type.
-    pub fn type_hash(&self, type_name: &str) -> FieldElement {
+    pub fn type_hash(&self, type_name: &str) -> Felt {
         get_selector_from_name(&self.encode_type(type_name)).unwrap()
     }
 
@@ -244,7 +244,7 @@ where
     /// # Returns
     ///
     /// * The hash of the message.
-    pub fn message_hash(&self, account_address: FieldElement) -> FieldElement {
+    pub fn message_hash(&self, account_address: Felt) -> Felt {
         let prefix = cairo_short_string_to_felt("StarkNet Message").unwrap();
 
         let json_str = serde_json::to_string(&self.domain).unwrap();
@@ -283,7 +283,7 @@ where
 pub(crate) fn get_hex(value: &Value) -> Result<String, &'static str> {
     match value {
         Value::Number(n) => {
-            let i = FieldElement::from_dec_str(&n.to_string()).expect("Error parsing number");
+            let i = Felt::from_dec_str(&n.to_string()).expect("Error parsing number");
             Ok(format!("{:#x}", i))
         }
         Value::String(s) => {
@@ -347,7 +347,7 @@ mod tests {
     #[derive(Debug, Serialize, Deserialize)]
     struct ContentsType {
         len: u64,
-        data: Vec<FieldElement>,
+        data: Vec<Felt>,
     }
 
     #[derive(Debug, Serialize, Deserialize)]
@@ -598,7 +598,7 @@ mod tests {
         #[case] account_address: &str,
         #[case] msg_hash: &str,
     ) {
-        let account_address = FieldElement::from_hex_be(account_address).unwrap();
+        let account_address = Felt::from_hex(account_address).unwrap();
 
         let result = match example {
             TD => {
