@@ -5,6 +5,7 @@ use axum::Router;
 use utoipa::OpenApi as OpenApiT;
 use utoipa_swagger_ui::SwaggerUi;
 
+use crate::handlers::entries::get_onchain::history::get_onchain_history;
 use crate::handlers::entries::get_onchain::{
     checkpoints::get_onchain_checkpoints, get_onchain, ohlc::subscribe_to_onchain_ohlc,
     publishers::get_onchain_publishers,
@@ -51,6 +52,7 @@ fn data_routes(state: AppState) -> Router<AppState> {
 fn onchain_routes(state: AppState) -> Router<AppState> {
     Router::new()
         .route("/:base/:quote", get(get_onchain))
+        .route("/history/:base/:quote", get(get_onchain_history))
         .route("/checkpoints/:base/:quote", get(get_onchain_checkpoints))
         .route("/publishers", get(get_onchain_publishers))
         .route("/ohlc/subscribe", get(subscribe_to_onchain_ohlc))

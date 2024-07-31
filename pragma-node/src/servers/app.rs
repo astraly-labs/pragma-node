@@ -35,6 +35,7 @@ pub async fn run_app_server(config: &Config, state: AppState) {
             handlers::entries::subscribe_to_entry::subscribe_to_entry,
             handlers::entries::get_volatility::get_volatility,
             handlers::entries::get_onchain::get_onchain,
+            handlers::entries::get_onchain::history::get_onchain_history,
             handlers::entries::get_onchain::checkpoints::get_onchain_checkpoints,
             handlers::entries::get_onchain::publishers::get_onchain_publishers,
             handlers::entries::get_onchain::ohlc::subscribe_to_onchain_ohlc,
@@ -60,6 +61,10 @@ pub async fn run_app_server(config: &Config, state: AppState) {
                 handlers::entries::GetOnchainPublishersParams,
                 handlers::entries::GetOnchainPublishersResponse,
                 handlers::entries::GetOnchainOHLCResponse,
+                handlers::entries::GetOnchainHistoryParams,
+                handlers::entries::GetOnchainHistoryEntry,
+                handlers::entries::GetOnchainHistoryResponse,
+
             ),
             schemas(
                 types::entries::BaseEntry,

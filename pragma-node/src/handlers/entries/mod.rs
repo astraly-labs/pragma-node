@@ -276,3 +276,35 @@ pub struct SubscribeToEntryResponse {
     pub oracle_prices: Vec<AssetOraclePrice>,
     pub timestamp: UnixTimestamp,
 }
+
+#[derive(Debug, Deserialize, IntoParams, ToSchema)]
+pub struct GetOnchainHistoryParams {
+    pub network: Network,
+    pub aggregation: Option<AggregationMode>,
+    pub routing: Option<bool>,
+    pub timestamp: Option<TimestampParam>,
+    // TODO(akhercha): add block/block_range
+}
+
+impl Default for GetOnchainHistoryParams {
+    fn default() -> Self {
+        Self {
+            network: Network::default(),
+            aggregation: None,
+            timestamp: Some(TimestampParam::from(chrono::Utc::now().timestamp() as u64)),
+            routing: None,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct GetOnchainHistoryEntry {
+    pair_id: String,
+    timestamp: u64,
+    price: String,
+    decimals: u32,
+    nb_sources_aggregated: u32,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct GetOnchainHistoryResponse(pub Vec<GetOnchainHistoryEntry>);

@@ -84,7 +84,12 @@ pub async fn create_future_entries(
         .map(|future_entry| {
             let dt = match DateTime::<Utc>::from_timestamp(future_entry.base.timestamp as i64, 0) {
                 Some(dt) => dt.naive_utc(),
-                None => return Err(EntryError::InvalidTimestamp),
+                None => {
+                    return Err(EntryError::InvalidTimestamp(format!(
+                        "Could not convert {} to DateTime",
+                        future_entry.base.timestamp
+                    )))
+                }
             };
 
             // For expiration_timestamp, 0 is sent by publishers for perpetual entries.
@@ -96,7 +101,12 @@ pub async fn create_future_entries(
                     future_entry.expiration_timestamp as i64,
                 ) {
                     Some(dt) => Some(dt.naive_utc()),
-                    None => return Err(EntryError::InvalidTimestamp),
+                    None => {
+                        return Err(EntryError::InvalidTimestamp(format!(
+                            "Could not convert {} to DateTime",
+                            future_entry.expiration_timestamp
+                        )))
+                    }
                 }
             };
 

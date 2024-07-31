@@ -83,7 +83,12 @@ pub async fn create_entries(
         .map(|entry| {
             let dt = match DateTime::<Utc>::from_timestamp(entry.base.timestamp as i64, 0) {
                 Some(dt) => dt.naive_utc(),
-                None => return Err(EntryError::InvalidTimestamp),
+                None => {
+                    return Err(EntryError::InvalidTimestamp(format!(
+                        "Could not convert {} to DateTime",
+                        entry.base.timestamp
+                    )))
+                }
             };
 
             Ok(NewEntry {

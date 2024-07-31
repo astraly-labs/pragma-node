@@ -31,19 +31,25 @@ impl TimestampParam {
         match ts_param {
             Some(TimestampParam::Single(ts)) => {
                 if ts > now {
-                    return Err(EntryError::InvalidTimestamp);
+                    return Err(EntryError::InvalidTimestamp(
+                        "Timestamp is in the future.".into(),
+                    ));
                 }
                 Ok(TimestampParam::Single(ts))
             }
             Some(TimestampParam::Range(range)) => {
                 // Check if start is after end
                 if range.start() > range.end() {
-                    return Err(EntryError::InvalidTimestamp);
+                    return Err(EntryError::InvalidTimestamp(
+                        "Range timestamp first date is greater than the second date.".into(),
+                    ));
                 }
 
                 // Check if end is in the future
                 if *range.end() > now {
-                    return Err(EntryError::InvalidTimestamp);
+                    return Err(EntryError::InvalidTimestamp(
+                        "Range timestamp end is in the future.".into(),
+                    ));
                 }
                 Ok(TimestampParam::Range(range))
             }

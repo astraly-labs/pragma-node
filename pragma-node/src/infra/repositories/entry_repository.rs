@@ -195,7 +195,9 @@ pub fn calculate_rebased_price(
     );
     let num_sources = std::cmp::max(base_entry.num_sources, quote_entry.num_sources);
     let new_timestamp = DateTime::from_timestamp(min_timestamp, 0)
-        .ok_or(InfraError::InvalidTimeStamp)?
+        .ok_or(InfraError::InvalidTimestamp(format!(
+            "Cannot convert to DateTime: {min_timestamp}"
+        )))?
         .naive_utc();
 
     let median_entry = MedianEntry {
@@ -319,8 +321,12 @@ pub async fn get_twap_price(
         get_expiration_timestamp_filter(routing_params.data_type, routing_params.expiry)?,
     );
 
-    let date_time = DateTime::from_timestamp(routing_params.timestamp, 0)
-        .ok_or(InfraError::InvalidTimeStamp)?;
+    let date_time = DateTime::from_timestamp(routing_params.timestamp, 0).ok_or(
+        InfraError::InvalidTimestamp(format!(
+            "Cannot convert to DateTime: {}",
+            routing_params.timestamp
+        )),
+    )?;
 
     let raw_entry = conn
         .interact(move |conn| {
@@ -374,8 +380,12 @@ pub async fn get_median_price(
         get_expiration_timestamp_filter(routing_params.data_type, routing_params.expiry)?,
     );
 
-    let date_time = DateTime::from_timestamp(routing_params.timestamp, 0)
-        .ok_or(InfraError::InvalidTimeStamp)?;
+    let date_time = DateTime::from_timestamp(routing_params.timestamp, 0).ok_or(
+        InfraError::InvalidTimestamp(format!(
+            "Cannot convert to DateTime: {}",
+            routing_params.timestamp
+        )),
+    )?;
 
     let raw_entry = conn
         .interact(move |conn| {
@@ -406,10 +416,12 @@ pub async fn get_entries_between(
     end_timestamp: u64,
 ) -> Result<Vec<MedianEntry>, InfraError> {
     let conn = pool.get().await.map_err(adapt_infra_error)?;
-    let start_datetime =
-        DateTime::from_timestamp(start_timestamp as i64, 0).ok_or(InfraError::InvalidTimeStamp)?;
-    let end_datetime =
-        DateTime::from_timestamp(end_timestamp as i64, 0).ok_or(InfraError::InvalidTimeStamp)?;
+    let start_datetime = DateTime::from_timestamp(start_timestamp as i64, 0).ok_or(
+        InfraError::InvalidTimestamp(format!("Cannot convert to DateTime: {start_timestamp}")),
+    )?;
+    let end_datetime = DateTime::from_timestamp(end_timestamp as i64, 0).ok_or(
+        InfraError::InvalidTimestamp(format!("Cannot convert to DateTime: {start_timestamp}")),
+    )?;
 
     let raw_sql = r#"
         SELECT
@@ -571,7 +583,9 @@ pub async fn get_ohlc(
         get_interval_specifier(interval, false)?
     );
 
-    let date_time = DateTime::from_timestamp(time, 0).ok_or(InfraError::InvalidTimeStamp)?;
+    let date_time = DateTime::from_timestamp(time, 0).ok_or(InfraError::InvalidTimestamp(
+        format!("Cannot convert to DateTime: {time}"),
+    ))?;
 
     let raw_entries = conn
         .interact(move |conn| {

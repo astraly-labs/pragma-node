@@ -47,7 +47,9 @@ pub async fn get_ohlc(
 
     // Validate given timestamp
     if timestamp > now {
-        return Err(EntryError::InvalidTimestamp);
+        return Err(EntryError::InvalidTimestamp(format!(
+            "Timestamp is in the future: {timestamp}"
+        )));
     }
 
     let entries =

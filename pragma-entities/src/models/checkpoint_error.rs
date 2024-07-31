@@ -21,7 +21,7 @@ impl From<InfraError> for CheckpointError {
             InfraError::InternalServerError => Self::InternalServerError,
             InfraError::NotFound => Self::NotFound,
             InfraError::RoutingError => Self::InternalServerError,
-            InfraError::InvalidTimeStamp => Self::InternalServerError,
+            InfraError::InvalidTimestamp(_) => Self::InternalServerError,
             InfraError::NonZeroU32Conversion(_) => Self::InternalServerError,
             InfraError::AxumError(_) => Self::InternalServerError,
         }

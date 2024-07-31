@@ -1,4 +1,5 @@
 pub mod checkpoints;
+pub mod history;
 pub mod ohlc;
 pub mod publishers;
 
@@ -39,7 +40,7 @@ pub async fn get_onchain(
     State(state): State<AppState>,
     PathExtractor(pair): PathExtractor<(String, String)>,
     Query(params): Query<GetOnchainParams>,
-) -> Result<Json<Vec<GetOnchainResponse>>, EntryError> {
+) -> Result<Json<GetOnchainResponse>, EntryError> {
     tracing::info!("Received get onchain entry request for pair {:?}", pair);
     let is_routing = params.routing.unwrap_or(false);
     let with_components = params.components.unwrap_or(true);
@@ -47,6 +48,16 @@ pub async fn get_onchain(
     let pair_id: String = currency_pair_to_pair_id(&pair.0, &pair.1);
     let aggregation_mode = params.aggregation.unwrap_or_default();
     let timestamp = TimestampParam::from_api_parameter(params.timestamp)?;
+
+    // Only single timestamps works for the get_onchain request.
+    match timestamp {
+        TimestampParam::Single(_) => {}
+        TimestampParam::Range(_) => {
+            return Err(EntryError::InvalidTimestamp(String::from(
+                "get_onchain only accepts a timestamp, not a range.",
+            )))
+        }
+    };
 
     let raw_data = routing(
         &state.onchain_pool,
@@ -69,31 +80,28 @@ pub async fn get_onchain(
     .await
     .map_err(|db_error| db_error.to_entry_error(&pair_id))?;
 
-    // We only compute variations if the timestamp is not a range
-    let variations = match timestamp {
-        TimestampParam::Single(_) => {
-            let v = get_variations(&state.onchain_pool, params.network, pair_id.clone())
-                .await
-                .map_err(|db_error| db_error.to_entry_error(&pair_id))?;
-            Some(v)
+    let variations = get_variations(&state.onchain_pool, params.network, pair_id.clone())
+        .await
+        .map_err(|db_error| db_error.to_entry_error(&pair_id))?;
+
+    let entry = match raw_data.first() {
+        Some(e) => e,
+        None => {
+            return Err(EntryError::NotFound(format!(
+                "No entry found for {pair_id}"
+            )))
         }
-        TimestampParam::Range(_) => None,
     };
 
-    let mut api_result: Vec<GetOnchainResponse> = Vec::with_capacity(raw_data.len());
-
-    for entries in raw_data {
-        api_result.push(adapt_entries_to_onchain_response(
-            pair_id.clone(),
-            entries.decimal,
-            entries.sources,
-            entries.price,
-            last_updated_timestamp,
-            variations.clone(),
-            with_components,
-        ));
-    }
-    Ok(Json(api_result))
+    Ok(Json(adapt_entries_to_onchain_response(
+        pair_id.clone(),
+        entry.decimal,
+        entry.sources.clone(),
+        entry.price.clone(),
+        last_updated_timestamp,
+        variations,
+        with_components,
+    )))
 }
 
 fn adapt_entries_to_onchain_response(
@@ -102,7 +110,7 @@ fn adapt_entries_to_onchain_response(
     sources: Vec<OnchainEntry>,
     aggregated_price: BigDecimal,
     last_updated_timestamp: u64,
-    variations: Option<HashMap<Interval, f32>>,
+    variations: HashMap<Interval, f32>,
     with_components: bool,
 ) -> GetOnchainResponse {
     GetOnchainResponse {
@@ -114,6 +122,6 @@ fn adapt_entries_to_onchain_response(
         // Only asset type used for now is Crypto
         asset_type: "Crypto".to_string(),
         components: with_components.then_some(sources),
-        variations,
+        variations: Some(variations),
     }
 }

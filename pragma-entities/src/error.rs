@@ -13,7 +13,7 @@ pub enum InfraError {
     InternalServerError,
     RoutingError,
     NotFound,
-    InvalidTimeStamp,
+    InvalidTimestamp(String),
     #[error(transparent)]
     NonZeroU32Conversion(#[from] TryFromIntError),
     #[error(transparent)]
@@ -26,7 +26,7 @@ impl InfraError {
             InfraError::InternalServerError => EntryError::InternalServerError,
             InfraError::NotFound => EntryError::NotFound(pair_id.to_string()),
             InfraError::RoutingError => EntryError::MissingData(pair_id.to_string()),
-            InfraError::InvalidTimeStamp => EntryError::InvalidTimestamp,
+            InfraError::InvalidTimestamp(e) => EntryError::InvalidTimestamp(e.to_string()),
             InfraError::NonZeroU32Conversion(_) => EntryError::InternalServerError,
             InfraError::AxumError(_) => EntryError::InternalServerError,
         }
@@ -54,7 +54,7 @@ impl fmt::Display for InfraError {
             InfraError::NotFound => write!(f, "Not found"),
             InfraError::RoutingError => write!(f, "Routing Error"),
             InfraError::InternalServerError => write!(f, "Internal server error"),
-            InfraError::InvalidTimeStamp => write!(f, "Invalid timestamp"),
+            InfraError::InvalidTimestamp(e) => write!(f, "Invalid timestamp {e}"),
             InfraError::NonZeroU32Conversion(e) => write!(f, "Non zero u32 conversion {e}"),
             InfraError::AxumError(e) => write!(f, "Axum error {e}"),
         }

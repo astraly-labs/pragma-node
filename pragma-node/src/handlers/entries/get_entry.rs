@@ -35,7 +35,9 @@ impl TryFrom<GetEntryParams> for RoutingParams {
         };
 
         if timestamp > now {
-            return Err(EntryError::InvalidTimestamp);
+            return Err(EntryError::InvalidTimestamp(format!(
+                "Timestamp is in the future: {timestamp}"
+            )));
         }
 
         let interval = if let Some(interval) = params.interval {

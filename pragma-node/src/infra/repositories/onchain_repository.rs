@@ -17,8 +17,8 @@ use crate::infra::repositories::entry_repository::{
 };
 use crate::types::TimestampParam;
 use crate::utils::{
-    convert_via_quote, format_bigdecimal_price, get_decimals_for_pair, get_mid_price,
-    normalize_to_decimals,
+    big_decimal_price_to_hex, convert_via_quote, format_bigdecimal_price, get_decimals_for_pair,
+    get_mid_price, normalize_to_decimals,
 };
 
 use super::entry_repository::get_decimals;
@@ -75,7 +75,7 @@ impl From<SpotEntryWithAggregatedPrice> for OnchainEntry {
         OnchainEntry {
             publisher: entry.spot_entry.publisher,
             source: entry.spot_entry.source,
-            price: entry.spot_entry.price.to_string(),
+            price: big_decimal_price_to_hex(&entry.spot_entry.price),
             tx_hash: entry.spot_entry.transaction_hash,
             timestamp: entry.spot_entry.timestamp.and_utc().timestamp() as u64,
         }
@@ -87,7 +87,7 @@ impl From<&SpotEntryWithAggregatedPrice> for OnchainEntry {
         OnchainEntry {
             publisher: entry.spot_entry.publisher.clone(),
             source: entry.spot_entry.source.clone(),
-            price: entry.spot_entry.price.to_string(),
+            price: big_decimal_price_to_hex(&entry.spot_entry.price),
             tx_hash: entry.spot_entry.transaction_hash.clone(),
             timestamp: entry.spot_entry.timestamp.and_utc().timestamp() as u64,
         }
@@ -736,13 +736,12 @@ pub struct RawLastPublisherEntryForPair {
 
 impl RawLastPublisherEntryForPair {
     pub fn to_publisher_entry(&self, currencies: &HashMap<String, BigDecimal>) -> PublisherEntry {
-        let decimals = get_decimals_for_pair(currencies, &self.pair_id);
         PublisherEntry {
             pair_id: self.pair_id.clone(),
             last_updated_timestamp: self.last_updated_timestamp.and_utc().timestamp() as u64,
-            price: format_bigdecimal_price(self.price.clone(), decimals),
+            price: big_decimal_price_to_hex(&self.price),
             source: self.source.clone(),
-            decimals,
+            decimals: get_decimals_for_pair(currencies, &self.pair_id),
             daily_updates: self.daily_updates as u32,
         }
     }
