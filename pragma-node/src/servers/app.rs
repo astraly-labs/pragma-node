@@ -75,6 +75,7 @@ pub async fn run_app_server(config: &Config, state: AppState) {
                 handlers::entries::get_onchain::publishers::Publisher,
                 handlers::entries::get_onchain::publishers::PublisherEntry,
                 handlers::entries::get_onchain::history::GetOnchainHistoryEntry,
+                handlers::entries::get_onchain::history::ChunkInterval,
             ),
             schemas(
                 pragma_common::types::AggregationMode,

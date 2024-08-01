@@ -133,18 +133,10 @@ pub async fn get_onchain_history(
 fn prepare_response(pair_id: &str, raw_data: Vec<RawOnchainData>) -> GetOnchainHistoryResponse {
     let mut api_result = Vec::with_capacity(raw_data.len());
     for entry in raw_data {
-        let last_updated_timestamp = entry
-            .sources
-            .iter()
-            .map(|source| source.timestamp)
-            .max()
-            .unwrap_or(0);
-
         api_result.push(adapt_entries_to_onchain_history_entry(
             pair_id.to_owned(),
             entry.decimal,
             entry.sources,
-            last_updated_timestamp,
             entry.price,
         ));
     }
@@ -155,9 +147,14 @@ fn adapt_entries_to_onchain_history_entry(
     pair_id: String,
     decimals: u32,
     sources: Vec<OnchainEntry>,
-    last_updated_timestamp: u64,
     aggregated_price: BigDecimal,
 ) -> GetOnchainHistoryEntry {
+    let last_updated_timestamp = sources
+        .iter()
+        .map(|source| source.timestamp)
+        .max()
+        .unwrap_or(0);
+
     let nb_sources_aggregated = sources
         .iter()
         .map(|entry| &entry.source)
