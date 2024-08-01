@@ -8,16 +8,20 @@ use pragma_entities::EntryError;
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 
-use crate::infra::repositories::onchain_repository::{routing, RawOnchainData};
+use crate::infra::repositories::onchain_repository::{
+    routing, OnchainRoutingArguments, RawOnchainData,
+};
 use crate::types::timestamp::TimestampParam;
 use crate::utils::{big_decimal_price_to_hex, PathExtractor};
-use crate::AppState;
+use crate::{is_enum_variant, AppState};
 
 use super::OnchainEntry;
 use crate::utils::currency_pair_to_pair_id;
 
 #[derive(Default, Debug, Serialize, Deserialize, ToSchema, Clone, Copy)]
 pub enum ChunkInterval {
+    #[serde(rename = "1s")]
+    OneSecond,
     #[serde(rename = "10s")]
     TenSeconds,
     #[serde(rename = "1min")]
@@ -40,6 +44,7 @@ pub enum ChunkInterval {
 impl ChunkInterval {
     pub fn as_sql_interval(&self) -> &str {
         match self {
+            Self::OneSecond => "1 second",
             Self::TenSeconds => "10 seconds",
             Self::OneMinute => "1 minute",
             Self::FifteenMinutes => "15 minutes",
@@ -99,7 +104,6 @@ pub async fn get_onchain_history(
 ) -> Result<Json<GetOnchainHistoryResponse>, EntryError> {
     tracing::info!("Received get onchain history request for pair {:?}", pair);
     let pair_id: String = currency_pair_to_pair_id(&pair.0, &pair.1);
-    let aggregation_mode = params.aggregation.unwrap_or_default();
     let mut chunk_interval = params.chunk_interval.unwrap_or_default();
 
     let timestamp = params
@@ -109,22 +113,22 @@ pub async fn get_onchain_history(
 
     // NOTE: For single timestamps, chunk interval is always [ChunkInterval::OneHour]
     // to align with `get_onchain`.
-    if timestamp.is_single() {
+    if is_enum_variant!(timestamp, TimestampParam::Single) {
         chunk_interval = ChunkInterval::OneHour;
     }
 
-    let raw_data = routing(
-        &state.onchain_pool,
-        &state.offchain_pool,
-        params.network,
-        pair_id.clone(),
-        timestamp.clone(),
-        aggregation_mode,
-        false,
+    let routing_arguments = OnchainRoutingArguments {
+        pair_id: pair_id.clone(),
+        network: params.network,
+        timestamp,
+        aggregation_mode: params.aggregation.unwrap_or_default(),
+        is_routing: false,
         chunk_interval,
-    )
-    .await
-    .map_err(|db_error| db_error.to_entry_error(&pair_id))?;
+    };
+
+    let raw_data = routing(&state.onchain_pool, &state.offchain_pool, routing_arguments)
+        .await
+        .map_err(|db_error| db_error.to_entry_error(&pair_id))?;
 
     let response = prepare_response(&pair_id, raw_data);
     Ok(Json(response))

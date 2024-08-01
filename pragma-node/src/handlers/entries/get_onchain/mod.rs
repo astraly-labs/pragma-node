@@ -15,11 +15,11 @@ use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 
 use crate::infra::repositories::onchain_repository::{
-    get_last_updated_timestamp, get_variations, routing,
+    get_last_updated_timestamp, get_variations, routing, OnchainRoutingArguments,
 };
 use crate::types::timestamp::TimestampParam;
 use crate::utils::{big_decimal_price_to_hex, PathExtractor};
-use crate::AppState;
+use crate::{is_enum_variant, AppState};
 
 use crate::utils::currency_pair_to_pair_id;
 
@@ -50,7 +50,7 @@ pub struct GetOnchainResponse {
     nb_sources_aggregated: u32,
     asset_type: String,
     components: Option<Vec<OnchainEntry>>,
-    variations: Option<HashMap<Interval, f32>>,
+    variations: HashMap<Interval, f32>,
 }
 
 #[utoipa::path(
@@ -74,33 +74,30 @@ pub async fn get_onchain(
 ) -> Result<Json<GetOnchainResponse>, EntryError> {
     tracing::info!("Received get onchain entry request for pair {:?}", pair);
     let pair_id: String = currency_pair_to_pair_id(&pair.0, &pair.1);
-    let aggregation_mode = params.aggregation.unwrap_or_default();
-    let is_routing = params.routing.unwrap_or(false);
     let with_components = params.components.unwrap_or(true);
-
     let timestamp = params
         .timestamp
         .unwrap_or_default()
         .assert_time_is_valid()?;
 
-    if !timestamp.is_single() {
+    if !is_enum_variant!(timestamp, TimestampParam::Single) {
         return Err(EntryError::InvalidTimestamp(
             "Expected a single timestamp, not a Range.".into(),
         ));
     }
 
-    let raw_data = routing(
-        &state.onchain_pool,
-        &state.offchain_pool,
-        params.network,
-        pair_id.clone(),
-        timestamp.clone(),
-        aggregation_mode,
-        is_routing,
-        ChunkInterval::OneHour,
-    )
-    .await
-    .map_err(|db_error| db_error.to_entry_error(&pair_id))?;
+    let routing_arguments = OnchainRoutingArguments {
+        pair_id: pair_id.clone(),
+        network: params.network,
+        timestamp,
+        aggregation_mode: params.aggregation.unwrap_or_default(),
+        is_routing: params.routing.unwrap_or(false),
+        chunk_interval: ChunkInterval::OneHour,
+    };
+
+    let raw_data = routing(&state.onchain_pool, &state.offchain_pool, routing_arguments)
+        .await
+        .map_err(|db_error| db_error.to_entry_error(&pair_id))?;
 
     let entry = raw_data
         .first()
@@ -144,6 +141,6 @@ fn adapt_entries_to_onchain_response(
         // Only asset type used for now is Crypto
         asset_type: "Crypto".to_string(),
         components: with_components.then_some(sources),
-        variations: Some(variations),
+        variations,
     }
 }

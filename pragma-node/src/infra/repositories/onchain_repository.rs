@@ -310,28 +310,34 @@ fn compute_multiple_rebased_price(
     Ok(result)
 }
 
-#[allow(clippy::too_many_arguments)]
+pub struct OnchainRoutingArguments {
+    pub pair_id: String,
+    pub network: Network,
+    pub timestamp: TimestampParam,
+    pub aggregation_mode: AggregationMode,
+    pub is_routing: bool,
+    pub chunk_interval: ChunkInterval,
+}
+
 pub async fn routing(
     onchain_pool: &Pool,
     offchain_pool: &Pool,
-    network: Network,
-    pair_id: String,
-    timestamp: TimestampParam,
-    aggregation_mode: AggregationMode,
-    is_routing: bool,
-    chunk_interval: ChunkInterval,
+    routing_args: OnchainRoutingArguments,
 ) -> Result<Vec<RawOnchainData>, InfraError> {
-    let existing_pair_list = get_existing_pairs(onchain_pool, network).await?;
+    let pair_id = routing_args.pair_id;
+    let is_routing = routing_args.is_routing;
+
+    let existing_pair_list = get_existing_pairs(onchain_pool, routing_args.network).await?;
     let mut result: Vec<RawOnchainData> = Vec::new();
 
     if !is_routing || onchain_pair_exist(&existing_pair_list, &pair_id) {
         let prices_and_entries = get_sources_and_aggregate(
             onchain_pool,
-            network,
+            routing_args.network,
             pair_id.clone(),
-            timestamp,
-            aggregation_mode,
-            chunk_interval,
+            routing_args.timestamp,
+            routing_args.aggregation_mode,
+            routing_args.chunk_interval,
         )
         .await?;
         let decimal = get_decimals(offchain_pool, &pair_id).await?;
@@ -369,21 +375,21 @@ pub async fn routing(
         {
             let mut base_alt_result = get_sources_and_aggregate(
                 onchain_pool,
-                network,
+                routing_args.network,
                 base_alt_pair.clone(),
-                timestamp.clone(),
-                aggregation_mode,
-                chunk_interval,
+                routing_args.timestamp.clone(),
+                routing_args.aggregation_mode,
+                routing_args.chunk_interval,
             )
             .await?;
             let base_alt_decimal = get_decimals(offchain_pool, &base_alt_pair).await?;
             let quote_alt_result = get_sources_and_aggregate(
                 onchain_pool,
-                network,
+                routing_args.network,
                 alt_quote_pair.clone(),
-                timestamp,
-                aggregation_mode,
-                chunk_interval,
+                routing_args.timestamp,
+                routing_args.aggregation_mode,
+                routing_args.chunk_interval,
             )
             .await?;
             let quote_alt_decimal = get_decimals(offchain_pool, &alt_quote_pair).await?;

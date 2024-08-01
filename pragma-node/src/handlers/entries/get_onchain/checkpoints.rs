@@ -25,7 +25,7 @@ impl Default for GetOnchainCheckpointsParams {
     fn default() -> Self {
         Self {
             network: Network::default(),
-            limit: Some(100),
+            limit: Some(DEFAULT_LIMIT),
         }
     }
 }

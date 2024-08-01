@@ -54,20 +54,6 @@ impl TimestampParam {
         }
         Ok(self)
     }
-
-    pub fn is_single(&self) -> bool {
-        match self {
-            Self::Single(_) => true,
-            Self::Range(_) => false,
-        }
-    }
-
-    pub fn is_range(&self) -> bool {
-        match self {
-            Self::Single(_) => false,
-            Self::Range(_) => true,
-        }
-    }
 }
 
 impl<'de> Deserialize<'de> for TimestampParam {

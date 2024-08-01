@@ -30,6 +30,7 @@ if [ "$fill_method" = "indexer" ]; then
     read -p "Enter your Apibara API key: " apibara_api_key
 
     # Fetch the latest block number
+    # TODO: get env variable, if empty get latest_block
     latest_block=$(curl -s --location 'https://juno.sepolia.dev.pragma.build' \
     --header 'Content-Type: application/json' \
     --data '{
