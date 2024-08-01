@@ -91,10 +91,11 @@ The project follows a modular structure to keep the code organized and maintaina
 
 ## Development
 
-Simply run the setup script using
+Simply run the setup script using:
 
 ```bash
-sh scripts/run_dev.sh
+# Running the script with only "sh" will fail because of syntax issues.
+bash scripts/run_dev.sh
 ```
 
 You will be prompted to either use the `indexer-service` repository or use a backup file.
@@ -103,6 +104,11 @@ When using the `indexer` option, make sure you've clone the indexer-service repo
 ```bash
 git clone git@github.com:astraly-labs/indexer-service.git
 ```
+
+You can optionally set:
+
+- `APIBARA_KEY` : will be used as your Apibara API key instead of asking for it,
+- `STARTING_BLOCK` : will be used as the indexer starting block.
 
 If you want to do the full flow manually, do the following
 

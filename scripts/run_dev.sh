@@ -1,5 +1,4 @@
 #!/bin/bash
-
 # Function to check if a command exists
 command_exists() {
     command -v "$1" >/dev/null 2>&1
@@ -27,27 +26,40 @@ if [ "$fill_method" = "indexer" ]; then
         echo "Error: ../indexer-service directory not found. Please ensure it exists."
         exit 1
     fi
-    read -p "Enter your Apibara API key: " apibara_api_key
 
-    # Fetch the latest block number
-    # TODO: get env variable, if empty get latest_block
-    latest_block=$(curl -s --location 'https://juno.sepolia.dev.pragma.build' \
-    --header 'Content-Type: application/json' \
-    --data '{
-        "jsonrpc": "2.0",
-        "method": "starknet_blockNumber",         
-        "params": [],                    
-        "id": 1
-    }' | jq '.result')
+    # Check if APIBARA_KEY environment variable is set
+    if [[ -z "${APIBARA_KEY}" ]]; then
+        # If not set, prompt the user for input
+        read -p "Enter your Apibara API key: " apibara_api_key
+    else
+        echo "Env variable APIBARA_KEY is set: using it as your Apibara API key."
+        # If set, use the environment variable
+        apibara_api_key="${APIBARA_KEY}"
+    fi
 
-    # Calculate the starting block
-    starting_block=$((latest_block - 1000))
-    
-    echo "Latest block: $latest_block"
-    echo "Starting block: $starting_block"
+    # Check if STARTING_BLOCK environment variable is set & valid
+    if [[ -n "${STARTING_BLOCK}" ]] && [[ "${STARTING_BLOCK}" =~ ^[1-9][0-9]*$ ]]; then
+        starting_block="${STARTING_BLOCK}"
+        echo "Using STARTING_BLOCK from environment: ${starting_block}"
+    else
+        # Fetch the latest block number
+        latest_block=$(curl -s --location 'https://juno.sepolia.dev.pragma.build' \
+            --header 'Content-Type: application/json' \
+            --data '{
+            "jsonrpc": "2.0",
+            "method": "starknet_blockNumber",         
+            "params": [],                    
+            "id": 1
+        }' | jq '.result')
+
+        # Calculate the starting block
+        echo "Latest block: $latest_block"
+        starting_block=$((latest_block - 1000))
+        echo "Calculated starting block: ${starting_block}"
+    fi
 
     # Create a separate script to run the indexer
-    cat << EOF > run_indexer.sh
+    cat <<EOF >run_indexer.sh
 #!/bin/bash
 cd ../indexer-service
 export STARTING_BLOCK=$starting_block
@@ -57,7 +69,7 @@ EOF
     chmod +x run_indexer.sh
 
     echo "Running indexer in the background..."
-    ./run_indexer.sh > indexer.log 2>&1 &
+    ./run_indexer.sh >indexer.log 2>&1 &
     echo "Indexer is running in the background. PID: $!"
     echo "Check indexer.log for progress."
 elif [ "$fill_method" = "backup" ]; then
