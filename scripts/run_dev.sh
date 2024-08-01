@@ -40,7 +40,7 @@ if [ "$fill_method" = "indexer" ]; then
     }' | jq '.result')
 
     # Calculate the starting block
-    starting_block=$((latest_block - 100))
+    starting_block=$((latest_block - 1000))
     
     echo "Latest block: $latest_block"
     echo "Starting block: $starting_block"

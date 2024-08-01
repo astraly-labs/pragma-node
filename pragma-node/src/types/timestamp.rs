@@ -1,6 +1,7 @@
 use pragma_entities::EntryError;
 use serde::{Deserialize, Deserializer};
 use std::ops::RangeInclusive;
+use utoipa::ToSchema;
 
 /// The number of seconds since the Unix epoch (00:00:00 UTC on 1 Jan 1970). The timestamp is
 /// always positive, but represented as a signed integer because that's the standard on Unix
@@ -8,7 +9,7 @@ use std::ops::RangeInclusive;
 pub type UnixTimestamp = i64;
 
 /// Represents
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, ToSchema)]
 pub enum TimestampParam {
     Single(UnixTimestamp),
     Range(RangeInclusive<UnixTimestamp>),
@@ -68,6 +69,12 @@ impl<'de> Deserialize<'de> for TimestampParam {
         D: Deserializer<'de>,
     {
         let s: String = Deserialize::deserialize(deserializer)?;
+        let now = chrono::Utc::now().timestamp();
+
+        if s.is_empty() {
+            return Ok(TimestampParam::Single(now));
+        }
+
         if let Some((start, end)) = s.split_once(',') {
             let start = start.parse().map_err(serde::de::Error::custom)?;
             let end = end.parse().map_err(serde::de::Error::custom)?;

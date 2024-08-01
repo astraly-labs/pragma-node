@@ -46,7 +46,7 @@ pub struct GetOnchainHistoryResponse(pub Vec<GetOnchainHistoryEntry>);
         ("quote" = String, Path, description = "Quote Asset"),
         ("network" = Network, Query, description = "Network"),
         ("aggregation" = Option<AggregationMode>, Query, description = "Aggregation Mode"),
-        ("timestamp" = Option<TimestampParam>, Query, description = "Timestamp or timestamp range")
+        ("timestamp" = Option<String>, Query, description = "Timestamp or timestamp range")
     ),
 )]
 pub async fn get_onchain_history(
