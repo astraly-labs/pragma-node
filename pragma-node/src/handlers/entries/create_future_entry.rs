@@ -2,9 +2,9 @@ use axum::extract::State;
 use axum::Json;
 use chrono::{DateTime, Utc};
 use pragma_entities::{EntryError, NewFutureEntry, PublisherError};
+use serde::{Deserialize, Serialize};
 use starknet::core::types::FieldElement;
-
-use super::{CreateFutureEntryRequest, CreateFutureEntryResponse};
+use utoipa::ToSchema;
 
 use crate::config::config;
 use crate::infra::kafka;
@@ -12,6 +12,29 @@ use crate::infra::repositories::publisher_repository;
 use crate::types::entries::FutureEntry;
 use crate::utils::{assert_request_signature_is_valid, JsonExtractor};
 use crate::AppState;
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct CreateFutureEntryRequest {
+    pub signature: Vec<FieldElement>,
+    pub entries: Vec<FutureEntry>,
+}
+
+impl AsRef<[FieldElement]> for CreateFutureEntryRequest {
+    fn as_ref(&self) -> &[FieldElement] {
+        &self.signature
+    }
+}
+
+impl AsRef<[FutureEntry]> for CreateFutureEntryRequest {
+    fn as_ref(&self) -> &[FutureEntry] {
+        &self.entries
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct CreateFutureEntryResponse {
+    number_entries_created: usize,
+}
 
 #[utoipa::path(
     post,

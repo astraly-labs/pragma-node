@@ -1,11 +1,11 @@
 use axum::extract::{Query, State};
 use axum::Json;
 use bigdecimal::BigDecimal;
+use pragma_common::types::{AggregationMode, Network};
 use pragma_entities::EntryError;
+use serde::{Deserialize, Serialize};
+use utoipa::{IntoParams, ToSchema};
 
-use crate::handlers::entries::{
-    GetOnchainHistoryEntry, GetOnchainHistoryParams, GetOnchainHistoryResponse,
-};
 use crate::infra::repositories::onchain_repository::routing;
 use crate::types::timestamp::TimestampParam;
 use crate::utils::{big_decimal_price_to_hex, PathExtractor};
@@ -13,6 +13,27 @@ use crate::AppState;
 
 use super::OnchainEntry;
 use crate::utils::currency_pair_to_pair_id;
+
+#[derive(Debug, Default, Deserialize, IntoParams, ToSchema)]
+pub struct GetOnchainHistoryParams {
+    pub network: Network,
+    pub aggregation: Option<AggregationMode>,
+    pub routing: Option<bool>,
+    pub timestamp: Option<TimestampParam>,
+    // TODO(akhercha): add block/block_range
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct GetOnchainHistoryEntry {
+    pair_id: String,
+    timestamp: u64,
+    price: String,
+    decimals: u32,
+    nb_sources_aggregated: u32,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct GetOnchainHistoryResponse(pub Vec<GetOnchainHistoryEntry>);
 
 #[utoipa::path(
     get,

@@ -1,7 +1,9 @@
 use axum::extract::{Query, State};
 use axum::Json;
+use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
-use crate::handlers::entries::{GetOHLCResponse, Interval};
+use crate::handlers::entries::Interval;
 use crate::infra::repositories::entry_repository::{self, OHLCEntry};
 use crate::utils::PathExtractor;
 use crate::AppState;
@@ -9,6 +11,12 @@ use pragma_entities::EntryError;
 
 use super::GetEntryParams;
 use crate::utils::currency_pair_to_pair_id;
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct GetOHLCResponse {
+    pair_id: String,
+    data: Vec<OHLCEntry>,
+}
 
 #[utoipa::path(
         get,

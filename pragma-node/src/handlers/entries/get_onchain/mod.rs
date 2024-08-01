@@ -8,10 +8,11 @@ use std::collections::HashMap;
 use axum::extract::{Query, State};
 use axum::Json;
 use bigdecimal::BigDecimal;
-use pragma_common::types::Interval;
+use pragma_common::types::{AggregationMode, Interval, Network};
 use pragma_entities::EntryError;
+use serde::{Deserialize, Serialize};
+use utoipa::{IntoParams, ToSchema};
 
-use crate::handlers::entries::{GetOnchainParams, GetOnchainResponse};
 use crate::infra::repositories::onchain_repository::{
     get_last_updated_timestamp, get_variations, routing,
 };
@@ -19,8 +20,37 @@ use crate::types::timestamp::TimestampParam;
 use crate::utils::{big_decimal_price_to_hex, PathExtractor};
 use crate::AppState;
 
-use super::OnchainEntry;
 use crate::utils::currency_pair_to_pair_id;
+
+#[derive(Debug, Default, Deserialize, IntoParams, ToSchema)]
+pub struct GetOnchainParams {
+    pub network: Network,
+    pub aggregation: Option<AggregationMode>,
+    pub routing: Option<bool>,
+    pub timestamp: Option<TimestampParam>,
+    pub components: Option<bool>,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema, Clone)]
+pub struct OnchainEntry {
+    pub publisher: String,
+    pub source: String,
+    pub price: String,
+    pub tx_hash: String,
+    pub timestamp: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct GetOnchainResponse {
+    pair_id: String,
+    last_updated_timestamp: u64,
+    price: String,
+    decimals: u32,
+    nb_sources_aggregated: u32,
+    asset_type: String,
+    components: Option<Vec<OnchainEntry>>,
+    variations: Option<HashMap<Interval, f32>>,
+}
 
 #[utoipa::path(
     get,

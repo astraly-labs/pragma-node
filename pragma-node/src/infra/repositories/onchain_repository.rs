@@ -11,7 +11,9 @@ use pragma_entities::error::{adapt_infra_error, InfraError};
 use pragma_entities::Currency;
 use pragma_monitoring::models::SpotEntry;
 
-use crate::handlers::entries::{Checkpoint, OnchainEntry, Publisher, PublisherEntry};
+use crate::handlers::entries::get_onchain::checkpoints::Checkpoint;
+use crate::handlers::entries::get_onchain::publishers::{Publisher, PublisherEntry};
+use crate::handlers::entries::get_onchain::OnchainEntry;
 use crate::infra::repositories::entry_repository::{
     get_interval_specifier, OHLCEntry, OHLCEntryRaw,
 };

@@ -1,9 +1,11 @@
 use axum::extract::{Query, State};
 use axum::Json;
 
+use pragma_common::types::Network;
 use pragma_entities::CheckpointError;
+use serde::{Deserialize, Serialize};
+use utoipa::{IntoParams, ToSchema};
 
-use crate::handlers::entries::{GetOnchainCheckpointsParams, GetOnchainCheckpointsResponse};
 use crate::infra::repositories::entry_repository::get_decimals;
 use crate::infra::repositories::onchain_repository::get_checkpoints;
 use crate::utils::currency_pair_to_pair_id;
@@ -12,6 +14,32 @@ use crate::AppState;
 
 pub const DEFAULT_LIMIT: u64 = 100;
 pub const MAX_LIMIT: u64 = 1000;
+
+#[derive(Debug, Deserialize, IntoParams, ToSchema)]
+pub struct GetOnchainCheckpointsParams {
+    pub network: Network,
+    pub limit: Option<u64>,
+}
+
+impl Default for GetOnchainCheckpointsParams {
+    fn default() -> Self {
+        Self {
+            network: Network::default(),
+            limit: Some(100),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct Checkpoint {
+    pub tx_hash: String,
+    pub price: String,
+    pub timestamp: u64,
+    pub sender_address: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct GetOnchainCheckpointsResponse(pub Vec<Checkpoint>);
 
 #[utoipa::path(
     get,

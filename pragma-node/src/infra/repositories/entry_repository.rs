@@ -12,7 +12,7 @@ use crate::handlers::entries::constants::{
     MINIMUM_NUMBER_OF_PUBLISHERS,
 };
 use crate::handlers::entries::get_entry::RoutingParams;
-use crate::handlers::entries::{AssetOraclePrice, SignedPublisherPrice};
+use crate::handlers::entries::subscribe_to_entry::{AssetOraclePrice, SignedPublisherPrice};
 use crate::utils::{convert_via_quote, normalize_to_decimals, StarkexPrice};
 use pragma_common::types::{AggregationMode, ConversionError, DataType, Interval};
 use pragma_entities::dto;
