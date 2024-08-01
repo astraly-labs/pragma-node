@@ -12,7 +12,7 @@ use pragma_common::types::DataType;
 use pragma_entities::EntryError;
 use utoipa::ToSchema;
 
-use crate::constants::PRAGMA_ORACLE_NAME_FOR_STARKEX;
+use crate::constants::starkex_ws::PRAGMA_ORACLE_NAME_FOR_STARKEX;
 use crate::infra::repositories::entry_repository::MedianEntryWithComponents;
 use crate::types::pricer::{IndexPricer, MarkPricer, Pricer};
 use crate::types::timestamp::UnixTimestamp;

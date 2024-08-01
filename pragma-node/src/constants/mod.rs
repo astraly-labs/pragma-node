@@ -1,11 +1,5 @@
 pub mod starkex_ws;
 
-/// "PRAGMA" to number is bigger than 2**40 - we alias it to "PRGM" to fit in 40 bits.
-/// Needed for StarkEx signature.
-/// See:
-/// https://docs.starkware.co/starkex/perpetual/becoming-an-oracle-provider-for-starkex.html
-pub const PRAGMA_ORACLE_NAME_FOR_STARKEX: &str = "PRGM";
-
 /// We cache the update count for our onchain publishers because the query
 /// takes a lot of time.
 /// The cached value will live for the time specified in time to live.
