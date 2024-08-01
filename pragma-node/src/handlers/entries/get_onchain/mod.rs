@@ -77,17 +77,16 @@ pub async fn get_onchain(
     let is_routing = params.routing.unwrap_or(false);
     let with_components = params.components.unwrap_or(true);
 
-    let now = chrono::Utc::now().timestamp();
     let timestamp = params
         .timestamp
-        .unwrap_or_else(|| TimestampParam::from(now));
-    // NOTE: Only timestamps works for the get_onchain request, not ranges.
+        .unwrap_or_default()
+        .assert_time_is_valid()?;
+
     if !timestamp.is_single() {
         return Err(EntryError::InvalidTimestamp(
             "Expected a single timestamp, not a Range.".into(),
         ));
     }
-    timestamp.validate_time()?;
 
     let raw_data = routing(
         &state.onchain_pool,

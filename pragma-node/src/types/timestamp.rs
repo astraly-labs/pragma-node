@@ -21,10 +21,17 @@ impl From<UnixTimestamp> for TimestampParam {
     }
 }
 
-impl TimestampParam {
-    pub fn validate_time(&self) -> Result<(), EntryError> {
+impl Default for TimestampParam {
+    fn default() -> Self {
         let now = chrono::Utc::now().timestamp();
-        match self {
+        TimestampParam::Single(now)
+    }
+}
+
+impl TimestampParam {
+    pub fn assert_time_is_valid(self) -> Result<Self, EntryError> {
+        let now = chrono::Utc::now().timestamp();
+        match &self {
             Self::Single(ts) => {
                 if *ts > now {
                     return Err(EntryError::InvalidTimestamp(
@@ -45,7 +52,7 @@ impl TimestampParam {
                 }
             }
         }
-        Ok(())
+        Ok(self)
     }
 
     pub fn is_single(&self) -> bool {
@@ -69,10 +76,8 @@ impl<'de> Deserialize<'de> for TimestampParam {
         D: Deserializer<'de>,
     {
         let s: String = Deserialize::deserialize(deserializer)?;
-        let now = chrono::Utc::now().timestamp();
-
         if s.is_empty() {
-            return Ok(TimestampParam::Single(now));
+            return Ok(TimestampParam::default());
         }
 
         if let Some((start, end)) = s.split_once(',') {

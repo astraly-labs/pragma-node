@@ -21,6 +21,7 @@ pub struct GetOnchainHistoryParams {
     pub routing: Option<bool>,
     pub timestamp: Option<TimestampParam>,
     // TODO(akhercha): add block/block_range
+    // TODO(akhercha): add chunk size
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
@@ -59,11 +60,10 @@ pub async fn get_onchain_history(
     let aggregation_mode = params.aggregation.unwrap_or_default();
     let is_routing = params.routing.unwrap_or(false);
 
-    let now = chrono::Utc::now().timestamp();
     let timestamp = params
         .timestamp
-        .unwrap_or_else(|| TimestampParam::from(now));
-    timestamp.validate_time()?;
+        .unwrap_or_default()
+        .assert_time_is_valid()?;
 
     let raw_data = routing(
         &state.onchain_pool,
