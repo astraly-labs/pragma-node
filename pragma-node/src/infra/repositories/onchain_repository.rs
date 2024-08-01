@@ -508,9 +508,9 @@ pub async fn get_last_updated_timestamp(
 #[derive(QueryableByName)]
 struct VariationEntry {
     #[diesel(sql_type = Numeric)]
-    low: BigDecimal,
+    open: BigDecimal,
     #[diesel(sql_type = Numeric)]
-    high: BigDecimal,
+    close: BigDecimal,
 }
 
 pub async fn get_variations(
@@ -529,8 +529,8 @@ pub async fn get_variations(
             WITH recent_entries AS (
                 SELECT
                     ohlc_bucket AS time,
-                    low,
-                    high,
+                    open,
+                    close,
                     ROW_NUMBER() OVER (ORDER BY ohlc_bucket DESC) as rn
                 FROM
                     {table_name}
@@ -541,8 +541,8 @@ pub async fn get_variations(
                 LIMIT 2
             )
             SELECT
-                low,
-                high
+                open,
+                close
             FROM
                 recent_entries
             WHERE
@@ -562,8 +562,8 @@ pub async fn get_variations(
             .map_err(adapt_infra_error)?;
 
         if raw_entries.len() == 2 {
-            let previous_open = get_mid_price(&raw_entries[0].low, &raw_entries[0].high);
-            let current_open = get_mid_price(&raw_entries[1].low, &raw_entries[1].high);
+            let current_open = get_mid_price(&raw_entries[0].open, &raw_entries[0].close);
+            let previous_open = get_mid_price(&raw_entries[1].open, &raw_entries[1].close);
 
             if !previous_open.is_zero() {
                 let variation = (current_open - previous_open.clone()) / previous_open;
