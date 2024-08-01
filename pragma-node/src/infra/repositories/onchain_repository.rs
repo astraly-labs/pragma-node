@@ -12,6 +12,7 @@ use pragma_entities::Currency;
 use pragma_monitoring::models::SpotEntry;
 
 use crate::handlers::entries::get_onchain::checkpoints::Checkpoint;
+use crate::handlers::entries::get_onchain::history::ChunkInterval;
 use crate::handlers::entries::get_onchain::publishers::{Publisher, PublisherEntry};
 use crate::handlers::entries::get_onchain::OnchainEntry;
 use crate::infra::repositories::entry_repository::{
@@ -24,8 +25,6 @@ use crate::utils::{
 };
 
 use super::entry_repository::get_decimals;
-
-const BACKWARD_TIMESTAMP_INTERVAL: &str = "1 hour";
 
 pub struct RawOnchainData {
     pub price: BigDecimal,
@@ -136,6 +135,7 @@ fn build_sql_query(
     network: Network,
     aggregation_mode: AggregationMode,
     timestamp: TimestampParam,
+    chunk_interval: ChunkInterval,
 ) -> Result<String, InfraError> {
     let table_name = get_table_name(network, DataType::SpotEntry)?;
 
@@ -174,7 +174,7 @@ fn build_sql_query(
                     FE.timestamp DESC;
             "#,
                 table_name = table_name,
-                backward_interval = BACKWARD_TIMESTAMP_INTERVAL,
+                backward_interval = chunk_interval.as_sql_interval(),
                 aggregation_subquery = aggregation_query,
                 ts_str = ts_str
             )
@@ -235,7 +235,7 @@ fn build_sql_query(
                     FE.window_start DESC, FE.timestamp DESC;
             "#,
                 table_name = table_name,
-                backward_interval = BACKWARD_TIMESTAMP_INTERVAL,
+                backward_interval = chunk_interval.as_sql_interval(),
                 aggregation_subquery = aggregation_query,
                 start_ts = start_ts,
                 end_ts = end_ts
@@ -310,6 +310,7 @@ fn compute_multiple_rebased_price(
     Ok(result)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn routing(
     onchain_pool: &Pool,
     offchain_pool: &Pool,
@@ -318,6 +319,7 @@ pub async fn routing(
     timestamp: TimestampParam,
     aggregation_mode: AggregationMode,
     is_routing: bool,
+    chunk_interval: ChunkInterval,
 ) -> Result<Vec<RawOnchainData>, InfraError> {
     let existing_pair_list = get_existing_pairs(onchain_pool, network).await?;
     let mut result: Vec<RawOnchainData> = Vec::new();
@@ -329,6 +331,7 @@ pub async fn routing(
             pair_id.clone(),
             timestamp,
             aggregation_mode,
+            chunk_interval,
         )
         .await?;
         let decimal = get_decimals(offchain_pool, &pair_id).await?;
@@ -370,6 +373,7 @@ pub async fn routing(
                 base_alt_pair.clone(),
                 timestamp.clone(),
                 aggregation_mode,
+                chunk_interval,
             )
             .await?;
             let base_alt_decimal = get_decimals(offchain_pool, &base_alt_pair).await?;
@@ -379,6 +383,7 @@ pub async fn routing(
                 alt_quote_pair.clone(),
                 timestamp,
                 aggregation_mode,
+                chunk_interval,
             )
             .await?;
             let quote_alt_decimal = get_decimals(offchain_pool, &alt_quote_pair).await?;
@@ -438,8 +443,9 @@ pub async fn get_sources_and_aggregate(
     pair_id: String,
     timestamp: TimestampParam,
     aggregation_mode: AggregationMode,
+    chunk_interval: ChunkInterval,
 ) -> Result<Vec<AggPriceAndEntries>, InfraError> {
-    let raw_sql = build_sql_query(network, aggregation_mode, timestamp)?;
+    let raw_sql = build_sql_query(network, aggregation_mode, timestamp, chunk_interval)?;
 
     let conn = pool.get().await.map_err(adapt_infra_error)?;
     let raw_entries = conn

@@ -8,6 +8,7 @@ use std::collections::HashMap;
 use axum::extract::{Query, State};
 use axum::Json;
 use bigdecimal::BigDecimal;
+use history::ChunkInterval;
 use pragma_common::types::{AggregationMode, Interval, Network};
 use pragma_entities::EntryError;
 use serde::{Deserialize, Serialize};
@@ -96,6 +97,7 @@ pub async fn get_onchain(
         timestamp.clone(),
         aggregation_mode,
         is_routing,
+        ChunkInterval::OneHour,
     )
     .await
     .map_err(|db_error| db_error.to_entry_error(&pair_id))?;
