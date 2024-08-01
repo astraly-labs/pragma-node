@@ -11,19 +11,20 @@ use pragma_entities::error::{adapt_infra_error, InfraError};
 use pragma_entities::Currency;
 use pragma_monitoring::models::SpotEntry;
 
-use crate::handlers::entries::{Checkpoint, OnchainEntry, Publisher, PublisherEntry};
+use crate::handlers::entries::get_onchain::checkpoints::Checkpoint;
+use crate::handlers::entries::get_onchain::history::ChunkInterval;
+use crate::handlers::entries::get_onchain::publishers::{Publisher, PublisherEntry};
+use crate::handlers::entries::get_onchain::OnchainEntry;
 use crate::infra::repositories::entry_repository::{
     get_interval_specifier, OHLCEntry, OHLCEntryRaw,
 };
-use crate::types::TimestampParam;
+use crate::types::timestamp::TimestampParam;
 use crate::utils::{
-    convert_via_quote, format_bigdecimal_price, get_decimals_for_pair, get_mid_price,
-    normalize_to_decimals,
+    big_decimal_price_to_hex, convert_via_quote, format_bigdecimal_price, get_decimals_for_pair,
+    get_mid_price, normalize_to_decimals,
 };
 
 use super::entry_repository::get_decimals;
-
-const BACKWARD_TIMESTAMP_INTERVAL: &str = "1 hour";
 
 pub struct RawOnchainData {
     pub price: BigDecimal,
@@ -75,7 +76,7 @@ impl From<SpotEntryWithAggregatedPrice> for OnchainEntry {
         OnchainEntry {
             publisher: entry.spot_entry.publisher,
             source: entry.spot_entry.source,
-            price: entry.spot_entry.price.to_string(),
+            price: big_decimal_price_to_hex(&entry.spot_entry.price),
             tx_hash: entry.spot_entry.transaction_hash,
             timestamp: entry.spot_entry.timestamp.and_utc().timestamp() as u64,
         }
@@ -87,7 +88,7 @@ impl From<&SpotEntryWithAggregatedPrice> for OnchainEntry {
         OnchainEntry {
             publisher: entry.spot_entry.publisher.clone(),
             source: entry.spot_entry.source.clone(),
-            price: entry.spot_entry.price.to_string(),
+            price: big_decimal_price_to_hex(&entry.spot_entry.price),
             tx_hash: entry.spot_entry.transaction_hash.clone(),
             timestamp: entry.spot_entry.timestamp.and_utc().timestamp() as u64,
         }
@@ -134,6 +135,7 @@ fn build_sql_query(
     network: Network,
     aggregation_mode: AggregationMode,
     timestamp: TimestampParam,
+    chunk_interval: ChunkInterval,
 ) -> Result<String, InfraError> {
     let table_name = get_table_name(network, DataType::SpotEntry)?;
 
@@ -172,7 +174,7 @@ fn build_sql_query(
                     FE.timestamp DESC;
             "#,
                 table_name = table_name,
-                backward_interval = BACKWARD_TIMESTAMP_INTERVAL,
+                backward_interval = chunk_interval.as_sql_interval(),
                 aggregation_subquery = aggregation_query,
                 ts_str = ts_str
             )
@@ -233,7 +235,7 @@ fn build_sql_query(
                     FE.window_start DESC, FE.timestamp DESC;
             "#,
                 table_name = table_name,
-                backward_interval = BACKWARD_TIMESTAMP_INTERVAL,
+                backward_interval = chunk_interval.as_sql_interval(),
                 aggregation_subquery = aggregation_query,
                 start_ts = start_ts,
                 end_ts = end_ts
@@ -308,25 +310,34 @@ fn compute_multiple_rebased_price(
     Ok(result)
 }
 
+pub struct OnchainRoutingArguments {
+    pub pair_id: String,
+    pub network: Network,
+    pub timestamp: TimestampParam,
+    pub aggregation_mode: AggregationMode,
+    pub is_routing: bool,
+    pub chunk_interval: ChunkInterval,
+}
+
 pub async fn routing(
     onchain_pool: &Pool,
     offchain_pool: &Pool,
-    network: Network,
-    pair_id: String,
-    timestamp: TimestampParam,
-    aggregation_mode: AggregationMode,
-    is_routing: bool,
+    routing_args: OnchainRoutingArguments,
 ) -> Result<Vec<RawOnchainData>, InfraError> {
-    let existing_pair_list = get_existing_pairs(onchain_pool, network).await?;
+    let pair_id = routing_args.pair_id;
+    let is_routing = routing_args.is_routing;
+
+    let existing_pair_list = get_existing_pairs(onchain_pool, routing_args.network).await?;
     let mut result: Vec<RawOnchainData> = Vec::new();
 
     if !is_routing || onchain_pair_exist(&existing_pair_list, &pair_id) {
         let prices_and_entries = get_sources_and_aggregate(
             onchain_pool,
-            network,
+            routing_args.network,
             pair_id.clone(),
-            timestamp,
-            aggregation_mode,
+            routing_args.timestamp,
+            routing_args.aggregation_mode,
+            routing_args.chunk_interval,
         )
         .await?;
         let decimal = get_decimals(offchain_pool, &pair_id).await?;
@@ -364,19 +375,21 @@ pub async fn routing(
         {
             let mut base_alt_result = get_sources_and_aggregate(
                 onchain_pool,
-                network,
+                routing_args.network,
                 base_alt_pair.clone(),
-                timestamp.clone(),
-                aggregation_mode,
+                routing_args.timestamp.clone(),
+                routing_args.aggregation_mode,
+                routing_args.chunk_interval,
             )
             .await?;
             let base_alt_decimal = get_decimals(offchain_pool, &base_alt_pair).await?;
             let quote_alt_result = get_sources_and_aggregate(
                 onchain_pool,
-                network,
+                routing_args.network,
                 alt_quote_pair.clone(),
-                timestamp,
-                aggregation_mode,
+                routing_args.timestamp,
+                routing_args.aggregation_mode,
+                routing_args.chunk_interval,
             )
             .await?;
             let quote_alt_decimal = get_decimals(offchain_pool, &alt_quote_pair).await?;
@@ -436,8 +449,9 @@ pub async fn get_sources_and_aggregate(
     pair_id: String,
     timestamp: TimestampParam,
     aggregation_mode: AggregationMode,
+    chunk_interval: ChunkInterval,
 ) -> Result<Vec<AggPriceAndEntries>, InfraError> {
-    let raw_sql = build_sql_query(network, aggregation_mode, timestamp)?;
+    let raw_sql = build_sql_query(network, aggregation_mode, timestamp, chunk_interval)?;
 
     let conn = pool.get().await.map_err(adapt_infra_error)?;
     let raw_entries = conn
@@ -736,13 +750,12 @@ pub struct RawLastPublisherEntryForPair {
 
 impl RawLastPublisherEntryForPair {
     pub fn to_publisher_entry(&self, currencies: &HashMap<String, BigDecimal>) -> PublisherEntry {
-        let decimals = get_decimals_for_pair(currencies, &self.pair_id);
         PublisherEntry {
             pair_id: self.pair_id.clone(),
             last_updated_timestamp: self.last_updated_timestamp.and_utc().timestamp() as u64,
-            price: format_bigdecimal_price(self.price.clone(), decimals),
+            price: big_decimal_price_to_hex(&self.price),
             source: self.source.clone(),
-            decimals,
+            decimals: get_decimals_for_pair(currencies, &self.pair_id),
             daily_updates: self.daily_updates as u32,
         }
     }

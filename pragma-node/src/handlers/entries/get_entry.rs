@@ -4,14 +4,16 @@ use chrono::{DateTime, NaiveDateTime, Utc};
 
 use pragma_common::types::{AggregationMode, DataType, Interval};
 use pragma_entities::EntryError;
+use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
-use crate::handlers::entries::GetEntryResponse;
 use crate::infra::repositories::entry_repository::{self, MedianEntry};
 use crate::utils::PathExtractor;
 use crate::AppState;
 
-use super::GetEntryParams;
 use crate::utils::{big_decimal_price_to_hex, currency_pair_to_pair_id};
+
+use super::GetEntryParams;
 
 #[derive(Default, Clone, Debug)]
 pub struct RoutingParams {
@@ -35,7 +37,9 @@ impl TryFrom<GetEntryParams> for RoutingParams {
         };
 
         if timestamp > now {
-            return Err(EntryError::InvalidTimestamp);
+            return Err(EntryError::InvalidTimestamp(format!(
+                "Timestamp is in the future: {timestamp}"
+            )));
         }
 
         let interval = if let Some(interval) = params.interval {
@@ -75,6 +79,15 @@ impl TryFrom<GetEntryParams> for RoutingParams {
             expiry,
         })
     }
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct GetEntryResponse {
+    num_sources_aggregated: usize,
+    pair_id: String,
+    price: String,
+    timestamp: u64,
+    decimals: u32,
 }
 
 #[utoipa::path(

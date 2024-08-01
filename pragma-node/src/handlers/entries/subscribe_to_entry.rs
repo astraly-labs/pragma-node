@@ -10,17 +10,40 @@ use serde::{Deserialize, Serialize};
 
 use pragma_common::types::DataType;
 use pragma_entities::EntryError;
+use utoipa::ToSchema;
 
-use crate::handlers::entries::SubscribeToEntryResponse;
 use crate::infra::repositories::entry_repository::MedianEntryWithComponents;
 use crate::types::pricer::{IndexPricer, MarkPricer, Pricer};
+use crate::types::timestamp::UnixTimestamp;
 use crate::types::ws::{ChannelHandler, Subscriber, SubscriptionType};
 use crate::utils::{sign_data, StarkexPrice};
 use crate::AppState;
 
 use super::constants::PRAGMA_ORACLE_NAME_FOR_STARKEX;
-use super::AssetOraclePrice;
 use crate::utils::only_existing_pairs;
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
+pub struct SignedPublisherPrice {
+    pub oracle_asset_id: String,
+    pub oracle_price: String,
+    pub signing_key: String,
+    pub signature: String,
+    pub timestamp: String,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize, ToSchema)]
+pub struct AssetOraclePrice {
+    pub global_asset_id: String,
+    pub median_price: String,
+    pub signature: String,
+    pub signed_prices: Vec<SignedPublisherPrice>,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize, ToSchema)]
+pub struct SubscribeToEntryResponse {
+    pub oracle_prices: Vec<AssetOraclePrice>,
+    pub timestamp: UnixTimestamp,
+}
 
 #[utoipa::path(
     get,

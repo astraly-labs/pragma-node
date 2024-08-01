@@ -1,9 +1,8 @@
 use axum::extract::{Query, State};
 use axum::Json;
-use serde::Deserialize;
-use utoipa::IntoParams;
+use serde::{Deserialize, Serialize};
+use utoipa::{IntoParams, ToSchema};
 
-use crate::handlers::entries::GetVolatilityResponse;
 use crate::infra::repositories::entry_repository::{self, MedianEntry};
 use crate::utils::PathExtractor;
 use crate::AppState;
@@ -18,6 +17,13 @@ pub struct VolatilityQuery {
     start: u64,
     /// Final timestamp
     end: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct GetVolatilityResponse {
+    pair_id: String,
+    volatility: f64,
+    decimals: u32,
 }
 
 #[utoipa::path(

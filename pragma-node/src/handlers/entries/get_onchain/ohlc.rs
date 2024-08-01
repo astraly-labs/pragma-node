@@ -9,7 +9,9 @@ use pragma_entities::InfraError;
 use serde::{Deserialize, Serialize};
 
 use pragma_common::types::{Interval, Network};
+use utoipa::ToSchema;
 
+use crate::infra::repositories::entry_repository::OHLCEntry;
 use crate::infra::repositories::onchain_repository;
 use crate::types::ws::metrics::{Interaction, Status};
 use crate::types::ws::{ChannelHandler, Subscriber, SubscriptionType};
@@ -17,6 +19,12 @@ use crate::utils::is_onchain_existing_pair;
 use crate::AppState;
 
 use axum::extract::ws::{WebSocket, WebSocketUpgrade};
+
+#[derive(Debug, Default, Serialize, Deserialize, ToSchema)]
+pub struct GetOnchainOHLCResponse {
+    pub pair_id: String,
+    pub data: Vec<OHLCEntry>,
+}
 
 #[utoipa::path(
     get,

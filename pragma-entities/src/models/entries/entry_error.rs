@@ -29,8 +29,8 @@ pub enum EntryError {
     InvalidSigner,
     #[error("unauthorized request: {0}")]
     Unauthorized(String),
-    #[error("invalid timestamp")]
-    InvalidTimestamp,
+    #[error("invalid timestamp: {0}")]
+    InvalidTimestamp(String),
     #[error("invalid expiry")]
     InvalidExpiry,
     #[error("missing data for routing on pair: {0}")]
@@ -53,7 +53,7 @@ impl From<InfraError> for EntryError {
             InfraError::InternalServerError => Self::InternalServerError,
             InfraError::NotFound => Self::NotFound("Unknown".to_string()),
             InfraError::RoutingError => Self::MissingData("Not enough data".to_string()),
-            InfraError::InvalidTimeStamp => Self::InternalServerError,
+            InfraError::InvalidTimestamp(e) => Self::InvalidTimestamp(e.to_string()),
             InfraError::NonZeroU32Conversion(_) => Self::InternalServerError,
             InfraError::AxumError(_) => Self::InternalServerError,
         }
@@ -83,7 +83,10 @@ impl IntoResponse for EntryError {
                 StatusCode::UNAUTHORIZED,
                 format!("Unauthorized publisher: {}", reason),
             ),
-            Self::InvalidTimestamp => (StatusCode::BAD_REQUEST, "Invalid timestamp".to_string()),
+            Self::InvalidTimestamp(reason) => (
+                StatusCode::BAD_REQUEST,
+                format!("Invalid timestamp: {}", reason),
+            ),
             Self::InvalidExpiry => (StatusCode::BAD_REQUEST, "Invalid expiry".to_string()),
             Self::PublisherError(err) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
