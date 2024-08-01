@@ -1,4 +1,5 @@
 mod config;
+mod constants;
 mod errors;
 mod handlers;
 mod infra;
@@ -19,7 +20,7 @@ use starknet::signers::SigningKey;
 use pragma_entities::connection::{ENV_OFFCHAIN_DATABASE_URL, ENV_ONCHAIN_DATABASE_URL};
 
 use crate::config::config;
-use crate::handlers::entries::constants::{
+use crate::constants::{
     PUBLISHERS_UDPATES_CACHE_TIME_TO_IDLE_IN_SECONDS,
     PUBLISHERS_UDPATES_CACHE_TIME_TO_LIVE_IN_SECONDS,
 };

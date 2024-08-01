@@ -11,10 +11,10 @@ use pragma_entities::error::{adapt_infra_error, InfraError};
 use pragma_entities::Currency;
 use pragma_monitoring::models::SpotEntry;
 
-use crate::handlers::entries::get_onchain::checkpoints::Checkpoint;
-use crate::handlers::entries::get_onchain::history::ChunkInterval;
-use crate::handlers::entries::get_onchain::publishers::{Publisher, PublisherEntry};
-use crate::handlers::entries::get_onchain::OnchainEntry;
+use crate::handlers::get_onchain::checkpoints::Checkpoint;
+use crate::handlers::get_onchain::history::ChunkInterval;
+use crate::handlers::get_onchain::publishers::{Publisher, PublisherEntry};
+use crate::handlers::get_onchain::OnchainEntry;
 use crate::infra::repositories::entry_repository::{
     get_interval_specifier, OHLCEntry, OHLCEntryRaw,
 };
@@ -36,9 +36,9 @@ pub struct RawOnchainData {
 // Retrieve the onchain table name based on the network and data type.
 fn get_table_name(network: Network, data_type: DataType) -> Result<&'static str, InfraError> {
     let table = match (network, data_type) {
-        (Network::Testnet, DataType::SpotEntry) => "spot_entry",
+        (Network::Sepolia, DataType::SpotEntry) => "spot_entry",
         (Network::Mainnet, DataType::SpotEntry) => "mainnet_spot_entry",
-        (Network::Testnet, DataType::FutureEntry) => "future_entry",
+        (Network::Sepolia, DataType::FutureEntry) => "future_entry",
         (Network::Mainnet, DataType::FutureEntry) => "mainnet_future_entry",
         _ => return Err(InfraError::InternalServerError),
     };
@@ -52,9 +52,9 @@ fn get_ohlc_table_name(
     interval: Interval,
 ) -> Result<String, InfraError> {
     let prefix_name = match (network, data_type) {
-        (Network::Testnet, DataType::SpotEntry) => "spot",
+        (Network::Sepolia, DataType::SpotEntry) => "spot",
         (Network::Mainnet, DataType::SpotEntry) => "mainnet_spot",
-        (Network::Testnet, DataType::FutureEntry) => "future",
+        (Network::Sepolia, DataType::FutureEntry) => "future",
         (Network::Mainnet, DataType::FutureEntry) => "mainnet_future",
         _ => return Err(InfraError::InternalServerError),
     };
@@ -652,7 +652,7 @@ pub async fn get_checkpoints(
 ) -> Result<Vec<Checkpoint>, InfraError> {
     let table_name = match network {
         Network::Mainnet => "mainnet_spot_checkpoints",
-        Network::Testnet => "spot_checkpoints",
+        Network::Sepolia => "spot_checkpoints",
     };
     let raw_sql = format!(
         r#"
@@ -706,7 +706,7 @@ pub async fn get_publishers(
 ) -> Result<Vec<RawPublisher>, InfraError> {
     let address_column = match network {
         Network::Mainnet => "mainnet_address",
-        Network::Testnet => "testnet_address",
+        Network::Sepolia => "testnet_address",
     };
     let raw_sql = format!(
         r#"

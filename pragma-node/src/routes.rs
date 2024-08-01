@@ -5,12 +5,12 @@ use axum::Router;
 use utoipa::OpenApi as OpenApiT;
 use utoipa_swagger_ui::SwaggerUi;
 
-use crate::handlers::entries::get_onchain::history::get_onchain_history;
-use crate::handlers::entries::get_onchain::{
+use crate::handlers::get_onchain::history::get_onchain_history;
+use crate::handlers::get_onchain::{
     checkpoints::get_onchain_checkpoints, get_onchain, ohlc::subscribe_to_onchain_ohlc,
     publishers::get_onchain_publishers,
 };
-use crate::handlers::entries::{
+use crate::handlers::{
     create_entries, create_future_entries, get_entry, get_expiries, get_ohlc, get_volatility,
     subscribe_to_entry,
 };
