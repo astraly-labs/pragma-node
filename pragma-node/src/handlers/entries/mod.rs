@@ -27,7 +27,7 @@ use pragma_common::types::{AggregationMode, DataType, Interval, Network};
 use crate::{
     infra::repositories::entry_repository::OHLCEntry,
     types::entries::{Entry, FutureEntry},
-    types::{TimestampParam, UnixTimestamp},
+    types::timestamp::{TimestampParam, UnixTimestamp},
     utils::doc_examples,
 };
 
@@ -99,25 +99,13 @@ pub struct GetVolatilityResponse {
     decimals: u32,
 }
 
-#[derive(Debug, Deserialize, IntoParams, ToSchema)]
+#[derive(Debug, Default, Deserialize, IntoParams, ToSchema)]
 pub struct GetOnchainParams {
     pub network: Network,
     pub aggregation: Option<AggregationMode>,
     pub routing: Option<bool>,
     pub timestamp: Option<TimestampParam>,
     pub components: Option<bool>,
-}
-
-impl Default for GetOnchainParams {
-    fn default() -> Self {
-        Self {
-            network: Network::default(),
-            aggregation: None,
-            timestamp: Some(TimestampParam::from(chrono::Utc::now().timestamp() as u64)),
-            routing: None,
-            components: None,
-        }
-    }
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema, Clone)]
@@ -277,24 +265,13 @@ pub struct SubscribeToEntryResponse {
     pub timestamp: UnixTimestamp,
 }
 
-#[derive(Debug, Deserialize, IntoParams, ToSchema)]
+#[derive(Debug, Default, Deserialize, IntoParams, ToSchema)]
 pub struct GetOnchainHistoryParams {
     pub network: Network,
     pub aggregation: Option<AggregationMode>,
     pub routing: Option<bool>,
     pub timestamp: Option<TimestampParam>,
     // TODO(akhercha): add block/block_range
-}
-
-impl Default for GetOnchainHistoryParams {
-    fn default() -> Self {
-        Self {
-            network: Network::default(),
-            aggregation: None,
-            timestamp: Some(TimestampParam::from(chrono::Utc::now().timestamp() as u64)),
-            routing: None,
-        }
-    }
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]

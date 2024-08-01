@@ -15,7 +15,7 @@ use crate::handlers::entries::{GetOnchainParams, GetOnchainResponse};
 use crate::infra::repositories::onchain_repository::{
     get_last_updated_timestamp, get_variations, routing,
 };
-use crate::types::TimestampParam;
+use crate::types::timestamp::TimestampParam;
 use crate::utils::{big_decimal_price_to_hex, PathExtractor};
 use crate::AppState;
 
@@ -42,22 +42,22 @@ pub async fn get_onchain(
     Query(params): Query<GetOnchainParams>,
 ) -> Result<Json<GetOnchainResponse>, EntryError> {
     tracing::info!("Received get onchain entry request for pair {:?}", pair);
+    let pair_id: String = currency_pair_to_pair_id(&pair.0, &pair.1);
+    let aggregation_mode = params.aggregation.unwrap_or_default();
     let is_routing = params.routing.unwrap_or(false);
     let with_components = params.components.unwrap_or(true);
 
-    let pair_id: String = currency_pair_to_pair_id(&pair.0, &pair.1);
-    let aggregation_mode = params.aggregation.unwrap_or_default();
-    let timestamp = TimestampParam::from_api_parameter(params.timestamp)?;
-
-    // Only single timestamps works for the get_onchain request.
-    match timestamp {
-        TimestampParam::Single(_) => {}
-        TimestampParam::Range(_) => {
-            return Err(EntryError::InvalidTimestamp(String::from(
-                "get_onchain only accepts a timestamp, not a range.",
-            )))
-        }
-    };
+    let now = chrono::Utc::now().timestamp();
+    let timestamp = params
+        .timestamp
+        .unwrap_or_else(|| TimestampParam::from(now));
+    // NOTE: Only timestamps works for the get_onchain request, not ranges.
+    if !timestamp.is_single() {
+        return Err(EntryError::InvalidTimestamp(
+            "Expected a single timestamp, not a Range.".into(),
+        ));
+    }
+    timestamp.validate_time()?;
 
     let raw_data = routing(
         &state.onchain_pool,
@@ -71,27 +71,18 @@ pub async fn get_onchain(
     .await
     .map_err(|db_error| db_error.to_entry_error(&pair_id))?;
 
-    // TODO(akhercha): ⚠ gives different result than onchain oracle sometime
-    let last_updated_timestamp = get_last_updated_timestamp(
-        &state.onchain_pool,
-        params.network,
-        raw_data[0].pair_used.clone(),
-    )
-    .await
-    .map_err(|db_error| db_error.to_entry_error(&pair_id))?;
+    let entry = raw_data
+        .first()
+        .ok_or_else(|| EntryError::NotFound(pair_id.to_string()))?;
+
+    let last_updated_timestamp =
+        get_last_updated_timestamp(&state.onchain_pool, params.network, entry.pair_used.clone())
+            .await
+            .map_err(|db_error| db_error.to_entry_error(&pair_id))?;
 
     let variations = get_variations(&state.onchain_pool, params.network, pair_id.clone())
         .await
         .map_err(|db_error| db_error.to_entry_error(&pair_id))?;
-
-    let entry = match raw_data.first() {
-        Some(e) => e,
-        None => {
-            return Err(EntryError::NotFound(format!(
-                "No entry found for {pair_id}"
-            )))
-        }
-    };
 
     Ok(Json(adapt_entries_to_onchain_response(
         pair_id.clone(),

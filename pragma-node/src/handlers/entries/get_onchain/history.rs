@@ -7,7 +7,7 @@ use crate::handlers::entries::{
     GetOnchainHistoryEntry, GetOnchainHistoryParams, GetOnchainHistoryResponse,
 };
 use crate::infra::repositories::onchain_repository::routing;
-use crate::types::TimestampParam;
+use crate::types::timestamp::TimestampParam;
 use crate::utils::{big_decimal_price_to_hex, PathExtractor};
 use crate::AppState;
 
@@ -18,14 +18,14 @@ use crate::utils::currency_pair_to_pair_id;
     get,
     path = "/node/v1/onchain/history/{base}/{quote}",
     responses(
-        (status = 200, description = "Get the onchain price", body = GetOnchainHistoryResponse)
+        (status = 200, description = "Get the onchain price history", body = GetOnchainHistoryResponse)
     ),
     params(
         ("base" = String, Path, description = "Base Asset"),
         ("quote" = String, Path, description = "Quote Asset"),
         ("network" = Network, Query, description = "Network"),
         ("aggregation" = Option<AggregationMode>, Query, description = "Aggregation Mode"),
-        ("timestamp" = Option<u64>, Query, description = "Timestamp")
+        ("timestamp" = Option<TimestampParam>, Query, description = "Timestamp or timestamp range")
     ),
 )]
 pub async fn get_onchain_history(
@@ -33,12 +33,16 @@ pub async fn get_onchain_history(
     PathExtractor(pair): PathExtractor<(String, String)>,
     Query(params): Query<GetOnchainHistoryParams>,
 ) -> Result<Json<GetOnchainHistoryResponse>, EntryError> {
-    tracing::info!("Received get onchain entry request for pair {:?}", pair);
-    let is_routing = params.routing.unwrap_or(false);
-
+    tracing::info!("Received get onchain history request for pair {:?}", pair);
     let pair_id: String = currency_pair_to_pair_id(&pair.0, &pair.1);
     let aggregation_mode = params.aggregation.unwrap_or_default();
-    let timestamp = TimestampParam::from_api_parameter(params.timestamp)?;
+    let is_routing = params.routing.unwrap_or(false);
+
+    let now = chrono::Utc::now().timestamp();
+    let timestamp = params
+        .timestamp
+        .unwrap_or_else(|| TimestampParam::from(now));
+    timestamp.validate_time()?;
 
     let raw_data = routing(
         &state.onchain_pool,

@@ -15,7 +15,7 @@ use crate::handlers::entries::{Checkpoint, OnchainEntry, Publisher, PublisherEnt
 use crate::infra::repositories::entry_repository::{
     get_interval_specifier, OHLCEntry, OHLCEntryRaw,
 };
-use crate::types::TimestampParam;
+use crate::types::timestamp::TimestampParam;
 use crate::utils::{
     big_decimal_price_to_hex, convert_via_quote, format_bigdecimal_price, get_decimals_for_pair,
     get_mid_price, normalize_to_decimals,
