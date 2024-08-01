@@ -23,9 +23,9 @@ pub enum AggregationMode {
 
 #[derive(Default, Debug, Serialize, Deserialize, ToSchema, Clone, Copy)]
 pub enum Network {
-    #[serde(rename = "testnet")]
+    #[serde(rename = "sepolia")]
     #[default]
-    Testnet,
+    Sepolia,
     #[serde(rename = "mainnet")]
     Mainnet,
 }

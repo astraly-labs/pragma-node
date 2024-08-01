@@ -7,12 +7,12 @@ use diesel::sql_types::{Double, Jsonb, VarChar};
 use diesel::{ExpressionMethods, QueryDsl, Queryable, RunQueryDsl};
 use serde::{Deserialize, Serialize};
 
-use crate::handlers::entries::constants::{
+use crate::constants::starkex_ws::{
     INITAL_INTERVAL_IN_MS, INTERVAL_INCREMENT_IN_MS, MAX_INTERVAL_WITHOUT_ENTRIES,
     MINIMUM_NUMBER_OF_PUBLISHERS,
 };
-use crate::handlers::entries::get_entry::RoutingParams;
-use crate::handlers::entries::subscribe_to_entry::{AssetOraclePrice, SignedPublisherPrice};
+use crate::handlers::get_entry::RoutingParams;
+use crate::handlers::subscribe_to_entry::{AssetOraclePrice, SignedPublisherPrice};
 use crate::utils::{convert_via_quote, normalize_to_decimals, StarkexPrice};
 use pragma_common::types::{AggregationMode, ConversionError, DataType, Interval};
 use pragma_entities::dto;

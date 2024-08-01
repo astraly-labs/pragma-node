@@ -3,7 +3,7 @@ use axum::Json;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::handlers::entries::Interval;
+use crate::handlers::Interval;
 use crate::infra::repositories::entry_repository::{self, OHLCEntry};
 use crate::utils::PathExtractor;
 use crate::AppState;
