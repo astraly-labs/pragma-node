@@ -121,8 +121,6 @@ mod tests {
 
         let merkle_tree = MerkleTree::new(leaves.clone()).unwrap();
 
-        dbg!(&merkle_tree);
-
         assert_eq!(merkle_tree.leaves, leaves);
         assert_eq!(merkle_tree.levels.len(), 3);
         assert_eq!(
