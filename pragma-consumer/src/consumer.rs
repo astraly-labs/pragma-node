@@ -23,6 +23,9 @@ impl PragmaConsumer {
         // TODO: Change how options are stored redis so we can call one option
         let _option = self.request_latest_option(instrument.name()).await?;
 
+        // TODO: Build the MerkleProof of the hashed Option to the MerkleTree
+
+        // TODO: Build the calldata using MerkleProof + Option
         Ok(MerkleFeedCalldata::default())
     }
 
