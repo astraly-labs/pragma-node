@@ -1,6 +1,7 @@
 pub mod builder;
 pub mod client;
 pub mod config;
+pub mod constants;
 pub mod types;
 
 use color_eyre::Result;
@@ -19,7 +20,8 @@ async fn main() -> Result<()> {
 
     let consumer = PragmaConsumerBuilder::new()
         .on_sepolia()
-        .with_api(api_config)?;
+        .with_api(api_config)
+        .await?;
 
     let instrument = instrument!("BTC-27JUN25-80000-P");
     let calldata = consumer.get_deribit_options_calldata(&instrument).await?;

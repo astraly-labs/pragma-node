@@ -3,7 +3,10 @@ use reqwest::{Response, StatusCode};
 
 use pragma_common::types::Network;
 
-use crate::types::{Instrument, MerkleFeedCalldata, OptionData};
+use crate::{
+    constants::PRAGMAPI_PATH_PREFIX,
+    types::{Instrument, MerkleFeedCalldata, OptionData},
+};
 
 pub struct PragmaConsumer {
     pub(crate) network: Network,
@@ -22,8 +25,8 @@ impl PragmaConsumer {
 
     async fn request_latest_option(&self, instrument_name: String) -> Result<OptionData> {
         let url = format!(
-            "{}/get_latest_option?network={}&instrument={}",
-            self.base_url, self.network, instrument_name,
+            "{}/{}/get_latest_option?network={}&instrument={}",
+            self.base_url, PRAGMAPI_PATH_PREFIX, self.network, instrument_name,
         );
 
         let api_response = self.request_api(url).await?;
@@ -36,8 +39,8 @@ impl PragmaConsumer {
 
     async fn request_latest_merkle_tree(&self) -> Result<Vec<u8>> {
         let url = format!(
-            "{}/get_latest_merkle_tree?network={}",
-            self.base_url, self.network
+            "{}/{}/get_latest_merkle_tree?network={}",
+            self.base_url, PRAGMAPI_PATH_PREFIX, self.network,
         );
 
         let api_response = self.request_api(url).await?;

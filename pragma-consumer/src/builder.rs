@@ -1,8 +1,9 @@
-use color_eyre::Result;
+use color_eyre::{eyre::eyre, Result};
 
 use pragma_common::types::Network;
+use reqwest::StatusCode;
 
-use crate::{client::PragmaConsumer, config::ApiConfig};
+use crate::{client::PragmaConsumer, config::ApiConfig, constants::PRAGMAPI_HEALTHCHECK_ENDPOINT};
 
 #[derive(Default, Debug)]
 pub struct PragmaConsumerBuilder {
@@ -27,8 +28,10 @@ impl PragmaConsumerBuilder {
         self
     }
 
-    pub fn with_api(self, api_config: ApiConfig) -> Result<PragmaConsumer> {
+    pub async fn with_api(self, api_config: ApiConfig) -> Result<PragmaConsumer> {
         let http_client = self.build_http_client(&api_config)?;
+        self.health_check(&http_client, &api_config.base_url)
+            .await?;
         Ok(PragmaConsumer {
             network: self.network,
             http_client,
@@ -50,5 +53,24 @@ impl PragmaConsumerBuilder {
                 headers
             })
             .build()?)
+    }
+
+    async fn health_check(&self, client: &reqwest::Client, base_url: &str) -> Result<()> {
+        let health_check_url = format!("{}/{}", base_url, PRAGMAPI_HEALTHCHECK_ENDPOINT);
+        let response = client.get(&health_check_url).send().await?;
+
+        if response.status() != StatusCode::OK {
+            return Err(eyre!(
+                "Health check failed: HTTP status {}",
+                response.status()
+            ));
+        }
+
+        let body = response.text().await?;
+        if body.trim() != "Server is running!" {
+            return Err(eyre!("Health check failed: Unexpected response body"));
+        }
+
+        Ok(())
     }
 }
