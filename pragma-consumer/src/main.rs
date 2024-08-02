@@ -1,7 +1,7 @@
 pub mod builder;
 pub mod client;
 pub mod config;
-pub mod constants;
+pub(crate) mod constants;
 pub mod types;
 
 use color_eyre::Result;

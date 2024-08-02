@@ -2569,6 +2569,7 @@ dependencies = [
  "rstest",
  "serde",
  "serde_json",
+ "starknet-crypto 0.7.1",
  "thiserror",
  "time",
  "tokio",

@@ -40,6 +40,8 @@ prometheus = "0.13.4"
 nonzero_ext = { version = "0.3.0" }
 serde_json = { version = "1.0", features = ["arbitrary_precision"] }
 starknet = "0.9.0"
+# Used in the pragma-consumer crate for the pedersen hash + felt type
+starknet-crypto = "0.7.1"
 redis = "0.26.1"
 reqwest = "0.12.5"
 rdkafka = "0.36.2"

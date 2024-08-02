@@ -30,8 +30,11 @@ impl PragmaConsumerBuilder {
 
     pub async fn with_api(self, api_config: ApiConfig) -> Result<PragmaConsumer> {
         let http_client = self.build_http_client(&api_config)?;
+
+        // TODO(akhercha): Do we really want to make this health check?
         self.health_check(&http_client, &api_config.base_url)
             .await?;
+
         Ok(PragmaConsumer {
             network: self.network,
             http_client,
@@ -57,7 +60,11 @@ impl PragmaConsumerBuilder {
 
     async fn health_check(&self, client: &reqwest::Client, base_url: &str) -> Result<()> {
         let health_check_url = format!("{}/{}", base_url, PRAGMAPI_HEALTHCHECK_ENDPOINT);
-        let response = client.get(&health_check_url).send().await?;
+        let response = client
+            .get(&health_check_url)
+            .send()
+            .await
+            .map_err(|e| eyre!("Could not reach URL \"{base_url}\": {e}"))?;
 
         if response.status() != StatusCode::OK {
             return Err(eyre!(

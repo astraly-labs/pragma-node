@@ -1,3 +1,5 @@
+pub mod merkle_tree;
+
 use std::str::FromStr;
 
 use bigdecimal::BigDecimal;
