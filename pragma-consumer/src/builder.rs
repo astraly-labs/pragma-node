@@ -3,7 +3,9 @@ use color_eyre::{eyre::eyre, Result};
 use pragma_common::types::Network;
 use reqwest::StatusCode;
 
-use crate::{client::PragmaConsumer, config::ApiConfig, constants::PRAGMAPI_HEALTHCHECK_ENDPOINT};
+use crate::{
+    config::ApiConfig, constants::PRAGMAPI_HEALTHCHECK_ENDPOINT, consumer::PragmaConsumer,
+};
 
 /// Builder of the Pragma consumer client.
 /// Default network is Sepolia.
