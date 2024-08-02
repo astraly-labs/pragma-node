@@ -1,3 +1,5 @@
+pub(crate) mod routes;
+
 use std::net::SocketAddr;
 use tower_http::{
     cors::CorsLayer,
@@ -9,7 +11,7 @@ use utoipa::{
 };
 
 use crate::errors::internal_error;
-use crate::{config::Config, handlers, routes::app_router, types, AppState};
+use crate::{config::Config, handlers, servers::app::routes::app_router, types, AppState};
 
 struct SecurityAddon;
 

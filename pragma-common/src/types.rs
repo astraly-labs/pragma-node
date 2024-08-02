@@ -1,3 +1,5 @@
+use core::fmt;
+
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -28,6 +30,15 @@ pub enum Network {
     Sepolia,
     #[serde(rename = "mainnet")]
     Mainnet,
+}
+
+impl fmt::Display for Network {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> Result<(), core::fmt::Error> {
+        match self {
+            Network::Sepolia => write!(f, "sepolia"),
+            Network::Mainnet => write!(f, "mainnet"),
+        }
+    }
 }
 
 #[derive(Default, Debug, Deserialize, ToSchema, Clone, Copy)]

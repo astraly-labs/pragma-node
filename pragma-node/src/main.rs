@@ -4,7 +4,6 @@ mod errors;
 mod handlers;
 mod infra;
 mod metrics;
-mod routes;
 mod servers;
 mod types;
 mod utils;
