@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 bigdecimal = { workspace = true, features = ["serde"] }
 chrono = { workspace = true }
+color-eyre = { workspace = true }
 deadpool-diesel = { workspace = true, features = ["postgres"] }
 dotenvy = { workspace = true }
 envy = { workspace = true }
@@ -26,3 +27,6 @@ tracing-subscriber = { workspace = true }
 
 pragma-common = { path = "../pragma-common" }
 pragma-entities = { path = "../pragma-entities" }
+
+[dev-dependencies]
+rstest = { workspace = true }

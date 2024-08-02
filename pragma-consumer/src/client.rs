@@ -1,5 +1,7 @@
-use pragma_common::types::Network;
+use color_eyre::{eyre::eyre, Result};
 use reqwest::{Response, StatusCode};
+
+use pragma_common::types::Network;
 
 use crate::types::{Instrument, MerkleFeedCalldata, OptionData};
 
@@ -10,30 +12,37 @@ pub struct PragmaConsumer {
 }
 
 impl PragmaConsumer {
-    async fn request_api(&self, url: String) -> Response {
-        self.http_client.get(url).send().await.unwrap()
+    async fn request_api(&self, url: String) -> Result<Response> {
+        self.http_client
+            .get(url)
+            .send()
+            .await
+            .map_err(|e| eyre!("Request failed: {e}"))
     }
 
-    async fn request_latest_option(&self, instrument_name: String) -> Result<OptionData, ()> {
+    async fn request_latest_option(&self, instrument_name: String) -> Result<OptionData> {
         let url = format!(
-            "{}/{}/get_latest_option&instrument={}",
+            "{}/get_latest_option?network={}&instrument={}",
             self.base_url, self.network, instrument_name,
         );
 
-        let api_response = self.request_api(url).await;
+        let api_response = self.request_api(url).await?;
         if api_response.status() != StatusCode::OK {
-            return Err(());
+            return Err(eyre!("Request get_latest_option failed!"));
         }
 
         Ok(OptionData::default())
     }
 
-    async fn request_latest_merkle_tree(&self) -> Result<Vec<u8>, ()> {
-        let url = format!("{}/{}/get_latest_merkle_tree", self.base_url, self.network);
+    async fn request_latest_merkle_tree(&self) -> Result<Vec<u8>> {
+        let url = format!(
+            "{}/get_latest_merkle_tree?network={}",
+            self.base_url, self.network
+        );
 
-        let api_response = self.request_api(url).await;
+        let api_response = self.request_api(url).await?;
         if api_response.status() != StatusCode::OK {
-            return Err(());
+            return Err(eyre!("Request get_latest_merkle_tree failed!"));
         }
 
         Ok(vec![])
@@ -42,7 +51,7 @@ impl PragmaConsumer {
     pub async fn get_deribit_options_calldata(
         &self,
         instrument: &Instrument,
-    ) -> Result<MerkleFeedCalldata, ()> {
+    ) -> Result<MerkleFeedCalldata> {
         let _merkle_tree = self.request_latest_merkle_tree().await?;
         let _option = self.request_latest_option(instrument.name()).await?;
 

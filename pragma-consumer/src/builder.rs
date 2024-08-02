@@ -1,3 +1,5 @@
+use color_eyre::Result;
+
 use pragma_common::types::Network;
 
 use crate::{client::PragmaConsumer, config::ApiConfig};
@@ -25,10 +27,7 @@ impl PragmaConsumerBuilder {
         self
     }
 
-    pub fn with_api(
-        self,
-        api_config: ApiConfig,
-    ) -> Result<PragmaConsumer, Box<dyn std::error::Error>> {
+    pub fn with_api(self, api_config: ApiConfig) -> Result<PragmaConsumer> {
         let http_client = self.build_http_client(&api_config)?;
         Ok(PragmaConsumer {
             network: self.network,
@@ -37,10 +36,7 @@ impl PragmaConsumerBuilder {
         })
     }
 
-    fn build_http_client(
-        &self,
-        api_config: &ApiConfig,
-    ) -> Result<reqwest::Client, Box<dyn std::error::Error>> {
+    fn build_http_client(&self, api_config: &ApiConfig) -> Result<reqwest::Client> {
         Ok(reqwest::Client::builder()
             .default_headers({
                 let mut headers = reqwest::header::HeaderMap::new();

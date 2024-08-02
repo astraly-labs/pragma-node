@@ -14,6 +14,7 @@ edition = "2021"
 authors = ["Pragma Labs <support@pragma.build>"]
 
 [workspace.dependencies]
+color-eyre = "0.6"
 aws-config = { version = "1.5.1", features = ["behavior-version-latest"] }
 aws-sdk-secretsmanager = "1.32.0"
 axum = { version = "0.6", features = ["macros", "ws", "tokio"] }
