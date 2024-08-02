@@ -1,11 +1,14 @@
+use std::cmp::Ordering;
+
 use color_eyre::eyre::eyre;
 use color_eyre::eyre::Result;
 use starknet_crypto::pedersen_hash;
 use starknet_crypto::Felt;
-use std::cmp::Ordering;
 
-pub type MerkleRoot = Felt;
-
+/// Simple MerkleTree.
+/// Reference:
+/// https://github.com/software-mansion/starknet.py/blob/development/starknet_py/utils/merkle_tree.py
+/// NOTE: Only supports the Pedersen hash for now.
 #[derive(Debug, Clone)]
 pub struct MerkleTree {
     leaves: Vec<Felt>,
@@ -13,12 +16,10 @@ pub struct MerkleTree {
     levels: Vec<Vec<Felt>>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+/// The merkle proof that a leaf belongs to a Merkle tree.
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct MerkleProof(pub Vec<Felt>);
 
-// Mimic of the implementation of Starknet.py:
-// https://github.com/software-mansion/starknet.py/blob/development/starknet_py/utils/merkle_tree.py
-// NOTE: Only supports the Pedersen hash for now.
 impl MerkleTree {
     pub fn new(leaves: Vec<Felt>) -> Result<Self> {
         if leaves.is_empty() {

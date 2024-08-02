@@ -5,6 +5,8 @@ use reqwest::StatusCode;
 
 use crate::{client::PragmaConsumer, config::ApiConfig, constants::PRAGMAPI_HEALTHCHECK_ENDPOINT};
 
+/// Builder of the Pragma consumer client.
+/// Default network is Sepolia.
 #[derive(Default, Debug)]
 pub struct PragmaConsumerBuilder {
     network: Network,
@@ -32,6 +34,7 @@ impl PragmaConsumerBuilder {
         let http_client = self.build_http_client(&api_config)?;
 
         // TODO(akhercha): Do we really want to make this health check?
+        // Should just be an opt-in function?
         self.health_check(&http_client, &api_config.base_url)
             .await?;
 

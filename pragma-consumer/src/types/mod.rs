@@ -5,12 +5,12 @@ use std::str::FromStr;
 use bigdecimal::BigDecimal;
 use chrono::NaiveDate;
 use color_eyre::{eyre::eyre, Result};
-
-pub type MerkleProof = Vec<u64>;
+use merkle_tree::MerkleProof;
 
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct InstrumentName(String);
 
+/// The possible types for an option.
 #[derive(Debug, PartialEq)]
 pub enum OptionType {
     Put,
@@ -18,7 +18,7 @@ pub enum OptionType {
 }
 
 impl OptionType {
-    pub fn to_str(&self) -> &str {
+    pub fn as_str(&self) -> &str {
         match self {
             Self::Put => "P",
             Self::Call => "C",
@@ -26,6 +26,7 @@ impl OptionType {
     }
 }
 
+/// The available currencies supported.
 #[derive(Debug, PartialEq)]
 pub enum Currency {
     BTC,
@@ -33,7 +34,7 @@ pub enum Currency {
 }
 
 impl Currency {
-    pub fn to_str(&self) -> &str {
+    pub fn as_str(&self) -> &str {
         match self {
             Self::BTC => "BTC",
             Self::ETH => "ETH",
@@ -46,7 +47,7 @@ impl Currency {
         let currency = match ticker {
             "BTC" => Self::BTC,
             "ETH" => Self::ETH,
-            _ => return Err(eyre!("Invalid currency")),
+            invalid => return Err(eyre!("Invalid currency: {invalid}")),
         };
         Ok(currency)
     }
@@ -66,6 +67,7 @@ macro_rules! instrument {
     )*};
 }
 
+/// An instrument.
 pub struct Instrument {
     pub base_currency: Currency,
     pub expiration_date: NaiveDate,
@@ -82,11 +84,8 @@ impl Instrument {
         }
 
         let base_currency = Currency::from_ticker(parts[0])?;
-
         let expiration_date = NaiveDate::parse_from_str(parts[1], "%d%b%y")?;
-
         let strike_price = BigDecimal::from_str(parts[2])?;
-
         let option_type = match parts[3] {
             "P" => OptionType::Put,
             "C" => OptionType::Call,
@@ -104,14 +103,15 @@ impl Instrument {
     pub fn name(&self) -> String {
         format!(
             "{}-{}-{}-{}",
-            self.base_currency.to_str(),
+            self.base_currency.as_str(),
             self.expiration_date,
             self.strike_price,
-            self.option_type.to_str()
+            self.option_type.as_str()
         )
     }
 }
 
+/// An instrument option with its mark price for a certain timestamp.
 #[derive(Default, Debug)]
 pub struct OptionData {
     pub instrument_name: String,
@@ -120,7 +120,8 @@ pub struct OptionData {
     pub mark_price: BigDecimal,
 }
 
-#[derive(Default, Debug)]
+/// Calldata used to query Pragma Oracle.
+#[derive(Debug, Default)]
 pub struct MerkleFeedCalldata {
     pub merkle_proof: MerkleProof,
     pub option_data: OptionData,
