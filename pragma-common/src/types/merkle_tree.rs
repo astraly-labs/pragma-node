@@ -1,5 +1,6 @@
 use std::cmp::Ordering;
 
+use serde::{Deserialize, Serialize};
 use starknet::core::{crypto::pedersen_hash, types::FieldElement};
 use thiserror::Error;
 
@@ -13,7 +14,8 @@ pub enum MerkleTreeError {
 /// Reference:
 /// https://github.com/software-mansion/starknet.py/blob/development/starknet_py/utils/merkle_tree.py
 /// NOTE: Only supports the Pedersen hash for now.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct MerkleTree {
     leaves: Vec<FieldElement>,
     root_hash: FieldElement,

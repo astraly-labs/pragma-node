@@ -2551,6 +2551,7 @@ dependencies = [
  "chrono",
  "rstest",
  "serde",
+ "serde_json",
  "starknet 0.9.0",
  "thiserror",
  "tracing",
