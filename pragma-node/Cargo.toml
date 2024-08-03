@@ -29,11 +29,11 @@ nonzero_ext = { workspace = true }
 pragma-monitoring = { workspace = true }
 prometheus = { workspace = true }
 rdkafka = { workspace = true }
+redis = { workspace = true, features = ["tokio-comp", "json"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true, features = ["arbitrary_precision"] }
 starknet = { workspace = true }
 strum = { workspace = true, features = ["derive"] }
-redis = { workspace = true, features = ["tokio-comp", "json"] }
 thiserror = { workspace = true }
 time = { workspace = true }
 tokio = { workspace = true, features = ["sync", "macros", "rt-multi-thread"] }

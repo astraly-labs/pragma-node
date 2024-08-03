@@ -10,9 +10,9 @@ bigdecimal = { workspace = true, features = ["serde"] }
 chrono = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 starknet = { workspace = true }
+thiserror = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
-thiserror = { workspace = true }
 utoipa = { workspace = true }
 
 [dev-dependencies]
