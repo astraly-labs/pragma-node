@@ -41,6 +41,8 @@ pub async fn run_app_server(config: &Config, state: AppState) {
             handlers::onchain::get_checkpoints::get_onchain_checkpoints,
             handlers::onchain::get_publishers::get_onchain_publishers,
             handlers::onchain::get_ohlc::subscribe_to_onchain_ohlc,
+            handlers::merkle_feeds::get_option::get_option,
+            handlers::merkle_feeds::get_merkle_tree::get_merkle_tree,
         ),
         components(
             schemas(pragma_entities::dto::Entry, pragma_entities::EntryError),
@@ -65,7 +67,10 @@ pub async fn run_app_server(config: &Config, state: AppState) {
                 handlers::onchain::get_ohlc::GetOnchainOHLCResponse,
                 handlers::onchain::get_history::GetOnchainHistoryParams,
                 handlers::onchain::get_history::GetOnchainHistoryResponse,
-
+                handlers::merkle_feeds::get_option::GetOptionQuery,
+                handlers::merkle_feeds::get_option::GetOptionResponse,
+                handlers::merkle_feeds::get_merkle_tree::GetMerkleTreeQuery,
+                handlers::merkle_feeds::get_merkle_tree::GetMerkleTreeResponse,
             ),
             schemas(
                 types::entries::BaseEntry,

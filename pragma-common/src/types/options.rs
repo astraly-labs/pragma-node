@@ -4,8 +4,32 @@ use bigdecimal::BigDecimal;
 use chrono::NaiveDate;
 use thiserror::Error;
 
-#[derive(Debug, Default, Clone, PartialEq)]
-pub struct InstrumentName(String);
+/// The available currencies supported.
+#[derive(Debug, PartialEq)]
+pub enum OptionCurrency {
+    BTC,
+    ETH,
+}
+
+impl OptionCurrency {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::BTC => "BTC",
+            Self::ETH => "ETH",
+        }
+    }
+}
+
+impl OptionCurrency {
+    pub fn from_ticker(ticker: &str) -> Result<Self, InstrumentError> {
+        let currency = match ticker.to_uppercase().as_str() {
+            "BTC" => Self::BTC,
+            "ETH" => Self::ETH,
+            _ => return Err(InstrumentError::UnsupportedCurrency(ticker.to_owned())),
+        };
+        Ok(currency)
+    }
+}
 
 /// The possible types for an option.
 #[derive(Debug, PartialEq)]
@@ -37,36 +61,9 @@ pub enum InstrumentError {
     UnsupportedCurrency(String),
 }
 
-/// The available currencies supported.
-#[derive(Debug, PartialEq)]
-pub enum Currency {
-    BTC,
-    ETH,
-}
-
-impl Currency {
-    pub fn as_str(&self) -> &str {
-        match self {
-            Self::BTC => "BTC",
-            Self::ETH => "ETH",
-        }
-    }
-}
-
-impl Currency {
-    pub fn from_ticker(ticker: &str) -> Result<Self, InstrumentError> {
-        let currency = match ticker.to_uppercase().as_str() {
-            "BTC" => Self::BTC,
-            "ETH" => Self::ETH,
-            _ => return Err(InstrumentError::UnsupportedCurrency(ticker.to_owned())),
-        };
-        Ok(currency)
-    }
-}
-
 /// An instrument.
 pub struct Instrument {
-    pub base_currency: Currency,
+    pub base_currency: OptionCurrency,
     pub expiration_date: NaiveDate,
     pub strike_price: BigDecimal,
     pub option_type: OptionType,
@@ -80,7 +77,7 @@ impl Instrument {
             return Err(InstrumentError::NameFormat(instrument_name.to_owned()));
         }
 
-        let base_currency = Currency::from_ticker(parts[0])?;
+        let base_currency = OptionCurrency::from_ticker(parts[0])?;
         let expiration_date = NaiveDate::parse_from_str(parts[1], "%d%b%y")
             .map_err(|_| InstrumentError::DateFormat(parts[1].to_owned()))?;
         let strike_price = BigDecimal::from_str(parts[2])
@@ -145,7 +142,7 @@ mod tests {
     #[rstest]
     #[case(
         "BTC-27JUN25-80000-P",
-        Currency::BTC,
+        OptionCurrency::BTC,
         2025,
         6,
         27,
@@ -154,7 +151,7 @@ mod tests {
     )]
     #[case(
         "BTC-16AUG24-59000-P",
-        Currency::BTC,
+        OptionCurrency::BTC,
         2024,
         8,
         16,
@@ -163,7 +160,7 @@ mod tests {
     )]
     #[case(
         "BTC-16AUG24-54000-C",
-        Currency::BTC,
+        OptionCurrency::BTC,
         2024,
         8,
         16,
@@ -172,7 +169,7 @@ mod tests {
     )]
     #[case(
         "BTC-27DEC24-20000-P",
-        Currency::BTC,
+        OptionCurrency::BTC,
         2024,
         12,
         27,
@@ -181,7 +178,7 @@ mod tests {
     )]
     #[case(
         "BTC-3AUG24-61500-C",
-        Currency::BTC,
+        OptionCurrency::BTC,
         2024,
         8,
         3,
@@ -190,7 +187,7 @@ mod tests {
     )]
     #[case(
         "BTC-27DEC24-28000-P",
-        Currency::BTC,
+        OptionCurrency::BTC,
         2024,
         12,
         27,
@@ -199,7 +196,7 @@ mod tests {
     )]
     #[case(
         "BTC-3AUG24-61000-P",
-        Currency::BTC,
+        OptionCurrency::BTC,
         2024,
         8,
         3,
@@ -208,7 +205,7 @@ mod tests {
     )]
     #[case(
         "BTC-30AUG24-78000-P",
-        Currency::BTC,
+        OptionCurrency::BTC,
         2024,
         8,
         30,
@@ -217,7 +214,7 @@ mod tests {
     )]
     #[case(
         "BTC-27DEC24-105000-C",
-        Currency::BTC,
+        OptionCurrency::BTC,
         2024,
         12,
         27,
@@ -226,7 +223,7 @@ mod tests {
     )]
     #[case(
         "BTC-4AUG24-56000-P",
-        Currency::BTC,
+        OptionCurrency::BTC,
         2024,
         8,
         4,
@@ -235,7 +232,7 @@ mod tests {
     )]
     fn test_instrument_from_name(
         #[case] name: &str,
-        #[case] expected_currency: Currency,
+        #[case] expected_currency: OptionCurrency,
         #[case] expected_year: i32,
         #[case] expected_month: u32,
         #[case] expected_day: u32,

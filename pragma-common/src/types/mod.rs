@@ -1,5 +1,5 @@
-pub mod instrument;
 pub mod merkle_tree;
+pub mod options;
 
 use core::fmt;
 use serde::{Deserialize, Serialize};

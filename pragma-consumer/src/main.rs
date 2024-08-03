@@ -7,7 +7,7 @@ pub mod types;
 use color_eyre::Result;
 
 use pragma_common::instrument;
-use pragma_common::types::instrument::Instrument;
+use pragma_common::types::options::Instrument;
 
 use builder::PragmaConsumerBuilder;
 use config::ApiConfig;

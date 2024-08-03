@@ -7,32 +7,38 @@ use pragma_entities::models::merkle_feed_error::MerkleFeedError;
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 
+use crate::utils::PathExtractor;
 use crate::AppState;
 
 #[derive(Default, Deserialize, IntoParams, ToSchema)]
-pub struct GetMerkleTreeQuery {
+pub struct GetOptionQuery {
     pub network: Option<Network>,
     pub block_number: u64,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
-pub struct GetMerkleTreeResponse {}
+pub struct GetOptionResponse {}
 
 #[utoipa::path(
     get,
-    path = "/node/v1/merkle_feeds/merkle_tree",
+    path = "/node/v1/merkle_feeds/options/{instrument}",
     responses(
-        (status = 200, description = "Get the merkle tree", body = [GetMerkleTreeResponse])
+        (status = 200, description = "Get the option", body = [GetOptionResponse])
     ),
     params(
-        GetMerkleTreeQuery
+        ("instrument" = String, Path, description = "Name of the instrument"),
+        GetOptionQuery
     ),
 )]
-pub async fn get_merkle_tree(
+pub async fn get_option(
     State(state): State<AppState>,
-    Query(params): Query<GetMerkleTreeQuery>,
-) -> Result<Json<GetMerkleTreeResponse>, MerkleFeedError> {
-    tracing::info!("Received get merkle tree request");
+    PathExtractor(instrument): PathExtractor<String>,
+    Query(params): Query<GetOptionQuery>,
+) -> Result<Json<GetOptionResponse>, MerkleFeedError> {
+    tracing::info!(
+        "Received get option request for instrument {:?}",
+        instrument
+    );
     if state.redis_client.is_none() {
         return Err(MerkleFeedError::RedisConnection);
     }
@@ -40,5 +46,5 @@ pub async fn get_merkle_tree(
     let _network = params.network.unwrap_or_default();
     let _block_number = params.block_number;
 
-    Ok(Json(GetMerkleTreeResponse {}))
+    Ok(Json(GetOptionResponse {}))
 }

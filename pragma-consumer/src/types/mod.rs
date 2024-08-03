@@ -1,4 +1,4 @@
-use pragma_common::types::{instrument::OptionData, merkle_tree::MerkleProof};
+use pragma_common::types::{merkle_tree::MerkleProof, options::OptionData};
 
 /// Calldata used to query Pragma Oracle.
 #[derive(Debug, Default)]

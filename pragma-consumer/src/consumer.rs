@@ -2,7 +2,7 @@ use color_eyre::{eyre::eyre, Result};
 use reqwest::{Response, StatusCode};
 
 use pragma_common::types::{
-    instrument::{Instrument, OptionData},
+    options::{Instrument, OptionData},
     Network,
 };
 
