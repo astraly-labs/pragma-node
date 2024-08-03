@@ -20,7 +20,7 @@ pub struct GetMerkleTreeResponse {}
 
 #[utoipa::path(
     get,
-    path = "/node/v1/merkle_feeds/merkle_tree",
+    path = "/node/v1/merkle_feeds/tree",
     responses(
         (status = 200, description = "Get the merkle tree", body = [GetMerkleTreeResponse])
     ),
@@ -28,7 +28,7 @@ pub struct GetMerkleTreeResponse {}
         GetMerkleTreeQuery
     ),
 )]
-pub async fn get_merkle_tree(
+pub async fn get_merkle_feeds_tree(
     State(state): State<AppState>,
     Query(params): Query<GetMerkleTreeQuery>,
 ) -> Result<Json<GetMerkleTreeResponse>, MerkleFeedError> {

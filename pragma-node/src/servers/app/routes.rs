@@ -5,7 +5,9 @@ use axum::Router;
 use utoipa::OpenApi as OpenApiT;
 use utoipa_swagger_ui::SwaggerUi;
 
-use crate::handlers::merkle_feeds::{get_merkle_tree::get_merkle_tree, get_option::get_option};
+use crate::handlers::merkle_feeds::{
+    get_merkle_tree::get_merkle_feeds_tree, get_option::get_merkle_feeds_option,
+};
 use crate::handlers::onchain::{
     get_checkpoints::get_onchain_checkpoints, get_history::get_onchain_history,
     get_ohlc::subscribe_to_onchain_ohlc, get_onchain, get_publishers::get_onchain_publishers,
@@ -74,7 +76,7 @@ fn aggregation_routes(state: AppState) -> Router<AppState> {
 
 fn merkle_feeds_routes(state: AppState) -> Router<AppState> {
     Router::new()
-        .route("/merkle_tree", get(get_merkle_tree))
-        .route("/options/:instrument", get(get_option))
+        .route("/tree", get(get_merkle_feeds_tree))
+        .route("/options/:instrument", get(get_merkle_feeds_option))
         .with_state(state)
 }

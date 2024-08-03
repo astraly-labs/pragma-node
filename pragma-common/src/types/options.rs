@@ -2,10 +2,11 @@ use std::str::FromStr;
 
 use bigdecimal::BigDecimal;
 use chrono::NaiveDate;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 /// The available currencies supported.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub enum OptionCurrency {
     BTC,
     ETH,
@@ -122,10 +123,10 @@ macro_rules! instrument {
 }
 
 /// An instrument option with its mark price for a certain timestamp.
-#[derive(Default, Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct OptionData {
     pub instrument_name: String,
-    pub base_currency: String,
+    pub base_currency: OptionCurrency,
     pub current_timestamp: i64,
     pub mark_price: BigDecimal,
 }

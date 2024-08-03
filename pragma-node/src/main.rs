@@ -84,7 +84,10 @@ async fn main() {
         config.redis_port(),
     ) {
         Ok(client) => Some(Arc::new(client)),
-        Err(_) => None,
+        Err(_) => {
+            tracing::warn!("⚠ Could not establish a connection with Redis.");
+            None
+        }
     };
 
     // Create the Metrics registry

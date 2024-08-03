@@ -41,8 +41,8 @@ pub async fn run_app_server(config: &Config, state: AppState) {
             handlers::onchain::get_checkpoints::get_onchain_checkpoints,
             handlers::onchain::get_publishers::get_onchain_publishers,
             handlers::onchain::get_ohlc::subscribe_to_onchain_ohlc,
-            handlers::merkle_feeds::get_option::get_option,
-            handlers::merkle_feeds::get_merkle_tree::get_merkle_tree,
+            handlers::merkle_feeds::get_option::get_merkle_feeds_option,
+            handlers::merkle_feeds::get_merkle_tree::get_merkle_feeds_tree,
         ),
         components(
             schemas(pragma_entities::dto::Entry, pragma_entities::EntryError),

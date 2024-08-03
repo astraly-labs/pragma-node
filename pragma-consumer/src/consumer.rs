@@ -26,7 +26,7 @@ impl PragmaConsumer {
         // TODO: Build the MerkleProof of the hashed Option to the MerkleTree
 
         // TODO: Build the calldata using MerkleProof + Option
-        Ok(MerkleFeedCalldata::default())
+        todo!()
     }
 
     async fn request_latest_option(&self, instrument_name: String) -> Result<OptionData> {
@@ -43,7 +43,7 @@ impl PragmaConsumer {
         }
 
         // TODO: Serialization redis -> our type
-        Ok(OptionData::default())
+        todo!()
     }
 
     async fn request_latest_merkle_tree(&self) -> Result<Vec<u8>> {

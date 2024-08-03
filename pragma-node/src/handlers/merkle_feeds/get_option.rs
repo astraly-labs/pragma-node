@@ -2,11 +2,13 @@
 
 use axum::extract::{Query, State};
 use axum::Json;
+use pragma_common::types::options::OptionData;
 use pragma_common::types::Network;
 use pragma_entities::models::merkle_feed_error::MerkleFeedError;
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 
+use crate::infra::repositories::merkle_feeds_repository;
 use crate::utils::PathExtractor;
 use crate::AppState;
 
@@ -17,7 +19,7 @@ pub struct GetOptionQuery {
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
-pub struct GetOptionResponse {}
+pub struct GetOptionResponse(pub OptionData);
 
 #[utoipa::path(
     get,
@@ -30,7 +32,7 @@ pub struct GetOptionResponse {}
         GetOptionQuery
     ),
 )]
-pub async fn get_option(
+pub async fn get_merkle_feeds_option(
     State(state): State<AppState>,
     PathExtractor(instrument): PathExtractor<String>,
     Query(params): Query<GetOptionQuery>,
@@ -43,8 +45,19 @@ pub async fn get_option(
         return Err(MerkleFeedError::RedisConnection);
     }
 
-    let _network = params.network.unwrap_or_default();
-    let _block_number = params.block_number;
+    let network = params.network.unwrap_or_default();
+    let block_number = params.block_number;
 
-    Ok(Json(GetOptionResponse {}))
+    let option = merkle_feeds_repository::get_option_from_redis(
+        state.redis_client.unwrap(),
+        network,
+        block_number,
+        instrument,
+    )
+    .await
+    .map_err(MerkleFeedError::from)?;
+
+    // TODO: option.mark_price must be scaled with decimals
+
+    Ok(Json(GetOptionResponse(option)))
 }
