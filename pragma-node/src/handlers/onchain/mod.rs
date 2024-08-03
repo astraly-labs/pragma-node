@@ -1,14 +1,14 @@
-pub mod checkpoints;
-pub mod history;
-pub mod ohlc;
-pub mod publishers;
+pub mod get_checkpoints;
+pub mod get_history;
+pub mod get_ohlc;
+pub mod get_publishers;
 
 use std::collections::HashMap;
 
 use axum::extract::{Query, State};
 use axum::Json;
 use bigdecimal::BigDecimal;
-use history::ChunkInterval;
+use get_history::ChunkInterval;
 use pragma_common::types::{AggregationMode, Interval, Network};
 use pragma_entities::EntryError;
 use serde::{Deserialize, Serialize};

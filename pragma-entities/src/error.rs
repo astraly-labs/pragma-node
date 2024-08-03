@@ -41,6 +41,8 @@ pub enum ErrorKind {
     VariableDatabase(String),
     #[error("database init error : {0}")]
     GenericInitDatabase(String),
+    #[error("cannot init redis connection : {0}")]
+    RedisConnection(String),
 }
 
 pub fn adapt_infra_error<T: Error + Debug>(error: T) -> InfraError {

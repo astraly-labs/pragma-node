@@ -11,10 +11,10 @@ use pragma_entities::error::{adapt_infra_error, InfraError};
 use pragma_entities::Currency;
 use pragma_monitoring::models::SpotEntry;
 
-use crate::handlers::get_onchain::checkpoints::Checkpoint;
-use crate::handlers::get_onchain::history::ChunkInterval;
-use crate::handlers::get_onchain::publishers::{Publisher, PublisherEntry};
-use crate::handlers::get_onchain::OnchainEntry;
+use crate::handlers::onchain::get_checkpoints::Checkpoint;
+use crate::handlers::onchain::get_history::ChunkInterval;
+use crate::handlers::onchain::get_publishers::{Publisher, PublisherEntry};
+use crate::handlers::onchain::OnchainEntry;
 use crate::infra::repositories::entry_repository::{
     get_interval_specifier, OHLCEntry, OHLCEntryRaw,
 };

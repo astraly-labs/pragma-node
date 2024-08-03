@@ -33,6 +33,9 @@ pub struct AppState {
     // Databases pools
     offchain_pool: Pool,
     onchain_pool: Pool,
+    // Redis connection
+    #[allow(dead_code)]
+    redis_client: Option<redis::Client>,
     // Database caches
     publishers_updates_cache: Cache<String, HashMap<String, RawPublisherUpdates>>,
     // Pragma Signer used for StarkEx signing
@@ -74,6 +77,16 @@ async fn main() {
     };
     let pragma_signer = signer_builder.build().await;
 
+    // Init the redis client - Optionnal, only for endpoints that interact with Redis.
+    // TODO(akhercha): See with Hithem for production mode
+    let redis_client = match pragma_entities::connection::init_redis_client(
+        config.redis_host(),
+        config.redis_port(),
+    ) {
+        Ok(client) => Some(client),
+        Err(_) => None,
+    };
+
     // Create the Metrics registry
     let metrics_registry = MetricsRegistry::new();
     let ws_metrics = WsMetrics::new(&metrics_registry).expect("Failed to create WsMetrics");
@@ -81,6 +94,7 @@ async fn main() {
     let state = AppState {
         offchain_pool,
         onchain_pool,
+        redis_client,
         publishers_updates_cache,
         pragma_signer,
         ws_metrics: Arc::new(ws_metrics),
