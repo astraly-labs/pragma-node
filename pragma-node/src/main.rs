@@ -85,7 +85,7 @@ async fn main() {
     ) {
         Ok(client) => Some(Arc::new(client)),
         Err(_) => {
-            tracing::warn!("⚠ Could not establish a connection with Redis.");
+            tracing::warn!("⚠ Could not connect to Redis. Merkle feeds endpoints won't work.");
             None
         }
     };
