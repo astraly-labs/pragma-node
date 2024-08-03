@@ -1,12 +1,12 @@
 use color_eyre::{eyre::eyre, Result};
 use reqwest::{Response, StatusCode};
 
-use pragma_common::types::Network;
-
-use crate::{
-    constants::PRAGMAPI_PATH_PREFIX,
-    types::{Instrument, MerkleFeedCalldata, OptionData},
+use pragma_common::types::{
+    instrument::{Instrument, OptionData},
+    Network,
 };
+
+use crate::{constants::PRAGMAPI_PATH_PREFIX, types::MerkleFeedCalldata};
 
 pub struct PragmaConsumer {
     pub(crate) network: Network,

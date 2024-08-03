@@ -41,7 +41,6 @@ nonzero_ext = { version = "0.3.0" }
 serde_json = { version = "1.0.122", features = ["arbitrary_precision"] }
 starknet = "0.9.0"
 # Used in the pragma-consumer crate for the pedersen hash + felt type
-starknet-crypto = "0.7.1"
 redis = { version = "0.26.1", features = ["json", "tokio-comp"] }
 reqwest = "0.12.5"
 rdkafka = "0.36.2"

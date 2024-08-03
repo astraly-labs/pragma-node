@@ -18,7 +18,7 @@ redis = { workspace = true, features = ["tokio-comp", "json"] }
 reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-starknet-crypto = { workspace = true }
+starknet = { workspace = true }
 thiserror = { workspace = true }
 time = { workspace = true }
 tokio = { workspace = true, features = ["full"] }

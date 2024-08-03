@@ -1,7 +1,7 @@
 pub mod starkex;
 pub mod typed_data;
 
-use pragma_common::types::ConversionError;
+use pragma_common::errors::ConversionError;
 use pragma_entities::EntryError;
 use serde::{Deserialize, Serialize};
 use starknet::{

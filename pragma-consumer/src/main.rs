@@ -6,9 +6,11 @@ pub mod types;
 
 use color_eyre::Result;
 
+use pragma_common::instrument;
+use pragma_common::types::instrument::Instrument;
+
 use builder::PragmaConsumerBuilder;
 use config::ApiConfig;
-use types::Instrument;
 
 // TODO(akhercha): Delete main function. Used for testing.
 #[tokio::main]

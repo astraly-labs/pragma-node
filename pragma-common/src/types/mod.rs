@@ -1,16 +1,9 @@
-use core::fmt;
+pub mod instrument;
+pub mod merkle_tree;
 
+use core::fmt;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-
-#[derive(Debug)]
-pub enum ConversionError {
-    FailedSerialization,
-    InvalidDateTime,
-    BigDecimalConversion,
-    FeltConversion,
-    U128Conversion,
-}
 
 #[derive(Default, Debug, Serialize, Deserialize, ToSchema, Clone, Copy)]
 pub enum AggregationMode {
