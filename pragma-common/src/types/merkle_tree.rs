@@ -164,4 +164,78 @@ mod tests {
         assert_eq!(proof, expected_proof);
         assert!(merkle_tree.verify_proof(&leaf, &proof));
     }
+
+    #[rstest]
+    fn test_merkle_tree_single_leaf() {
+        let leaves = vec![FieldElement::from(1_u32)];
+        let merkle_tree = MerkleTree::new(leaves.clone()).unwrap();
+
+        assert_eq!(merkle_tree.leaves, leaves);
+        assert_eq!(merkle_tree.levels.len(), 1);
+        assert_eq!(merkle_tree.root_hash, FieldElement::from(1_u32));
+    }
+
+    #[rstest]
+    fn test_merkle_tree_odd_number_of_leaves() {
+        let leaves = vec![
+            FieldElement::from(1_u32),
+            FieldElement::from(2_u32),
+            FieldElement::from(3_u32),
+        ];
+        let merkle_tree = MerkleTree::new(leaves.clone()).unwrap();
+
+        assert_eq!(merkle_tree.leaves, leaves);
+        assert_eq!(merkle_tree.levels.len(), 3);
+        assert_eq!(
+            merkle_tree.root_hash,
+            FieldElement::from_hex_be(
+                "0x015ac9e457789ef0c56e5d559809e7336a909c14ee2511503fa7af69be1ba639"
+            )
+            .unwrap()
+        );
+    }
+
+    #[rstest]
+    fn test_merkle_tree_empty_leaves() {
+        let leaves: Vec<FieldElement> = vec![];
+        let result = MerkleTree::new(leaves);
+
+        assert!(matches!(result, Err(MerkleTreeError::EmptyLeaves)));
+    }
+
+    #[rstest]
+    fn test_merkle_tree_proof_verification_failure() {
+        let leaves = vec![
+            FieldElement::from(1_u32),
+            FieldElement::from(2_u32),
+            FieldElement::from(3_u32),
+            FieldElement::from(4_u32),
+        ];
+        let merkle_tree = MerkleTree::new(leaves.clone()).unwrap();
+
+        let leaf = FieldElement::from(1_u32);
+        let mut proof = merkle_tree.get_proof(&leaf).unwrap();
+
+        if let Some(first) = proof.0.first_mut() {
+            *first = FieldElement::from(99_u32);
+        }
+
+        assert!(!merkle_tree.verify_proof(&leaf, &proof));
+    }
+
+    #[rstest]
+    fn test_merkle_tree_proof_for_nonexistent_leaf() {
+        let leaves = vec![
+            FieldElement::from(1_u32),
+            FieldElement::from(2_u32),
+            FieldElement::from(3_u32),
+            FieldElement::from(4_u32),
+        ];
+        let merkle_tree = MerkleTree::new(leaves).unwrap();
+
+        let nonexistent_leaf = FieldElement::from(5_u32);
+        let proof = merkle_tree.get_proof(&nonexistent_leaf);
+
+        assert!(proof.is_none());
+    }
 }
