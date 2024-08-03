@@ -15,7 +15,7 @@ use types::Instrument;
 async fn main() -> Result<()> {
     let api_config = ApiConfig {
         base_url: "http://localhost:3000".into(),
-        api_key: "hiRQqrMjNK9mFQ4TLLKc54Cs6mWCKeoq7JPIrd0g".into(),
+        api_key: "".into(),
     };
 
     let consumer = PragmaConsumerBuilder::new()
