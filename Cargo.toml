@@ -34,7 +34,7 @@ dotenvy = "0.15.7"
 envy = "0.4.2"
 chrono = { version = "0.4.26", features = ["serde"] }
 lazy_static = "1.4.0"
-serde = { version = "1.0", features = ["derive"] }
+serde = { version = "1.0.204", features = ["derive"] }
 moka = { version = "0.12", features = ["future"] }
 prometheus = "0.13.4"
 nonzero_ext = { version = "0.3.0" }
@@ -42,7 +42,7 @@ serde_json = { version = "1.0", features = ["arbitrary_precision"] }
 starknet = "0.9.0"
 # Used in the pragma-consumer crate for the pedersen hash + felt type
 starknet-crypto = "0.7.1"
-redis = "0.26.1"
+redis = { version = "0.26.1", features = ["json", "tokio-comp"] }
 reqwest = "0.12.5"
 rdkafka = "0.36.2"
 time = "0.3.29"

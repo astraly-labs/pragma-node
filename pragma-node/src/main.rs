@@ -35,7 +35,7 @@ pub struct AppState {
     onchain_pool: Pool,
     // Redis connection
     #[allow(dead_code)]
-    redis_client: Option<redis::Client>,
+    redis_client: Option<Arc<redis::Client>>,
     // Database caches
     publishers_updates_cache: Cache<String, HashMap<String, RawPublisherUpdates>>,
     // Pragma Signer used for StarkEx signing
@@ -83,7 +83,7 @@ async fn main() {
         config.redis_host(),
         config.redis_port(),
     ) {
-        Ok(client) => Some(client),
+        Ok(client) => Some(Arc::new(client)),
         Err(_) => None,
     };
 
