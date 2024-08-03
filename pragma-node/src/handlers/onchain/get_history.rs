@@ -15,8 +15,9 @@ use crate::types::timestamp::TimestampParam;
 use crate::utils::{big_decimal_price_to_hex, PathExtractor};
 use crate::{is_enum_variant, AppState};
 
-use super::OnchainEntry;
 use crate::utils::currency_pair_to_pair_id;
+
+use super::get_entry::OnchainEntry;
 
 #[derive(Default, Debug, Serialize, Deserialize, ToSchema, Clone, Copy)]
 pub enum ChunkInterval {

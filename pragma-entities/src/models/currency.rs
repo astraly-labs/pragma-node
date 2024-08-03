@@ -1,7 +1,7 @@
 use super::DieselResult;
 use crate::schema::currencies;
 use bigdecimal::BigDecimal;
-use diesel::{ExpressionMethods, PgConnection, QueryDsl, RunQueryDsl};
+use diesel::{ExpressionMethods, OptionalExtension, PgConnection, QueryDsl, RunQueryDsl};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
@@ -40,5 +40,16 @@ impl Currency {
             .filter(currencies::name.eq_any(pairs))
             .select((currencies::name, currencies::decimals))
             .get_results::<(String, BigDecimal)>(conn)
+    }
+
+    pub fn get_decimals_by_name(
+        conn: &mut PgConnection,
+        name: &str,
+    ) -> DieselResult<Option<BigDecimal>> {
+        currencies::table
+            .filter(currencies::name.eq(name))
+            .select(currencies::decimals)
+            .first(conn)
+            .optional()
     }
 }

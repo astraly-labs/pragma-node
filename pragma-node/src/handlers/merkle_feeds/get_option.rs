@@ -57,7 +57,5 @@ pub async fn get_merkle_feeds_option(
     .await
     .map_err(MerkleFeedError::from)?;
 
-    // TODO: option.mark_price must be scaled with decimals
-
     Ok(Json(GetOptionResponse(option)))
 }

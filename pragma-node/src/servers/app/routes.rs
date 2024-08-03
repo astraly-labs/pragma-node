@@ -9,8 +9,9 @@ use crate::handlers::merkle_feeds::{
     get_merkle_tree::get_merkle_feeds_tree, get_option::get_merkle_feeds_option,
 };
 use crate::handlers::onchain::{
-    get_checkpoints::get_onchain_checkpoints, get_history::get_onchain_history,
-    get_ohlc::subscribe_to_onchain_ohlc, get_onchain, get_publishers::get_onchain_publishers,
+    get_checkpoints::get_onchain_checkpoints, get_entry::get_onchain_entry,
+    get_history::get_onchain_history, get_ohlc::subscribe_to_onchain_ohlc,
+    get_publishers::get_onchain_publishers,
 };
 use crate::handlers::{
     create_entries, create_future_entries, get_entry, get_expiries, get_ohlc, get_volatility,
@@ -54,7 +55,7 @@ fn data_routes(state: AppState) -> Router<AppState> {
 
 fn onchain_routes(state: AppState) -> Router<AppState> {
     Router::new()
-        .route("/:base/:quote", get(get_onchain))
+        .route("/:base/:quote", get(get_onchain_entry))
         .route("/history/:base/:quote", get(get_onchain_history))
         .route("/checkpoints/:base/:quote", get(get_onchain_checkpoints))
         .route("/publishers", get(get_onchain_publishers))

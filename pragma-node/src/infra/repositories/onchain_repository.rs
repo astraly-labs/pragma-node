@@ -12,9 +12,9 @@ use pragma_entities::Currency;
 use pragma_monitoring::models::SpotEntry;
 
 use crate::handlers::onchain::get_checkpoints::Checkpoint;
+use crate::handlers::onchain::get_entry::OnchainEntry;
 use crate::handlers::onchain::get_history::ChunkInterval;
 use crate::handlers::onchain::get_publishers::{Publisher, PublisherEntry};
-use crate::handlers::onchain::OnchainEntry;
 use crate::infra::repositories::entry_repository::{
     get_interval_specifier, OHLCEntry, OHLCEntryRaw,
 };
