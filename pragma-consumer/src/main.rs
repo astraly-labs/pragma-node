@@ -7,7 +7,6 @@ pub mod types;
 use color_eyre::Result;
 
 use pragma_common::instrument;
-use pragma_common::tracing::init_tracing;
 use pragma_common::types::options::Instrument;
 
 use builder::PragmaConsumerBuilder;
@@ -16,8 +15,6 @@ use config::ApiConfig;
 // TODO(akhercha): Delete main function. Used for testing.
 #[tokio::main]
 async fn main() -> Result<()> {
-    init_tracing();
-
     let api_config = ApiConfig {
         base_url: "http://localhost:3000".into(),
         api_key: "".into(),
