@@ -1,6 +1,6 @@
 # Pragma Consumer SDK
 
-A Rust SDK for interacting with the Pragma API to fetch option data and Merkle proofs.
+A Rust SDK for interacting with the Pragma API to fetch option data and their associated Merkle proofs so you can use them in our Pragma Oracle contract to interact with the Merkle Feed published on-chain.
 
 We have [examples](./examples/src/) to help you get started.
 
@@ -21,7 +21,7 @@ use pragma_consumer::{builder::PragmaConsumerBuilder, config::ApiConfig, instrum
 #[tokio::main]
 async fn main() -> Result<()> {
     let api_config = ApiConfig {
-        base_url: "https://api.pragma.com".into(),
+        base_url: "https://api.dev.pragma.build".into(),
         api_key: "your_api_key".into(),
     };
 
@@ -50,6 +50,14 @@ Create a `PragmaConsumer` instance using the builder pattern:
 ```rust
 let consumer = PragmaConsumerBuilder::new()
     .on_sepolia() // or .on_mainnet()
+    .with_api(api_config)
+    .await?;
+```
+
+**NOTE**: By default, the network will be `Sepolia` if you don't specify it:
+
+```rust
+let consumer = PragmaConsumerBuilder::new()
     .with_api(api_config)
     .await?;
 ```
@@ -89,6 +97,6 @@ let instrument = Instrument {
 };
 ```
 
-### Error Handling
+### Error Handling
 
 The SDK uses the `thiserror` crate for error handling. Errors are propagated through the Result type, allowing for easy error handling and propagation in your application.
