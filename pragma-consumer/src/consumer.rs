@@ -2,6 +2,7 @@ use color_eyre::{eyre::eyre, Result};
 use reqwest::{Response, StatusCode};
 
 use pragma_common::types::{
+    merkle_tree::MerkleProof,
     options::{Instrument, OptionData},
     Network,
 };
@@ -18,48 +19,59 @@ impl PragmaConsumer {
     pub async fn get_deribit_options_calldata(
         &self,
         instrument: &Instrument,
+        block_number: u64,
     ) -> Result<MerkleFeedCalldata> {
-        let _merkle_tree = self.request_latest_merkle_tree().await?;
-        // TODO: Change how options are stored redis so we can call one option
-        let _option = self.request_latest_option(instrument.name()).await?;
+        let option_data = self.request_option(instrument.name(), block_number).await?;
+        let merkle_proof = self
+            .request_merkle_proof(option_data.hexadecimal_hash(), block_number)
+            .await?;
 
-        // TODO: Build the MerkleProof of the hashed Option to the MerkleTree
-
-        // TODO: Build the calldata using MerkleProof + Option
-        todo!()
+        Ok(MerkleFeedCalldata {
+            merkle_proof,
+            option_data,
+        })
     }
 
-    async fn request_latest_option(&self, instrument_name: String) -> Result<OptionData> {
-        // TODO: Create the get_latest_option endpoint.
-        // TODO: Update the Redis storage so it's easy to query for an instrument name.
+    async fn request_option(
+        &self,
+        instrument_name: String,
+        block_number: u64,
+    ) -> Result<OptionData> {
         let url = format!(
-            "{}/{}/get_latest_option?network={}&instrument={}",
-            self.base_url, PRAGMAPI_PATH_PREFIX, self.network, instrument_name,
+            "{}/{}/options/{}?network={}&block_number={}",
+            self.base_url, PRAGMAPI_PATH_PREFIX, instrument_name, self.network, block_number,
+        );
+
+        tracing::info!("Url: {}", url);
+
+        let api_response = self.request_api(url).await?;
+        if api_response.status() != StatusCode::OK {
+            return Err(eyre!("Request get_option failed!"));
+        }
+
+        let contents = api_response.text().await?;
+        let option_data = serde_json::from_str(&contents)?;
+        Ok(option_data)
+    }
+
+    async fn request_merkle_proof(
+        &self,
+        option_hash: String,
+        block_number: u64,
+    ) -> Result<MerkleProof> {
+        let url = format!(
+            "{}/{}/proof/{}?network={}&block_number={}",
+            self.base_url, PRAGMAPI_PATH_PREFIX, option_hash, self.network, block_number,
         );
 
         let api_response = self.request_api(url).await?;
         if api_response.status() != StatusCode::OK {
-            return Err(eyre!("Request get_latest_option failed!"));
+            return Err(eyre!("Request get_proof failed!"));
         }
 
-        // TODO: Serialization redis -> our type
-        todo!()
-    }
-
-    async fn request_latest_merkle_tree(&self) -> Result<Vec<u8>> {
-        // TODO: Create the get_latest_option endpoint.
-        let url = format!(
-            "{}/{}/get_latest_merkle_tree?network={}",
-            self.base_url, PRAGMAPI_PATH_PREFIX, self.network,
-        );
-
-        let api_response = self.request_api(url).await?;
-        if api_response.status() != StatusCode::OK {
-            return Err(eyre!("Request get_latest_merkle_tree failed!"));
-        }
-
-        // TODO: Serialization redis -> our type
-        Ok(vec![])
+        let contents = api_response.text().await?;
+        let merkle_proof = serde_json::from_str(&contents)?;
+        Ok(merkle_proof)
     }
 
     async fn request_api(&self, url: String) -> Result<Response> {

@@ -104,7 +104,10 @@ impl Instrument {
         format!(
             "{}-{}-{}-{}",
             self.base_currency.as_str(),
-            self.expiration_date,
+            self.expiration_date
+                .format("%d%b%y")
+                .to_string()
+                .to_uppercase(),
             self.strike_price,
             self.option_type.as_str()
         )
