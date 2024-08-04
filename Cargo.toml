@@ -7,7 +7,6 @@ members = [
   "pragma-common",
   "pragma-consumer",
 ]
-exclude = ["pragma-consumer-examples"]
 
 [workspace.package]
 version = "0.1.0"
