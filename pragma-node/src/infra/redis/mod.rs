@@ -118,6 +118,7 @@ pub async fn get_merkle_tree(
         return Err(InfraError::NotFound);
     }
 
+    // Safe to unwrap, see condition above
     let merkle_tree = MerkleTree::try_from(tree_response.pop().unwrap())
         .map_err(|_| InfraError::InternalServerError)?;
 
