@@ -1,5 +1,3 @@
-# Pragma Consumer
+# Pragma Consumer
 
-Pragma SDK to interact with our options published on chain.
-
-![alt text](.github/image.png)
+Pragma Consumer SDK to interact with our options published on chain.
