@@ -54,6 +54,7 @@ pub async fn get_merkle_feeds_proof(
         state.redis_client.unwrap(),
         network,
         block_number,
+        state.caches.merkle_feeds_tree().clone(),
     )
     .await
     .map_err(MerkleFeedError::from)?;

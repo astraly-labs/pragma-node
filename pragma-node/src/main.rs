@@ -1,3 +1,4 @@
+mod caches;
 mod config;
 mod constants;
 mod errors;
@@ -8,22 +9,15 @@ mod servers;
 mod types;
 mod utils;
 
-use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::Duration;
 
+use caches::CacheRegistry;
 use deadpool_diesel::postgres::Pool;
-use moka::future::Cache;
 use starknet::signers::SigningKey;
 
 use pragma_entities::connection::{ENV_OFFCHAIN_DATABASE_URL, ENV_ONCHAIN_DATABASE_URL};
 
 use crate::config::config;
-use crate::constants::{
-    PUBLISHERS_UDPATES_CACHE_TIME_TO_IDLE_IN_SECONDS,
-    PUBLISHERS_UDPATES_CACHE_TIME_TO_LIVE_IN_SECONDS,
-};
-use crate::infra::repositories::onchain_repository::RawPublisherUpdates;
 use crate::metrics::MetricsRegistry;
 use crate::utils::PragmaSignerBuilder;
 use types::ws::metrics::WsMetrics;
@@ -36,9 +30,8 @@ pub struct AppState {
     // Redis connection
     #[allow(dead_code)]
     redis_client: Option<Arc<redis::Client>>,
-    // TODO: Implement a CacheRegistry to store all the caches
     // Database caches
-    publishers_updates_cache: Cache<String, HashMap<String, RawPublisherUpdates>>,
+    caches: Arc<CacheRegistry>,
     // Pragma Signer used for StarkEx signing
     pragma_signer: Option<SigningKey>,
     // Metrics
@@ -61,14 +54,7 @@ async fn main() {
             .expect("can't init onchain database pool");
 
     // Init the database caches
-    let publishers_updates_cache = Cache::builder()
-        .time_to_live(Duration::from_secs(
-            PUBLISHERS_UDPATES_CACHE_TIME_TO_LIVE_IN_SECONDS,
-        )) // 30 minutes
-        .time_to_idle(Duration::from_secs(
-            PUBLISHERS_UDPATES_CACHE_TIME_TO_IDLE_IN_SECONDS,
-        )) // 5 minutes
-        .build();
+    let caches = CacheRegistry::new();
 
     // Build the pragma signer
     let signer_builder = if config.is_production_mode() {
@@ -99,7 +85,7 @@ async fn main() {
         offchain_pool,
         onchain_pool,
         redis_client,
-        publishers_updates_cache,
+        caches: Arc::new(caches),
         pragma_signer,
         ws_metrics: Arc::new(ws_metrics),
     };

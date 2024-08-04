@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use moka::future::Cache;
 use redis::JsonAsyncCommands;
 
 use pragma_common::types::{
@@ -78,13 +79,22 @@ impl TryFrom<RawMerkleTree> for MerkleTree {
     }
 }
 
-// TODO: This function deserves a Cache, so we don't rebuild
-//       the same merkle tree everytime for the same block.
 pub async fn get_merkle_tree_from_redis(
     redis_client: Arc<redis::Client>,
     network: Network,
     block_number: u64,
+    merkle_tree_cache: Cache<u64, MerkleTree>,
 ) -> Result<MerkleTree, InfraError> {
+    // Try to retrieve the latest available cached value, and return it if it exists
+    let maybe_cached_value = merkle_tree_cache.get(&block_number).await;
+    if let Some(cached_value) = maybe_cached_value {
+        tracing::debug!("Found a cached value for merkle tree at block {block_number} - using it.");
+        return Ok(cached_value);
+    }
+    tracing::debug!(
+        "No cache found for merkle tree at block {block_number}, fetching it from Redis."
+    );
+
     let mut conn = redis_client
         .get_multiplexed_async_connection()
         .await
@@ -110,5 +120,11 @@ pub async fn get_merkle_tree_from_redis(
 
     let merkle_tree = MerkleTree::try_from(tree_response.pop().unwrap())
         .map_err(|_| InfraError::InternalServerError)?;
+
+    // Update the cache with the merkle tree for the current block
+    merkle_tree_cache
+        .insert(block_number, merkle_tree.clone())
+        .await;
+
     Ok(merkle_tree)
 }
