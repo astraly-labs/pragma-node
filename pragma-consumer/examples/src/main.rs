@@ -21,7 +21,7 @@ async fn main() -> Result<()> {
     let instrument = instrument!("BTC-16AUG24-52000-P");
 
     let calldata = consumer
-        .get_deribit_options_calldata(&instrument, current_block)
+        .get_merkle_feed_calldata(&instrument, current_block)
         .await?;
 
     let _ = dbg!(calldata);

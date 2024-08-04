@@ -16,7 +16,7 @@ pub struct PragmaConsumer {
 }
 
 impl PragmaConsumer {
-    pub async fn get_deribit_options_calldata(
+    pub async fn get_merkle_feed_calldata(
         &self,
         instrument: &Instrument,
         block_number: u64,
