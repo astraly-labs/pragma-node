@@ -101,7 +101,6 @@ pub async fn get_merkle_tree(
         .map_err(InfraError::RedisError)?;
 
     let instrument_key = format!("{}/{}/merkle_tree", network, block_number);
-    tracing::info!("{}", instrument_key);
 
     let result: String = conn
         .json_get(instrument_key, "$")

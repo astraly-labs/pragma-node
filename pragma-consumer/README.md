@@ -1,6 +1,6 @@
 # Pragma Consumer SDK
 
-A Rust SDK for interacting with the Pragma API to fetch option data and their associated Merkle proofs so you can use them in our Pragma Oracle contract to interact with the Merkle Feed published on-chain.
+The Pragma Consumer SDK is used to fetch options and their associated Merkle proofs so you can use them in our Pragma Oracle contract to interact with the Merkle Feed published on-chain.
 
 We have [examples](./examples/src/) to help you get started.
 
@@ -107,8 +107,7 @@ println!("{}", instrument.name());
 
 ### Error Handling
 
-The SDK uses the `thiserror` crate for error handling. Errors are propagated through the Result type, allowing for easy error handling and propagation in your application.
-The two main errors types are:
+The SDK uses the `thiserror` crate for error handling. The two main errors types are:
 
 - `builder::BuilderError` for errors during the `PragmaConsumer` building,
 - `conssumer::ConsumerError` for errors during the fetching of the option and the merkle proof.
