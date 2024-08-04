@@ -12,7 +12,7 @@ use pragma_entities::InfraError;
 use serde::{Deserialize, Serialize};
 use starknet::core::types::FieldElement;
 
-pub async fn get_option_from_redis(
+pub async fn get_option_data(
     redis_client: Arc<redis::Client>,
     network: Network,
     block_number: u64,
@@ -79,7 +79,7 @@ impl TryFrom<RawMerkleTree> for MerkleTree {
     }
 }
 
-pub async fn get_merkle_tree_from_redis(
+pub async fn get_merkle_tree(
     redis_client: Arc<redis::Client>,
     network: Network,
     block_number: u64,

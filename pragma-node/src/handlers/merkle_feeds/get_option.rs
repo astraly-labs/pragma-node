@@ -52,7 +52,7 @@ pub async fn get_merkle_feeds_option(
     let network = params.network.unwrap_or_default();
     let block_number = params.block_number;
 
-    let option_data = redis::get_option_from_redis(
+    let option_data = redis::get_option_data(
         state.redis_client.unwrap(),
         network,
         block_number,

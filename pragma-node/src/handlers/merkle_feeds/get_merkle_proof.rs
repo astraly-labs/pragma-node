@@ -50,7 +50,7 @@ pub async fn get_merkle_feeds_proof(
         return Err(MerkleFeedError::InvalidOptionHash(option_hex_hash.clone()));
     }
 
-    let merkle_tree = redis::get_merkle_tree_from_redis(
+    let merkle_tree = redis::get_merkle_tree(
         state.redis_client.unwrap(),
         network,
         block_number,
