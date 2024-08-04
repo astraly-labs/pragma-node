@@ -48,7 +48,7 @@ This library contains models and DTOs related to the entities used in the servic
 
 ### Pragma Consumer
 
-SDK allowing a user to retrieve data from our Merkle feeds. See [the repository](./pragma-consumer/README.md) for more information.
+SDK allowing a user to retrieve data from our Merkle feeds. See [the repository](./pragma-consumer) for more information.
 
 # Services Structure
 

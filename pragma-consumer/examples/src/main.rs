@@ -1,18 +1,10 @@
-pub mod builder;
-pub mod config;
-pub(crate) mod constants;
-pub mod consumer;
-pub mod types;
-
 use color_eyre::Result;
 
-use pragma_common::instrument;
-use pragma_common::types::options::Instrument;
+use pragma_consumer::builder::PragmaConsumerBuilder;
+use pragma_consumer::config::ApiConfig;
+use pragma_consumer::instrument;
+use pragma_consumer::Instrument;
 
-use builder::PragmaConsumerBuilder;
-use config::ApiConfig;
-
-// TODO(akhercha): Delete main function. Used for testing.
 #[tokio::main]
 async fn main() -> Result<()> {
     let api_config = ApiConfig {
@@ -25,7 +17,7 @@ async fn main() -> Result<()> {
         .with_api(api_config)
         .await?;
 
-    let current_block = 85617;
+    let current_block = 85626;
     let instrument = instrument!("BTC-16AUG24-52000-P");
 
     let calldata = consumer
