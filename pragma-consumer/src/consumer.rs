@@ -27,6 +27,8 @@ pub struct PragmaConsumer {
 }
 
 impl PragmaConsumer {
+    /// Query the PragmAPI and returns the necessary calldata to use
+    /// with our Oracle contract.
     pub async fn get_merkle_feed_calldata(
         &self,
         instrument: &Instrument,
@@ -43,6 +45,8 @@ impl PragmaConsumer {
         })
     }
 
+    /// Requests from our PragmAPI the option data for a given instrument name at a
+    /// certain block.
     async fn request_option(
         &self,
         instrument_name: String,
@@ -63,6 +67,7 @@ impl PragmaConsumer {
         Ok(option_data)
     }
 
+    /// Requests from our PragmAPI the merkle proof for an hash at a certain block.
     async fn request_merkle_proof(
         &self,
         option_hash: String,
@@ -83,6 +88,7 @@ impl PragmaConsumer {
         Ok(merkle_proof)
     }
 
+    /// Utility function to make an HTTP Get request to a provided URL.
     async fn request_api(&self, url: String) -> Result<Response, ConsumerError> {
         self.http_client
             .get(url)

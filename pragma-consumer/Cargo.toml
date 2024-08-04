@@ -30,3 +30,4 @@ pragma-entities = { path = "../pragma-entities" }
 
 [dev-dependencies]
 rstest = { workspace = true }
+httpmock = { workspace = true, features = ["remote"] }

@@ -61,3 +61,4 @@ pragma-monitoring = { git = "https://github.com/astraly-labs/pragma-monitoring",
 
 # Test dependencies
 rstest = "0.18.2"
+httpmock = { version = "0.7.0" }
