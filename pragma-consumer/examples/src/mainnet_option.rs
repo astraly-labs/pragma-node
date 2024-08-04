@@ -13,7 +13,7 @@ async fn main() -> Result<()> {
     };
 
     let consumer = PragmaConsumerBuilder::new()
-        .on_sepolia()
+        .on_mainnet() // Sepolia by default
         .with_api(api_config)
         .await?;
 
@@ -25,5 +25,6 @@ async fn main() -> Result<()> {
         .await?;
 
     let _ = dbg!(calldata);
+    // Use the calldata with the pragma-oracle contract...
     Ok(())
 }
