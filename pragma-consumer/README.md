@@ -97,6 +97,14 @@ let instrument = Instrument {
 };
 ```
 
+You can retrieve the name of an instrument with the `name()` method:
+
+```rust
+println!("{}", instrument.name());
+
+// BTC-16AUG24-52000-P
+```
+
 ### Error Handling
 
 The SDK uses the `thiserror` crate for error handling. Errors are propagated through the Result type, allowing for easy error handling and propagation in your application.
