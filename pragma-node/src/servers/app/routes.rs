@@ -6,7 +6,7 @@ use utoipa::OpenApi as OpenApiT;
 use utoipa_swagger_ui::SwaggerUi;
 
 use crate::handlers::merkle_feeds::{
-    get_merkle_tree::get_merkle_feeds_tree, get_option::get_merkle_feeds_option,
+    get_merkle_proof::get_merkle_feeds_proof, get_option::get_merkle_feeds_option,
 };
 use crate::handlers::onchain::{
     get_checkpoints::get_onchain_checkpoints, get_entry::get_onchain_entry,
@@ -77,7 +77,7 @@ fn aggregation_routes(state: AppState) -> Router<AppState> {
 
 fn merkle_feeds_routes(state: AppState) -> Router<AppState> {
     Router::new()
-        .route("/tree", get(get_merkle_feeds_tree))
+        .route("/proof/:option_hash", get(get_merkle_feeds_proof))
         .route("/options/:instrument", get(get_merkle_feeds_option))
         .with_state(state)
 }

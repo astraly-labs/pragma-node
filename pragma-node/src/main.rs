@@ -36,6 +36,7 @@ pub struct AppState {
     // Redis connection
     #[allow(dead_code)]
     redis_client: Option<Arc<redis::Client>>,
+    // TODO: Implement a CacheRegistry to store all the caches
     // Database caches
     publishers_updates_cache: Cache<String, HashMap<String, RawPublisherUpdates>>,
     // Pragma Signer used for StarkEx signing

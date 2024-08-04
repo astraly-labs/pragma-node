@@ -3,6 +3,9 @@ use std::str::FromStr;
 use bigdecimal::BigDecimal;
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
+use starknet::core::{
+    crypto::compute_hash_on_elements, types::FieldElement, utils::cairo_short_string_to_felt,
+};
 use thiserror::Error;
 
 /// The available currencies supported.
@@ -129,6 +132,24 @@ pub struct OptionData {
     pub base_currency: OptionCurrency,
     pub current_timestamp: i64,
     pub mark_price: BigDecimal,
+}
+
+impl OptionData {
+    pub fn pedersen_hash(&self) -> FieldElement {
+        // TODO(akhercha): Handle unwraps
+        let elements: Vec<FieldElement> = vec![
+            cairo_short_string_to_felt(&self.instrument_name).unwrap(),
+            cairo_short_string_to_felt(self.base_currency.as_str()).unwrap(),
+            FieldElement::from(self.current_timestamp as u64),
+            FieldElement::from_str(&self.mark_price.to_string()).unwrap(),
+        ];
+        compute_hash_on_elements(&elements)
+    }
+
+    pub fn hexadecimal_hash(&self) -> String {
+        let hash = self.pedersen_hash();
+        format!("0x{:x}", hash)
+    }
 }
 
 #[cfg(test)]

@@ -6,6 +6,8 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum MerkleTreeError {
+    #[error("could not build the merkle tree: {0}")]
+    BuildFailed(String),
     #[error("cannot build a merkle tree from empty leaves")]
     EmptyLeaves,
 }
@@ -17,13 +19,13 @@ pub enum MerkleTreeError {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct MerkleTree {
-    leaves: Vec<FieldElement>,
-    root_hash: FieldElement,
-    levels: Vec<Vec<FieldElement>>,
+    pub root_hash: FieldElement,
+    pub leaves: Vec<FieldElement>,
+    pub levels: Vec<Vec<FieldElement>>,
 }
 
 /// The merkle proof that a leaf belongs to a Merkle tree.
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct MerkleProof(pub Vec<FieldElement>);
 
 impl MerkleTree {

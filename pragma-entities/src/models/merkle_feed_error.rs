@@ -14,6 +14,8 @@ pub enum MerkleFeedError {
     OptionNotFound(u64, String),
     #[error("merkle tree not found for block {0}")]
     MerkleTreeNotFound(u64),
+    #[error("invalid option hash, could not convert to felt: {0}")]
+    InvalidOptionHash(String),
 }
 
 impl From<InfraError> for MerkleFeedError {
@@ -37,6 +39,13 @@ impl IntoResponse for MerkleFeedError {
                 format!(
                     "MerkleFeed option for instrument {} has not been found for block {}",
                     instrument_name, block_number
+                ),
+            ),
+            Self::InvalidOptionHash(hash) => (
+                StatusCode::BAD_REQUEST,
+                format!(
+                    "Option hash is not a correct 0x prefixed hexadecimal hash: {}",
+                    hash
                 ),
             ),
             Self::MerkleTreeNotFound(block_number) => (

@@ -19,7 +19,11 @@ pub struct GetOptionQuery {
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
-pub struct GetOptionResponse(pub OptionData);
+pub struct GetOptionResponse {
+    #[serde(flatten)]
+    pub option_data: OptionData,
+    pub hash: String,
+}
 
 #[utoipa::path(
     get,
@@ -48,7 +52,7 @@ pub async fn get_merkle_feeds_option(
     let network = params.network.unwrap_or_default();
     let block_number = params.block_number;
 
-    let option = merkle_feeds_repository::get_option_from_redis(
+    let option_data = merkle_feeds_repository::get_option_from_redis(
         state.redis_client.unwrap(),
         network,
         block_number,
@@ -57,5 +61,8 @@ pub async fn get_merkle_feeds_option(
     .await
     .map_err(MerkleFeedError::from)?;
 
-    Ok(Json(GetOptionResponse(option)))
+    Ok(Json(GetOptionResponse {
+        hash: option_data.hexadecimal_hash(),
+        option_data,
+    }))
 }
