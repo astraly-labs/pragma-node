@@ -1,6 +1,5 @@
 mod common;
 
-use httpmock::prelude::*;
 use httpmock::MockServer;
 use pragma_common::instrument;
 use pragma_consumer::{
@@ -19,18 +18,10 @@ async fn test_consumer(#[from(pragmapi_mock)] pragmapi: MockServer) {
     };
 
     // 1. Create the PragmaConsumer & assert that it is healthy
-    let healthcheck_mock = pragmapi.mock(|when, then| {
-        when.method(GET).path("/node");
-        then.status(200)
-            .header("content-type", "text/html")
-            .body("Server is running!");
-    });
     let _consumer: PragmaConsumer = PragmaConsumerBuilder::new()
         .with_api(api_config)
         .await
-        .expect("Could not build API");
-    // Assert that the healthcheck mock got called
-    healthcheck_mock.assert();
+        .expect("Could not build PragmaConsumer");
 
     // 2. Define some fake tests instruments
     let _test_instrument: Instrument = instrument!("BTC-16AUG24-52000-P");

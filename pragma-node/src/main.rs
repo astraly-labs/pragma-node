@@ -64,7 +64,8 @@ async fn main() {
     };
     let pragma_signer = signer_builder.build().await;
 
-    // Init the redis client - Optionnal, only for endpoints that interact with Redis.
+    // Init the redis client - Optionnal, only for endpoints that interact with Redis,
+    // i.e just the Merkle Feeds endpoint for now.
     // TODO(akhercha): See with Hithem for production mode
     let redis_client = match pragma_entities::connection::init_redis_client(
         config.redis_host(),
