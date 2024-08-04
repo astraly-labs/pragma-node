@@ -2,9 +2,9 @@ use bigdecimal::{BigDecimal, FromPrimitive};
 use chrono::NaiveDate;
 use color_eyre::Result;
 
-use pragma_consumer::{Instrument, OptionCurrency, OptionType};
 use pragma_consumer::builder::PragmaConsumerBuilder;
 use pragma_consumer::config::ApiConfig;
+use pragma_consumer::{Instrument, OptionCurrency, OptionType};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -22,7 +22,7 @@ async fn main() -> Result<()> {
         base_currency: OptionCurrency::BTC,
         expiration_date: NaiveDate::from_ymd_opt(2024, 8, 16).unwrap(),
         strike_price: BigDecimal::from(52000).unwrap(),
-        option_type: OptionType::Put
+        option_type: OptionType::Put,
     };
     // Or
     // let instrument = Instrument::from_name("BTC-16AUG24-52000-P")
