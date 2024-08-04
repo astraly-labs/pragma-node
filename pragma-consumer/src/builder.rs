@@ -1,11 +1,21 @@
-use color_eyre::{eyre::eyre, Result};
-
 use pragma_common::types::Network;
-use reqwest::StatusCode;
+use reqwest::{header::InvalidHeaderValue, StatusCode};
 
 use crate::{
     config::ApiConfig, constants::PRAGMAPI_HEALTHCHECK_ENDPOINT, consumer::PragmaConsumer,
 };
+
+#[derive(thiserror::Error, Debug)]
+pub enum BuilderError {
+    #[error("HTTP request to the pragmAPI failed with status `{0}`")]
+    HttpRequest(StatusCode),
+    #[error(transparent)]
+    Reqwest(#[from] reqwest::Error),
+    #[error("unexpected health check response: `{0}`")]
+    HealthCheck(String),
+    #[error(transparent)]
+    Header(#[from] InvalidHeaderValue),
+}
 
 /// Builder of the Pragma consumer client.
 /// Default network is Sepolia.
@@ -32,7 +42,7 @@ impl PragmaConsumerBuilder {
         self
     }
 
-    pub async fn with_api(self, api_config: ApiConfig) -> Result<PragmaConsumer> {
+    pub async fn with_api(self, api_config: ApiConfig) -> Result<PragmaConsumer, BuilderError> {
         let http_client = self.build_http_client(&api_config)?;
 
         // TODO(akhercha): Do we really want to make this health check?
@@ -47,7 +57,7 @@ impl PragmaConsumerBuilder {
         })
     }
 
-    fn build_http_client(&self, api_config: &ApiConfig) -> Result<reqwest::Client> {
+    fn build_http_client(&self, api_config: &ApiConfig) -> Result<reqwest::Client, BuilderError> {
         Ok(reqwest::Client::builder()
             .default_headers({
                 let mut headers = reqwest::header::HeaderMap::new();
@@ -56,31 +66,33 @@ impl PragmaConsumerBuilder {
                     reqwest::header::HeaderValue::from_str(&format!(
                         "X-API-KEY: {}",
                         api_config.api_key
-                    ))?,
+                    ))
+                    .map_err(BuilderError::Header)?,
                 );
                 headers
             })
             .build()?)
     }
 
-    async fn health_check(&self, client: &reqwest::Client, base_url: &str) -> Result<()> {
+    async fn health_check(
+        &self,
+        client: &reqwest::Client,
+        base_url: &str,
+    ) -> Result<(), BuilderError> {
         let health_check_url = format!("{}/{}", base_url, PRAGMAPI_HEALTHCHECK_ENDPOINT);
         let response = client
             .get(&health_check_url)
             .send()
             .await
-            .map_err(|e| eyre!("Could not reach URL \"{base_url}\": {e}"))?;
+            .map_err(BuilderError::Reqwest)?;
 
         if response.status() != StatusCode::OK {
-            return Err(eyre!(
-                "Health check failed: HTTP status {}",
-                response.status()
-            ));
+            return Err(BuilderError::HttpRequest(response.status()));
         }
 
         let body = response.text().await?;
         if body.trim() != "Server is running!" {
-            return Err(eyre!("Health check failed: Unexpected response body"));
+            return Err(BuilderError::HealthCheck(body));
         }
 
         Ok(())

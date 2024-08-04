@@ -1,4 +1,3 @@
-use color_eyre::{eyre::eyre, Result};
 use reqwest::{Response, StatusCode};
 
 use pragma_common::types::{
@@ -8,6 +7,18 @@ use pragma_common::types::{
 };
 
 use crate::{constants::PRAGMAPI_PATH_PREFIX, types::MerkleFeedCalldata};
+
+#[derive(thiserror::Error, Debug)]
+pub enum ConsumerError {
+    #[error("http request to the pragmAPI failed with status `{0}`")]
+    HttpRequest(StatusCode),
+    #[error("could not decode the HTTP response: `{0}`")]
+    Decode(String),
+    #[error(transparent)]
+    Reqwest(#[from] reqwest::Error),
+    #[error(transparent)]
+    Serde(#[from] serde_json::Error),
+}
 
 pub struct PragmaConsumer {
     pub(crate) network: Network,
@@ -20,7 +31,7 @@ impl PragmaConsumer {
         &self,
         instrument: &Instrument,
         block_number: u64,
-    ) -> Result<MerkleFeedCalldata> {
+    ) -> Result<MerkleFeedCalldata, ConsumerError> {
         let option_data = self.request_option(instrument.name(), block_number).await?;
         let merkle_proof = self
             .request_merkle_proof(option_data.hexadecimal_hash(), block_number)
@@ -36,21 +47,19 @@ impl PragmaConsumer {
         &self,
         instrument_name: String,
         block_number: u64,
-    ) -> Result<OptionData> {
+    ) -> Result<OptionData, ConsumerError> {
         let url = format!(
             "{}/{}/options/{}?network={}&block_number={}",
             self.base_url, PRAGMAPI_PATH_PREFIX, instrument_name, self.network, block_number,
         );
 
-        tracing::info!("Url: {}", url);
-
         let api_response = self.request_api(url).await?;
         if api_response.status() != StatusCode::OK {
-            return Err(eyre!("Request get_option failed!"));
+            return Err(ConsumerError::HttpRequest(api_response.status()));
         }
 
-        let contents = api_response.text().await?;
-        let option_data = serde_json::from_str(&contents)?;
+        let contents = api_response.text().await.map_err(ConsumerError::Reqwest)?;
+        let option_data = serde_json::from_str(&contents).map_err(ConsumerError::Serde)?;
         Ok(option_data)
     }
 
@@ -58,7 +67,7 @@ impl PragmaConsumer {
         &self,
         option_hash: String,
         block_number: u64,
-    ) -> Result<MerkleProof> {
+    ) -> Result<MerkleProof, ConsumerError> {
         let url = format!(
             "{}/{}/proof/{}?network={}&block_number={}",
             self.base_url, PRAGMAPI_PATH_PREFIX, option_hash, self.network, block_number,
@@ -66,19 +75,19 @@ impl PragmaConsumer {
 
         let api_response = self.request_api(url).await?;
         if api_response.status() != StatusCode::OK {
-            return Err(eyre!("Request get_proof failed!"));
+            return Err(ConsumerError::HttpRequest(api_response.status()));
         }
 
-        let contents = api_response.text().await?;
-        let merkle_proof = serde_json::from_str(&contents)?;
+        let contents = api_response.text().await.map_err(ConsumerError::Reqwest)?;
+        let merkle_proof = serde_json::from_str(&contents).map_err(ConsumerError::Serde)?;
         Ok(merkle_proof)
     }
 
-    async fn request_api(&self, url: String) -> Result<Response> {
+    async fn request_api(&self, url: String) -> Result<Response, ConsumerError> {
         self.http_client
             .get(url)
             .send()
             .await
-            .map_err(|e| eyre!("Request failed: {e}"))
+            .map_err(ConsumerError::Reqwest)
     }
 }

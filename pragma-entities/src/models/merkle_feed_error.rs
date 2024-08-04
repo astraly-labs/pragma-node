@@ -27,6 +27,7 @@ impl From<InfraError> for MerkleFeedError {
             InfraError::InvalidTimestamp(_) => Self::InternalServerError,
             InfraError::NonZeroU32Conversion(_) => Self::InternalServerError,
             InfraError::AxumError(_) => Self::InternalServerError,
+            InfraError::RedisError(_) => Self::InternalServerError,
         }
     }
 }

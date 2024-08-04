@@ -21,7 +21,7 @@ pub async fn get_option_from_redis(
     let mut conn = redis_client
         .get_multiplexed_async_connection()
         .await
-        .map_err(|_| InfraError::InternalServerError)?;
+        .map_err(InfraError::RedisError)?;
 
     let instrument_key = format!("{}/{}/options/{}", network, block_number, instrument_name);
 
@@ -98,7 +98,7 @@ pub async fn get_merkle_tree_from_redis(
     let mut conn = redis_client
         .get_multiplexed_async_connection()
         .await
-        .map_err(|_| InfraError::InternalServerError)?;
+        .map_err(InfraError::RedisError)?;
 
     let instrument_key = format!("{}/{}/merkle_tree", network, block_number);
     tracing::info!("{}", instrument_key);

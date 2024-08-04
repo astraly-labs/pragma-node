@@ -1,4 +1,5 @@
 use deadpool_diesel::InteractError;
+use redis::RedisError;
 use std::{
     fmt::{self, Debug},
     num::TryFromIntError,
@@ -18,6 +19,8 @@ pub enum InfraError {
     NonZeroU32Conversion(#[from] TryFromIntError),
     #[error(transparent)]
     AxumError(#[from] axum::Error),
+    #[error(transparent)]
+    RedisError(#[from] RedisError),
 }
 
 impl InfraError {
@@ -29,6 +32,7 @@ impl InfraError {
             InfraError::InvalidTimestamp(e) => EntryError::InvalidTimestamp(e.to_string()),
             InfraError::NonZeroU32Conversion(_) => EntryError::InternalServerError,
             InfraError::AxumError(_) => EntryError::InternalServerError,
+            InfraError::RedisError(_) => EntryError::InternalServerError,
         }
     }
 }
@@ -59,6 +63,7 @@ impl fmt::Display for InfraError {
             InfraError::InvalidTimestamp(e) => write!(f, "Invalid timestamp {e}"),
             InfraError::NonZeroU32Conversion(e) => write!(f, "Non zero u32 conversion {e}"),
             InfraError::AxumError(e) => write!(f, "Axum error {e}"),
+            InfraError::RedisError(e) => write!(f, "Redis error {e}"),
         }
     }
 }

@@ -56,6 +56,7 @@ impl From<InfraError> for EntryError {
             InfraError::InvalidTimestamp(e) => Self::InvalidTimestamp(e.to_string()),
             InfraError::NonZeroU32Conversion(_) => Self::InternalServerError,
             InfraError::AxumError(_) => Self::InternalServerError,
+            InfraError::RedisError(_) => Self::InternalServerError,
         }
     }
 }
