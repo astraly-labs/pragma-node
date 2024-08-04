@@ -8,7 +8,7 @@ use pragma_entities::models::merkle_feed_error::MerkleFeedError;
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 
-use crate::infra::repositories::merkle_feeds_repository;
+use crate::infra::redis;
 use crate::utils::PathExtractor;
 use crate::AppState;
 
@@ -52,7 +52,7 @@ pub async fn get_merkle_feeds_option(
     let network = params.network.unwrap_or_default();
     let block_number = params.block_number;
 
-    let option_data = merkle_feeds_repository::get_option_from_redis(
+    let option_data = redis::get_option_from_redis(
         state.redis_client.unwrap(),
         network,
         block_number,

@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use starknet::core::types::FieldElement;
 use utoipa::{IntoParams, ToSchema};
 
-use crate::infra::repositories::merkle_feeds_repository;
+use crate::infra::redis;
 use crate::utils::PathExtractor;
 use crate::AppState;
 
@@ -50,7 +50,7 @@ pub async fn get_merkle_feeds_proof(
         return Err(MerkleFeedError::InvalidOptionHash(option_hex_hash.clone()));
     }
 
-    let merkle_tree = merkle_feeds_repository::get_merkle_tree_from_redis(
+    let merkle_tree = redis::get_merkle_tree_from_redis(
         state.redis_client.unwrap(),
         network,
         block_number,
