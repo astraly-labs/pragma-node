@@ -42,11 +42,11 @@ impl PragmaConsumerBuilder {
         self
     }
 
+    // TODO: Rename this [with_http] & create a new [with_ws] for websockets?
     pub async fn with_api(self, api_config: ApiConfig) -> Result<PragmaConsumer, BuilderError> {
         let http_client = self.build_http_client(&api_config)?;
 
         // TODO(akhercha): Do we really want to make this health check?
-        // Should just be an opt-in function?
         self.health_check(&http_client, &api_config.base_url)
             .await?;
 

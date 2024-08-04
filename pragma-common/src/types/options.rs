@@ -9,7 +9,7 @@ use starknet::core::{
 use thiserror::Error;
 
 /// The available currencies supported.
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub enum OptionCurrency {
     BTC,
     ETH,
@@ -36,7 +36,7 @@ impl OptionCurrency {
 }
 
 /// The possible types for an option.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum OptionType {
     Put,
     Call,
@@ -65,6 +65,7 @@ pub enum InstrumentError {
     UnsupportedCurrency(String),
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
 /// An instrument.
 pub struct Instrument {
     pub base_currency: OptionCurrency,

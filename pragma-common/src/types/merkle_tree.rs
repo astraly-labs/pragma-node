@@ -28,6 +28,18 @@ pub struct MerkleTree {
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct MerkleProof(pub Vec<FieldElement>);
 
+impl MerkleProof {
+    /// Converts the Merkle proof vector of FieldElement into a Vector of
+    /// hexadecimal strings.
+    pub fn as_hexadecimal_proof(&self) -> Vec<String> {
+        self.0
+            .clone()
+            .into_iter()
+            .map(|felt| format!("0x{:x}", felt))
+            .collect()
+    }
+}
+
 impl MerkleTree {
     pub fn new(leaves: Vec<FieldElement>) -> Result<Self, MerkleTreeError> {
         if leaves.is_empty() {
