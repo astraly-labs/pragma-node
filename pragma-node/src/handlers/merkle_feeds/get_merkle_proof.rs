@@ -10,6 +10,7 @@ use starknet::core::types::FieldElement;
 use utoipa::{IntoParams, ToSchema};
 
 use crate::infra::redis;
+use crate::types::hex_hash::HexHash;
 use crate::utils::PathExtractor;
 use crate::AppState;
 
@@ -35,7 +36,7 @@ pub struct GetMerkleProofResponse(pub MerkleProof);
 )]
 pub async fn get_merkle_feeds_proof(
     State(state): State<AppState>,
-    PathExtractor(option_hex_hash): PathExtractor<String>,
+    PathExtractor(option_hex_hash): PathExtractor<HexHash>,
     Query(params): Query<GetMerkleProofQuery>,
 ) -> Result<Json<GetMerkleProofResponse>, MerkleFeedError> {
     tracing::info!("Received get merkle tree request");
@@ -43,12 +44,9 @@ pub async fn get_merkle_feeds_proof(
         return Err(MerkleFeedError::RedisConnection);
     }
 
+    let option_hex_hash = option_hex_hash.0;
     let network = params.network.unwrap_or_default();
     let block_number = params.block_number;
-
-    if !is_0x_prefixed_hex_string(&option_hex_hash) {
-        return Err(MerkleFeedError::InvalidOptionHash(option_hex_hash.clone()));
-    }
 
     let merkle_tree = redis::get_merkle_tree(
         state.redis_client.unwrap(),
@@ -70,12 +68,6 @@ pub async fn get_merkle_feeds_proof(
                 option_hex_hash,
             ))?;
 
-    // Safe to unwrap, see condition above
     let hexadecimals_proof = MerkleProof::from(merkle_proof);
     Ok(Json(GetMerkleProofResponse(hexadecimals_proof)))
-}
-
-// Helper function to check if a string is a valid 0x-prefixed hexadecimal string
-fn is_0x_prefixed_hex_string(s: &str) -> bool {
-    s.starts_with("0x") && s[2..].chars().all(|c| c.is_ascii_hexdigit())
 }
