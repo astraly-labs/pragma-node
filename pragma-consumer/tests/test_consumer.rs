@@ -25,7 +25,8 @@ async fn test_consumer() {
     let healthcheck_mock = mock_healthcheck(&pragmapi);
     let consumer: PragmaConsumer = PragmaConsumerBuilder::new()
         .on_sepolia()
-        .with_api(api_config)
+        .check_api_health()
+        .with_http(api_config)
         .await
         .expect("Could not build PragmaConsumer");
     healthcheck_mock.assert();

@@ -14,7 +14,7 @@ async fn main() -> Result<()> {
 
     let consumer = PragmaConsumerBuilder::new()
         .on_sepolia()
-        .with_api(api_config)
+        .with_http(api_config)
         .await?;
 
     let current_block = 85626;

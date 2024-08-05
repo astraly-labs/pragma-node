@@ -27,7 +27,7 @@ async fn main() -> Result<()> {
 
     let consumer = PragmaConsumerBuilder::new()
         .on_sepolia()
-        .with_api(api_config)
+        .with_http(api_config)
         .await?;
 
     let instrument = instrument!("BTC-16AUG24-52000-P");
@@ -50,7 +50,7 @@ Create a `PragmaConsumer` instance using the builder pattern:
 ```rust
 let consumer = PragmaConsumerBuilder::new()
     .on_sepolia() // or .on_mainnet()
-    .with_api(api_config)
+    .with_http(api_config)
     .await?;
 ```
 
@@ -58,7 +58,16 @@ let consumer = PragmaConsumerBuilder::new()
 
 ```rust
 let consumer = PragmaConsumerBuilder::new()
-    .with_api(api_config)
+    .with_http(api_config)
+    .await?;
+```
+
+You can also add a `check_api_health` call to the builder to make sure the connection with the PragmAPI is healthy:
+
+```rust
+let consumer = PragmaConsumerBuilder::new()
+    .check_api_health()
+    .with_http(api_config)
     .await?;
 ```
 

@@ -22,6 +22,7 @@ pub enum BuilderError {
 #[derive(Default, Debug)]
 pub struct PragmaConsumerBuilder {
     network: Network,
+    check_api_health: bool,
 }
 
 impl PragmaConsumerBuilder {
@@ -42,13 +43,20 @@ impl PragmaConsumerBuilder {
         self
     }
 
-    // TODO: Rename this [with_http] & create a new [with_ws] for websockets?
-    pub async fn with_api(self, api_config: ApiConfig) -> Result<PragmaConsumer, BuilderError> {
+    /// Perform an health check with the PragmAPI to make sur the connection is
+    /// successfuly established.
+    pub fn check_api_health(mut self) -> Self {
+        self.check_api_health = true;
+        self
+    }
+
+    pub async fn with_http(self, api_config: ApiConfig) -> Result<PragmaConsumer, BuilderError> {
         let http_client = self.build_http_client(&api_config)?;
 
-        // TODO(akhercha): Do we really want to make this health check?
-        self.health_check(&http_client, &api_config.base_url)
-            .await?;
+        if self.check_api_health {
+            self.http_health_check(&http_client, &api_config.base_url)
+                .await?;
+        }
 
         Ok(PragmaConsumer {
             network: self.network,
@@ -74,7 +82,7 @@ impl PragmaConsumerBuilder {
             .build()?)
     }
 
-    async fn health_check(
+    async fn http_health_check(
         &self,
         client: &reqwest::Client,
         base_url: &str,

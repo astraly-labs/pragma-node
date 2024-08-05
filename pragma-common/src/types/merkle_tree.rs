@@ -92,6 +92,8 @@ impl MerkleTree {
         (curr_level_nodes[0], levels)
     }
 
+    /// The first element A of a pedersen hash (A,B) follows the rule:
+    /// A <= B
     fn hash(&self, a: &FieldElement, b: &FieldElement) -> FieldElement {
         let (a_sorted, b_sorted) = match a.cmp(b) {
             Ordering::Less | Ordering::Equal => (a, b),
@@ -100,6 +102,7 @@ impl MerkleTree {
         pedersen_hash(a_sorted, b_sorted)
     }
 
+    /// Returns the merkle proof if the passed leaf is found in the tree.
     pub fn get_proof(&self, leaf: &FieldElement) -> Option<MerkleProof> {
         let mut path = Vec::new();
         let mut current_hash = *leaf;
@@ -119,6 +122,7 @@ impl MerkleTree {
         Some(MerkleProof(path))
     }
 
+    /// Verify that the passed merkle proof is valid for the leaf.
     pub fn verify_proof(&self, leaf: &FieldElement, proof: &MerkleProof) -> bool {
         let mut current_hash = *leaf;
         for &sibling in &proof.0 {
