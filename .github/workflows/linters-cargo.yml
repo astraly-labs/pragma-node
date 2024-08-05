@@ -29,8 +29,5 @@ jobs:
           command: install
           args: cargo-udeps
 
-      - name: Run udeps
-        uses: actions-rs/cargo@v1
-        with:
-          toolchain: nightly
-          command: udeps
+      - name: Check for unused dependencies
+        uses: bnjbvr/cargo-machete@main
