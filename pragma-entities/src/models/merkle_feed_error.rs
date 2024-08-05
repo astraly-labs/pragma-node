@@ -71,6 +71,10 @@ impl IntoResponse for MerkleFeedError {
                 StatusCode::NOT_FOUND,
                 format!("No merkle feeds published for network {}", network),
             ),
+            Self::MerkleProof(hash) => (
+                StatusCode::NOT_FOUND,
+                format!("Could not generate a valid merkle proof for hash {}", hash),
+            ),
             _ => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 String::from("Internal server error"),

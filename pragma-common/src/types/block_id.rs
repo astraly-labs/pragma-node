@@ -12,14 +12,15 @@ use strum::{Display, EnumString};
 )]
 #[strum(serialize_all = "lowercase")]
 pub enum BlockTag {
-    #[default]
     Latest,
+    #[default]
+    Pending,
 }
 
 /// Block identifier in the form of hash, number or tag.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Display)]
 pub enum BlockId {
-    #[strum(serialize = "latest")]
+    #[strum(serialize = "{0}")]
     Tag(BlockTag),
     #[strum(serialize = "{0}")]
     Number(u64),

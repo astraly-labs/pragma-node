@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use starknet::core::types::FieldElement;
 
 use pragma_common::types::{
-    block_id::BlockId,
+    block_id::{BlockId, BlockTag},
     merkle_tree::{MerkleTree, MerkleTreeError},
     options::OptionData,
     Network,
@@ -142,16 +142,18 @@ async fn get_block_number_from_id(
 ) -> Result<u64, RedisError> {
     let block_number = match block_id {
         BlockId::Number(nbr) => *nbr,
-        // We only support the Latest block as BlockTag for now
-        BlockId::Tag(_) => get_latest_block_number(redis_client, network).await?,
+        BlockId::Tag(tag) => get_block_number_for_tag(redis_client, network, tag).await?,
     };
     Ok(block_number)
 }
 
-/// Retrieve the latest block number available in the Redis database.
-async fn get_latest_block_number(
+/// Retrieve the block number corresponding to the block tag.
+/// For us, the pending block is the latest block available in Redis,
+/// and the latest is the one before.
+async fn get_block_number_for_tag(
     redis_client: &Arc<redis::Client>,
     network: &Network,
+    tag: &BlockTag,
 ) -> Result<u64, RedisError> {
     let mut conn = redis_client
         .get_multiplexed_async_connection()
@@ -163,13 +165,24 @@ async fn get_latest_block_number(
         .await
         .map_err(|_| RedisError::Connection)?;
 
-    let block_numbers: Vec<u64> = keys
+    let mut block_numbers: Vec<u64> = keys
         .into_iter()
         .filter_map(|key| key.split('/').nth(1)?.parse::<u64>().ok())
         .collect();
 
-    block_numbers
-        .into_iter()
-        .max()
-        .ok_or(RedisError::NoBlocks(network.to_string()))
+    block_numbers.sort_unstable();
+
+    match block_numbers.last() {
+        Some(&latest) => match tag {
+            BlockTag::Pending => Ok(latest),
+            BlockTag::Latest => {
+                if latest > 0 {
+                    Ok(latest - 1)
+                } else {
+                    Err(RedisError::NoBlocks(network.to_string()))
+                }
+            }
+        },
+        None => Err(RedisError::NoBlocks(network.to_string())),
+    }
 }
