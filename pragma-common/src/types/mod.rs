@@ -1,14 +1,10 @@
-use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
+pub mod block_id;
+pub mod merkle_tree;
+pub mod options;
 
-#[derive(Debug)]
-pub enum ConversionError {
-    FailedSerialization,
-    InvalidDateTime,
-    BigDecimalConversion,
-    FeltConversion,
-    U128Conversion,
-}
+use serde::{Deserialize, Serialize};
+use strum::{Display, EnumString};
+use utoipa::ToSchema;
 
 #[derive(Default, Debug, Serialize, Deserialize, ToSchema, Clone, Copy)]
 pub enum AggregationMode {
@@ -21,10 +17,11 @@ pub enum AggregationMode {
     Twap,
 }
 
-#[derive(Default, Debug, Serialize, Deserialize, ToSchema, Clone, Copy)]
+#[derive(Default, Debug, Serialize, Deserialize, ToSchema, Clone, Copy, Display, EnumString)]
+#[strum(serialize_all = "lowercase")]
 pub enum Network {
-    #[serde(rename = "sepolia")]
     #[default]
+    #[serde(rename = "sepolia")]
     Sepolia,
     #[serde(rename = "mainnet")]
     Mainnet,

@@ -34,3 +34,12 @@ pub fn init_pool(app_name: &str, database_url_env: &str) -> Result<Pool, ErrorKi
         .build()
         .map_err(|e| ErrorKind::PoolDatabase(e.to_string()))
 }
+
+fn get_redis_connection_uri(host: &str, port: u16) -> String {
+    format!("redis://{}:{}/", host, port)
+}
+
+pub fn init_redis_client(host: &str, port: u16) -> Result<redis::Client, ErrorKind> {
+    redis::Client::open(get_redis_connection_uri(host, port))
+        .map_err(|e| ErrorKind::RedisConnection(e.to_string()))
+}

@@ -1,18 +1,14 @@
-pub mod checkpoints;
-pub mod history;
-pub mod ohlc;
-pub mod publishers;
-
 use std::collections::HashMap;
 
 use axum::extract::{Query, State};
 use axum::Json;
 use bigdecimal::BigDecimal;
-use history::ChunkInterval;
 use pragma_common::types::{AggregationMode, Interval, Network};
 use pragma_entities::EntryError;
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
+
+use super::get_history::ChunkInterval;
 
 use crate::infra::repositories::onchain_repository::{
     get_last_updated_timestamp, get_variations, routing, OnchainRoutingArguments,
@@ -24,7 +20,7 @@ use crate::{is_enum_variant, AppState};
 use crate::utils::currency_pair_to_pair_id;
 
 #[derive(Debug, Default, Deserialize, IntoParams, ToSchema)]
-pub struct GetOnchainParams {
+pub struct GetOnchainEntryParams {
     pub network: Network,
     pub aggregation: Option<AggregationMode>,
     pub routing: Option<bool>,
@@ -42,7 +38,7 @@ pub struct OnchainEntry {
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
-pub struct GetOnchainResponse {
+pub struct GetOnchainEntryResponse {
     pair_id: String,
     last_updated_timestamp: u64,
     price: String,
@@ -57,7 +53,7 @@ pub struct GetOnchainResponse {
     get,
     path = "/node/v1/onchain/{base}/{quote}",
     responses(
-        (status = 200, description = "Get the onchain price", body = GetOnchainResponse)
+        (status = 200, description = "Get the onchain entry", body = GetOnchainEntryResponse)
     ),
     params(
         ("base" = String, Path, description = "Base Asset"),
@@ -67,11 +63,11 @@ pub struct GetOnchainResponse {
         ("timestamp" = Option<u64>, Query, description = "Timestamp")
     ),
 )]
-pub async fn get_onchain(
+pub async fn get_onchain_entry(
     State(state): State<AppState>,
     PathExtractor(pair): PathExtractor<(String, String)>,
-    Query(params): Query<GetOnchainParams>,
-) -> Result<Json<GetOnchainResponse>, EntryError> {
+    Query(params): Query<GetOnchainEntryParams>,
+) -> Result<Json<GetOnchainEntryResponse>, EntryError> {
     tracing::info!("Received get onchain entry request for pair {:?}", pair);
     let pair_id: String = currency_pair_to_pair_id(&pair.0, &pair.1);
     let with_components = params.components.unwrap_or(true);
@@ -131,8 +127,8 @@ fn adapt_entries_to_onchain_response(
     last_updated_timestamp: u64,
     variations: HashMap<Interval, f32>,
     with_components: bool,
-) -> GetOnchainResponse {
-    GetOnchainResponse {
+) -> GetOnchainEntryResponse {
+    GetOnchainEntryResponse {
         pair_id,
         last_updated_timestamp,
         price: big_decimal_price_to_hex(&aggregated_price),

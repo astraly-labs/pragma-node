@@ -16,6 +16,7 @@ diesel = { workspace = true, features = [
   "postgres_backend",
 ] }
 diesel_migrations = { workspace = true }
+redis = { workspace = true, features = ["tokio-comp", "json"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true, features = ["arbitrary_precision"] }
 starknet = { workspace = true }
@@ -23,3 +24,5 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 utoipa = { workspace = true }
 uuid = { workspace = true, features = ["fast-rng", "v4", "serde"] }
+
+pragma-common = { path = "../pragma-common" }

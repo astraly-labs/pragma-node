@@ -41,6 +41,8 @@ pub enum ErrorKind {
     VariableDatabase(String),
     #[error("database init error : {0}")]
     GenericInitDatabase(String),
+    #[error("cannot init redis connection : {0}")]
+    RedisConnection(String),
 }
 
 pub fn adapt_infra_error<T: Error + Debug>(error: T) -> InfraError {
@@ -84,4 +86,22 @@ impl Error for InteractError {
     fn as_infra_error(&self) -> InfraError {
         InfraError::InternalServerError
     }
+}
+
+#[derive(Debug, thiserror::Error, ToSchema)]
+pub enum RedisError {
+    #[error("internal server error")]
+    InternalServerError,
+    #[error("could not establish a connection with Redis")]
+    Connection,
+    #[error("could not find option for instrument {1} at block {0}")]
+    OptionNotFound(u64, String),
+    #[error("merkle tree not found for block {0}")]
+    MerkleTreeNotFound(u64),
+    #[error("invalid option hash, could not convert to felt: {0}")]
+    InvalidOptionHash(String),
+    #[error("could not deserialize RawMerkleTree into MerkleTree")]
+    TreeDeserialization,
+    #[error("no merkle feeds published for network: {0}")]
+    NoBlocks(String),
 }

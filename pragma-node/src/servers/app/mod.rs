@@ -1,3 +1,5 @@
+pub(crate) mod routes;
+
 use std::net::SocketAddr;
 use tower_http::{
     cors::CorsLayer,
@@ -9,7 +11,7 @@ use utoipa::{
 };
 
 use crate::errors::internal_error;
-use crate::{config::Config, handlers, routes::app_router, types, AppState};
+use crate::{config::Config, handlers, servers::app::routes::app_router, types, AppState};
 
 struct SecurityAddon;
 
@@ -34,11 +36,13 @@ pub async fn run_app_server(config: &Config, state: AppState) {
             handlers::get_ohlc::get_ohlc,
             handlers::subscribe_to_entry::subscribe_to_entry,
             handlers::get_volatility::get_volatility,
-            handlers::get_onchain::get_onchain,
-            handlers::get_onchain::history::get_onchain_history,
-            handlers::get_onchain::checkpoints::get_onchain_checkpoints,
-            handlers::get_onchain::publishers::get_onchain_publishers,
-            handlers::get_onchain::ohlc::subscribe_to_onchain_ohlc,
+            handlers::onchain::get_entry::get_onchain_entry,
+            handlers::onchain::get_history::get_onchain_history,
+            handlers::onchain::get_checkpoints::get_onchain_checkpoints,
+            handlers::onchain::get_publishers::get_onchain_publishers,
+            handlers::onchain::get_ohlc::subscribe_to_onchain_ohlc,
+            handlers::merkle_feeds::get_option::get_merkle_feeds_option,
+            handlers::merkle_feeds::get_merkle_proof::get_merkle_feeds_proof,
         ),
         components(
             schemas(pragma_entities::dto::Entry, pragma_entities::EntryError),
@@ -54,28 +58,31 @@ pub async fn run_app_server(config: &Config, state: AppState) {
                 handlers::subscribe_to_entry::SubscribeToEntryResponse,
                 handlers::get_volatility::GetVolatilityResponse,
                 handlers::get_ohlc::GetOHLCResponse,
-                handlers::get_onchain::GetOnchainParams,
-                handlers::get_onchain::GetOnchainResponse,
-                handlers::get_onchain::checkpoints::GetOnchainCheckpointsParams,
-                handlers::get_onchain::checkpoints::GetOnchainCheckpointsResponse,
-                handlers::get_onchain::publishers::GetOnchainPublishersParams,
-                handlers::get_onchain::publishers::GetOnchainPublishersResponse,
-                handlers::get_onchain::ohlc::GetOnchainOHLCResponse,
-                handlers::get_onchain::history::GetOnchainHistoryParams,
-                handlers::get_onchain::history::GetOnchainHistoryResponse,
-
+                handlers::onchain::get_entry::GetOnchainEntryParams,
+                handlers::onchain::get_entry::GetOnchainEntryResponse,
+                handlers::onchain::get_checkpoints::GetOnchainCheckpointsParams,
+                handlers::onchain::get_checkpoints::GetOnchainCheckpointsResponse,
+                handlers::onchain::get_publishers::GetOnchainPublishersParams,
+                handlers::onchain::get_publishers::GetOnchainPublishersResponse,
+                handlers::onchain::get_ohlc::GetOnchainOHLCResponse,
+                handlers::onchain::get_history::GetOnchainHistoryParams,
+                handlers::onchain::get_history::GetOnchainHistoryResponse,
+                handlers::merkle_feeds::get_option::GetOptionQuery,
+                handlers::merkle_feeds::get_option::GetOptionResponse,
+                handlers::merkle_feeds::get_merkle_proof::GetMerkleProofQuery,
+                handlers::merkle_feeds::get_merkle_proof::GetMerkleProofResponse,
             ),
             schemas(
                 types::entries::BaseEntry,
                 types::entries::Entry,
                 types::entries::PerpEntry,
                 types::entries::FutureEntry,
-                handlers::get_onchain::OnchainEntry,
-                handlers::get_onchain::checkpoints::Checkpoint,
-                handlers::get_onchain::publishers::Publisher,
-                handlers::get_onchain::publishers::PublisherEntry,
-                handlers::get_onchain::history::GetOnchainHistoryEntry,
-                handlers::get_onchain::history::ChunkInterval,
+                handlers::onchain::get_entry::OnchainEntry,
+                handlers::onchain::get_checkpoints::Checkpoint,
+                handlers::onchain::get_publishers::Publisher,
+                handlers::onchain::get_publishers::PublisherEntry,
+                handlers::onchain::get_history::GetOnchainHistoryEntry,
+                handlers::onchain::get_history::ChunkInterval,
             ),
             schemas(
                 pragma_common::types::AggregationMode,

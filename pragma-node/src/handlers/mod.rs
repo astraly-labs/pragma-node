@@ -3,8 +3,9 @@ pub mod create_future_entry;
 pub mod get_entry;
 pub mod get_expiries;
 pub mod get_ohlc;
-pub mod get_onchain;
 pub mod get_volatility;
+pub mod merkle_feeds;
+pub mod onchain;
 pub mod subscribe_to_entry;
 
 pub use create_entry::create_entries;
