@@ -9,12 +9,12 @@ use pragma_consumer::config::ApiConfig;
 #[tokio::main]
 async fn main() -> Result<()> {
     let api_config = ApiConfig {
-        base_url: "http://localhost:3000".into(),
+        base_url: PragmaBaseUrl::Custom("http://localhost:3000".into()),
         api_key: "".into(),
     };
 
     let consumer = PragmaConsumerBuilder::new()
-        .on_sepolia()
+        .on_sepolia() // Sepolia by default
         .with_http(api_config)
         .await?;
 

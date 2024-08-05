@@ -2,6 +2,7 @@
 
 use axum::extract::{Query, State};
 use axum::Json;
+use pragma_common::types::block_id::{BlockId, BlockTag};
 use pragma_common::types::merkle_tree::MerkleProof;
 use pragma_common::types::Network;
 use pragma_entities::models::merkle_feed_error::MerkleFeedError;
@@ -17,7 +18,7 @@ use crate::AppState;
 #[derive(Default, Deserialize, IntoParams, ToSchema)]
 pub struct GetMerkleProofQuery {
     pub network: Option<Network>,
-    pub block_number: u64,
+    pub block_id: Option<BlockId>,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
@@ -46,12 +47,12 @@ pub async fn get_merkle_feeds_proof(
 
     let option_hex_hash = option_hex_hash.0;
     let network = params.network.unwrap_or_default();
-    let block_number = params.block_number;
+    let block_id = params.block_id.unwrap_or(BlockId::Tag(BlockTag::Latest));
 
     let merkle_tree = redis::get_merkle_tree(
         state.redis_client.unwrap(),
         network,
-        block_number,
+        block_id,
         state.caches.merkle_feeds_tree().clone(),
     )
     .await
@@ -60,13 +61,9 @@ pub async fn get_merkle_feeds_proof(
     let option_felt_hash = FieldElement::from_hex_be(&option_hex_hash)
         .map_err(|_| MerkleFeedError::InvalidOptionHash(option_hex_hash.clone()))?;
 
-    let merkle_proof =
-        merkle_tree
-            .get_proof(&option_felt_hash)
-            .ok_or(MerkleFeedError::OptionNotFound(
-                block_number,
-                option_hex_hash,
-            ))?;
+    let merkle_proof = merkle_tree
+        .get_proof(&option_felt_hash)
+        .ok_or(MerkleFeedError::MerkleProof(option_hex_hash))?;
 
     let hexadecimals_proof = MerkleProof::from(merkle_proof);
     Ok(Json(GetMerkleProofResponse(hexadecimals_proof)))

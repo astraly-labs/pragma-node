@@ -2,7 +2,9 @@ use pragma_common::types::Network;
 use reqwest::{header::InvalidHeaderValue, StatusCode};
 
 use crate::{
-    config::ApiConfig, constants::PRAGMAPI_HEALTHCHECK_ENDPOINT, consumer::PragmaConsumer,
+    config::{ApiConfig, PragmaBaseUrl},
+    constants::PRAGMAPI_HEALTHCHECK_ENDPOINT,
+    consumer::PragmaConsumer,
 };
 
 #[derive(thiserror::Error, Debug)]
@@ -85,9 +87,9 @@ impl PragmaConsumerBuilder {
     async fn http_health_check(
         &self,
         client: &reqwest::Client,
-        base_url: &str,
+        base_url: &PragmaBaseUrl,
     ) -> Result<(), BuilderError> {
-        let health_check_url = format!("{}/{}", base_url, PRAGMAPI_HEALTHCHECK_ENDPOINT);
+        let health_check_url = format!("{}/{}", base_url.url(), PRAGMAPI_HEALTHCHECK_ENDPOINT);
         let response = client
             .get(&health_check_url)
             .send()

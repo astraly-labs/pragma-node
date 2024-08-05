@@ -1,12 +1,13 @@
 use reqwest::{Response, StatusCode};
 
 use pragma_common::types::{
+    block_id::{BlockId, BlockTag},
     merkle_tree::MerkleProof,
     options::{Instrument, OptionData},
     Network,
 };
 
-use crate::{constants::PRAGMAPI_PATH_PREFIX, types::MerkleFeedCalldata};
+use crate::{config::PragmaBaseUrl, constants::PRAGMAPI_PATH_PREFIX, types::MerkleFeedCalldata};
 
 #[derive(thiserror::Error, Debug)]
 pub enum ConsumerError {
@@ -25,7 +26,7 @@ pub enum ConsumerError {
 pub struct PragmaConsumer {
     pub(crate) network: Network,
     pub(crate) http_client: reqwest::Client,
-    pub(crate) base_url: String,
+    pub(crate) base_url: PragmaBaseUrl,
 }
 
 impl PragmaConsumer {
@@ -34,14 +35,15 @@ impl PragmaConsumer {
     pub async fn get_merkle_feed_calldata(
         &self,
         instrument: &Instrument,
-        block_number: u64,
+        block_id: Option<BlockId>,
     ) -> Result<MerkleFeedCalldata, ConsumerError> {
-        let option_data = self.request_option(instrument.name(), block_number).await?;
+        let block_id = block_id.unwrap_or(BlockId::Tag(BlockTag::Latest));
+        let option_data = self.request_option(instrument.name(), block_id).await?;
         let option_hash = option_data
             .pedersen_hash_as_hex_string()
             .map_err(|_| ConsumerError::OptionHash(option_data.clone()))?;
 
-        let merkle_proof = self.request_merkle_proof(option_hash, block_number).await?;
+        let merkle_proof = self.request_merkle_proof(option_hash, block_id).await?;
 
         Ok(MerkleFeedCalldata {
             merkle_proof,
@@ -54,14 +56,16 @@ impl PragmaConsumer {
     async fn request_option(
         &self,
         instrument_name: String,
-        block_number: u64,
+        block_id: BlockId,
     ) -> Result<OptionData, ConsumerError> {
         let url = format!(
-            "{}/{}/options/{}?network={}&block_number={}",
-            self.base_url, PRAGMAPI_PATH_PREFIX, instrument_name, self.network, block_number,
+            "{}/{}/options/{}?network={}&block_id={}",
+            self.base_url.url(),
+            PRAGMAPI_PATH_PREFIX,
+            instrument_name,
+            self.network,
+            block_id,
         );
-
-        println!("{}", url);
 
         let api_response = self.request_api(url).await?;
         if api_response.status() != StatusCode::OK {
@@ -76,11 +80,15 @@ impl PragmaConsumer {
     async fn request_merkle_proof(
         &self,
         option_hash: String,
-        block_number: u64,
+        block_id: BlockId,
     ) -> Result<MerkleProof, ConsumerError> {
         let url = format!(
-            "{}/{}/proof/{}?network={}&block_number={}",
-            self.base_url, PRAGMAPI_PATH_PREFIX, option_hash, self.network, block_number,
+            "{}/{}/proof/{}?network={}&block_id={}",
+            self.base_url.url(),
+            PRAGMAPI_PATH_PREFIX,
+            option_hash,
+            self.network,
+            block_id,
         );
 
         let api_response = self.request_api(url).await?;

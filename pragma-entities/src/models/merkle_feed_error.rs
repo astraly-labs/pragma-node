@@ -18,17 +18,22 @@ pub enum MerkleFeedError {
     InvalidOptionHash(String),
     #[error("could not deserialize the redis merkle tree into MerkleTree")]
     TreeDeserialization,
+    #[error("could not generate a merkle proof for hash: {0}")]
+    MerkleProof(String),
+    #[error("no merkle feeds published for network: {0}")]
+    NoBlocks(String),
 }
 
 impl From<RedisError> for MerkleFeedError {
     fn from(error: RedisError) -> Self {
         match error {
-            RedisError::InternalServerError => Self::InternalServerError,
             RedisError::Connection => Self::RedisConnection,
             RedisError::OptionNotFound(block, name) => Self::OptionNotFound(block, name),
             RedisError::MerkleTreeNotFound(block) => Self::MerkleTreeNotFound(block),
             RedisError::InvalidOptionHash(r) => Self::InvalidOptionHash(r),
             RedisError::TreeDeserialization => Self::TreeDeserialization,
+            RedisError::NoBlocks(network) => Self::NoBlocks(network),
+            RedisError::InternalServerError => Self::InternalServerError,
         }
     }
 }
@@ -61,6 +66,10 @@ impl IntoResponse for MerkleFeedError {
             Self::TreeDeserialization => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 String::from("Internal server error: could not decode Redis merkle tree"),
+            ),
+            Self::NoBlocks(network) => (
+                StatusCode::NOT_FOUND,
+                format!("No merkle feeds published for network {}", network),
             ),
             _ => (
                 StatusCode::INTERNAL_SERVER_ERROR,

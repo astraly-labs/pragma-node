@@ -24,3 +24,5 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 utoipa = { workspace = true }
 uuid = { workspace = true, features = ["fast-rng", "v4", "serde"] }
+
+pragma-common = { path = "../pragma-common" }

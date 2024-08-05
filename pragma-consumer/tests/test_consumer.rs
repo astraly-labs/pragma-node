@@ -6,7 +6,10 @@ use starknet::core::types::FieldElement;
 
 use pragma_common::{hash::pedersen_hash, instrument, types::Network};
 use pragma_consumer::{
-    builder::PragmaConsumerBuilder, config::ApiConfig, consumer::PragmaConsumer, types::Instrument,
+    builder::PragmaConsumerBuilder,
+    config::{ApiConfig, PragmaBaseUrl},
+    consumer::PragmaConsumer,
+    types::{BlockId, BlockTag, Instrument},
 };
 
 use common::mocks::{
@@ -20,7 +23,7 @@ async fn test_consumer() {
     let pragmapi = MockServer::start();
 
     let api_config = ApiConfig {
-        base_url: format!("http://{}", pragmapi.address()),
+        base_url: PragmaBaseUrl::Custom(format!("http://{}", pragmapi.address())),
         api_key: "this_is_a_test".into(),
     };
 
@@ -37,7 +40,7 @@ async fn test_consumer() {
 
     // 2. Define some fake tests instruments
     let test_instrument: Instrument = instrument!("BTC-16AUG24-52000-P");
-    let block_test = 85743;
+    let block_test = BlockId::Tag(BlockTag::Latest);
     let network = Network::Sepolia;
 
     // 2.5 Mock responses
@@ -54,7 +57,7 @@ async fn test_consumer() {
 
     // 3. Fetch the calldata & assert that the mocks got correctly called
     let calldata = consumer
-        .get_merkle_feed_calldata(&test_instrument, block_test)
+        .get_merkle_feed_calldata(&test_instrument, Some(block_test))
         .await
         .expect("Could not fetch the calldata");
 

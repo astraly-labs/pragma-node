@@ -1,6 +1,6 @@
 use httpmock::{prelude::*, Mock};
 use pragma_common::types::Network;
-use pragma_consumer::types::Instrument;
+use pragma_consumer::types::{BlockId, Instrument};
 use serde_json::json;
 
 pub fn mock_healthcheck(pragmapi: &MockServer) -> Mock {
@@ -14,14 +14,14 @@ pub fn mock_option_response(
     pragmapi: &MockServer,
     instrument: Instrument,
     network: Network,
-    block_number: u64,
+    block_id: BlockId,
 ) -> Mock {
     let url = format!("node/v1/merkle_feeds/options/{}", instrument.name(),);
     pragmapi.mock(|when, then| {
         when.method(GET)
             .path_contains(url)
             .query_param("network", network.to_string())
-            .query_param("block_number", block_number.to_string());
+            .query_param("block_id", block_id.to_string());
         then.status(200)
             .header("content-type", "text/json")
             .json_body(option_data(&instrument));
@@ -32,14 +32,14 @@ pub fn mock_merkle_proof_response(
     pragmapi: &MockServer,
     option_hash: String,
     network: Network,
-    block_number: u64,
+    block_id: BlockId,
 ) -> Mock {
     let url = format!("node/v1/merkle_feeds/proof/{}", &option_hash);
     pragmapi.mock(|when, then| {
         when.method(GET)
             .path_contains(url)
             .query_param("network", network.to_string())
-            .query_param("block_number", block_number.to_string());
+            .query_param("block_id", block_id.to_string());
         then.status(200)
             .header("content-type", "text/json")
             .json_body(merkle_proof_data());

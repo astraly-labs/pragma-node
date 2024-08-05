@@ -1,3 +1,4 @@
+pub use pragma_common::types::block_id::{BlockId, BlockTag};
 /// Re-export of some types from our common library so they're publicly accessible
 /// through the SDK.
 pub use pragma_common::types::merkle_tree::MerkleProof;

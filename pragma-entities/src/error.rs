@@ -102,4 +102,6 @@ pub enum RedisError {
     InvalidOptionHash(String),
     #[error("could not deserialize RawMerkleTree into MerkleTree")]
     TreeDeserialization,
+    #[error("no merkle feeds published for network: {0}")]
+    NoBlocks(String),
 }

@@ -1,11 +1,12 @@
 use std::sync::Arc;
 
 use moka::future::Cache;
-use redis::JsonAsyncCommands;
+use redis::{AsyncCommands, JsonAsyncCommands};
 use serde::{Deserialize, Serialize};
 use starknet::core::types::FieldElement;
 
 use pragma_common::types::{
+    block_id::BlockId,
     merkle_tree::{MerkleTree, MerkleTreeError},
     options::OptionData,
     Network,
@@ -15,9 +16,11 @@ use pragma_entities::error::RedisError;
 pub async fn get_option_data(
     redis_client: Arc<redis::Client>,
     network: Network,
-    block_number: u64,
+    block_id: BlockId,
     instrument_name: String,
 ) -> Result<OptionData, RedisError> {
+    let block_number = get_block_number_from_id(&redis_client, &network, &block_id).await?;
+
     let mut conn = redis_client
         .get_multiplexed_async_connection()
         .await
@@ -82,9 +85,11 @@ impl TryFrom<RawMerkleTree> for MerkleTree {
 pub async fn get_merkle_tree(
     redis_client: Arc<redis::Client>,
     network: Network,
-    block_number: u64,
+    block_id: BlockId,
     merkle_tree_cache: Cache<u64, MerkleTree>,
 ) -> Result<MerkleTree, RedisError> {
+    let block_number = get_block_number_from_id(&redis_client, &network, &block_id).await?;
+
     // Try to retrieve the latest available cached value, and return it if it exists
     let maybe_cached_value = merkle_tree_cache.get(&block_number).await;
     if let Some(cached_value) = maybe_cached_value {
@@ -110,7 +115,7 @@ pub async fn get_merkle_tree(
     // Redis [json_get] method returns a list of objects
     let mut tree_response: Vec<RawMerkleTree> = serde_json::from_str(&result).map_err(|e| {
         tracing::error!("Error while deserialzing: {e}");
-        RedisError::InternalServerError
+        RedisError::TreeDeserialization
     })?;
 
     if tree_response.len() != 1 {
@@ -127,4 +132,44 @@ pub async fn get_merkle_tree(
         .await;
 
     Ok(merkle_tree)
+}
+
+/// Converts a BlockId to a block number.
+async fn get_block_number_from_id(
+    redis_client: &Arc<redis::Client>,
+    network: &Network,
+    block_id: &BlockId,
+) -> Result<u64, RedisError> {
+    let block_number = match block_id {
+        BlockId::Number(nbr) => *nbr,
+        // We only support the Latest block as BlockTag for now
+        BlockId::Tag(_) => get_latest_block_number(redis_client, network).await?,
+    };
+    Ok(block_number)
+}
+
+/// Retrieve the latest block number available in the Redis database.
+async fn get_latest_block_number(
+    redis_client: &Arc<redis::Client>,
+    network: &Network,
+) -> Result<u64, RedisError> {
+    let mut conn = redis_client
+        .get_multiplexed_async_connection()
+        .await
+        .map_err(|_| RedisError::Connection)?;
+
+    let keys: Vec<String> = conn
+        .keys(format!("{}/*", network))
+        .await
+        .map_err(|_| RedisError::Connection)?;
+
+    let block_numbers: Vec<u64> = keys
+        .into_iter()
+        .filter_map(|key| key.split('/').nth(1)?.parse::<u64>().ok())
+        .collect();
+
+    block_numbers
+        .into_iter()
+        .max()
+        .ok_or(RedisError::NoBlocks(network.to_string()))
 }

@@ -1,3 +1,4 @@
+pub mod block_id;
 pub mod merkle_tree;
 pub mod options;
 
