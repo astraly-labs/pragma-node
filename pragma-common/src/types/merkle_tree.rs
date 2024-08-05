@@ -28,15 +28,20 @@ pub struct MerkleTree {
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct MerkleProof(pub Vec<FieldElement>);
 
-impl MerkleProof {
-    /// Converts the Merkle proof vector of FieldElement into a Vector of
-    /// hexadecimal strings.
-    pub fn as_hexadecimal_proof(&self) -> Vec<String> {
-        self.0
-            .clone()
-            .into_iter()
-            .map(|felt| format!("0x{:x}", felt))
-            .collect()
+/// The merkle proof but with hexadecimal hashes instead of Field elements.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+pub struct HexaMerkleProof(pub Vec<String>);
+
+impl From<MerkleProof> for HexaMerkleProof {
+    fn from(proof: MerkleProof) -> Self {
+        HexaMerkleProof(
+            proof
+                .0
+                .clone()
+                .into_iter()
+                .map(|felt| format!("0x{:x}", felt))
+                .collect(),
+        )
     }
 }
 

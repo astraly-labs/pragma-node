@@ -1,16 +1,19 @@
 mod common;
 
 use httpmock::MockServer;
+use rstest::*;
+use starknet::core::types::FieldElement;
+
 use pragma_common::{instrument, types::Network};
 use pragma_consumer::{
     builder::PragmaConsumerBuilder, config::ApiConfig, consumer::PragmaConsumer, Instrument,
 };
-use rstest::*;
 
 use common::mocks::{
     merkle_root_data, mock_healthcheck, mock_merkle_proof_response, mock_option_response,
     option_data,
 };
+use common::utils::hash;
 
 #[rstest]
 #[tokio::test]
@@ -23,6 +26,7 @@ async fn test_consumer() {
     };
 
     let healthcheck_mock = mock_healthcheck(&pragmapi);
+
     let consumer: PragmaConsumer = PragmaConsumerBuilder::new()
         .on_sepolia()
         .check_api_health()
@@ -49,7 +53,7 @@ async fn test_consumer() {
     );
 
     // 3. Fetch the calldata & assert that the mocks got correctly called
-    let _calldata = consumer
+    let calldata = consumer
         .get_merkle_feed_calldata(&test_instrument, block_test)
         .await
         .expect("Could not fetch the calldata");
@@ -57,6 +61,18 @@ async fn test_consumer() {
     option_mock.assert();
     merkle_proof_mock.assert();
 
-    // TODO: Assert that the merkleproof is correct
-    let _merkle_root = merkle_root_data();
+    // 4. Verify the proof returned
+    let expected_merkle_root = FieldElement::from_hex_be(&merkle_root_data()).unwrap();
+
+    let mut out_merkle_root = calldata
+        .option_data
+        .pedersen_hash()
+        .expect("Could not generate the hash of option");
+
+    for sibling in calldata.merkle_proof.0 {
+        let felt_sibling = FieldElement::from_hex_be(&sibling).unwrap();
+        out_merkle_root = hash(&out_merkle_root, &felt_sibling);
+    }
+
+    assert_eq!(out_merkle_root, expected_merkle_root);
 }

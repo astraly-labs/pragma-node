@@ -5,7 +5,7 @@ use serde_json::json;
 
 pub fn mock_healthcheck(pragmapi: &MockServer) -> Mock {
     pragmapi.mock(|when, then| {
-        when.method(GET).path("node");
+        when.method(GET).path("/node");
         then.status(200).body("Server is running!");
     })
 }
@@ -19,7 +19,7 @@ pub fn mock_option_response(
     let url = format!("node/v1/merkle_feeds/options/{}", instrument.name(),);
     pragmapi.mock(|when, then| {
         when.method(GET)
-            .path(url)
+            .path_contains(url)
             .query_param("network", network.to_string())
             .query_param("block_number", block_number.to_string());
         then.status(200)
@@ -37,7 +37,7 @@ pub fn mock_merkle_proof_response(
     let url = format!("node/v1/merkle_feeds/proof/{}", &option_hash);
     pragmapi.mock(|when, then| {
         when.method(GET)
-            .path(url)
+            .path_contains(url)
             .query_param("network", network.to_string())
             .query_param("block_number", block_number.to_string());
         then.status(200)

@@ -2,6 +2,7 @@
 
 use axum::extract::{Query, State};
 use axum::Json;
+use pragma_common::types::merkle_tree::HexaMerkleProof;
 use pragma_common::types::Network;
 use pragma_entities::models::merkle_feed_error::MerkleFeedError;
 use serde::{Deserialize, Serialize};
@@ -19,7 +20,7 @@ pub struct GetMerkleProofQuery {
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
-pub struct GetMerkleProofResponse(pub Vec<String>);
+pub struct GetMerkleProofResponse(pub HexaMerkleProof);
 
 #[utoipa::path(
     get,
@@ -70,7 +71,7 @@ pub async fn get_merkle_feeds_proof(
     }
 
     // Safe to unwrap, see condition above
-    let hexadecimals_proof = merkle_proof.unwrap().as_hexadecimal_proof();
+    let hexadecimals_proof = HexaMerkleProof::from(merkle_proof.unwrap());
     Ok(Json(GetMerkleProofResponse(hexadecimals_proof)))
 }
 
