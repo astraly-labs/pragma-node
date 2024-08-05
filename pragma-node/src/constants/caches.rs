@@ -9,5 +9,5 @@ pub const PUBLISHERS_UDPATES_CACHE_TIME_TO_IDLE_IN_SECONDS: u64 = 5 * 60; // 5 m
 
 /// Cache of the stored Merkle Tree for a certain block in Redis.
 /// Since this value never change we can cache it for faster iterations.
-pub const MERKLE_FEED_TREE_CACHE_TIME_TO_LIVE_IN_SECONDS: u64 = 10 * 60; // 10 minutes
-pub const MERKLE_FEED_TREE_CACHE_TIME_TO_IDLE_IN_SECONDS: u64 = 2 * 60; // 2 minutes
+pub const MERKLE_FEED_TREE_CACHE_TIME_TO_LIVE_IN_SECONDS: u64 = 6 * 60; // 6 minutes
+pub const MERKLE_FEED_TREE_CACHE_TIME_TO_IDLE_IN_SECONDS: u64 = 60; // 1 minutes

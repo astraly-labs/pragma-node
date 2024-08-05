@@ -11,6 +11,9 @@ use crate::constants::caches::{
 };
 use crate::infra::repositories::onchain_repository::RawPublisherUpdates;
 
+/// Structure responsible of holding our Databases caches.
+/// All the caches are initialized empty with their associated time to live in the
+/// constants module.
 #[derive(Clone)]
 pub struct CacheRegistry {
     onchain_publishers_updates: Cache<String, HashMap<String, RawPublisherUpdates>>,
@@ -18,6 +21,7 @@ pub struct CacheRegistry {
 }
 
 impl CacheRegistry {
+    /// Initialize all of our caches empty.
     pub fn new() -> Self {
         let onchain_publishers_updates_cache = Cache::builder()
             .time_to_live(Duration::from_secs(

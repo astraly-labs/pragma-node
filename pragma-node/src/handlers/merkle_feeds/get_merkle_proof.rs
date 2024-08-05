@@ -62,16 +62,16 @@ pub async fn get_merkle_feeds_proof(
     let option_felt_hash = FieldElement::from_hex_be(&option_hex_hash)
         .map_err(|_| MerkleFeedError::InvalidOptionHash(option_hex_hash.clone()))?;
 
-    let merkle_proof = merkle_tree.get_proof(&option_felt_hash);
-    if merkle_proof.is_none() {
-        return Err(MerkleFeedError::OptionNotFound(
-            block_number,
-            option_hex_hash,
-        ));
-    }
+    let merkle_proof =
+        merkle_tree
+            .get_proof(&option_felt_hash)
+            .ok_or(MerkleFeedError::OptionNotFound(
+                block_number,
+                option_hex_hash,
+            ))?;
 
     // Safe to unwrap, see condition above
-    let hexadecimals_proof = MerkleProof::from(merkle_proof.unwrap());
+    let hexadecimals_proof = MerkleProof::from(merkle_proof);
     Ok(Json(GetMerkleProofResponse(hexadecimals_proof)))
 }
 
