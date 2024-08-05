@@ -26,15 +26,15 @@ pub struct MerkleTree {
 
 /// The merkle proof that a leaf belongs to a Merkle tree.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
-pub struct MerkleProof(pub Vec<FieldElement>);
+pub struct FeltMerkleProof(pub Vec<FieldElement>);
 
 /// The merkle proof but with hexadecimal hashes instead of Field elements.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
-pub struct HexaMerkleProof(pub Vec<String>);
+pub struct MerkleProof(pub Vec<String>);
 
-impl From<MerkleProof> for HexaMerkleProof {
-    fn from(proof: MerkleProof) -> Self {
-        HexaMerkleProof(
+impl From<FeltMerkleProof> for MerkleProof {
+    fn from(proof: FeltMerkleProof) -> Self {
+        MerkleProof(
             proof
                 .0
                 .clone()
@@ -108,7 +108,7 @@ impl MerkleTree {
     }
 
     /// Returns the merkle proof if the passed leaf is found in the tree.
-    pub fn get_proof(&self, leaf: &FieldElement) -> Option<MerkleProof> {
+    pub fn get_proof(&self, leaf: &FieldElement) -> Option<FeltMerkleProof> {
         let mut path = Vec::new();
         let mut current_hash = *leaf;
 
@@ -124,11 +124,11 @@ impl MerkleTree {
             path.push(*sibling);
             current_hash = self.hash(&current_hash, sibling);
         }
-        Some(MerkleProof(path))
+        Some(FeltMerkleProof(path))
     }
 
     /// Verify that the passed merkle proof is valid for the leaf.
-    pub fn verify_proof(&self, leaf: &FieldElement, proof: &MerkleProof) -> bool {
+    pub fn verify_proof(&self, leaf: &FieldElement, proof: &FeltMerkleProof) -> bool {
         let mut current_hash = *leaf;
         for &sibling in &proof.0 {
             current_hash = self.hash(&current_hash, &sibling);
@@ -178,7 +178,7 @@ mod tests {
         let leaf = FieldElement::from(1_u32);
         let proof = merkle_tree.get_proof(&leaf).unwrap();
 
-        let expected_proof = MerkleProof(vec![
+        let expected_proof = FeltMerkleProof(vec![
             FieldElement::from_hex_be("0x2").unwrap(),
             FieldElement::from_hex_be(
                 "0x262697b88544f733e5c6907c3e1763131e9f14c51ee7951258abbfb29415fbf",

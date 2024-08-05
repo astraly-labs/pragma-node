@@ -1,7 +1,7 @@
 use reqwest::{Response, StatusCode};
 
 use pragma_common::types::{
-    merkle_tree::HexaMerkleProof,
+    merkle_tree::MerkleProof,
     options::{Instrument, OptionData},
     Network,
 };
@@ -76,7 +76,7 @@ impl PragmaConsumer {
         &self,
         option_hash: String,
         block_number: u64,
-    ) -> Result<HexaMerkleProof, ConsumerError> {
+    ) -> Result<MerkleProof, ConsumerError> {
         let url = format!(
             "{}/{}/proof/{}?network={}&block_number={}",
             self.base_url, PRAGMAPI_PATH_PREFIX, option_hash, self.network, block_number,
