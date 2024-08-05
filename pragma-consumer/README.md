@@ -16,32 +16,56 @@ pragma-consumer = "0.1.0"
 ## Quick Start
 
 ```rust
-use pragma_consumer::{builder::PragmaConsumerBuilder, config::ApiConfig, instrument};
+use pragma_consumer::builder::PragmaConsumerBuilder;
+use pragma_consumer::config::{ApiConfig, PragmaBaseUrl};
+use pragma_consumer::macros::instrument;
+use pragma_consumer::types::{BlockId, Instrument};
 
 #[tokio::main]
-async fn main() -> Result<()> {
+async fn main() -> Result<(), ()> {
     let api_config = ApiConfig {
-        base_url: "https://api.dev.pragma.build".into(),
+        base_url: PragmaBaseUrl::Prod,
         api_key: "your_api_key".into(),
     };
 
     let consumer = PragmaConsumerBuilder::new()
-        .on_sepolia()
+        .on_mainnet()
         .with_http(api_config)
-        .await?;
+        .await
+        .unwrap();
 
+    let current_block = BlockId::Number(85925);
     let instrument = instrument!("BTC-16AUG24-52000-P");
-    let current_block = 85626;
 
-    let calldata = consumer
-        .get_merkle_feed_calldata(&instrument, current_block)
-        .await?;
+    let result = consumer
+        .get_merkle_feed_calldata(&instrument, Some(current_block))
+        .await
+        .unwrap();
 
-    // Use calldata with the Pragma Oracle contract
+    // Use the calldata with the pragma-oracle contract...
+    println!("Hex calldata: {}", result.as_hex_calldata());
 }
 ```
 
 ## Usage
+
+### Configure the API connection
+
+Create an instance of an `ApiConfig` object:
+
+```rust
+let api_config = ApiConfig {
+    // This will use our dev API
+    base_url: PragmaBaseUrl::Dev, // or PragmaBaseUrl::Prod
+    api_key: "your_api_key".into(),
+};
+
+// If you need a custom url, you can do:
+let api_config = ApiConfig {
+    base_url: PragmaBaseUrl::Custom("http://localhost:3000".into()),
+    api_key: "your_api_key".into(),
+};
+```
 
 ### Initializing the Consumer
 
@@ -112,6 +136,23 @@ You can retrieve the name of an instrument with the `name()` method:
 println!("{}", instrument.name());
 
 // BTC-16AUG24-52000-P
+```
+
+### Specifying Block ID
+
+You can specify the block in different ways:
+
+```rust
+use pragma_consumer::types::{BlockId, BlockTag};
+
+// Using a specific block number
+let block = BlockId::Number(85925);
+
+// Using the latest block
+let block = BlockId::Tag(BlockTag::Latest);
+
+// Using the pending block
+let block = BlockId::Tag(BlockTag::Pending);
 ```
 
 ### Error Handling
