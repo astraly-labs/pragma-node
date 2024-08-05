@@ -49,7 +49,7 @@ pub fn mock_merkle_proof_response(
 pub fn option_data(instrument: &Instrument) -> serde_json::Value {
     json!({
         "instrument_name": instrument.name(),
-        "base_currency": instrument.base_currency.as_str(),
+        "base_currency": &instrument.base_currency.to_string(),
         "current_timestamp": 1722805873,
         "mark_price": "45431835920",
         "hash": "0x7866fd2ec3bc6bd1a2efb6e1f02337d62064a86e8d5755bdc568d92a06f320a"

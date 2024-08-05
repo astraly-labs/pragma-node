@@ -6,51 +6,35 @@ use serde::{Deserialize, Serialize};
 use starknet::core::{
     crypto::compute_hash_on_elements, types::FieldElement, utils::cairo_short_string_to_felt,
 };
+use strum::{Display, EnumString};
 use thiserror::Error;
 
 use crate::utils::field_element_as_hex_string;
 
 /// The available currencies supported.
-#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Display, EnumString)]
+#[strum(serialize_all = "UPPERCASE")]
 pub enum OptionCurrency {
     BTC,
     ETH,
 }
 
 impl OptionCurrency {
-    pub fn as_str(&self) -> &str {
-        match self {
-            Self::BTC => "BTC",
-            Self::ETH => "ETH",
-        }
-    }
-}
-
-impl OptionCurrency {
     pub fn from_ticker(ticker: &str) -> Result<Self, InstrumentError> {
-        let currency = match ticker.to_uppercase().as_str() {
-            "BTC" => Self::BTC,
-            "ETH" => Self::ETH,
-            _ => return Err(InstrumentError::UnsupportedCurrency(ticker.to_owned())),
-        };
-        Ok(currency)
+        ticker
+            .parse()
+            .map_err(|_| InstrumentError::UnsupportedCurrency(ticker.to_owned()))
     }
 }
 
 /// The possible types for an option.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Display, EnumString)]
+#[strum(serialize_all = "UPPERCASE")]
 pub enum OptionType {
+    #[strum(serialize = "P")]
     Put,
+    #[strum(serialize = "C")]
     Call,
-}
-
-impl OptionType {
-    pub fn as_str(&self) -> &str {
-        match self {
-            Self::Put => "P",
-            Self::Call => "C",
-        }
-    }
 }
 
 #[derive(Debug, Error)]
@@ -108,13 +92,13 @@ impl Instrument {
     pub fn name(&self) -> String {
         format!(
             "{}-{}-{}-{}",
-            self.base_currency.as_str(),
+            self.base_currency,
             self.expiration_date
                 .format("%d%b%y")
                 .to_string()
                 .to_uppercase(),
             self.strike_price,
-            self.option_type.as_str()
+            self.option_type
         )
     }
 }
@@ -143,18 +127,22 @@ pub struct OptionData {
 }
 
 impl OptionData {
-    /// Computes the pedersen hash of the Option.
-    pub fn pedersen_hash(&self) -> Result<FieldElement, InstrumentError> {
-        let elements = vec![
+    /// Converts an option as a Vec of FieldElement - i.e a calldata.
+    pub fn as_calldata(&self) -> Result<Vec<FieldElement>, InstrumentError> {
+        Ok(vec![
             cairo_short_string_to_felt(&self.instrument_name)
                 .map_err(|_| InstrumentError::FieldElement("instrument name".to_string()))?,
-            cairo_short_string_to_felt(self.base_currency.as_str())
+            cairo_short_string_to_felt(&self.base_currency.to_string())
                 .map_err(|_| InstrumentError::FieldElement("base currency".to_string()))?,
             FieldElement::from(self.current_timestamp as u64),
             FieldElement::from_str(&self.mark_price.to_string())
                 .map_err(|_| InstrumentError::FieldElement("mark price".to_string()))?,
-        ];
+        ])
+    }
 
+    /// Computes the pedersen hash of the Option.
+    pub fn pedersen_hash(&self) -> Result<FieldElement, InstrumentError> {
+        let elements = self.as_calldata()?;
         Ok(compute_hash_on_elements(&elements))
     }
 

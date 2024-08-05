@@ -10,6 +10,8 @@ pub enum MerkleTreeError {
     BuildFailed(String),
     #[error("cannot build a merkle tree from empty leaves")]
     EmptyLeaves,
+    #[error("could not convert hash {0} to a felt")]
+    FeltConversion(String),
 }
 
 /// Simple MerkleTree.
@@ -39,9 +41,23 @@ impl From<FeltMerkleProof> for MerkleProof {
                 .0
                 .clone()
                 .into_iter()
-                .map(|felt| format!("0x{:x}", felt))
+                .map(|felt| format!("{:#x}", felt))
                 .collect(),
         )
+    }
+}
+
+impl TryInto<FeltMerkleProof> for MerkleProof {
+    type Error = MerkleTreeError;
+
+    fn try_into(self) -> Result<FeltMerkleProof, Self::Error> {
+        self.0
+            .into_iter()
+            .map(|hash| {
+                FieldElement::from_hex_be(&hash).map_err(|_| MerkleTreeError::FeltConversion(hash))
+            })
+            .collect::<Result<Vec<FieldElement>, _>>()
+            .map(FeltMerkleProof)
     }
 }
 
@@ -85,6 +101,7 @@ impl MerkleTree {
                 } else {
                     FieldElement::ZERO
                 };
+                // sorting of A & B happens in the [hash] method
                 new_nodes.push(self.hash(&a, &b));
             }
 

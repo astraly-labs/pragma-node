@@ -1,8 +1,8 @@
 pub mod merkle_tree;
 pub mod options;
 
-use core::fmt;
 use serde::{Deserialize, Serialize};
+use strum::{Display, EnumString};
 use utoipa::ToSchema;
 
 #[derive(Default, Debug, Serialize, Deserialize, ToSchema, Clone, Copy)]
@@ -16,22 +16,12 @@ pub enum AggregationMode {
     Twap,
 }
 
-#[derive(Default, Debug, Serialize, Deserialize, ToSchema, Clone, Copy)]
+#[derive(Default, Debug, Serialize, Deserialize, ToSchema, Clone, Copy, Display, EnumString)]
+#[strum(serialize_all = "lowercase")]
 pub enum Network {
-    #[serde(rename = "sepolia")]
     #[default]
     Sepolia,
-    #[serde(rename = "mainnet")]
     Mainnet,
-}
-
-impl fmt::Display for Network {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> Result<(), core::fmt::Error> {
-        match self {
-            Network::Sepolia => write!(f, "sepolia"),
-            Network::Mainnet => write!(f, "mainnet"),
-        }
-    }
 }
 
 #[derive(Default, Debug, Deserialize, ToSchema, Clone, Copy)]
