@@ -2380,7 +2380,6 @@ dependencies = [
 name = "pragma-common"
 version = "1.0.0"
 dependencies = [
- "chrono",
  "serde",
  "tracing",
  "tracing-subscriber",

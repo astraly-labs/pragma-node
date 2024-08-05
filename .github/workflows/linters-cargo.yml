@@ -16,8 +16,21 @@ jobs:
       - run: rustup show
 
       - uses: Swatinem/rust-cache@v2
+
       - name: Format and clippy
         run: |
           cargo fmt -- --check
           cargo clippy --no-deps -- -D warnings
           cargo clippy --tests --no-deps -- -D warnings
+
+      - name: Install udeps
+        uses: actions-rs/cargo@v1
+        with:
+          command: install
+          args: cargo-udeps
+
+      - name: Run udeps
+        uses: actions-rs/cargo@v1
+        with:
+          toolchain: nightly
+          command: udeps
