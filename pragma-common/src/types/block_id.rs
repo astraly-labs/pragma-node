@@ -17,7 +17,6 @@ pub enum BlockTag {
 }
 
 /// Block identifier in the form of hash, number or tag.
-/// Block identifier in the form of hash, number or tag.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Display)]
 pub enum BlockId {
     #[strum(serialize = "latest")]
