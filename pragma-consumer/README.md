@@ -34,16 +34,18 @@ async fn main() -> Result<(), ()> {
         .await
         .unwrap();
 
-    let current_block = BlockId::Number(85925);
     let instrument = instrument!("BTC-16AUG24-52000-P");
 
     let result = consumer
-        .get_merkle_feed_calldata(&instrument, Some(current_block))
+        .get_merkle_feed_calldata(&instrument, None) // None = Pending block by default
         .await
         .unwrap();
 
     // Use the calldata with the pragma-oracle contract...
     println!("Hex calldata: {}", result.as_hex_calldata());
+
+    // result.calldata() returns the calldata wrapped with FieldElement
+    // from starknet-rs 0.9.0
 }
 ```
 
