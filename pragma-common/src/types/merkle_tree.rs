@@ -16,7 +16,7 @@ pub enum MerkleTreeError {
 
 /// Simple MerkleTree.
 /// Reference:
-/// https://github.com/software-mansion/starknet.py/blob/development/starknet_py/utils/merkle_tree.py
+/// https://github.com/software-mansion/starknet.py/blob/v0.23.0/starknet_py/utils/merkle_tree.py
 /// NOTE: Only supports the Pedersen hash for now.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -144,6 +144,9 @@ impl MerkleTree {
     }
 }
 
+/// All the expected values for the hash come from the python implementation of starknet.py.
+/// Reference:
+/// https://github.com/software-mansion/starknet.py/blob/v0.23.0/starknet_py/utils/merkle_tree.py
 #[cfg(test)]
 mod tests {
     use rstest::rstest;
