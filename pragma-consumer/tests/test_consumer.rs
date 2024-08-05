@@ -4,16 +4,15 @@ use httpmock::MockServer;
 use rstest::*;
 use starknet::core::types::FieldElement;
 
-use pragma_common::{instrument, types::Network};
+use pragma_common::{hash::pedersen_hash, instrument, types::Network};
 use pragma_consumer::{
-    builder::PragmaConsumerBuilder, config::ApiConfig, consumer::PragmaConsumer, Instrument,
+    builder::PragmaConsumerBuilder, config::ApiConfig, consumer::PragmaConsumer, types::Instrument,
 };
 
 use common::mocks::{
     merkle_root_data, mock_healthcheck, mock_merkle_proof_response, mock_option_response,
     option_data,
 };
-use common::utils::hash;
 
 #[rstest]
 #[tokio::test]
@@ -71,7 +70,7 @@ async fn test_consumer() {
 
     for sibling in calldata.merkle_proof.0 {
         let felt_sibling = FieldElement::from_hex_be(&sibling).unwrap();
-        out_merkle_root = hash(&out_merkle_root, &felt_sibling);
+        out_merkle_root = pedersen_hash(&out_merkle_root, &felt_sibling);
     }
 
     assert_eq!(out_merkle_root, expected_merkle_root);

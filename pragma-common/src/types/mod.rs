@@ -20,7 +20,9 @@ pub enum AggregationMode {
 #[strum(serialize_all = "lowercase")]
 pub enum Network {
     #[default]
+    #[serde(rename = "sepolia")]
     Sepolia,
+    #[serde(rename = "mainnet")]
     Mainnet,
 }
 

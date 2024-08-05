@@ -1,6 +1,6 @@
 use httpmock::{prelude::*, Mock};
 use pragma_common::types::Network;
-use pragma_consumer::Instrument;
+use pragma_consumer::types::Instrument;
 use serde_json::json;
 
 pub fn mock_healthcheck(pragmapi: &MockServer) -> Mock {

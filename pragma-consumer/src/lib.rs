@@ -4,9 +4,8 @@ pub(crate) mod constants;
 pub mod consumer;
 pub mod types;
 
-// Re-export of some types so they're publicly accessible through the SDK.
-pub use pragma_common::instrument;
-pub use pragma_common::types::merkle_tree::MerkleProof;
-pub use pragma_common::types::options::{
-    Instrument, InstrumentError, OptionCurrency, OptionData, OptionType,
-};
+/// Re-export of some types from our common library so they're publicly accessible
+/// through the SDK.
+pub mod macros {
+    pub use pragma_common::instrument;
+}

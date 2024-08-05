@@ -61,13 +61,16 @@ impl PragmaConsumer {
             self.base_url, PRAGMAPI_PATH_PREFIX, instrument_name, self.network, block_number,
         );
 
+        println!("{}", url);
+
         let api_response = self.request_api(url).await?;
         if api_response.status() != StatusCode::OK {
             return Err(ConsumerError::HttpRequest(api_response.status()));
         }
 
         let contents = api_response.text().await.map_err(ConsumerError::Reqwest)?;
-        serde_json::from_str(&contents).map_err(ConsumerError::Serde)
+        let option_data = serde_json::from_str(&contents).map_err(ConsumerError::Serde)?;
+        Ok(option_data)
     }
 
     /// Requests from our PragmAPI the merkle proof for an hash at a certain block.
@@ -87,7 +90,8 @@ impl PragmaConsumer {
         }
 
         let contents = api_response.text().await.map_err(ConsumerError::Reqwest)?;
-        serde_json::from_str(&contents).map_err(ConsumerError::Serde)
+        let merkle_proof = serde_json::from_str(&contents).map_err(ConsumerError::Serde)?;
+        Ok(merkle_proof)
     }
 
     /// Utility function to make an HTTP Get request to a provided URL.

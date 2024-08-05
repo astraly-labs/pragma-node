@@ -1,7 +1,11 @@
-use pragma_common::types::{
-    merkle_tree::{FeltMerkleProof, MerkleProof},
-    options::OptionData,
+/// Re-export of some types from our common library so they're publicly accessible
+/// through the SDK.
+pub use pragma_common::types::merkle_tree::MerkleProof;
+pub use pragma_common::types::options::{
+    Instrument, InstrumentError, OptionCurrency, OptionData, OptionType,
 };
+
+use pragma_common::{types::merkle_tree::FeltMerkleProof, utils::field_element_as_hex_string};
 use starknet::core::types::FieldElement;
 
 #[derive(thiserror::Error, Debug)]
@@ -37,5 +41,13 @@ impl MerkleFeedCalldata {
         calldata.extend(option_calldata);
 
         Ok(calldata)
+    }
+
+    pub fn as_hex_calldata(&self) -> Result<Vec<String>, CalldataError> {
+        Ok(self
+            .as_calldata()?
+            .into_iter()
+            .map(|f| field_element_as_hex_string(&f))
+            .collect())
     }
 }

@@ -1,8 +1,8 @@
-use std::cmp::Ordering;
-
 use serde::{Deserialize, Serialize};
-use starknet::core::{crypto::pedersen_hash, types::FieldElement};
+use starknet::core::types::FieldElement;
 use thiserror::Error;
+
+use crate::hash::pedersen_hash;
 
 #[derive(Debug, Error)]
 pub enum MerkleTreeError {
@@ -102,7 +102,7 @@ impl MerkleTree {
                     FieldElement::ZERO
                 };
                 // sorting of A & B happens in the [hash] method
-                new_nodes.push(self.hash(&a, &b));
+                new_nodes.push(pedersen_hash(&a, &b));
             }
 
             curr_level_nodes = new_nodes;
@@ -112,16 +112,6 @@ impl MerkleTree {
         levels.push(curr_level_nodes.clone());
 
         (curr_level_nodes[0], levels)
-    }
-
-    /// The first element A of a pedersen hash (A,B) follows the rule:
-    /// A <= B
-    fn hash(&self, a: &FieldElement, b: &FieldElement) -> FieldElement {
-        let (a_sorted, b_sorted) = match a.cmp(b) {
-            Ordering::Less | Ordering::Equal => (a, b),
-            Ordering::Greater => (b, a),
-        };
-        pedersen_hash(a_sorted, b_sorted)
     }
 
     /// Returns the merkle proof if the passed leaf is found in the tree.
@@ -139,7 +129,7 @@ impl MerkleTree {
             let sibling = level.get(sibling_index).unwrap_or(&FieldElement::ZERO);
 
             path.push(*sibling);
-            current_hash = self.hash(&current_hash, sibling);
+            current_hash = pedersen_hash(&current_hash, sibling);
         }
         Some(FeltMerkleProof(path))
     }
@@ -148,7 +138,7 @@ impl MerkleTree {
     pub fn verify_proof(&self, leaf: &FieldElement, proof: &FeltMerkleProof) -> bool {
         let mut current_hash = *leaf;
         for &sibling in &proof.0 {
-            current_hash = self.hash(&current_hash, &sibling);
+            current_hash = pedersen_hash(&current_hash, &sibling);
         }
         current_hash == self.root_hash
     }
