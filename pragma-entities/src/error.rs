@@ -94,7 +94,7 @@ pub enum RedisError {
     InternalServerError,
     #[error("could not establish a connection with Redis")]
     Connection,
-    #[error("option for instrument {1} not found for block {0}")]
+    #[error("could not find option for instrument {1} at block {0}")]
     OptionNotFound(u64, String),
     #[error("merkle tree not found for block {0}")]
     MerkleTreeNotFound(u64),
