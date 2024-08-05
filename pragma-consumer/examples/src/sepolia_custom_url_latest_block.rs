@@ -18,8 +18,9 @@ async fn main() -> Result<(), ()> {
 
     let instrument = instrument!("BTC-16AUG24-52000-P");
 
+    let block = BlockId::Tag(BlockTag::Latest);
     let result = consumer
-        .get_merkle_feed_calldata(&instrument, None)
+        .get_merkle_feed_calldata(&instrument, Some(block))
         .await
         .unwrap();
 
