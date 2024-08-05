@@ -1,5 +1,4 @@
 use deadpool_diesel::InteractError;
-use redis::RedisError;
 use std::{
     fmt::{self, Debug},
     num::TryFromIntError,
@@ -19,8 +18,6 @@ pub enum InfraError {
     NonZeroU32Conversion(#[from] TryFromIntError),
     #[error(transparent)]
     AxumError(#[from] axum::Error),
-    #[error(transparent)]
-    RedisError(#[from] RedisError),
 }
 
 impl InfraError {
@@ -32,7 +29,6 @@ impl InfraError {
             InfraError::InvalidTimestamp(e) => EntryError::InvalidTimestamp(e.to_string()),
             InfraError::NonZeroU32Conversion(_) => EntryError::InternalServerError,
             InfraError::AxumError(_) => EntryError::InternalServerError,
-            InfraError::RedisError(_) => EntryError::InternalServerError,
         }
     }
 }
@@ -63,7 +59,6 @@ impl fmt::Display for InfraError {
             InfraError::InvalidTimestamp(e) => write!(f, "Invalid timestamp {e}"),
             InfraError::NonZeroU32Conversion(e) => write!(f, "Non zero u32 conversion {e}"),
             InfraError::AxumError(e) => write!(f, "Axum error {e}"),
-            InfraError::RedisError(e) => write!(f, "Redis error {e}"),
         }
     }
 }
@@ -91,4 +86,20 @@ impl Error for InteractError {
     fn as_infra_error(&self) -> InfraError {
         InfraError::InternalServerError
     }
+}
+
+#[derive(Debug, thiserror::Error, ToSchema)]
+pub enum RedisError {
+    #[error("internal server error")]
+    InternalServerError,
+    #[error("could not establish a connection with Redis")]
+    Connection,
+    #[error("option for instrument {1} not found for block {0}")]
+    OptionNotFound(u64, String),
+    #[error("merkle tree not found for block {0}")]
+    MerkleTreeNotFound(u64),
+    #[error("invalid option hash, could not convert to felt: {0}")]
+    InvalidOptionHash(String),
+    #[error("could not deserialize RawMerkleTree into MerkleTree")]
+    TreeDeserialization,
 }

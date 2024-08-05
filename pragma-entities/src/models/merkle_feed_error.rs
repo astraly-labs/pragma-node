@@ -2,7 +2,7 @@ use axum::{http::StatusCode, response::IntoResponse, Json};
 use serde_json::json;
 use utoipa::ToSchema;
 
-use crate::InfraError;
+use crate::error::RedisError;
 
 #[derive(Debug, thiserror::Error, ToSchema)]
 pub enum MerkleFeedError {
@@ -16,18 +16,19 @@ pub enum MerkleFeedError {
     MerkleTreeNotFound(u64),
     #[error("invalid option hash, could not convert to felt: {0}")]
     InvalidOptionHash(String),
+    #[error("could not deserialize the redis merkle tree into MerkleTree")]
+    TreeDeserialization,
 }
 
-impl From<InfraError> for MerkleFeedError {
-    fn from(error: InfraError) -> Self {
+impl From<RedisError> for MerkleFeedError {
+    fn from(error: RedisError) -> Self {
         match error {
-            InfraError::InternalServerError => Self::InternalServerError,
-            InfraError::NotFound => Self::InternalServerError,
-            InfraError::RoutingError => Self::InternalServerError,
-            InfraError::InvalidTimestamp(_) => Self::InternalServerError,
-            InfraError::NonZeroU32Conversion(_) => Self::InternalServerError,
-            InfraError::AxumError(_) => Self::InternalServerError,
-            InfraError::RedisError(_) => Self::InternalServerError,
+            RedisError::InternalServerError => Self::InternalServerError,
+            RedisError::Connection => Self::RedisConnection,
+            RedisError::OptionNotFound(block, name) => Self::OptionNotFound(block, name),
+            RedisError::MerkleTreeNotFound(block) => Self::MerkleTreeNotFound(block),
+            RedisError::InvalidOptionHash(r) => Self::InvalidOptionHash(r),
+            RedisError::TreeDeserialization => Self::TreeDeserialization,
         }
     }
 }
@@ -35,18 +36,18 @@ impl From<InfraError> for MerkleFeedError {
 impl IntoResponse for MerkleFeedError {
     fn into_response(self) -> axum::response::Response {
         let (status, err_msg) = match self {
-            Self::OptionNotFound(block_number, instrument_name) => (
-                StatusCode::NOT_FOUND,
-                format!(
-                    "MerkleFeed option for instrument {} has not been found for block {}",
-                    instrument_name, block_number
-                ),
-            ),
             Self::InvalidOptionHash(hash) => (
                 StatusCode::BAD_REQUEST,
                 format!(
                     "Option hash is not a correct 0x prefixed hexadecimal hash: {}",
                     hash
+                ),
+            ),
+            Self::OptionNotFound(block_number, instrument_name) => (
+                StatusCode::NOT_FOUND,
+                format!(
+                    "MerkleFeed option for instrument {} has not been found for block {}",
+                    instrument_name, block_number
                 ),
             ),
             Self::MerkleTreeNotFound(block_number) => (
@@ -56,6 +57,10 @@ impl IntoResponse for MerkleFeedError {
             Self::RedisConnection => (
                 StatusCode::SERVICE_UNAVAILABLE,
                 "Could not establish a connection with the Redis database".to_string(),
+            ),
+            Self::TreeDeserialization => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                String::from("Internal server error: could not decode Redis merkle tree"),
             ),
             _ => (
                 StatusCode::INTERNAL_SERVER_ERROR,

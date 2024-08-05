@@ -2,42 +2,42 @@ use std::sync::Arc;
 
 use moka::future::Cache;
 use redis::JsonAsyncCommands;
+use serde::{Deserialize, Serialize};
+use starknet::core::types::FieldElement;
 
 use pragma_common::types::{
     merkle_tree::{MerkleTree, MerkleTreeError},
     options::OptionData,
     Network,
 };
-use pragma_entities::InfraError;
-use serde::{Deserialize, Serialize};
-use starknet::core::types::FieldElement;
+use pragma_entities::error::RedisError;
 
 pub async fn get_option_data(
     redis_client: Arc<redis::Client>,
     network: Network,
     block_number: u64,
     instrument_name: String,
-) -> Result<OptionData, InfraError> {
+) -> Result<OptionData, RedisError> {
     let mut conn = redis_client
         .get_multiplexed_async_connection()
         .await
-        .map_err(InfraError::RedisError)?;
+        .map_err(|_| RedisError::Connection)?;
 
     let instrument_key = format!("{}/{}/options/{}", network, block_number, instrument_name);
 
     let result: String = conn
         .json_get(instrument_key, "$")
         .await
-        .map_err(|_| InfraError::NotFound)?;
+        .map_err(|_| RedisError::OptionNotFound(block_number, instrument_name.clone()))?;
 
     // Redis [json_get] method returns a list of objects
     let mut option_response: Vec<OptionData> = serde_json::from_str(&result).map_err(|e| {
         tracing::error!("Error while deserialzing: {e}");
-        InfraError::InternalServerError
+        RedisError::InternalServerError
     })?;
 
     if option_response.len() != 1 {
-        return Err(InfraError::NotFound);
+        return Err(RedisError::OptionNotFound(block_number, instrument_name));
     }
 
     // Safe to unwrap, see condition above
@@ -84,7 +84,7 @@ pub async fn get_merkle_tree(
     network: Network,
     block_number: u64,
     merkle_tree_cache: Cache<u64, MerkleTree>,
-) -> Result<MerkleTree, InfraError> {
+) -> Result<MerkleTree, RedisError> {
     // Try to retrieve the latest available cached value, and return it if it exists
     let maybe_cached_value = merkle_tree_cache.get(&block_number).await;
     if let Some(cached_value) = maybe_cached_value {
@@ -98,28 +98,28 @@ pub async fn get_merkle_tree(
     let mut conn = redis_client
         .get_multiplexed_async_connection()
         .await
-        .map_err(InfraError::RedisError)?;
+        .map_err(|_| RedisError::Connection)?;
 
     let instrument_key = format!("{}/{}/merkle_tree", network, block_number);
 
     let result: String = conn
         .json_get(instrument_key, "$")
         .await
-        .map_err(|_| InfraError::NotFound)?;
+        .map_err(|_| RedisError::MerkleTreeNotFound(block_number))?;
 
     // Redis [json_get] method returns a list of objects
     let mut tree_response: Vec<RawMerkleTree> = serde_json::from_str(&result).map_err(|e| {
         tracing::error!("Error while deserialzing: {e}");
-        InfraError::InternalServerError
+        RedisError::InternalServerError
     })?;
 
     if tree_response.len() != 1 {
-        return Err(InfraError::NotFound);
+        return Err(RedisError::MerkleTreeNotFound(block_number));
     }
 
     // Safe to unwrap, see condition above
     let merkle_tree = MerkleTree::try_from(tree_response.pop().unwrap())
-        .map_err(|_| InfraError::InternalServerError)?;
+        .map_err(|_| RedisError::TreeDeserialization)?;
 
     // Update the cache with the merkle tree for the current block
     merkle_tree_cache
