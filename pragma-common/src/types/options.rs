@@ -8,6 +8,8 @@ use starknet::core::{
 };
 use thiserror::Error;
 
+use crate::utils::field_element_as_hex_string;
+
 /// The available currencies supported.
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub enum OptionCurrency {
@@ -63,6 +65,8 @@ pub enum InstrumentError {
     MarkPrice(String),
     #[error("currency must be BTC or ETH, found: {0}")]
     UnsupportedCurrency(String),
+    #[error("could not convert {0} to a field element")]
+    FieldElement(String),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -130,7 +134,7 @@ macro_rules! instrument {
 }
 
 /// An instrument option with its mark price for a certain timestamp.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OptionData {
     pub instrument_name: String,
     pub base_currency: OptionCurrency,
@@ -139,20 +143,24 @@ pub struct OptionData {
 }
 
 impl OptionData {
-    pub fn pedersen_hash(&self) -> FieldElement {
-        // TODO(akhercha): Handle unwraps
-        let elements: Vec<FieldElement> = vec![
-            cairo_short_string_to_felt(&self.instrument_name).unwrap(),
-            cairo_short_string_to_felt(self.base_currency.as_str()).unwrap(),
+    /// Computes the pedersen hash of the Option.
+    pub fn pedersen_hash(&self) -> Result<FieldElement, InstrumentError> {
+        let elements = vec![
+            cairo_short_string_to_felt(&self.instrument_name)
+                .map_err(|_| InstrumentError::FieldElement("instrument name".to_string()))?,
+            cairo_short_string_to_felt(self.base_currency.as_str())
+                .map_err(|_| InstrumentError::FieldElement("base currency".to_string()))?,
             FieldElement::from(self.current_timestamp as u64),
-            FieldElement::from_str(&self.mark_price.to_string()).unwrap(),
+            FieldElement::from_str(&self.mark_price.to_string())
+                .map_err(|_| InstrumentError::FieldElement("mark price".to_string()))?,
         ];
-        compute_hash_on_elements(&elements)
+
+        Ok(compute_hash_on_elements(&elements))
     }
 
-    pub fn hexadecimal_hash(&self) -> String {
-        let hash = self.pedersen_hash();
-        format!("0x{:x}", hash)
+    pub fn pedersen_hash_as_hex_string(&self) -> Result<String, InstrumentError> {
+        let hash = self.pedersen_hash()?;
+        Ok(field_element_as_hex_string(&hash))
     }
 }
 

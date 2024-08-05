@@ -18,6 +18,8 @@ pub enum ConsumerError {
     Reqwest(#[from] reqwest::Error),
     #[error(transparent)]
     Serde(#[from] serde_json::Error),
+    #[error("could not compute the pedersen hash for option: `{:?}`", 0)]
+    OptionHash(OptionData),
 }
 
 pub struct PragmaConsumer {
@@ -35,9 +37,11 @@ impl PragmaConsumer {
         block_number: u64,
     ) -> Result<MerkleFeedCalldata, ConsumerError> {
         let option_data = self.request_option(instrument.name(), block_number).await?;
-        let merkle_proof = self
-            .request_merkle_proof(option_data.hexadecimal_hash(), block_number)
-            .await?;
+        let option_hash = option_data
+            .pedersen_hash_as_hex_string()
+            .map_err(|_| ConsumerError::OptionHash(option_data.clone()))?;
+
+        let merkle_proof = self.request_merkle_proof(option_hash, block_number).await?;
 
         Ok(MerkleFeedCalldata {
             merkle_proof,
