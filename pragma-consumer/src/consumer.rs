@@ -69,8 +69,7 @@ impl PragmaConsumer {
         }
 
         let contents = api_response.text().await.map_err(ConsumerError::Reqwest)?;
-        let option_data = serde_json::from_str(&contents).map_err(ConsumerError::Serde)?;
-        Ok(option_data)
+        serde_json::from_str(&contents).map_err(ConsumerError::Serde)
     }
 
     /// Requests from our PragmAPI the merkle proof for an hash at a certain block.
@@ -90,8 +89,7 @@ impl PragmaConsumer {
         }
 
         let contents = api_response.text().await.map_err(ConsumerError::Reqwest)?;
-        let merkle_proof = serde_json::from_str(&contents).map_err(ConsumerError::Serde)?;
-        Ok(merkle_proof)
+        serde_json::from_str(&contents).map_err(ConsumerError::Serde)
     }
 
     /// Utility function to make an HTTP Get request to a provided URL.
