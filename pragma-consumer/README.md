@@ -43,7 +43,7 @@ async fn main() -> Result<()> {
 
 ## Usage
 
-### Initializing the Consumer
+### Initializing the Consumer
 
 Create a `PragmaConsumer` instance using the builder pattern:
 
