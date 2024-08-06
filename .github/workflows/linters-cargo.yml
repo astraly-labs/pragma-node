@@ -23,11 +23,5 @@ jobs:
           cargo clippy --no-deps -- -D warnings
           cargo clippy --tests --no-deps -- -D warnings
 
-      - name: Install udeps
-        uses: actions-rs/cargo@v1
-        with:
-          command: install
-          args: cargo-udeps
-
       - name: Check for unused dependencies
         uses: bnjbvr/cargo-machete@main
