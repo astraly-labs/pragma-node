@@ -16,8 +16,12 @@ jobs:
       - run: rustup show
 
       - uses: Swatinem/rust-cache@v2
+
       - name: Format and clippy
         run: |
           cargo fmt -- --check
           cargo clippy --no-deps -- -D warnings
           cargo clippy --tests --no-deps -- -D warnings
+
+      - name: Check for unused dependencies
+        uses: bnjbvr/cargo-machete@main

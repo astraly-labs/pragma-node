@@ -1,6 +1,7 @@
 # Pragma Consumer SDK
 
-The Pragma Consumer SDK is used to fetch options and their associated Merkle proofs so you can use them in our Pragma Oracle contract to interact with the Merkle Feed published on-chain.
+The Pragma Consumer SDK is used to fetch options and their associated Merkle proofs
+so you can use them in our Pragma Oracle contract to interact with the Merkle Feed published on-chain.
 
 We have [examples](./examples/src/) to help you get started.
 
