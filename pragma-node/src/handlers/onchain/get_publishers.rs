@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 
 use crate::infra::repositories::entry_repository::get_all_currencies_decimals;
-use crate::infra::repositories::onchain_repository::{
+use crate::infra::repositories::onchain_repository::publisher::{
     get_publishers, get_publishers_with_components,
 };
 use crate::AppState;

@@ -2,65 +2,49 @@ use std::collections::HashMap;
 
 use bigdecimal::{BigDecimal, ToPrimitive, Zero};
 use deadpool_diesel::postgres::Pool;
-use diesel::sql_types::{BigInt, Integer, Numeric, Text, Timestamp, VarChar};
+use diesel::sql_types::{Numeric, Text, Timestamp, VarChar};
 use diesel::{Queryable, QueryableByName, RunQueryDsl};
 
-use moka::future::Cache;
 use pragma_common::types::{AggregationMode, DataType, Interval, Network};
 use pragma_entities::error::{adapt_infra_error, InfraError};
 use pragma_entities::Currency;
 use pragma_monitoring::models::SpotEntry;
 
-use crate::handlers::onchain::get_checkpoints::Checkpoint;
-use crate::handlers::onchain::get_entry::OnchainEntry;
 use crate::handlers::onchain::get_history::ChunkInterval;
-use crate::handlers::onchain::get_publishers::{Publisher, PublisherEntry};
-use crate::infra::repositories::entry_repository::{
-    get_interval_specifier, OHLCEntry, OHLCEntryRaw,
-};
+use crate::handlers::onchain::get_entry::OnchainEntry;
 use crate::types::timestamp::TimestampParam;
 use crate::utils::{
-    big_decimal_price_to_hex, convert_via_quote, format_bigdecimal_price, get_decimals_for_pair,
+    big_decimal_price_to_hex, convert_via_quote,
     get_mid_price, normalize_to_decimals,
 };
 
-use super::entry_repository::get_decimals;
+use super::{get_onchain_ohlc_table_name, get_onchain_table_name};
+
+use crate::infra::repositories::entry_repository::get_decimals;
+
+#[derive(Queryable, QueryableByName, PartialEq, Debug)]
+pub struct EntryPairId {
+    #[diesel(sql_type = VarChar)]
+    pub pair_id: String,
+}
+
+impl PartialEq<str> for EntryPairId {
+    fn eq(&self, other: &str) -> bool {
+        self.pair_id == other
+    }
+}
+
+impl PartialEq<String> for EntryPairId {
+    fn eq(&self, other: &String) -> bool {
+        self.pair_id == other.as_str()
+    }
+}
 
 pub struct RawOnchainData {
     pub price: BigDecimal,
     pub decimal: u32,
     pub sources: Vec<OnchainEntry>,
     pub pair_used: Vec<String>,
-}
-
-// Retrieve the onchain table name based on the network and data type.
-fn get_table_name(network: Network, data_type: DataType) -> Result<&'static str, InfraError> {
-    let table = match (network, data_type) {
-        (Network::Sepolia, DataType::SpotEntry) => "spot_entry",
-        (Network::Mainnet, DataType::SpotEntry) => "mainnet_spot_entry",
-        (Network::Sepolia, DataType::FutureEntry) => "future_entry",
-        (Network::Mainnet, DataType::FutureEntry) => "mainnet_future_entry",
-        _ => return Err(InfraError::InternalServerError),
-    };
-    Ok(table)
-}
-
-// Retrieve the onchain table name for the OHLC based on network, datatype & interval.
-fn get_ohlc_table_name(
-    network: Network,
-    data_type: DataType,
-    interval: Interval,
-) -> Result<String, InfraError> {
-    let prefix_name = match (network, data_type) {
-        (Network::Sepolia, DataType::SpotEntry) => "spot",
-        (Network::Mainnet, DataType::SpotEntry) => "mainnet_spot",
-        (Network::Sepolia, DataType::FutureEntry) => "future",
-        (Network::Mainnet, DataType::FutureEntry) => "mainnet_future",
-        _ => return Err(InfraError::InternalServerError),
-    };
-    let interval_specifier = get_interval_specifier(interval, true)?;
-    let table_name = format!("{prefix_name}_{interval_specifier}_candle");
-    Ok(table_name)
 }
 
 #[derive(Queryable, QueryableByName, Debug)]
@@ -137,7 +121,7 @@ fn build_sql_query(
     timestamp: TimestampParam,
     chunk_interval: ChunkInterval,
 ) -> Result<String, InfraError> {
-    let table_name = get_table_name(network, DataType::SpotEntry)?;
+    let table_name = get_onchain_table_name(network, DataType::SpotEntry)?;
 
     let complete_sql_query = match timestamp {
         TimestampParam::Single(ts) => {
@@ -491,7 +475,7 @@ pub async fn get_last_updated_timestamp(
         ORDER BY timestamp DESC
         LIMIT 1;
     "#,
-        get_table_name(network, DataType::SpotEntry)?,
+        get_onchain_table_name(network, DataType::SpotEntry)?,
         pair_list,
     );
     let conn = pool.get().await.map_err(adapt_infra_error)?;
@@ -523,7 +507,7 @@ pub async fn get_variations(
     let mut variations = HashMap::new();
 
     for interval in intervals {
-        let ohlc_table_name = get_ohlc_table_name(network, DataType::SpotEntry, interval)?;
+        let ohlc_table_name = get_onchain_ohlc_table_name(network, DataType::SpotEntry, interval)?;
         let raw_sql = format!(
             r#"
             WITH recent_entries AS (
@@ -577,24 +561,6 @@ pub async fn get_variations(
     Ok(variations)
 }
 
-#[derive(Queryable, QueryableByName, PartialEq, Debug)]
-pub struct EntryPairId {
-    #[diesel(sql_type = VarChar)]
-    pub pair_id: String,
-}
-
-impl PartialEq<str> for EntryPairId {
-    fn eq(&self, other: &str) -> bool {
-        self.pair_id == other
-    }
-}
-
-impl PartialEq<String> for EntryPairId {
-    fn eq(&self, other: &String) -> bool {
-        self.pair_id == other.as_str()
-    }
-}
-
 // TODO(0xevolve): Only works for Spot entries
 pub async fn get_existing_pairs(
     pool: &Pool,
@@ -607,7 +573,7 @@ pub async fn get_existing_pairs(
         FROM
             {table_name};
     "#,
-        table_name = get_table_name(network, DataType::SpotEntry)?
+        table_name = get_onchain_table_name(network, DataType::SpotEntry)?
     );
 
     let conn = pool.get().await.map_err(adapt_infra_error)?;
@@ -618,385 +584,4 @@ pub async fn get_existing_pairs(
         .map_err(adapt_infra_error)?;
 
     Ok(raw_entries)
-}
-
-#[derive(Queryable, QueryableByName)]
-struct RawCheckpoint {
-    #[diesel(sql_type = VarChar)]
-    pub transaction_hash: String,
-    #[diesel(sql_type = Numeric)]
-    pub price: BigDecimal,
-    #[diesel(sql_type = Timestamp)]
-    pub timestamp: chrono::NaiveDateTime,
-    #[diesel(sql_type = VarChar)]
-    pub sender_address: String,
-}
-
-impl RawCheckpoint {
-    pub fn to_checkpoint(&self, decimals: u32) -> Checkpoint {
-        Checkpoint {
-            tx_hash: self.transaction_hash.clone(),
-            price: format_bigdecimal_price(self.price.clone(), decimals),
-            timestamp: self.timestamp.and_utc().timestamp() as u64,
-            sender_address: self.sender_address.clone(),
-        }
-    }
-}
-
-pub async fn get_checkpoints(
-    pool: &Pool,
-    network: Network,
-    pair_id: String,
-    decimals: u32,
-    limit: u64,
-) -> Result<Vec<Checkpoint>, InfraError> {
-    let table_name = match network {
-        Network::Mainnet => "mainnet_spot_checkpoints",
-        Network::Sepolia => "spot_checkpoints",
-    };
-    let raw_sql = format!(
-        r#"
-        SELECT
-            transaction_hash,
-            price,
-            timestamp,
-            sender_address
-        FROM
-            {table_name}
-        WHERE
-            pair_id = $1
-        ORDER BY timestamp DESC
-        LIMIT $2;
-    "#,
-        table_name = table_name
-    );
-
-    let conn = pool.get().await.map_err(adapt_infra_error)?;
-    let raw_checkpoints = conn
-        .interact(move |conn| {
-            diesel::sql_query(raw_sql)
-                .bind::<diesel::sql_types::Text, _>(pair_id)
-                .bind::<diesel::sql_types::BigInt, _>(limit as i64)
-                .load::<RawCheckpoint>(conn)
-        })
-        .await
-        .map_err(adapt_infra_error)?
-        .map_err(adapt_infra_error)?;
-
-    let checkpoints: Vec<Checkpoint> = raw_checkpoints
-        .into_iter()
-        .map(|raw_checkpoint| raw_checkpoint.to_checkpoint(decimals))
-        .collect();
-    Ok(checkpoints)
-}
-
-#[derive(Debug, Queryable, QueryableByName)]
-pub struct RawPublisher {
-    #[diesel(sql_type = VarChar)]
-    pub name: String,
-    #[diesel(sql_type = VarChar)]
-    pub website_url: String,
-    #[diesel(sql_type = Integer)]
-    pub publisher_type: i32,
-}
-
-pub async fn get_publishers(
-    pool: &Pool,
-    network: Network,
-) -> Result<Vec<RawPublisher>, InfraError> {
-    let address_column = match network {
-        Network::Mainnet => "mainnet_address",
-        Network::Sepolia => "testnet_address",
-    };
-    let raw_sql = format!(
-        r#"
-        SELECT
-            name,
-            website_url,
-            publisher_type
-        FROM
-            publishers
-        WHERE
-            {address_column} IS NOT NULL
-        ORDER BY
-            name ASC;
-    "#,
-        address_column = address_column,
-    );
-
-    let conn = pool.get().await.map_err(adapt_infra_error)?;
-    let raw_publishers = conn
-        .interact(move |conn| diesel::sql_query(raw_sql).load::<RawPublisher>(conn))
-        .await
-        .map_err(adapt_infra_error)?
-        .map_err(adapt_infra_error)?;
-
-    Ok(raw_publishers)
-}
-
-#[derive(Debug, Queryable, QueryableByName)]
-pub struct RawLastPublisherEntryForPair {
-    #[diesel(sql_type = VarChar)]
-    pub pair_id: String,
-    #[diesel(sql_type = Numeric)]
-    pub price: BigDecimal,
-    #[diesel(sql_type = VarChar)]
-    pub source: String,
-    #[diesel(sql_type = Timestamp)]
-    pub last_updated_timestamp: chrono::NaiveDateTime,
-    #[diesel(sql_type = BigInt)]
-    pub daily_updates: i64,
-}
-
-impl RawLastPublisherEntryForPair {
-    pub fn to_publisher_entry(&self, currencies: &HashMap<String, BigDecimal>) -> PublisherEntry {
-        PublisherEntry {
-            pair_id: self.pair_id.clone(),
-            last_updated_timestamp: self.last_updated_timestamp.and_utc().timestamp() as u64,
-            price: big_decimal_price_to_hex(&self.price),
-            source: self.source.clone(),
-            decimals: get_decimals_for_pair(currencies, &self.pair_id),
-            daily_updates: self.daily_updates as u32,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Queryable, QueryableByName)]
-pub struct RawPublisherUpdates {
-    #[diesel(sql_type = VarChar)]
-    pub publisher: String,
-    #[diesel(sql_type = BigInt)]
-    pub daily_updates: i64,
-    #[diesel(sql_type = BigInt)]
-    pub total_updates: i64,
-    #[diesel(sql_type = BigInt)]
-    pub nb_feeds: i64,
-}
-
-async fn get_all_publishers_updates(
-    pool: &Pool,
-    table_name: &str,
-    publishers_names: Vec<String>,
-    publishers_updates_cache: Cache<String, HashMap<String, RawPublisherUpdates>>,
-) -> Result<HashMap<String, RawPublisherUpdates>, InfraError> {
-    let publishers_list = publishers_names.join("','");
-
-    // Try to retrieve the latest available cached value, and return it if it exists
-    let maybe_cached_value = publishers_updates_cache.get(&publishers_list).await;
-    if let Some(cached_value) = maybe_cached_value {
-        tracing::debug!("Found a cached value for publishers: {publishers_list} - using it.");
-        return Ok(cached_value);
-    }
-    tracing::debug!("No cache found for publishers: {publishers_list}, fetching the database.");
-
-    // ... else, fetch the value from the database
-    let raw_sql = format!(
-        r#"
-        SELECT 
-            publisher,
-            COUNT(*) FILTER (WHERE timestamp >= NOW() - INTERVAL '1 day') AS daily_updates,
-            COUNT(*) AS total_updates,
-            COUNT(DISTINCT pair_id) AS nb_feeds
-        FROM 
-            {table_name}
-        WHERE 
-            publisher IN ('{publishers_list}')
-        GROUP BY 
-            publisher;
-        "#,
-        table_name = table_name,
-        publishers_list = publishers_list,
-    );
-
-    let conn = pool.get().await.map_err(adapt_infra_error)?;
-    let updates = conn
-        .interact(move |conn| diesel::sql_query(raw_sql).load::<RawPublisherUpdates>(conn))
-        .await
-        .map_err(adapt_infra_error)?
-        .map_err(adapt_infra_error)?;
-
-    let updates: HashMap<String, RawPublisherUpdates> = updates
-        .into_iter()
-        .map(|update| (update.publisher.clone(), update))
-        .collect();
-
-    // Update the cache with the latest value for the publishers
-    publishers_updates_cache
-        .insert(publishers_list.clone(), updates.clone())
-        .await;
-
-    Ok(updates)
-}
-
-async fn get_publisher_with_components(
-    pool: &Pool,
-    table_name: &str,
-    publisher: &RawPublisher,
-    publisher_updates: &RawPublisherUpdates,
-    currencies: &HashMap<String, BigDecimal>,
-) -> Result<Publisher, InfraError> {
-    let raw_sql_entries = format!(
-        r#"
-    WITH recent_entries AS (
-        SELECT 
-            pair_id,
-            price,
-            source,
-            timestamp AS last_updated_timestamp
-        FROM 
-            {table_name}
-        WHERE
-            publisher = '{publisher_name}'
-            AND timestamp >= NOW() - INTERVAL '1 day'
-    ),
-    ranked_entries AS (
-        SELECT 
-            pair_id,
-            price,
-            source,
-            last_updated_timestamp,
-            ROW_NUMBER() OVER (PARTITION BY pair_id, source ORDER BY last_updated_timestamp DESC) as rn,
-            COUNT(*) OVER (PARTITION BY pair_id, source) as daily_updates
-        FROM 
-            recent_entries
-    )
-    SELECT 
-        pair_id,
-        price,
-        source,
-        last_updated_timestamp,
-        daily_updates
-    FROM 
-        ranked_entries
-    WHERE 
-        rn = 1
-    ORDER BY 
-        pair_id, source ASC;
-    "#,
-        table_name = table_name,
-        publisher_name = publisher.name
-    );
-
-    let conn = pool.get().await.map_err(adapt_infra_error)?;
-
-    let raw_components = conn
-        .interact(move |conn| {
-            diesel::sql_query(raw_sql_entries).load::<RawLastPublisherEntryForPair>(conn)
-        })
-        .await
-        .map_err(adapt_infra_error)?
-        .map_err(adapt_infra_error)?;
-
-    let components: Vec<PublisherEntry> = raw_components
-        .into_iter()
-        .map(|component| component.to_publisher_entry(currencies))
-        .collect();
-
-    let last_updated_timestamp = components
-        .iter()
-        .map(|component| component.last_updated_timestamp)
-        .max()
-        .ok_or(InfraError::NotFound)?;
-
-    let publisher = Publisher {
-        publisher: publisher.name.clone(),
-        website_url: publisher.website_url.clone(),
-        last_updated_timestamp,
-        r#type: publisher.publisher_type as u32,
-        nb_feeds: publisher_updates.nb_feeds as u32,
-        daily_updates: publisher_updates.daily_updates as u32,
-        total_updates: publisher_updates.total_updates as u32,
-        components,
-    };
-    Ok(publisher)
-}
-
-pub async fn get_publishers_with_components(
-    pool: &Pool,
-    network: Network,
-    data_type: DataType,
-    currencies: HashMap<String, BigDecimal>,
-    publishers: Vec<RawPublisher>,
-    publishers_updates_cache: Cache<String, HashMap<String, RawPublisherUpdates>>,
-) -> Result<Vec<Publisher>, InfraError> {
-    let table_name = get_table_name(network, data_type)?;
-    let publisher_names = publishers.iter().map(|p| p.name.clone()).collect();
-
-    let updates =
-        get_all_publishers_updates(pool, table_name, publisher_names, publishers_updates_cache)
-            .await?;
-    let mut publishers_response = Vec::with_capacity(publishers.len());
-
-    for publisher in publishers.iter() {
-        let publisher_updates = match updates.get(&publisher.name) {
-            Some(updates) => updates,
-            None => continue,
-        };
-        if publisher_updates.daily_updates == 0 {
-            continue;
-        }
-        let publisher_with_components = get_publisher_with_components(
-            pool,
-            table_name,
-            publisher,
-            publisher_updates,
-            &currencies,
-        )
-        .await?;
-        publishers_response.push(publisher_with_components);
-    }
-
-    Ok(publishers_response)
-}
-
-// Only works for Spot for now - since we only store spot entries on chain.
-pub async fn get_ohlc(
-    pool: &Pool,
-    network: Network,
-    pair_id: String,
-    interval: Interval,
-    data_to_retrieve: u64,
-) -> Result<Vec<OHLCEntry>, InfraError> {
-    let raw_sql = format!(
-        r#"
-        SELECT
-            ohlc_bucket AS time,
-            open,
-            high,
-            low,
-            close
-        FROM
-            {table_name}
-        WHERE
-            pair_id = $1
-        ORDER BY
-            time DESC
-        LIMIT {data_to_retrieve};
-        "#,
-        table_name = get_ohlc_table_name(network, DataType::SpotEntry, interval)?,
-    );
-
-    let conn = pool.get().await.map_err(adapt_infra_error)?;
-    let raw_entries = conn
-        .interact(move |conn| {
-            diesel::sql_query(raw_sql)
-                .bind::<diesel::sql_types::Text, _>(pair_id)
-                .load::<OHLCEntryRaw>(conn)
-        })
-        .await
-        .map_err(adapt_infra_error)?
-        .map_err(adapt_infra_error)?;
-
-    let entries: Vec<OHLCEntry> = raw_entries
-        .into_iter()
-        .map(|raw_entry| OHLCEntry {
-            time: raw_entry.time,
-            open: raw_entry.open,
-            high: raw_entry.high,
-            low: raw_entry.low,
-            close: raw_entry.close,
-        })
-        .collect();
-
-    Ok(entries)
 }

@@ -8,7 +8,7 @@ use pragma_entities::EntryError;
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 
-use crate::infra::repositories::onchain_repository::{
+use crate::infra::repositories::onchain_repository::entry::{
     routing, OnchainRoutingArguments, RawOnchainData,
 };
 use crate::types::timestamp::TimestampParam;

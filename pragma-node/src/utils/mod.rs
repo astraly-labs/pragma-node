@@ -15,7 +15,7 @@ use pragma_entities::{Entry, FutureEntry};
 use std::collections::HashMap;
 
 use crate::infra::repositories::{
-    entry_repository::MedianEntry, onchain_repository::get_existing_pairs,
+    entry_repository::MedianEntry, onchain_repository::entry::get_existing_pairs,
 };
 
 mod aws;
