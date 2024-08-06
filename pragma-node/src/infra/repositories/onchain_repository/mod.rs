@@ -1,14 +1,17 @@
-pub mod ohlc;
-pub mod entry;
 pub mod checkpoint;
+pub mod entry;
+pub mod ohlc;
 pub mod publisher;
 
+use crate::infra::repositories::entry_repository::get_interval_specifier;
 use pragma_common::types::{DataType, Interval, Network};
 use pragma_entities::error::InfraError;
-use crate::infra::repositories::entry_repository::get_interval_specifier;
 
 // Retrieve the onchain table name based on the network and data type.
-fn get_onchain_table_name(network: Network, data_type: DataType) -> Result<&'static str, InfraError> {
+fn get_onchain_table_name(
+    network: Network,
+    data_type: DataType,
+) -> Result<&'static str, InfraError> {
     let table = match (network, data_type) {
         (Network::Sepolia, DataType::SpotEntry) => "spot_entry",
         (Network::Mainnet, DataType::SpotEntry) => "mainnet_spot_entry",

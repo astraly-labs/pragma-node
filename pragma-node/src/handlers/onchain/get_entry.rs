@@ -10,7 +10,7 @@ use utoipa::{IntoParams, ToSchema};
 
 use crate::handlers::onchain::get_history::ChunkInterval;
 use crate::infra::repositories::onchain_repository::entry::{
-    routing, OnchainRoutingArguments, get_variations, get_last_updated_timestamp,
+    get_last_updated_timestamp, get_variations, routing, OnchainRoutingArguments,
 };
 use crate::types::timestamp::TimestampParam;
 use crate::utils::{big_decimal_price_to_hex, PathExtractor};

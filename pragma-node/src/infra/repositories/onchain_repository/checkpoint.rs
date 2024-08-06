@@ -9,7 +9,6 @@ use pragma_entities::error::{adapt_infra_error, InfraError};
 use crate::handlers::onchain::get_checkpoints::Checkpoint;
 use crate::utils::format_bigdecimal_price;
 
-
 #[derive(Queryable, QueryableByName)]
 struct RawCheckpoint {
     #[diesel(sql_type = VarChar)]

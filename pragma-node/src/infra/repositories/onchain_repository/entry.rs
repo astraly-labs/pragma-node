@@ -10,12 +10,11 @@ use pragma_entities::error::{adapt_infra_error, InfraError};
 use pragma_entities::Currency;
 use pragma_monitoring::models::SpotEntry;
 
-use crate::handlers::onchain::get_history::ChunkInterval;
 use crate::handlers::onchain::get_entry::OnchainEntry;
+use crate::handlers::onchain::get_history::ChunkInterval;
 use crate::types::timestamp::TimestampParam;
 use crate::utils::{
-    big_decimal_price_to_hex, convert_via_quote,
-    get_mid_price, normalize_to_decimals,
+    big_decimal_price_to_hex, convert_via_quote, get_mid_price, normalize_to_decimals,
 };
 
 use super::{get_onchain_ohlc_table_name, get_onchain_table_name};
