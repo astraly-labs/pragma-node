@@ -5,10 +5,13 @@ use axum::Router;
 use utoipa::OpenApi as OpenApiT;
 use utoipa_swagger_ui::SwaggerUi;
 
-use crate::handlers::get_onchain::history::get_onchain_history;
-use crate::handlers::get_onchain::{
-    checkpoints::get_onchain_checkpoints, get_onchain, ohlc::subscribe_to_onchain_ohlc,
-    publishers::get_onchain_publishers,
+use crate::handlers::merkle_feeds::{
+    get_merkle_proof::get_merkle_feeds_proof, get_option::get_merkle_feeds_option,
+};
+use crate::handlers::onchain::{
+    get_checkpoints::get_onchain_checkpoints, get_entry::get_onchain_entry,
+    get_history::get_onchain_history, get_ohlc::subscribe_to_onchain_ohlc,
+    get_publishers::get_onchain_publishers,
 };
 use crate::handlers::{
     create_entries, create_future_entries, get_entry, get_expiries, get_ohlc, get_volatility,
@@ -25,6 +28,7 @@ pub fn app_router<T: OpenApiT>(state: AppState) -> Router<AppState> {
         .nest("/node/v1/onchain", onchain_routes(state.clone()))
         .nest("/node/v1/aggregation", aggregation_routes(state.clone()))
         .nest("/node/v1/volatility", volatility_routes(state.clone()))
+        .nest("/node/v1/merkle_feeds", merkle_feeds_routes(state.clone()))
         .fallback(handler_404)
 }
 
@@ -51,7 +55,7 @@ fn data_routes(state: AppState) -> Router<AppState> {
 
 fn onchain_routes(state: AppState) -> Router<AppState> {
     Router::new()
-        .route("/:base/:quote", get(get_onchain))
+        .route("/:base/:quote", get(get_onchain_entry))
         .route("/history/:base/:quote", get(get_onchain_history))
         .route("/checkpoints/:base/:quote", get(get_onchain_checkpoints))
         .route("/publishers", get(get_onchain_publishers))
@@ -68,5 +72,12 @@ fn volatility_routes(state: AppState) -> Router<AppState> {
 fn aggregation_routes(state: AppState) -> Router<AppState> {
     Router::new()
         .route("/candlestick/:base/:quote", get(get_ohlc))
+        .with_state(state)
+}
+
+fn merkle_feeds_routes(state: AppState) -> Router<AppState> {
+    Router::new()
+        .route("/proof/:option_hash", get(get_merkle_feeds_proof))
+        .route("/options/:instrument", get(get_merkle_feeds_option))
         .with_state(state)
 }

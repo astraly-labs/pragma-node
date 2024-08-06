@@ -72,7 +72,7 @@ pub async fn get_onchain_publishers(
         params.data_type,
         currencies_decimals,
         publishers,
-        state.publishers_updates_cache.clone(),
+        state.caches.onchain_publishers_updates().clone(),
     )
     .await
     .map_err(EntryError::from)?;

@@ -1,9 +1,8 @@
 use bigdecimal::{BigDecimal, ToPrimitive};
+use pragma_common::errors::ConversionError;
 use starknet::core::{
     crypto::pedersen_hash, types::FieldElement, utils::cairo_short_string_to_felt,
 };
-
-use pragma_common::types::ConversionError;
 
 use super::Signable;
 

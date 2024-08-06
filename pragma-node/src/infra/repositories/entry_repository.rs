@@ -5,6 +5,7 @@ use chrono::{DateTime, NaiveDateTime};
 use diesel::prelude::QueryableByName;
 use diesel::sql_types::{Double, Jsonb, VarChar};
 use diesel::{ExpressionMethods, QueryDsl, Queryable, RunQueryDsl};
+use pragma_common::errors::ConversionError;
 use serde::{Deserialize, Serialize};
 
 use crate::constants::starkex_ws::{
@@ -14,7 +15,7 @@ use crate::constants::starkex_ws::{
 use crate::handlers::get_entry::RoutingParams;
 use crate::handlers::subscribe_to_entry::{AssetOraclePrice, SignedPublisherPrice};
 use crate::utils::{convert_via_quote, normalize_to_decimals, StarkexPrice};
-use pragma_common::types::{AggregationMode, ConversionError, DataType, Interval};
+use pragma_common::types::{AggregationMode, DataType, Interval};
 use pragma_entities::dto;
 use pragma_entities::{
     error::{adapt_infra_error, InfraError},

@@ -1,30 +1,23 @@
+mod caches;
 mod config;
 mod constants;
 mod errors;
 mod handlers;
 mod infra;
 mod metrics;
-mod routes;
 mod servers;
 mod types;
 mod utils;
 
-use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::Duration;
 
+use caches::CacheRegistry;
 use deadpool_diesel::postgres::Pool;
-use moka::future::Cache;
 use starknet::signers::SigningKey;
 
 use pragma_entities::connection::{ENV_OFFCHAIN_DATABASE_URL, ENV_ONCHAIN_DATABASE_URL};
 
 use crate::config::config;
-use crate::constants::{
-    PUBLISHERS_UDPATES_CACHE_TIME_TO_IDLE_IN_SECONDS,
-    PUBLISHERS_UDPATES_CACHE_TIME_TO_LIVE_IN_SECONDS,
-};
-use crate::infra::repositories::onchain_repository::RawPublisherUpdates;
 use crate::metrics::MetricsRegistry;
 use crate::utils::PragmaSignerBuilder;
 use types::ws::metrics::WsMetrics;
@@ -34,8 +27,11 @@ pub struct AppState {
     // Databases pools
     offchain_pool: Pool,
     onchain_pool: Pool,
+    // Redis connection
+    #[allow(dead_code)]
+    redis_client: Option<Arc<redis::Client>>,
     // Database caches
-    publishers_updates_cache: Cache<String, HashMap<String, RawPublisherUpdates>>,
+    caches: Arc<CacheRegistry>,
     // Pragma Signer used for StarkEx signing
     pragma_signer: Option<SigningKey>,
     // Metrics
@@ -58,14 +54,7 @@ async fn main() {
             .expect("can't init onchain database pool");
 
     // Init the database caches
-    let publishers_updates_cache = Cache::builder()
-        .time_to_live(Duration::from_secs(
-            PUBLISHERS_UDPATES_CACHE_TIME_TO_LIVE_IN_SECONDS,
-        )) // 30 minutes
-        .time_to_idle(Duration::from_secs(
-            PUBLISHERS_UDPATES_CACHE_TIME_TO_IDLE_IN_SECONDS,
-        )) // 5 minutes
-        .build();
+    let caches = CacheRegistry::new();
 
     // Build the pragma signer
     let signer_builder = if config.is_production_mode() {
@@ -75,6 +64,22 @@ async fn main() {
     };
     let pragma_signer = signer_builder.build().await;
 
+    // Init the redis client - Optionnal, only for endpoints that interact with Redis,
+    // i.e just the Merkle Feeds endpoint for now.
+    // TODO(akhercha): See with Hithem for production mode
+    let redis_client = match pragma_entities::connection::init_redis_client(
+        config.redis_host(),
+        config.redis_port(),
+    ) {
+        Ok(client) => Some(Arc::new(client)),
+        Err(_) => {
+            tracing::warn!(
+                "⚠ Could not create the Redis client. Merkle feeds endpoints won't work."
+            );
+            None
+        }
+    };
+
     // Create the Metrics registry
     let metrics_registry = MetricsRegistry::new();
     let ws_metrics = WsMetrics::new(&metrics_registry).expect("Failed to create WsMetrics");
@@ -82,7 +87,8 @@ async fn main() {
     let state = AppState {
         offchain_pool,
         onchain_pool,
-        publishers_updates_cache,
+        redis_client,
+        caches: Arc::new(caches),
         pragma_signer,
         ws_metrics: Arc::new(ws_metrics),
     };
