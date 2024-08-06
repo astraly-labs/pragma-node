@@ -18,7 +18,6 @@ diesel = { workspace = true, features = [
   "postgres_backend",
   "serde_json",
 ] }
-diesel_migrations = { workspace = true }
 dotenvy = { workspace = true }
 envy = { workspace = true }
 futures-util = { workspace = true }
@@ -38,8 +37,6 @@ time = { workspace = true }
 tokio = { workspace = true, features = ["sync", "macros", "rt-multi-thread"] }
 tower-http = { workspace = true, features = ["fs", "trace", "cors"] }
 tracing = { workspace = true }
-tracing-subscriber = { workspace = true, features = ["env-filter"] }
-url = { workspace = true }
 utoipa = { workspace = true }
 utoipa-swagger-ui = { workspace = true, features = ["axum"] }
 uuid = { workspace = true, features = ["fast-rng", "v4", "serde"] }
