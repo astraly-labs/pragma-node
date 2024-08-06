@@ -11,8 +11,6 @@ use pragma_entities::Currency;
 use pragma_monitoring::models::SpotEntry;
 
 use crate::handlers::onchain::get_entry::OnchainEntry;
-use crate::handlers::onchain::get_history::ChunkInterval;
-use crate::types::timestamp::TimestampParam;
 use crate::utils::{
     big_decimal_price_to_hex, convert_via_quote, get_mid_price, normalize_to_decimals,
 };
@@ -21,22 +19,16 @@ use super::{get_onchain_ohlc_table_name, get_onchain_table_name};
 
 use crate::infra::repositories::entry_repository::get_decimals;
 
-#[derive(Queryable, QueryableByName, PartialEq, Debug)]
-pub struct EntryPairId {
-    #[diesel(sql_type = VarChar)]
+// Means that we only consider the entries for the last hour when computing the aggregation &
+// retrieving the sources.
+pub const ENTRIES_BACKWARD_INTERVAL: &str = "1 hour";
+
+pub struct OnchainRoutingArguments {
     pub pair_id: String,
-}
-
-impl PartialEq<str> for EntryPairId {
-    fn eq(&self, other: &str) -> bool {
-        self.pair_id == other
-    }
-}
-
-impl PartialEq<String> for EntryPairId {
-    fn eq(&self, other: &String) -> bool {
-        self.pair_id == other.as_str()
-    }
+    pub network: Network,
+    pub timestamp: u64,
+    pub aggregation_mode: AggregationMode,
+    pub is_routing: bool,
 }
 
 pub struct RawOnchainData {
@@ -78,230 +70,6 @@ impl From<&SpotEntryWithAggregatedPrice> for OnchainEntry {
     }
 }
 
-fn get_aggregation_query(
-    aggregation_mode: AggregationMode,
-    is_range: bool,
-) -> Result<&'static str, InfraError> {
-    let query = match aggregation_mode {
-        AggregationMode::Mean => "AVG(price) AS aggregated_price",
-        AggregationMode::Median if is_range => {
-            "(
-                SELECT AVG(price)
-                FROM (
-                    SELECT price
-                    FROM FilteredEntries
-                    WHERE window_start = FE.window_start
-                    ORDER BY price
-                    LIMIT 2 - (SELECT COUNT(*) FROM FilteredEntries WHERE window_start = FE.window_start) % 2
-                    OFFSET (SELECT (COUNT(*) - 1) / 2 FROM FilteredEntries WHERE window_start = FE.window_start)
-                ) AS MedianPrices
-            ) AS aggregated_price"
-        }
-        AggregationMode::Median if !is_range => {
-            "(
-                SELECT AVG(price)
-                FROM (
-                    SELECT price
-                    FROM FilteredEntries
-                    ORDER BY price
-                    LIMIT 2 - (SELECT COUNT(*) FROM FilteredEntries) % 2
-                    OFFSET (SELECT (COUNT(*) - 1) / 2 FROM FilteredEntries)
-                ) AS MedianPrices
-            ) AS aggregated_price"
-        }
-        _ => Err(InfraError::InternalServerError)?,
-    };
-    Ok(query)
-}
-
-fn build_sql_query(
-    network: Network,
-    aggregation_mode: AggregationMode,
-    timestamp: TimestampParam,
-    chunk_interval: ChunkInterval,
-) -> Result<String, InfraError> {
-    let table_name = get_onchain_table_name(network, DataType::SpotEntry)?;
-
-    let complete_sql_query = match timestamp {
-        TimestampParam::Single(ts) => {
-            let ts_str = ts.to_string();
-            let aggregation_query = get_aggregation_query(aggregation_mode, false)?;
-            format!(
-                r#"
-                WITH RankedEntries AS (
-                    SELECT 
-                        *,
-                        ROW_NUMBER() OVER (PARTITION BY publisher, source ORDER BY timestamp DESC) as rn
-                    FROM 
-                        {table_name}
-                    WHERE 
-                        pair_id = $1
-                        AND timestamp BETWEEN (to_timestamp({ts_str}) - INTERVAL '{backward_interval}') AND to_timestamp({ts_str})
-                ),
-                FilteredEntries AS (
-                    SELECT *
-                    FROM RankedEntries
-                    WHERE rn = 1
-                ),
-                AggregatedPrice AS (
-                    SELECT {aggregation_subquery}
-                    FROM FilteredEntries
-                )
-                SELECT DISTINCT 
-                    FE.*,
-                    AP.aggregated_price
-                FROM 
-                    FilteredEntries FE,
-                    AggregatedPrice AP
-                ORDER BY 
-                    FE.timestamp DESC;
-            "#,
-                table_name = table_name,
-                backward_interval = chunk_interval.as_sql_interval(),
-                aggregation_subquery = aggregation_query,
-                ts_str = ts_str
-            )
-        }
-        TimestampParam::Range(range) => {
-            let start_ts = range.start().to_string();
-            let end_ts = range.end().to_string();
-            let aggregation_query = get_aggregation_query(aggregation_mode, true)?;
-            format!(
-                r#"
-                WITH TimeWindows AS (
-                    SELECT 
-                        generate_series(
-                            to_timestamp({start_ts}), 
-                            to_timestamp({end_ts}) - INTERVAL '{backward_interval}', 
-                            INTERVAL '{backward_interval}'
-                        ) AS window_start
-                ),
-                RankedEntries AS (
-                    SELECT 
-                        TW.window_start,
-                        E.*,
-                        ROW_NUMBER() OVER (PARTITION BY E.publisher, E.source, TW.window_start ORDER BY E.timestamp DESC) as rn
-                    FROM 
-                        {table_name} E
-                    JOIN 
-                        TimeWindows TW
-                    ON 
-                        E.timestamp BETWEEN TW.window_start AND (TW.window_start + INTERVAL '{backward_interval}')
-                    WHERE 
-                        E.pair_id = $1
-                ),
-                FilteredEntries AS (
-                    SELECT *
-                    FROM RankedEntries
-                    WHERE rn = 1
-                ),
-                AggregatedPrice AS (
-                    SELECT 
-                        FE.window_start,
-                        {aggregation_subquery}
-                    FROM 
-                        FilteredEntries FE
-                    GROUP BY 
-                        FE.window_start
-                )
-                SELECT DISTINCT 
-                    FE.window_start,
-                    FE.*,
-                    AP.aggregated_price
-                FROM 
-                    FilteredEntries FE
-                JOIN 
-                    AggregatedPrice AP
-                ON 
-                    FE.window_start = AP.window_start
-                ORDER BY 
-                    FE.window_start DESC, FE.timestamp DESC;
-            "#,
-                table_name = table_name,
-                backward_interval = chunk_interval.as_sql_interval(),
-                aggregation_subquery = aggregation_query,
-                start_ts = start_ts,
-                end_ts = end_ts
-            )
-        }
-    };
-    Ok(complete_sql_query)
-}
-
-pub fn onchain_pair_exist(existing_pair_list: &[EntryPairId], pair_id: &str) -> bool {
-    existing_pair_list.iter().any(|entry| entry == pair_id)
-}
-
-fn calculate_rebased_price(
-    base_result: (BigDecimal, u32),
-    quote_result: (BigDecimal, u32),
-) -> Result<(BigDecimal, u32), InfraError> {
-    let (base_price, base_decimals) = base_result;
-    let (quote_price, quote_decimals) = quote_result;
-
-    if quote_price == BigDecimal::from(0) {
-        return Err(InfraError::InternalServerError);
-    }
-
-    let (rebase_price, decimals) = if base_decimals < quote_decimals {
-        let normalized_base_price =
-            normalize_to_decimals(base_price, base_decimals, quote_decimals);
-        (
-            convert_via_quote(normalized_base_price, quote_price, quote_decimals)?,
-            quote_decimals,
-        )
-    } else {
-        let normalized_quote_price =
-            normalize_to_decimals(quote_price, quote_decimals, base_decimals);
-        (
-            convert_via_quote(base_price, normalized_quote_price, base_decimals)?,
-            base_decimals,
-        )
-    };
-
-    Ok((rebase_price, decimals))
-}
-
-fn compute_multiple_rebased_price(
-    base_alt_result: &mut [AggPriceAndEntries],
-    quote_alt_result: &[AggPriceAndEntries],
-    alt_pairs: Vec<String>,
-    base_alt_decimal: u32,
-    quote_alt_decimal: u32,
-) -> Result<Vec<RawOnchainData>, InfraError> {
-    if quote_alt_result.len() != base_alt_result.len() {
-        return Err(InfraError::RoutingError);
-    }
-
-    let mut result: Vec<RawOnchainData> = Vec::new();
-
-    for (i, base) in base_alt_result.iter_mut().enumerate() {
-        let quote = &quote_alt_result[i];
-        let rebased_price = calculate_rebased_price(
-            (base.aggregated_price.to_owned(), base_alt_decimal),
-            (quote.aggregated_price.to_owned(), quote_alt_decimal),
-        )?;
-        base.entries.extend(quote.entries.to_owned());
-        result.push(RawOnchainData {
-            price: rebased_price.0,
-            decimal: rebased_price.1,
-            sources: base.entries.clone(),
-            pair_used: alt_pairs.clone(),
-        });
-    }
-
-    Ok(result)
-}
-
-pub struct OnchainRoutingArguments {
-    pub pair_id: String,
-    pub network: Network,
-    pub timestamp: TimestampParam,
-    pub aggregation_mode: AggregationMode,
-    pub is_routing: bool,
-    pub chunk_interval: ChunkInterval,
-}
-
 pub async fn routing(
     onchain_pool: &Pool,
     offchain_pool: &Pool,
@@ -320,7 +88,6 @@ pub async fn routing(
             pair_id.clone(),
             routing_args.timestamp,
             routing_args.aggregation_mode,
-            routing_args.chunk_interval,
         )
         .await?;
         let decimal = get_decimals(offchain_pool, &pair_id).await?;
@@ -360,9 +127,8 @@ pub async fn routing(
                 onchain_pool,
                 routing_args.network,
                 base_alt_pair.clone(),
-                routing_args.timestamp.clone(),
+                routing_args.timestamp,
                 routing_args.aggregation_mode,
-                routing_args.chunk_interval,
             )
             .await?;
             let base_alt_decimal = get_decimals(offchain_pool, &base_alt_pair).await?;
@@ -372,7 +138,6 @@ pub async fn routing(
                 alt_quote_pair.clone(),
                 routing_args.timestamp,
                 routing_args.aggregation_mode,
-                routing_args.chunk_interval,
             )
             .await?;
             let quote_alt_decimal = get_decimals(offchain_pool, &alt_quote_pair).await?;
@@ -391,10 +156,147 @@ pub async fn routing(
     Err(InfraError::NotFound)
 }
 
+fn build_sql_query(
+    network: Network,
+    aggregation_mode: AggregationMode,
+    timestamp: u64,
+) -> Result<String, InfraError> {
+    let table_name = get_onchain_table_name(network, DataType::SpotEntry)?;
+
+    let complete_sql_query = {
+        let aggregation_query = get_aggregation_subquery(aggregation_mode, false)?;
+        format!(
+            r#"
+                WITH RankedEntries AS (
+                    SELECT 
+                        *,
+                        ROW_NUMBER() OVER (PARTITION BY publisher, source ORDER BY timestamp DESC) as rn
+                    FROM 
+                        {table_name}
+                    WHERE 
+                        pair_id = $1
+                        AND timestamp BETWEEN (to_timestamp({timestamp}) - INTERVAL '{ENTRIES_BACKWARD_INTERVAL}') AND to_timestamp({timestamp})
+                ),
+                FilteredEntries AS (
+                    SELECT *
+                    FROM RankedEntries
+                    WHERE rn = 1
+                ),
+                AggregatedPrice AS (
+                    SELECT {aggregation_subquery}
+                    FROM FilteredEntries
+                )
+                SELECT DISTINCT 
+                    FE.*,
+                    AP.aggregated_price
+                FROM 
+                    FilteredEntries FE,
+                    AggregatedPrice AP
+                ORDER BY 
+                    FE.timestamp DESC;
+            "#,
+            table_name = table_name,
+            aggregation_subquery = aggregation_query,
+            timestamp = timestamp
+        )
+    };
+    Ok(complete_sql_query)
+}
+
+fn get_aggregation_subquery(
+    aggregation_mode: AggregationMode,
+    is_range: bool,
+) -> Result<&'static str, InfraError> {
+    let query = match aggregation_mode {
+        AggregationMode::Mean => "AVG(price) AS aggregated_price",
+        AggregationMode::Median if is_range => {
+            "(
+                SELECT AVG(price)
+                FROM (
+                    SELECT price
+                    FROM FilteredEntries
+                    WHERE window_start = FE.window_start
+                    ORDER BY price
+                    LIMIT 2 - (SELECT COUNT(*) FROM FilteredEntries WHERE window_start = FE.window_start) % 2
+                    OFFSET (SELECT (COUNT(*) - 1) / 2 FROM FilteredEntries WHERE window_start = FE.window_start)
+                ) AS MedianPrices
+            ) AS aggregated_price"
+        }
+        AggregationMode::Median if !is_range => {
+            "(
+                SELECT AVG(price)
+                FROM (
+                    SELECT price
+                    FROM FilteredEntries
+                    ORDER BY price
+                    LIMIT 2 - (SELECT COUNT(*) FROM FilteredEntries) % 2
+                    OFFSET (SELECT (COUNT(*) - 1) / 2 FROM FilteredEntries)
+                ) AS MedianPrices
+            ) AS aggregated_price"
+        }
+        _ => Err(InfraError::InternalServerError)?,
+    };
+    Ok(query)
+}
+
+fn calculate_rebased_price(
+    base_result: (BigDecimal, u32),
+    quote_result: (BigDecimal, u32),
+) -> Result<(BigDecimal, u32), InfraError> {
+    let (base_price, base_decimals) = base_result;
+    let (quote_price, quote_decimals) = quote_result;
+
+    if quote_price == BigDecimal::from(0) {
+        return Err(InfraError::InternalServerError);
+    }
+
+    let (rebase_price, decimals) = if base_decimals < quote_decimals {
+        let normalized_base_price =
+            normalize_to_decimals(base_price, base_decimals, quote_decimals);
+        (
+            convert_via_quote(normalized_base_price, quote_price, quote_decimals)?,
+            quote_decimals,
+        )
+    } else {
+        let normalized_quote_price =
+            normalize_to_decimals(quote_price, quote_decimals, base_decimals);
+        (
+            convert_via_quote(base_price, normalized_quote_price, base_decimals)?,
+            base_decimals,
+        )
+    };
+
+    Ok((rebase_price, decimals))
+}
+
 #[derive(Debug)]
 pub struct AggPriceAndEntries {
     aggregated_price: BigDecimal,
     entries: Vec<OnchainEntry>,
+}
+
+// TODO(akhercha): Only works for Spot entries
+pub async fn get_sources_and_aggregate(
+    pool: &Pool,
+    network: Network,
+    pair_id: String,
+    timestamp: u64,
+    aggregation_mode: AggregationMode,
+) -> Result<Vec<AggPriceAndEntries>, InfraError> {
+    let raw_sql = build_sql_query(network, aggregation_mode, timestamp)?;
+
+    let conn = pool.get().await.map_err(adapt_infra_error)?;
+    let raw_entries = conn
+        .interact(move |conn| {
+            diesel::sql_query(raw_sql)
+                .bind::<Text, _>(pair_id)
+                .load::<SpotEntryWithAggregatedPrice>(conn)
+        })
+        .await
+        .map_err(adapt_infra_error)?
+        .map_err(adapt_infra_error)?;
+
+    group_entries_per_aggprice(raw_entries)
 }
 
 fn group_entries_per_aggprice(
@@ -425,29 +327,35 @@ fn group_entries_per_aggprice(
     Ok(result)
 }
 
-// TODO(akhercha): Only works for Spot entries
-pub async fn get_sources_and_aggregate(
-    pool: &Pool,
-    network: Network,
-    pair_id: String,
-    timestamp: TimestampParam,
-    aggregation_mode: AggregationMode,
-    chunk_interval: ChunkInterval,
-) -> Result<Vec<AggPriceAndEntries>, InfraError> {
-    let raw_sql = build_sql_query(network, aggregation_mode, timestamp, chunk_interval)?;
+fn compute_multiple_rebased_price(
+    base_alt_result: &mut [AggPriceAndEntries],
+    quote_alt_result: &[AggPriceAndEntries],
+    alt_pairs: Vec<String>,
+    base_alt_decimal: u32,
+    quote_alt_decimal: u32,
+) -> Result<Vec<RawOnchainData>, InfraError> {
+    if quote_alt_result.len() != base_alt_result.len() {
+        return Err(InfraError::RoutingError);
+    }
 
-    let conn = pool.get().await.map_err(adapt_infra_error)?;
-    let raw_entries = conn
-        .interact(move |conn| {
-            diesel::sql_query(raw_sql)
-                .bind::<Text, _>(pair_id)
-                .load::<SpotEntryWithAggregatedPrice>(conn)
-        })
-        .await
-        .map_err(adapt_infra_error)?
-        .map_err(adapt_infra_error)?;
+    let mut result: Vec<RawOnchainData> = Vec::new();
 
-    group_entries_per_aggprice(raw_entries)
+    for (i, base) in base_alt_result.iter_mut().enumerate() {
+        let quote = &quote_alt_result[i];
+        let rebased_price = calculate_rebased_price(
+            (base.aggregated_price.to_owned(), base_alt_decimal),
+            (quote.aggregated_price.to_owned(), quote_alt_decimal),
+        )?;
+        base.entries.extend(quote.entries.to_owned());
+        result.push(RawOnchainData {
+            price: rebased_price.0,
+            decimal: rebased_price.1,
+            sources: base.entries.clone(),
+            pair_used: alt_pairs.clone(),
+        });
+    }
+
+    Ok(result)
 }
 
 #[derive(Queryable, QueryableByName)]
@@ -456,7 +364,6 @@ struct EntryTimestamp {
     pub timestamp: chrono::NaiveDateTime,
 }
 
-// TODO(akhercha): Only works for Spot entries
 pub async fn get_last_updated_timestamp(
     pool: &Pool,
     network: Network,
@@ -558,6 +465,28 @@ pub async fn get_variations(
     }
 
     Ok(variations)
+}
+
+#[derive(Queryable, QueryableByName, PartialEq, Debug)]
+pub struct EntryPairId {
+    #[diesel(sql_type = VarChar)]
+    pub pair_id: String,
+}
+
+impl PartialEq<str> for EntryPairId {
+    fn eq(&self, other: &str) -> bool {
+        self.pair_id == other
+    }
+}
+
+impl PartialEq<String> for EntryPairId {
+    fn eq(&self, other: &String) -> bool {
+        self.pair_id == other.as_str()
+    }
+}
+
+pub fn onchain_pair_exist(existing_pair_list: &[EntryPairId], pair_id: &str) -> bool {
+    existing_pair_list.iter().any(|entry| entry == pair_id)
 }
 
 // TODO(0xevolve): Only works for Spot entries
