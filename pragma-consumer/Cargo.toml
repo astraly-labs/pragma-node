@@ -2,6 +2,12 @@
 name = "pragma-consumer"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
+homepage = "https://pragma.build/"
+repository = "https://github.com/astraly-labs/pragma-node/"
+description = "SDK to consume Pragma data feeds"
+readme = "README.md"
+keywords = ["pragma", "sdk", "consumer", "data", "feeds"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
