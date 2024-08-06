@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 
 use crate::infra::repositories::entry_repository::get_decimals;
-use crate::infra::repositories::onchain_repository::get_checkpoints;
+use crate::infra::repositories::onchain_repository::checkpoint::get_checkpoints;
 use crate::utils::currency_pair_to_pair_id;
 use crate::utils::PathExtractor;
 use crate::AppState;

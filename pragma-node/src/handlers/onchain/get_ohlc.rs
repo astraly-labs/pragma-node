@@ -135,7 +135,7 @@ impl ChannelHandler<SubscriptionState, SubscriptionRequest, InfraError> for WsOH
         };
         let pair_id = state.subscribed_pair.clone().unwrap();
 
-        let ohlc_data_res = onchain_repository::get_ohlc(
+        let ohlc_data_res = onchain_repository::ohlc::get_ohlc(
             &subscriber.app_state.onchain_pool,
             state.network,
             pair_id.clone(),

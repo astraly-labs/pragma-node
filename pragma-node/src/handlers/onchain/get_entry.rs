@@ -8,14 +8,11 @@ use pragma_entities::EntryError;
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 
-use super::get_history::ChunkInterval;
-
-use crate::infra::repositories::onchain_repository::{
+use crate::infra::repositories::onchain_repository::entry::{
     get_last_updated_timestamp, get_variations, routing, OnchainRoutingArguments,
 };
-use crate::types::timestamp::TimestampParam;
 use crate::utils::{big_decimal_price_to_hex, PathExtractor};
-use crate::{is_enum_variant, AppState};
+use crate::AppState;
 
 use crate::utils::currency_pair_to_pair_id;
 
@@ -24,7 +21,7 @@ pub struct GetOnchainEntryParams {
     pub network: Network,
     pub aggregation: Option<AggregationMode>,
     pub routing: Option<bool>,
-    pub timestamp: Option<TimestampParam>,
+    pub timestamp: Option<i64>,
     pub components: Option<bool>,
 }
 
@@ -60,7 +57,7 @@ pub struct GetOnchainEntryResponse {
         ("quote" = String, Path, description = "Quote Asset"),
         ("network" = Network, Query, description = "Network"),
         ("aggregation" = Option<AggregationMode>, Query, description = "Aggregation Mode"),
-        ("timestamp" = Option<u64>, Query, description = "Timestamp")
+        ("timestamp" = Option<i64>, Query, description = "Timestamp")
     ),
 )]
 pub async fn get_onchain_entry(
@@ -71,24 +68,20 @@ pub async fn get_onchain_entry(
     tracing::info!("Received get onchain entry request for pair {:?}", pair);
     let pair_id: String = currency_pair_to_pair_id(&pair.0, &pair.1);
     let with_components = params.components.unwrap_or(true);
-    let timestamp = params
-        .timestamp
-        .unwrap_or_default()
-        .assert_time_is_valid()?;
 
-    if !is_enum_variant!(timestamp, TimestampParam::Single) {
-        return Err(EntryError::InvalidTimestamp(
-            "Expected a single timestamp, not a Range.".into(),
-        ));
-    }
+    let now = chrono::Utc::now().timestamp();
+    let timestamp = if let Some(timestamp) = params.timestamp {
+        timestamp
+    } else {
+        now
+    };
 
     let routing_arguments = OnchainRoutingArguments {
         pair_id: pair_id.clone(),
         network: params.network,
-        timestamp,
+        timestamp: (timestamp as u64),
         aggregation_mode: params.aggregation.unwrap_or_default(),
         is_routing: params.routing.unwrap_or(false),
-        chunk_interval: ChunkInterval::OneHour,
     };
 
     let raw_data = routing(&state.onchain_pool, &state.offchain_pool, routing_arguments)

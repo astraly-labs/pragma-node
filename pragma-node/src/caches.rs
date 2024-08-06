@@ -9,7 +9,7 @@ use crate::constants::caches::{
     PUBLISHERS_UDPATES_CACHE_TIME_TO_IDLE_IN_SECONDS,
     PUBLISHERS_UDPATES_CACHE_TIME_TO_LIVE_IN_SECONDS,
 };
-use crate::infra::repositories::onchain_repository::RawPublisherUpdates;
+use crate::infra::repositories::onchain_repository::publisher::RawPublisherUpdates;
 
 /// Structure responsible of holding our Databases caches.
 /// All the caches are initialized empty with their associated time to live in the
