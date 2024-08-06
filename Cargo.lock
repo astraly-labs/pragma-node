@@ -2555,7 +2555,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0f23f71580015254b020e856feac3df5878c2c7a8812297edd6c0a485ac9dada"
 dependencies = [
  "serde",
- "toml 0.7.8",
+ "toml",
 ]
 
 [[package]]
@@ -3121,7 +3121,6 @@ dependencies = [
  "chrono",
  "rstest",
  "serde",
- "serde_json",
  "starknet 0.9.0",
  "strum 0.26.3",
  "thiserror",
@@ -3134,28 +3133,14 @@ dependencies = [
 name = "pragma-consumer"
 version = "0.1.0"
 dependencies = [
- "bigdecimal 0.4.3",
- "chrono",
- "deadpool-diesel",
- "dotenvy",
- "envy",
  "httpmock",
- "lazy_static",
  "pragma-common",
- "pragma-entities",
- "rdkafka",
- "redis",
  "reqwest 0.12.5",
  "rstest",
- "serde",
  "serde_json",
  "starknet 0.9.0",
  "thiserror",
- "time",
  "tokio",
- "toml 0.8.14",
- "tracing",
- "tracing-subscriber",
 ]
 
 [[package]]
@@ -3168,7 +3153,6 @@ dependencies = [
  "deadpool-diesel",
  "diesel",
  "diesel_migrations",
- "pragma-common",
  "redis",
  "serde",
  "serde_json",
@@ -5012,18 +4996,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "toml"
-version = "0.8.14"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6f49eb2ab21d2f26bd6db7bf383edc527a7ebaee412d17af4d40fdccd442f335"
-dependencies = [
- "serde",
- "serde_spanned",
- "toml_datetime",
- "toml_edit 0.22.14",
-]
-
-[[package]]
 name = "toml_datetime"
 version = "0.6.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5042,7 +5014,7 @@ dependencies = [
  "serde",
  "serde_spanned",
  "toml_datetime",
- "winnow 0.5.40",
+ "winnow",
 ]
 
 [[package]]
@@ -5053,20 +5025,7 @@ checksum = "6a8534fd7f78b5405e860340ad6575217ce99f38d4d5c8f2442cb5ecb50090e1"
 dependencies = [
  "indexmap 2.2.6",
  "toml_datetime",
- "winnow 0.5.40",
-]
-
-[[package]]
-name = "toml_edit"
-version = "0.22.14"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f21c7aaf97f1bd9ca9d4f9e73b0a6c74bd5afef56f2bc931943a6e1c37e04e38"
-dependencies = [
- "indexmap 2.2.6",
- "serde",
- "serde_spanned",
- "toml_datetime",
- "winnow 0.6.13",
+ "winnow",
 ]
 
 [[package]]
@@ -5719,15 +5678,6 @@ name = "winnow"
 version = "0.5.40"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f593a95398737aeed53e489c785df13f3618e41dbcd6718c6addbf1395aa6876"
-dependencies = [
- "memchr",
-]
-
-[[package]]
-name = "winnow"
-version = "0.6.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "59b5e5f6c299a3c7890b876a2a587f3115162487e704907d9b6cd29473052ba1"
 dependencies = [
  "memchr",
 ]

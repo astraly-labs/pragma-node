@@ -7,7 +7,6 @@ authors = ["Pragma Labs <support@pragma.build>"]
 [workspace]
 
 [dependencies]
-color-eyre = "0.6"
 tokio = { version = "1.11.0", features = ["full"] }
 
 pragma-consumer = { path = "../" }
