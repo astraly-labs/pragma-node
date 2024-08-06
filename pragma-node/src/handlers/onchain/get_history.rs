@@ -15,10 +15,10 @@ use crate::AppState;
 
 use crate::utils::currency_pair_to_pair_id;
 
-#[derive(Debug, Default, Deserialize, IntoParams, ToSchema)]
+#[derive(Debug, Deserialize, IntoParams, ToSchema)]
 pub struct GetOnchainHistoryParams {
     pub network: Network,
-    pub timestamp: Option<TimestampRange>,
+    pub timestamp: TimestampRange,
     pub chunk_interval: Option<Interval>,
 }
 
@@ -60,10 +60,8 @@ pub async fn get_onchain_history(
     tracing::info!("Received get onchain history request for pair {:?}", pair);
     let pair_id: String = currency_pair_to_pair_id(&pair.0, &pair.1);
     let network = params.network;
-    let timestamp_range = params
-        .timestamp
-        .unwrap_or_default()
-        .assert_time_is_valid()?;
+    let timestamp_range = params.timestamp.assert_time_is_valid()?;
+
     let chunk_interval = params.chunk_interval.unwrap_or_default();
 
     let raw_entries: Vec<HistoricalEntryRaw> = get_historical_aggregated_entries(

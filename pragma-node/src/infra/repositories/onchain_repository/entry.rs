@@ -23,6 +23,7 @@ use crate::infra::repositories::entry_repository::get_decimals;
 // retrieving the sources.
 pub const ENTRIES_BACKWARD_INTERVAL: &str = "1 hour";
 
+#[derive(Debug)]
 pub struct OnchainRoutingArguments {
     pub pair_id: String,
     pub network: Network,
@@ -90,16 +91,18 @@ pub async fn routing(
             routing_args.aggregation_mode,
         )
         .await?;
-        let decimal = get_decimals(offchain_pool, &pair_id).await?;
-        for row in prices_and_entries {
-            result.push(RawOnchainData {
-                price: row.aggregated_price,
-                decimal,
-                sources: row.entries,
-                pair_used: vec![pair_id.clone()],
-            })
+        if !prices_and_entries.is_empty() {
+            let decimal = get_decimals(offchain_pool, &pair_id).await?;
+            for row in prices_and_entries {
+                result.push(RawOnchainData {
+                    price: row.aggregated_price,
+                    decimal,
+                    sources: row.entries,
+                    pair_used: vec![pair_id.clone()],
+                })
+            }
+            return Ok(result);
         }
-        return Ok(result);
     }
     if !is_routing {
         return Err(InfraError::NotFound);
@@ -164,7 +167,7 @@ fn build_sql_query(
     let table_name = get_onchain_table_name(network, DataType::SpotEntry)?;
 
     let complete_sql_query = {
-        let aggregation_query = get_aggregation_subquery(aggregation_mode, false)?;
+        let aggregation_query = get_aggregation_subquery(aggregation_mode)?;
         format!(
             r#"
                 WITH RankedEntries AS (
@@ -203,26 +206,10 @@ fn build_sql_query(
     Ok(complete_sql_query)
 }
 
-fn get_aggregation_subquery(
-    aggregation_mode: AggregationMode,
-    is_range: bool,
-) -> Result<&'static str, InfraError> {
+fn get_aggregation_subquery(aggregation_mode: AggregationMode) -> Result<&'static str, InfraError> {
     let query = match aggregation_mode {
         AggregationMode::Mean => "AVG(price) AS aggregated_price",
-        AggregationMode::Median if is_range => {
-            "(
-                SELECT AVG(price)
-                FROM (
-                    SELECT price
-                    FROM FilteredEntries
-                    WHERE window_start = FE.window_start
-                    ORDER BY price
-                    LIMIT 2 - (SELECT COUNT(*) FROM FilteredEntries WHERE window_start = FE.window_start) % 2
-                    OFFSET (SELECT (COUNT(*) - 1) / 2 FROM FilteredEntries WHERE window_start = FE.window_start)
-                ) AS MedianPrices
-            ) AS aggregated_price"
-        }
-        AggregationMode::Median if !is_range => {
+        AggregationMode::Median => {
             "(
                 SELECT AVG(price)
                 FROM (
@@ -302,10 +289,6 @@ pub async fn get_sources_and_aggregate(
 fn group_entries_per_aggprice(
     raw_entries: Vec<SpotEntryWithAggregatedPrice>,
 ) -> Result<Vec<AggPriceAndEntries>, InfraError> {
-    if raw_entries.is_empty() {
-        return Err(InfraError::NotFound);
-    }
-
     let mut result: Vec<AggPriceAndEntries> = Vec::new();
     let mut curr_agg_price: BigDecimal = BigDecimal::default();
     for entry in raw_entries.iter().rev() {

@@ -4,7 +4,7 @@ pub mod history;
 pub mod ohlc;
 pub mod publisher;
 
-use crate::infra::repositories::entry_repository::get_interval_specifier;
+use crate::{infra::repositories::entry_repository::get_interval_specifier, is_enum_variant};
 use pragma_common::types::{DataType, Interval, Network};
 use pragma_entities::error::InfraError;
 
@@ -55,7 +55,12 @@ pub(crate) fn get_onchain_aggregate_table_name(
         (Network::Mainnet, DataType::FutureEntry) => "mainnet_future_price",
         _ => return Err(InfraError::InternalServerError),
     };
-    let interval_specifier = get_interval_specifier(interval, true)?;
+    let mut interval_specifier = get_interval_specifier(interval, true)?;
+
+    // TODO: fix the aggregate view & add the missing "s"
+    if is_enum_variant!(interval, Interval::TwoHours) {
+        interval_specifier = "2_hour";
+    }
     let table_name = format!("{prefix_name}_{interval_specifier}_agg");
     Ok(table_name)
 }

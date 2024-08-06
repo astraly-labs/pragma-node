@@ -46,8 +46,8 @@ pub async fn get_historical_aggregated_entries(
             {table_name}
         WHERE
             pair_id = $1
-            AND bucket >= $2
-            AND bucket <= $3
+            AND bucket >= to_timestamp($2)
+            AND bucket <= to_timestamp($3)
         ORDER BY
             bucket ASC
         "#,

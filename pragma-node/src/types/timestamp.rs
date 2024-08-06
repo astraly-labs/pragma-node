@@ -12,17 +12,12 @@ pub type UnixTimestamp = i64;
 #[derive(Debug, Clone, ToSchema)]
 pub struct TimestampRange(pub RangeInclusive<UnixTimestamp>);
 
-impl Default for TimestampRange {
-    fn default() -> Self {
-        let now = chrono::Utc::now().timestamp();
-        TimestampRange(now..=now)
-    }
-}
-
 impl TimestampRange {
     pub fn assert_time_is_valid(self) -> Result<Self, EntryError> {
         let now = chrono::Utc::now().timestamp();
         let range = &self.0;
+
+        tracing::info!("wtf: {:?}", &range);
 
         if range.start() > range.end() {
             return Err(EntryError::InvalidTimestamp(
@@ -32,6 +27,11 @@ impl TimestampRange {
         if *range.end() > now {
             return Err(EntryError::InvalidTimestamp(
                 "Range timestamp end is in the future.".into(),
+            ));
+        }
+        if *range.start() == *range.end() {
+            return Err(EntryError::InvalidTimestamp(
+                "Range timestamp start and end have the same value.".into(),
             ));
         }
 
@@ -45,9 +45,6 @@ impl<'de> Deserialize<'de> for TimestampRange {
         D: Deserializer<'de>,
     {
         let s: String = Deserialize::deserialize(deserializer)?;
-        if s.is_empty() {
-            return Ok(TimestampRange::default());
-        }
 
         let (start, end) = s
             .split_once(',')
