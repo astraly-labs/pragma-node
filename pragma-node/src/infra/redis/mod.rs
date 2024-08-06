@@ -160,20 +160,12 @@ async fn get_block_number_for_tag(
         .await
         .map_err(|_| RedisError::Connection)?;
 
-    let keys: Vec<String> = conn
-        .keys(format!("{}/*", network))
-        .await
-        .map_err(|_| RedisError::Connection)?;
+    let key = format!("{}/latest_published_block", network);
+    let latest_published_block: Option<u64> =
+        conn.get(key).await.map_err(|_| RedisError::Connection)?;
 
-    let mut block_numbers: Vec<u64> = keys
-        .into_iter()
-        .filter_map(|key| key.split('/').nth(1)?.parse::<u64>().ok())
-        .collect();
-
-    block_numbers.sort_unstable();
-
-    match block_numbers.last() {
-        Some(&latest) => match tag {
+    match latest_published_block {
+        Some(latest) => match tag {
             BlockTag::Pending => Ok(latest),
             BlockTag::Latest => {
                 if latest > 0 {
