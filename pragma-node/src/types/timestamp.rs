@@ -17,8 +17,6 @@ impl TimestampRange {
         let now = chrono::Utc::now().timestamp();
         let range = &self.0;
 
-        tracing::info!("wtf: {:?}", &range);
-
         if range.start() > range.end() {
             return Err(EntryError::InvalidTimestamp(
                 "Range timestamp first date is greater than the second date.".into(),
