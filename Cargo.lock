@@ -3115,7 +3115,7 @@ dependencies = [
 
 [[package]]
 name = "pragma-common"
-version = "1.0.0"
+version = "0.1.0"
 dependencies = [
  "bigdecimal 0.4.3",
  "chrono",
@@ -3145,7 +3145,7 @@ dependencies = [
 
 [[package]]
 name = "pragma-entities"
-version = "1.0.0"
+version = "0.1.0"
 dependencies = [
  "axum",
  "bigdecimal 0.4.3",

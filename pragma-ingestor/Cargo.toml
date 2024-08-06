@@ -17,5 +17,5 @@ thiserror = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 tracing = { workspace = true }
 
-pragma-common = { path = "../pragma-common", version = "1.0.0" }
-pragma-entities = { path = "../pragma-entities", version = "1.0.0" }
+pragma-common = { path = "../pragma-common", version = "0.1.0" }
+pragma-entities = { path = "../pragma-entities", version = "0.1.0" }
