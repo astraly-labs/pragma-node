@@ -1,3 +1,4 @@
+use testcontainers::core::IntoContainerPort;
 use testcontainers::runners::AsyncRunner;
 use testcontainers::{ContainerAsync, ImageExt};
 use testcontainers_modules::postgres::Postgres;
@@ -11,7 +12,9 @@ pub async fn setup_onchain_db() -> ContainerAsync<Timescale> {
         .with_tag("pg14-latest")
         .with_env_var("POSTGRES_DB", "pragma")
         .with_env_var("POSTGRES_PASSWORD", "test-password")
-        .with_env_var("PGPORT", "5432")
+        .with_mapped_port(5433, 5432_u16.tcp())
+        .with_network("pragma-tests-network")
+        .with_container_name("test-onchain-db")
         .start()
         .await
         .unwrap()

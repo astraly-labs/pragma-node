@@ -34,33 +34,37 @@ pub fn setup_pragma_node(offchain_port: u16, onchain_port: u16) {
 
     // Run the pragma-node Docker container with environment variables
     let output = Command::new("docker")
-        .arg("run")
-        .arg("-d") // Run in detached mode
-        .arg("-p")
-        .arg("3000:3000") // Node API port
-        .arg("-p")
-        .arg("8080:8080") // Metrics port
-        .arg("-e")
-        .arg("DATABASE_MAX_CONN=25")
-        .arg("-e")
-        .arg("TOPIC=pragma-data")
-        .arg("-e")
-        .arg("KAFKA_BROKERS=pragma-data")
-        .arg("-e")
-        .arg(format!(
-            "OFFCHAIN_DATABASE_URL={}",
-            db_connection_url(offchain_port)
-        ))
-        .arg("-e")
-        .arg(format!(
-            "ONCHAIN_DATABASE_URL={}",
-            db_connection_url(onchain_port)
-        ))
-        .arg("-e")
-        .arg("METRICS_PORT=8080")
-        .arg("pragma-node-e2e")
+        .args([
+            "run",
+            "-d", // Run in detached mode
+            "--network",
+            "pragma-tests-network",
+            "-p",
+            "3000:3000", // Node API port
+            "-p",
+            "8080:8080", // Metrics port
+            "-e",
+            "DATABASE_MAX_CONN=25",
+            "-e",
+            "TOPIC=pragma-data", // Kafka
+            "-e",
+            "KAFKA_BROKERS=pragma-data",
+            "-e",
+            &format!(
+                "OFFCHAIN_DATABASE_URL={}",
+                db_connection_url("test-offchain-db", offchain_port)
+            ),
+            "-e",
+            &format!(
+                "ONCHAIN_DATABASE_URL={}",
+                db_connection_url("test-onchain-db", onchain_port)
+            ),
+            "-e",
+            "METRICS_PORT=8080",
+            "pragma-node-e2e",
+        ])
         .output()
-        .unwrap();
+        .expect("Failed to run Docker container");
 
     if !output.status.success() {
         tracing::error!("Unable to run pragma-node container:");
@@ -75,7 +79,7 @@ pub fn setup_pragma_node(offchain_port: u16, onchain_port: u16) {
 fn wait_for_pragma_node_to_be_ready() {
     tracing::info!("Waiting for pragma-node container to be ready...");
     let max_retries = 10;
-    let retry_interval = Duration::from_secs(2);
+    let retry_interval = Duration::from_secs(30);
     let port = 3000;
 
     for attempt in 1..=max_retries {
@@ -98,10 +102,10 @@ fn wait_for_pragma_node_to_be_ready() {
     }
 }
 
-fn db_connection_url(db_port: u16) -> String {
+fn db_connection_url(host: &str, db_port: u16) -> String {
     format!(
-        "postgres://postgres:test-password@localhost:{}/pragma",
-        db_port
+        "postgres://postgres:test-password@{}:{}/pragma",
+        host, db_port
     )
 }
 
