@@ -42,7 +42,9 @@ pub async fn setup_pragma_node(offchain_port: u16, onchain_port: u16) {
             "--name",
             PRAGMA_NODE_CONTAINER_NAME,
             "--network",
-            "pragma-tests-network",
+            "pragma-tests-db-network",
+            "--network",
+            "pragma-tests-kafka-network",
             "-p",
             "3000:3000", // Node API port
             "-p",
