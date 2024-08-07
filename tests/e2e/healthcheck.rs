@@ -7,7 +7,7 @@ use crate::common::containers::Containers;
 #[rstest]
 #[tokio::test]
 async fn healthcheck_ok(#[future] setup_containers: Containers) {
-    let c: Containers = setup_containers.await;
+    let c = setup_containers.await;
 
     let body = reqwest::get(format!("{}/node", c.pragma_node.base_url()))
         .await
