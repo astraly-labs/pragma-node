@@ -84,6 +84,8 @@ async fn wait_for_pragma_node_to_be_ready() {
     let retry_interval = Duration::from_secs(15);
     let node_url = "localhost:3000";
 
+    sleep(Duration::from_secs(10)).await;
+
     for attempt in 1..=max_retries {
         match TcpStream::connect(node_url).await {
             Ok(_) => {

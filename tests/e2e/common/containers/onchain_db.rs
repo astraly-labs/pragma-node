@@ -3,16 +3,21 @@ use testcontainers::runners::AsyncRunner;
 use testcontainers::{ContainerAsync, ImageExt};
 use testcontainers_modules::postgres::Postgres;
 
+use crate::common::constants::DEFAULT_PG_PORT;
+
 use super::Timescale;
 
 #[rstest::fixture]
+// TODO(akhercha): run the migrations with PGDATA
 pub async fn setup_onchain_db() -> ContainerAsync<Timescale> {
     Postgres::default()
         .with_name("timescale/timescaledb-ha")
         .with_tag("pg14-latest")
         .with_env_var("POSTGRES_DB", "pragma")
         .with_env_var("POSTGRES_PASSWORD", "test-password")
-        .with_mapped_port(5433, 5432_u16.tcp())
+        .with_mapped_port(5433, DEFAULT_PG_PORT.tcp())
+        .with_env_var("TIMESCALEDB_TELEMETRY", "off")
+        .with_env_var("PGPORT", "5433")
         .with_network("pragma-tests-network")
         .with_container_name("test-onchain-db")
         .start()
