@@ -5,6 +5,8 @@ pub mod pragma_node;
 pub mod utils;
 pub mod zookeeper;
 
+use std::sync::Arc;
+
 use pragma_node::PragmaNodeContainer;
 use testcontainers::ContainerAsync;
 use testcontainers_modules::kafka::Kafka;
@@ -27,11 +29,11 @@ pub type Timescale = Postgres;
 #[allow(dead_code)]
 #[derive(Debug)]
 pub struct Containers {
-    offchain_db: ContainerAsync<Timescale>,
-    onchain_db: ContainerAsync<Timescale>,
-    zookeeper: ContainerAsync<Zookeeper>,
-    kafka: ContainerAsync<Kafka>,
-    pragma_node: PragmaNodeContainer,
+    pub offchain_db: Arc<ContainerAsync<Timescale>>,
+    pub onchain_db: Arc<ContainerAsync<Timescale>>,
+    pub zookeeper: Arc<ContainerAsync<Zookeeper>>,
+    pub kafka: Arc<ContainerAsync<Kafka>>,
+    pub pragma_node: Arc<PragmaNodeContainer>,
 }
 
 #[rstest::fixture]
@@ -56,11 +58,9 @@ pub async fn setup_containers(
         .get_host_port_ipv4(DEFAULT_PG_PORT)
         .await
         .unwrap();
-    tracing::info!("✅ ... onchain db ready (port={onchain_db_port})!");
-
-    tracing::info!("🔨 Executing onchain migrations...");
+    tracing::info!("🪛 Executing onchain migrations...");
     run_onchain_migrations(onchain_db_port).await;
-    tracing::info!("✅ ... onchain migrations ok!\n");
+    tracing::info!("✅ ... onchain db ready (port={onchain_db_port})!");
 
     tracing::info!("🔨 Setup zookeeper..");
     let zookeeper = setup_zookeeper.await;
@@ -75,10 +75,10 @@ pub async fn setup_containers(
     tracing::info!("✅ ... pragma-node!\n");
 
     Containers {
-        onchain_db,
-        offchain_db,
-        zookeeper,
-        kafka,
-        pragma_node,
+        onchain_db: Arc::new(onchain_db),
+        offchain_db: Arc::new(offchain_db),
+        zookeeper: Arc::new(zookeeper),
+        kafka: Arc::new(kafka),
+        pragma_node: Arc::new(pragma_node),
     }
 }

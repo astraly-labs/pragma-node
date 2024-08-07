@@ -9,7 +9,7 @@ use crate::common::containers::Containers;
 async fn healthcheck_ok(#[future] setup_containers: Containers) {
     let c: Containers = setup_containers.await;
 
-    let body = reqwest::get("http://localhost:3000/node")
+    let body = reqwest::get(format!("{}/node", c.pragma_node.base_url()))
         .await
         .unwrap()
         .text()
@@ -17,6 +17,4 @@ async fn healthcheck_ok(#[future] setup_containers: Containers) {
         .unwrap();
 
     assert_eq!(body.trim(), "Server is running!");
-
-    println!("{:?}", c)
 }

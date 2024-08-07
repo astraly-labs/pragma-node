@@ -26,6 +26,10 @@ impl PragmaNodeContainer {
         container
     }
 
+    pub fn base_url(&self) -> &str {
+        "http://localhost:3000"
+    }
+
     pub fn container_name(&self) -> &str {
         PRAGMA_NODE_CONTAINER_NAME
     }
@@ -104,23 +108,18 @@ impl PragmaNodeContainer {
     async fn wait_is_healthy(&self) {
         let max_retries = 20;
         let retry_interval = Duration::from_secs(5);
-        let node_url = "localhost:3000";
 
         for attempt in 1..=max_retries {
-            match TcpStream::connect(node_url).await {
+            match TcpStream::connect("localhost:3000").await {
                 Ok(_) => {
-                    sleep(Duration::from_secs(10)).await;
+                    tracing::info!("🪛 Applying pragma-node migrations...");
+                    sleep(Duration::from_secs(15)).await;
                     return;
                 }
                 _ => {
                     if attempt == max_retries {
                         panic!("pragma-node failed to start after {} attempts", max_retries);
                     }
-                    tracing::debug!(
-                        "Waiting for pragma-node to be ready (attempt {}/{})",
-                        attempt,
-                        max_retries
-                    );
                     sleep(retry_interval).await;
                 }
             }
