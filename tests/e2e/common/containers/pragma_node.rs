@@ -5,6 +5,7 @@ use tokio::time::sleep;
 
 use crate::common::constants::PRAGMA_NODE_CONTAINER_NAME;
 
+// TODO: implement a struct that start a container with some options + handle Drop
 // It is not possible yet to start local Dockefiles using the testcontainers
 // rust crate.
 // To bypass this, we start it using the `docker` command ourselves.
