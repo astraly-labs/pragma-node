@@ -3,6 +3,8 @@ use testcontainers::runners::AsyncRunner;
 use testcontainers::{ContainerAsync, ImageExt};
 use testcontainers_modules::kafka::Kafka;
 
+pub const KAFKA_CONTAINER_NAME: &str = "test-kafka";
+
 #[rstest::fixture]
 pub async fn setup_kafka() -> ContainerAsync<Kafka> {
     Kafka::default()
@@ -13,7 +15,7 @@ pub async fn setup_kafka() -> ContainerAsync<Kafka> {
         .with_mapped_port(9093, 9093_u16.tcp())
         .with_network("pragma-tests-zookeeper-network")
         .with_network("pragma-tests-kafka-network")
-        .with_container_name("test-kafka")
+        .with_container_name(KAFKA_CONTAINER_NAME)
         .start()
         .await
         .unwrap()

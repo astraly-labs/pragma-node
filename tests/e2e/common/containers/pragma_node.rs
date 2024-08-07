@@ -8,7 +8,7 @@ use tokio::time::sleep;
 use super::offchain_db::OFFCHAIN_DB_CONTAINER_NAME;
 use super::onchain_db::ONCHAIN_DB_CONTAINER_NAME;
 
-const PRAGMA_NODE_CONTAINER_NAME: &str = "pragma-node-container";
+pub const PRAGMA_NODE_CONTAINER_NAME: &str = "pragma-node-container";
 
 #[derive(Debug, Clone)]
 pub struct PragmaNodeContainer {
