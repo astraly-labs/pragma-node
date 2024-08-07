@@ -17,7 +17,7 @@ pub async fn setup_onchain_db() -> ContainerAsync<Timescale> {
         .with_env_var("POSTGRES_PASSWORD", "test-password")
         .with_mapped_port(5433, DEFAULT_PG_PORT.tcp())
         .with_env_var("TIMESCALEDB_TELEMETRY", "off")
-        .with_env_var("PGPORT", "5433")
+        // .with_env_var("PGPORT", "5433")
         .with_network("pragma-tests-network")
         .with_container_name("test-onchain-db")
         .start()

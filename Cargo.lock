@@ -5218,6 +5218,9 @@ dependencies = [
 name = "tests"
 version = "0.1.0"
 dependencies = [
+ "deadpool-diesel",
+ "diesel",
+ "futures-util",
  "pretty_assertions",
  "reqwest 0.12.5",
  "rstest",
