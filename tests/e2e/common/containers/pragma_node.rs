@@ -7,19 +7,22 @@ use std::{
 // To bypass this, we start it using the `docker` command ourselves.
 pub fn setup_pragma_node(offchain_port: u16, onchain_port: u16) {
     let dockerfile_path = pragma_node_dockerfile_path();
-
     // Build the pragma-node Docker image
-    // TODO(akhercha): Assert that the docker command is installed?
+    let args = vec![
+        "buildx",
+        "build",
+        "--file",
+        dockerfile_path.to_str().unwrap(),
+        "--force-rm",
+        "--tag",
+        "pragma-node-e2e",
+        "..",
+    ];
+
     let output = Command::new("docker")
-        .arg("build")
-        .arg("--file")
-        .arg(dockerfile_path)
-        .arg("--force-rm")
-        .arg("--tag")
-        .arg("pragma-node-e2e")
-        .arg(".")
+        .args(&args)
         .output()
-        .unwrap();
+        .expect("Failed to execute Docker build command");
 
     if !output.status.success() {
         tracing::error!("Unable to build pragma-node-e2e");
@@ -78,7 +81,6 @@ fn wait_for_pragma_node_to_be_ready() {
     for attempt in 1..=max_retries {
         match TcpStream::connect(("localhost", port)) {
             Ok(_) => {
-                tracing::error!("pragma-node is now ready and listening on port {}", port);
                 break;
             }
             Err(_) => {

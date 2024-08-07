@@ -1,3 +1,4 @@
+use pretty_assertions::assert_eq;
 use rstest::rstest;
 use testcontainers::ContainerAsync;
 
@@ -14,15 +15,29 @@ async fn healthcheck_ok(
     #[future] setup_offchain_db: ContainerAsync<Timescale>,
     #[future] setup_onchain_db: ContainerAsync<Timescale>,
 ) {
+    tracing::info!("🔨 Setup offchain db..");
     let offchain_db = setup_offchain_db.await;
     let host_ip = offchain_db.get_host().await.unwrap();
     assert_eq!(host_ip.to_string(), "localhost");
     let offchain_db_port: u16 = offchain_db.get_host_port_ipv4(5432).await.unwrap();
+    tracing::info!("✅ offchain db!");
 
+    tracing::info!("🔨 Setup onchain db..");
     let onchain_db = setup_onchain_db.await;
     let host_ip = onchain_db.get_host().await.unwrap();
     assert_eq!(host_ip.to_string(), "localhost");
     let onchain_db_port: u16 = onchain_db.get_host_port_ipv4(5432).await.unwrap();
+    tracing::info!("✅ onchain db!");
 
+    tracing::info!("🔨 Setup of pragma_node...");
     setup_pragma_node(offchain_db_port, onchain_db_port);
+    tracing::info!("✅ pragma-node!");
+
+    let body = reqwest::get("localhost:3000/node")
+        .await
+        .unwrap()
+        .text()
+        .await
+        .unwrap();
+    assert_eq!(body.trim(), "Server is running!");
 }

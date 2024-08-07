@@ -5218,6 +5218,7 @@ name = "tests"
 version = "0.1.0"
 dependencies = [
  "pretty_assertions",
+ "reqwest 0.12.5",
  "rstest",
  "serde_json",
  "testcontainers",
