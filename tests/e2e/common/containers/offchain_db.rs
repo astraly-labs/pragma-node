@@ -5,7 +5,7 @@ use testcontainers_modules::postgres::Postgres;
 use super::Timescale;
 
 #[rstest::fixture]
-pub async fn setup_onchain_db() -> ContainerAsync<Timescale> {
+pub async fn setup_offchain_db() -> ContainerAsync<Timescale> {
     Postgres::default()
         .with_name("timescale/timescaledb-ha")
         .with_tag("pg14-latest")
