@@ -63,4 +63,5 @@ pragma-monitoring = { git = "https://github.com/astraly-labs/pragma-monitoring",
 rstest = "0.18.2"
 httpmock = { version = "0.7.0" }
 testcontainers = { version = "0.21.1" }
+testcontainers-modules = { version = "0.9.0", features = ["postgres", "kafka"]}
 pretty_assertions = "1.4.0"
