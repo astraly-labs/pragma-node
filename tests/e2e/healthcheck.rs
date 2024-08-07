@@ -1,7 +1,6 @@
 use pretty_assertions::assert_eq;
 use rstest::rstest;
 use testcontainers::ContainerAsync;
-use tokio::time::{sleep, Duration};
 
 use crate::common::containers::{
     offchain_db::setup_offchain_db, onchain_db::setup_onchain_db, pragma_node::setup_pragma_node,
@@ -37,8 +36,6 @@ async fn healthcheck_ok(
     tracing::info!("🔨 Setup pragma_node...");
     setup_pragma_node(offchain_db_port, onchain_db_port);
     tracing::info!("✅ pragma-node!");
-
-    sleep(Duration::from_secs(10)).await;
 
     let body = reqwest::get("http://localhost:3000/node")
         .await

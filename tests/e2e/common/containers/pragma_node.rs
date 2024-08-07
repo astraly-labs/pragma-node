@@ -85,6 +85,8 @@ fn wait_for_pragma_node_to_be_ready() {
     for attempt in 1..=max_retries {
         match TcpStream::connect(("localhost", port)) {
             Ok(_) => {
+                tracing::info!("Waiting a few seconds to apply the migrations...");
+                thread::sleep(Duration::from_secs(10));
                 break;
             }
             Err(_) => {
