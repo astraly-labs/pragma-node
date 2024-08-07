@@ -7,6 +7,8 @@ use crate::common::constants::DEFAULT_PG_PORT;
 
 use super::Timescale;
 
+pub const OFFCHAIN_DB_CONTAINER_NAME: &str = "test-offchain-db";
+
 #[rstest::fixture]
 pub async fn setup_offchain_db() -> ContainerAsync<Timescale> {
     Postgres::default()
@@ -18,7 +20,7 @@ pub async fn setup_offchain_db() -> ContainerAsync<Timescale> {
         .with_env_var("PGPORT", "5435")
         .with_mapped_port(5435, DEFAULT_PG_PORT.tcp())
         .with_network("pragma-tests-db-network")
-        .with_container_name("test-offchain-db")
+        .with_container_name(OFFCHAIN_DB_CONTAINER_NAME)
         .start()
         .await
         .unwrap()
