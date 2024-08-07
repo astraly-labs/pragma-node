@@ -39,6 +39,5 @@ pub async fn run_onchain_migrations(port: u16) {
         .join("pragma-node")
         .join("postgres_migrations");
 
-    tracing::info!("{:?}", migrations_folder);
     run_migrations(&db_url, migrations_folder).await;
 }

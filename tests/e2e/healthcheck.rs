@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use pretty_assertions::assert_eq;
 use rstest::rstest;
 use testcontainers::ContainerAsync;
@@ -33,8 +31,6 @@ async fn healthcheck_ok(
         .await
         .unwrap();
     tracing::info!("✅ ... onchain db ready (port={onchain_db_port})!");
-
-    let _ = tokio::time::sleep(Duration::from_secs(10)).await;
 
     tracing::info!("🔨 Executing onchain migrations...");
     run_onchain_migrations(onchain_db_port).await;
