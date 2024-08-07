@@ -7,12 +7,10 @@ use crate::common::containers::{
     offchain_db::setup_offchain_db, onchain_db::setup_onchain_db, pragma_node::setup_pragma_node,
     utils::kill_and_remove_container, Timescale,
 };
-use crate::common::logs::init_logging;
-
 #[rstest]
 #[tokio::test]
+#[tracing_test::traced_test]
 async fn healthcheck_ok(
-    #[from(init_logging)] _logging: (),
     #[future] setup_offchain_db: ContainerAsync<Timescale>,
     #[future] setup_onchain_db: ContainerAsync<Timescale>,
 ) {
@@ -46,7 +44,5 @@ async fn healthcheck_ok(
     assert_eq!(body.trim(), "Server is running!");
 
     // Teardown
-    tracing::info!("🔨 Shutting down pragma-node...");
     kill_and_remove_container(PRAGMA_NODE_CONTAINER_NAME).await;
-    tracing::info!("✅ ... teardown!");
 }
