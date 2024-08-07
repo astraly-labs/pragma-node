@@ -25,31 +25,19 @@ pub async fn kill_and_remove_container(container_name: &str) {
     }
 }
 
-pub async fn run_migrations(
-    database_url: &str,
-    folder: PathBuf,
-) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn run_migrations(database_url: &str, folder: PathBuf) {
     // Create a connection pool
     let manager = Manager::new(database_url.to_string(), deadpool_diesel::Runtime::Tokio1);
-
-    tracing::info!(
-        "?? {} ??",
-        format!("{}?application_name=pragma-node-tests", database_url)
-    );
     let pool = Pool::builder(manager).build().unwrap();
 
     // Read and sort migration files
     let mut migration_files = read_migration_files(folder);
     migration_files.sort_by(|a, b| a.0.cmp(&b.0));
 
-    println!("Migrations: {:?}", migration_files);
-
     // Execute migrations sequentially
     for (_, file_path) in migration_files {
-        execute_migration(&pool, file_path).await?;
+        execute_migration(&pool, file_path).await;
     }
-
-    Ok(())
 }
 
 fn read_migration_files(folder: PathBuf) -> Vec<(u32, PathBuf)> {
@@ -69,15 +57,12 @@ fn read_migration_files(folder: PathBuf) -> Vec<(u32, PathBuf)> {
         .collect()
 }
 
-async fn execute_migration(
-    pool: &Pool,
-    file_path: PathBuf,
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn execute_migration(pool: &Pool, file_path: PathBuf) {
     let sql = fs::read_to_string(&file_path).unwrap();
     let conn = pool.get().await.unwrap();
 
     conn.interact(move |conn| conn.batch_execute(&sql))
-        .await??;
-
-    Ok(())
+        .await
+        .unwrap()
+        .unwrap();
 }

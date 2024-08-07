@@ -1,3 +1,5 @@
+use std::env::current_dir;
+
 use testcontainers::core::IntoContainerPort;
 use testcontainers::runners::AsyncRunner;
 use testcontainers::{ContainerAsync, ImageExt};
@@ -5,10 +7,10 @@ use testcontainers_modules::postgres::Postgres;
 
 use crate::common::constants::DEFAULT_PG_PORT;
 
+use super::utils::run_migrations;
 use super::Timescale;
 
 #[rstest::fixture]
-// TODO(akhercha): run the migrations with PGDATA
 pub async fn setup_onchain_db() -> ContainerAsync<Timescale> {
     Postgres::default()
         .with_name("timescale/timescaledb-ha")
@@ -23,4 +25,20 @@ pub async fn setup_onchain_db() -> ContainerAsync<Timescale> {
         .start()
         .await
         .unwrap()
+}
+
+pub async fn run_onchain_migrations(port: u16) {
+    let db_url = format!(
+        "postgres://postgres:test-password@localhost:{}/pragma",
+        port
+    );
+    let migrations_folder = current_dir()
+        .unwrap()
+        .join("..")
+        .join("infra")
+        .join("pragma-node")
+        .join("postgres_migrations");
+
+    tracing::info!("{:?}", migrations_folder);
+    run_migrations(&db_url, migrations_folder).await;
 }

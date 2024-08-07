@@ -1,4 +1,3 @@
-use std::env::current_dir;
 use std::time::Duration;
 
 use pretty_assertions::assert_eq;
@@ -6,7 +5,7 @@ use rstest::rstest;
 use testcontainers::ContainerAsync;
 
 use crate::common::constants::{DEFAULT_PG_PORT, PRAGMA_NODE_CONTAINER_NAME};
-use crate::common::containers::utils::run_migrations;
+use crate::common::containers::onchain_db::run_onchain_migrations;
 use crate::common::containers::{
     offchain_db::setup_offchain_db, onchain_db::setup_onchain_db, pragma_node::setup_pragma_node,
     utils::kill_and_remove_container, Timescale,
@@ -37,19 +36,8 @@ async fn healthcheck_ok(
 
     let _ = tokio::time::sleep(Duration::from_secs(10)).await;
 
-    // TODO: export that
     tracing::info!("🔨 Executing onchain migrations...");
-    let onchain_db_url = format!(
-        "postgres://postgres:test-password@localhost:{}/pragma",
-        onchain_db_port
-    );
-    let migrations_folder = current_dir()
-        .unwrap()
-        .join("..")
-        .join("infra")
-        .join("pragma-node")
-        .join("postgres_migrations");
-    let _ = run_migrations(&onchain_db_url, migrations_folder).await;
+    run_onchain_migrations(onchain_db_port).await;
     tracing::info!("✅ ... onchain migrations ok!");
 
     tracing::info!("🔨 Setup pragma_node...");
