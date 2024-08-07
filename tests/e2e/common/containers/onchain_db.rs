@@ -7,7 +7,7 @@ use testcontainers_modules::postgres::Postgres;
 
 use crate::common::constants::DEFAULT_PG_PORT;
 
-use super::utils::run_migrations;
+use super::utils::migrations::run_migrations;
 use super::Timescale;
 
 pub const ONCHAIN_DB_CONTAINER_NAME: &str = "test-onchain-db";
