@@ -13,7 +13,6 @@ use testcontainers_modules::kafka::Kafka;
 use testcontainers_modules::postgres::Postgres;
 use testcontainers_modules::zookeeper::Zookeeper;
 
-use crate::common::containers::onchain_db::run_onchain_migrations;
 use crate::common::containers::{
     kafka::setup_kafka, offchain_db::setup_offchain_db, onchain_db::setup_onchain_db,
     pragma_node::setup_pragma_node, zookeeper::setup_zookeeper,
@@ -50,9 +49,6 @@ pub async fn setup_containers(
 
     tracing::info!("🔨 Setup onchain db..");
     let onchain_db = setup_onchain_db.await;
-    let onchain_db_port: u16 = onchain_db.get_host_port_ipv4(5432).await.unwrap();
-    tracing::info!("🪛 Executing onchain migrations...");
-    run_onchain_migrations(onchain_db_port).await;
     tracing::info!("✅ ... onchain db ready!\n");
 
     tracing::info!("🔨 Setup zookeeper..");

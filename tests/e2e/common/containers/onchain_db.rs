@@ -8,10 +8,12 @@ use super::utils::migrations::run_migrations;
 use super::Timescale;
 
 pub const ONCHAIN_DB_CONTAINER_NAME: &str = "test-onchain-db";
+const PORT: u16 = 5432;
 
 #[rstest::fixture]
 pub async fn setup_onchain_db() -> ContainerAsync<Timescale> {
-    Postgres::default()
+    // 1. Run the container
+    let onchain_container = Postgres::default()
         .with_name("timescale/timescaledb-ha")
         .with_tag("pg14-latest")
         .with_env_var("POSTGRES_DB", "pragma")
@@ -21,7 +23,13 @@ pub async fn setup_onchain_db() -> ContainerAsync<Timescale> {
         .with_container_name(ONCHAIN_DB_CONTAINER_NAME)
         .start()
         .await
-        .unwrap()
+        .unwrap();
+
+    // 2. Run the migrations
+    let onchain_db_port: u16 = onchain_container.get_host_port_ipv4(PORT).await.unwrap();
+    run_onchain_migrations(onchain_db_port).await;
+
+    onchain_container
 }
 
 pub async fn run_onchain_migrations(port: u16) {

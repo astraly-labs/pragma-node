@@ -11,12 +11,14 @@ use super::{
     utils::image_builder::ImageBuilder,
 };
 
-pub const PRAGMA_NODE_BUILD_NAME: &str = "pragma-node-e2e";
-pub const PRAGMA_NODE_CONTAINER_NAME: &str = "pragma-node-container";
-pub const TAG: &str = "latest";
+const PRAGMA_NODE_BUILD_NAME: &str = "pragma-node-e2e";
+const TAG: &str = "latest";
 
-pub const SERVER_PORT: u16 = 3000;
-pub const METRICS_PORT: u16 = 8080;
+const PRAGMA_NODE_CONTAINER_NAME: &str = "pragma-node-container";
+
+const SERVER_PORT: u16 = 3000;
+const METRICS_PORT: u16 = 8080;
+const DB_PORT: u16 = 5432;
 
 #[rstest::fixture]
 pub async fn setup_pragma_node() -> ContainerAsync<PragmaNode> {
@@ -144,5 +146,8 @@ fn pragma_node_dockerfile() -> PathBuf {
 
 // Builds a connection URL from an host & db port.
 fn db_connection_url(host: &str) -> String {
-    format!("postgres://postgres:test-password@{}:5432/pragma", host)
+    format!(
+        "postgres://postgres:test-password@{}:{}/pragma",
+        host, DB_PORT
+    )
 }
