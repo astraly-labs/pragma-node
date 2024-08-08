@@ -1,8 +1,7 @@
 use pretty_assertions::assert_eq;
 use rstest::rstest;
 
-use crate::common::containers::setup_containers;
-use crate::common::containers::Containers;
+use crate::common::{containers::Containers, setup::setup_containers};
 
 #[rstest]
 #[tokio::test]
