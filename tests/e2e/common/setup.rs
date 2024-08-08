@@ -6,7 +6,7 @@ use testcontainers_modules::kafka::Kafka;
 use testcontainers_modules::zookeeper::Zookeeper;
 
 use crate::common::containers::{
-    kafka::setup_kafka,
+    kafka::{init_kafka_topics, setup_kafka},
     offchain_db::setup_offchain_db,
     onchain_db::{run_onchain_migrations, setup_onchain_db},
     pragma_node::{setup_pragma_node, PragmaNode, SERVER_PORT},
@@ -56,6 +56,7 @@ pub async fn setup_containers(
 
     tracing::info!("🔨 Setup kafka..");
     let kafka = setup_kafka.await;
+    init_kafka_topics(&kafka).await;
     tracing::info!("✅ ... kafka!\n");
 
     tracing::info!("🔨 Setup pragma_node...");
