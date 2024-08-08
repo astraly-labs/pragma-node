@@ -46,6 +46,8 @@ jobs:
         run: |
           cargo llvm-cov clean --workspace
 
+      - uses: Swatinem/rust-cache@v2
+
       - name: Run llvm-cov
         run: |
           cargo llvm-cov nextest --release --lcov --output-path lcov.info
