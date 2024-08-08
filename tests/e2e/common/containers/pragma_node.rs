@@ -31,14 +31,11 @@ pub async fn setup_pragma_node() -> ContainerAsync<PragmaNode> {
 
     // 2. Run the container
     PragmaNode::default()
-        .with_env_var(
-            "OFFCHAIN_DATABASE_URL",
-            db_connection_url(OFFCHAIN_DB_CONTAINER_NAME),
-        )
-        .with_env_var(
-            "ONCHAIN_DATABASE_URL",
-            db_connection_url(ONCHAIN_DB_CONTAINER_NAME),
-        )
+        .with_offchain_url(&db_connection_url(OFFCHAIN_DB_CONTAINER_NAME))
+        .with_onchain_url(&db_connection_url(ONCHAIN_DB_CONTAINER_NAME))
+        // We run as mode "dev" even though it's production, so we don't build the PragmaSigner
+        // for now.
+        .with_mode("dev")
         .with_mapped_port(SERVER_PORT, SERVER_PORT.tcp())
         .with_mapped_port(METRICS_PORT, METRICS_PORT.tcp())
         .with_network("pragma-tests-network")
