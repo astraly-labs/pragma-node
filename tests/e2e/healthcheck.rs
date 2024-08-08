@@ -6,9 +6,9 @@ use crate::common::setup::{setup_containers, TestHelper};
 #[rstest]
 #[tokio::test]
 async fn healthcheck_ok(#[future] setup_containers: TestHelper) {
-    let hlp = setup_containers.await;
+    let hlpr = setup_containers.await;
 
-    let body = reqwest::get(hlp.endpoint("node"))
+    let body = reqwest::get(hlpr.endpoint("node"))
         .await
         .unwrap()
         .text()
