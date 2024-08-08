@@ -16,7 +16,6 @@ use testcontainers_modules::{kafka::Kafka, postgres::Postgres, zookeeper::Zookee
 // timescale in our test suite.
 pub type Timescale = Postgres;
 
-#[allow(dead_code)]
 #[derive(Debug)]
 pub struct Containers {
     pub offchain_db: Arc<ContainerAsync<Timescale>>,
