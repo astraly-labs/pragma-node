@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use deadpool_diesel::{postgres::Pool, Manager};
 use testcontainers::ContainerAsync;
 use testcontainers_modules::kafka::Kafka;
 use testcontainers_modules::zookeeper::Zookeeper;
@@ -14,6 +15,14 @@ use crate::common::containers::{
 };
 use crate::common::logs::init_logging;
 
+#[allow(dead_code)]
+pub struct TestHelper {
+    node_base_url: String,
+    onchain_pool: Pool,
+    offchain_pool: Pool,
+    containers: Containers,
+}
+
 #[rstest::fixture]
 pub async fn setup_containers(
     #[from(init_logging)] _logging: (),
@@ -22,7 +31,7 @@ pub async fn setup_containers(
     #[future] setup_zookeeper: ContainerAsync<Zookeeper>,
     #[future] setup_kafka: ContainerAsync<Kafka>,
     #[future] setup_pragma_node: ContainerAsync<PragmaNode>,
-) -> Containers {
+) -> TestHelper {
     tracing::info!("🔨 Setup offchain db..");
     let offchain_db = setup_offchain_db.await;
     tracing::info!("✅ ... offchain db ready!\n");
@@ -43,11 +52,30 @@ pub async fn setup_containers(
     let pragma_node = setup_pragma_node.await;
     tracing::info!("✅ ... pragma-node!\n");
 
-    Containers {
+    let onchain_pool = get_db_pool(onchain_db.get_host_port_ipv4(5432).await.unwrap());
+    let offchain_pool = get_db_pool(offchain_db.get_host_port_ipv4(5432).await.unwrap());
+
+    let containers = Containers {
         onchain_db: Arc::new(onchain_db),
         offchain_db: Arc::new(offchain_db),
         zookeeper: Arc::new(zookeeper),
         kafka: Arc::new(kafka),
         pragma_node: Arc::new(pragma_node),
+    };
+
+    TestHelper {
+        node_base_url: "http://localhost:3000".to_owned(),
+        containers,
+        onchain_pool,
+        offchain_pool,
     }
+}
+
+fn get_db_pool(db_port: u16) -> Pool {
+    let db_url = format!(
+        "postgres://postgres:test-password@localhost:{}/pragma",
+        db_port
+    );
+    let manager = Manager::new(db_url, deadpool_diesel::Runtime::Tokio1);
+    Pool::builder(manager).build().unwrap()
 }

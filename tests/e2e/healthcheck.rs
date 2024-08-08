@@ -1,11 +1,11 @@
 use pretty_assertions::assert_eq;
 use rstest::rstest;
 
-use crate::common::{containers::Containers, setup::setup_containers};
+use crate::common::setup::{setup_containers, TestHelper};
 
 #[rstest]
 #[tokio::test]
-async fn healthcheck_ok(#[future] setup_containers: Containers) {
+async fn healthcheck_ok(#[future] setup_containers: TestHelper) {
     let _c = setup_containers.await;
 
     let body = reqwest::get("http://localhost:3000/node".to_string())
