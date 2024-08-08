@@ -104,7 +104,7 @@ impl Image for PragmaNode {
     fn ready_conditions(&self) -> Vec<WaitFor> {
         vec![WaitFor::http(
             HttpWaitStrategy::new("/node")
-                .with_port(ContainerPort::Tcp(3000))
+                .with_port(ContainerPort::Tcp(SERVER_PORT))
                 .with_expected_status_code(200_u16),
         )]
     }
