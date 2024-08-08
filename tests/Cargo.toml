@@ -31,4 +31,5 @@ testcontainers-modules = { workspace = true, features = [
   "kafka",
   "postgres",
   "zookeeper",
+  "http_wait",
 ] }

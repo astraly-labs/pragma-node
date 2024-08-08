@@ -13,8 +13,7 @@ pub async fn setup_kafka() -> ContainerAsync<Kafka> {
         .with_env_var("KAFKA_AUTO_CREATE_TOPICS_ENABLE", "true")
         .with_mapped_port(29092, 29092_u16.tcp())
         .with_mapped_port(9093, 9093_u16.tcp())
-        .with_network("pragma-tests-zookeeper-network")
-        .with_network("pragma-tests-kafka-network")
+        .with_network("pragma-tests-network")
         .with_container_name(KAFKA_CONTAINER_NAME)
         .start()
         .await

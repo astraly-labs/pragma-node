@@ -13,7 +13,7 @@ pub async fn setup_zookeeper() -> ContainerAsync<Zookeeper> {
         .with_env_var("ZOOKEEPER_CLIENT_PORT", "2181")
         .with_env_var("ZOOKEEPER_TICK_TIME", "2000")
         .with_mapped_port(2181, 2181_u16.tcp())
-        .with_network("pragma-tests-zookeeper-network")
+        .with_network("pragma-tests-network")
         .with_container_name(ZOOKEEPER_CONTAINER_NAME)
         .start()
         .await

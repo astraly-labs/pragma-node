@@ -69,5 +69,6 @@ testcontainers-modules = { version = "0.9.0", features = [
   "postgres",
   "kafka",
   "zookeeper",
+  "http_wait",
 ] }
 pretty_assertions = "1.4.0"
