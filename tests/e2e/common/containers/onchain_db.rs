@@ -32,7 +32,7 @@ pub async fn setup_onchain_db() -> ContainerAsync<Timescale> {
     onchain_container
 }
 
-pub async fn run_onchain_migrations(port: u16) {
+async fn run_onchain_migrations(port: u16) {
     let db_url = format!(
         "postgres://postgres:test-password@localhost:{}/pragma",
         port

@@ -131,11 +131,9 @@ impl Default for PragmaNode {
 
 // Returns the path of the Pragma node dockerfile.
 fn pragma_node_dockerfile() -> PathBuf {
-    let mut current_dir = current_dir().unwrap();
-    if current_dir.ends_with("tests") {
-        current_dir = current_dir.join("..");
-    }
-    current_dir
+    current_dir()
+        .unwrap()
+        .join("..")
         .join("infra")
         .join("pragma-node")
         .join("Dockerfile")
