@@ -1,5 +1,6 @@
 use std::env::current_dir;
 
+use deadpool_diesel::postgres::Pool;
 use testcontainers::runners::AsyncRunner;
 use testcontainers::{ContainerAsync, ImageExt};
 use testcontainers_modules::postgres::Postgres;
@@ -8,12 +9,10 @@ use super::utils::migrations::run_migrations;
 use super::Timescale;
 
 pub const ONCHAIN_DB_CONTAINER_NAME: &str = "test-onchain-db";
-const PORT: u16 = 5432;
 
 #[rstest::fixture]
 pub async fn setup_onchain_db() -> ContainerAsync<Timescale> {
-    // 1. Run the container
-    let onchain_container = Postgres::default()
+    Postgres::default()
         .with_name("timescale/timescaledb-ha")
         .with_tag("pg14-latest")
         .with_env_var("POSTGRES_DB", "pragma")
@@ -23,20 +22,10 @@ pub async fn setup_onchain_db() -> ContainerAsync<Timescale> {
         .with_container_name(ONCHAIN_DB_CONTAINER_NAME)
         .start()
         .await
-        .unwrap();
-
-    // 2. Run the migrations
-    let onchain_db_port: u16 = onchain_container.get_host_port_ipv4(PORT).await.unwrap();
-    run_onchain_migrations(onchain_db_port).await;
-
-    onchain_container
+        .unwrap()
 }
 
-async fn run_onchain_migrations(port: u16) {
-    let db_url = format!(
-        "postgres://postgres:test-password@localhost:{}/pragma",
-        port
-    );
+pub async fn run_onchain_migrations(db_pool: &Pool) {
     let migrations_folder = current_dir()
         .unwrap()
         .join("..")
@@ -44,5 +33,5 @@ async fn run_onchain_migrations(port: u16) {
         .join("pragma-node")
         .join("postgres_migrations");
 
-    run_migrations(&db_url, migrations_folder).await;
+    run_migrations(db_pool, migrations_folder).await;
 }

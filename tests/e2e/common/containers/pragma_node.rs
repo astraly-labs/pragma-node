@@ -51,13 +51,14 @@ pub struct PragmaNode {
 }
 
 impl PragmaNode {
-    /// Sets the database max connections.
+    /// Sets the database max connections. Defaults to 25.
     pub fn with_max_conn(mut self, conns: &str) -> Self {
         self.env_vars
             .insert("DATABASE_MAX_CONN".to_owned(), conns.to_owned());
         self
     }
 
+    /// Sets the API port. Defaults to 3000.
     pub fn with_port(mut self, port: &str) -> Self {
         self.env_vars.insert("PORT".to_owned(), port.to_owned());
         self
@@ -121,6 +122,7 @@ impl Default for PragmaNode {
         env_vars.insert("DATABASE_MAX_CONN".to_owned(), "25".to_owned());
         env_vars.insert("TOPIC".to_owned(), "pragma-data".to_owned());
         env_vars.insert("KAFKA_BROKERS".to_owned(), "pragma-data".to_owned());
+        env_vars.insert("PORT".to_owned(), "3000".to_owned());
         env_vars.insert("METRICS_PORT".to_owned(), "8080".to_owned());
 
         Self { env_vars }

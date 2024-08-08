@@ -8,7 +8,7 @@ use testcontainers_modules::zookeeper::Zookeeper;
 use crate::common::containers::{
     kafka::setup_kafka,
     offchain_db::setup_offchain_db,
-    onchain_db::setup_onchain_db,
+    onchain_db::{run_onchain_migrations, setup_onchain_db},
     pragma_node::{setup_pragma_node, PragmaNode},
     zookeeper::setup_zookeeper,
     Containers, Timescale,
@@ -42,10 +42,13 @@ pub async fn setup_containers(
 ) -> TestHelper {
     tracing::info!("🔨 Setup offchain db..");
     let offchain_db = setup_offchain_db.await;
+    let offchain_pool = get_db_pool(offchain_db.get_host_port_ipv4(5432).await.unwrap());
     tracing::info!("✅ ... offchain db ready!\n");
 
     tracing::info!("🔨 Setup onchain db..");
     let onchain_db = setup_onchain_db.await;
+    let onchain_pool = get_db_pool(onchain_db.get_host_port_ipv4(5432).await.unwrap());
+    run_onchain_migrations(&onchain_pool).await;
     tracing::info!("✅ ... onchain db ready!\n");
 
     tracing::info!("🔨 Setup zookeeper..");
@@ -59,9 +62,6 @@ pub async fn setup_containers(
     tracing::info!("🔨 Setup pragma_node...");
     let pragma_node = setup_pragma_node.await;
     tracing::info!("✅ ... pragma-node!\n");
-
-    let onchain_pool = get_db_pool(onchain_db.get_host_port_ipv4(5432).await.unwrap());
-    let offchain_pool = get_db_pool(offchain_db.get_host_port_ipv4(5432).await.unwrap());
 
     let containers = Containers {
         onchain_db: Arc::new(onchain_db),

@@ -1,21 +1,17 @@
 use std::fs;
 use std::path::PathBuf;
 
-use deadpool_diesel::postgres::{Manager, Pool};
+use deadpool_diesel::postgres::Pool;
 use diesel::connection::SimpleConnection;
 
-pub async fn run_migrations(database_url: &str, folder: PathBuf) {
-    // Create a connection pool
-    let manager = Manager::new(database_url.to_string(), deadpool_diesel::Runtime::Tokio1);
-    let pool = Pool::builder(manager).build().unwrap();
-
+pub async fn run_migrations(pool: &Pool, folder: PathBuf) {
     // Read and sort migration files
     let mut migration_files = read_migration_files(folder);
     migration_files.sort_by(|a, b| a.0.cmp(&b.0));
 
     // Execute migrations sequentially
     for (_, file_path) in migration_files {
-        execute_migration(&pool, file_path).await;
+        execute_migration(pool, file_path).await;
     }
 }
 
