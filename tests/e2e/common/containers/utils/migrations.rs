@@ -10,7 +10,8 @@ pub async fn run_migrations(pool: &Pool, folder: PathBuf) {
     migration_files.sort_by(|a, b| a.0.cmp(&b.0));
 
     // Execute migrations sequentially
-    for (_, file_path) in migration_files {
+    for (nb, file_path) in migration_files {
+        tracing::debug!("[{nb}] Executing migration from {:?}", file_path);
         execute_migration(pool, file_path).await;
     }
 }

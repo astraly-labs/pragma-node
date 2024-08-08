@@ -16,7 +16,7 @@ const TAG: &str = "latest";
 
 const PRAGMA_NODE_CONTAINER_NAME: &str = "pragma-node-container";
 
-const SERVER_PORT: u16 = 3000;
+pub const SERVER_PORT: u16 = 3000;
 const METRICS_PORT: u16 = 8080;
 const DB_PORT: u16 = 5432;
 
@@ -25,7 +25,7 @@ pub async fn setup_pragma_node() -> ContainerAsync<PragmaNode> {
     // 1. Build the pragma-node image
     ImageBuilder::default()
         .with_build_name(PRAGMA_NODE_BUILD_NAME)
-        .with_dockerfile(&pragma_node_dockerfile())
+        .with_dockerfile(&pragma_node_dockerfile_path())
         .build()
         .await;
 
@@ -132,7 +132,7 @@ impl Default for PragmaNode {
 // Utilities for build
 
 // Returns the path of the Pragma node dockerfile.
-fn pragma_node_dockerfile() -> PathBuf {
+fn pragma_node_dockerfile_path() -> PathBuf {
     current_dir()
         .unwrap()
         .join("..")

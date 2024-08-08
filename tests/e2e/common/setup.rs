@@ -9,7 +9,7 @@ use crate::common::containers::{
     kafka::setup_kafka,
     offchain_db::setup_offchain_db,
     onchain_db::{run_onchain_migrations, setup_onchain_db},
-    pragma_node::{setup_pragma_node, PragmaNode},
+    pragma_node::{setup_pragma_node, PragmaNode, SERVER_PORT},
     zookeeper::setup_zookeeper,
     Containers, Timescale,
 };
@@ -71,7 +71,7 @@ pub async fn setup_containers(
     };
 
     TestHelper {
-        node_base_url: "http://localhost:3000".to_owned(),
+        node_base_url: format!("http://localhost:{}", SERVER_PORT),
         containers,
         onchain_pool,
         offchain_pool,
