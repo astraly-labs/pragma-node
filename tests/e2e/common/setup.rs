@@ -15,12 +15,20 @@ use crate::common::containers::{
 };
 use crate::common::logs::init_logging;
 
+/// Main structure that we carry around for our tests.
+/// Contains some usefull fields & functions attached to make testing easier.
 #[allow(dead_code)]
 pub struct TestHelper {
     node_base_url: String,
     onchain_pool: Pool,
     offchain_pool: Pool,
     containers: Containers,
+}
+
+impl TestHelper {
+    pub fn endpoint(&self, path: &str) -> String {
+        format!("{}/{}", self.node_base_url, path)
+    }
 }
 
 #[rstest::fixture]
