@@ -49,7 +49,8 @@ pub struct GetOnchainHistoryResponse(pub Vec<GetOnchainHistoryEntry>);
             "chunk_interval" = Option<Interval>,
             Query,
             description = "Chunk time length for each block of data",
-        )
+        ),
+        ("routing" = Option<bool>, Query, description = "Activate routing functionnality"),
     ),
 )]
 pub async fn get_onchain_history(
