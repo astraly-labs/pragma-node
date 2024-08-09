@@ -165,7 +165,7 @@ pub async fn retry_with_routing(
         }
     }
 
-    Err(InfraError::NotFound)
+    Err(InfraError::RoutingError)
 }
 
 /// Given two vector of entries, compute a new vector containing the routed prices.
