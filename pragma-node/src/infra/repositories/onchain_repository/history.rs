@@ -240,7 +240,7 @@ fn combine_entries(
     quote_entry: &HistoricalEntryRaw,
     converted_price: BigDecimal,
 ) -> Result<HistoricalEntryRaw, InfraError> {
-    let min_timestamp = std::cmp::max(
+    let max_timestamp = std::cmp::max(
         base_entry.timestamp.and_utc().timestamp(),
         quote_entry.timestamp.and_utc().timestamp(),
     );
@@ -248,9 +248,9 @@ fn combine_entries(
         base_entry.nb_sources_aggregated,
         quote_entry.nb_sources_aggregated,
     );
-    let new_timestamp = DateTime::from_timestamp(min_timestamp, 0)
+    let new_timestamp = DateTime::from_timestamp(max_timestamp, 0)
         .ok_or(InfraError::InvalidTimestamp(format!(
-            "Cannot convert to DateTime: {min_timestamp}"
+            "Cannot convert to DateTime: {max_timestamp}"
         )))?
         .naive_utc();
 
