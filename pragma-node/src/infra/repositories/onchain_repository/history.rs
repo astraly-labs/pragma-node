@@ -106,7 +106,6 @@ async fn get_historical_aggregated_entries(
 
 /// Retry to get the onchain historical entries by finding
 /// an alternative route.
-/// NOTE: Routing is enabled only for interval >= 1 hour.
 /// TODO: This code is very similar to the one in [entry_repository] ;
 ///       once we have proper E2E tests, we should try to merge the code.
 pub async fn retry_with_routing(
@@ -117,10 +116,6 @@ pub async fn retry_with_routing(
     timestamp_range: &TimestampRange,
     chunk_interval: &Interval,
 ) -> Result<(Vec<HistoricalEntryRaw>, u32), InfraError> {
-    if chunk_interval.to_minutes() < 60 {
-        return Err(InfraError::NotFound);
-    }
-
     let [base, quote]: [&str; 2] = pair_id
         .split('/')
         .collect::<Vec<_>>()
