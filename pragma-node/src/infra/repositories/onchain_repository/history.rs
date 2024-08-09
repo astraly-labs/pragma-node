@@ -10,7 +10,7 @@ use serde::Serialize;
 
 use crate::infra::repositories::entry_repository::get_decimals;
 use crate::types::timestamp::TimestampRange;
-use crate::utils::{convert_via_quote, normalize_to_decimals};
+use crate::utils::{convert_via_quote, normalize_to_decimals, pair_id_to_currency_pair};
 
 use super::entry::{get_existing_pairs, onchain_pair_exist};
 use super::get_onchain_aggregate_table_name;
@@ -116,11 +116,7 @@ pub async fn retry_with_routing(
     timestamp_range: &TimestampRange,
     chunk_interval: &Interval,
 ) -> Result<(Vec<HistoricalEntryRaw>, u32), InfraError> {
-    let [base, quote]: [&str; 2] = pair_id
-        .split('/')
-        .collect::<Vec<_>>()
-        .try_into()
-        .map_err(|_| InfraError::InternalServerError)?;
+    let (base, quote) = pair_id_to_currency_pair(&pair_id);
 
     let offchain_conn = offchain_pool.get().await.map_err(adapt_infra_error)?;
     let alternative_currencies = offchain_conn

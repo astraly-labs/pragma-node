@@ -36,7 +36,6 @@ pub(crate) fn currency_pair_to_pair_id(base: &str, quote: &str) -> String {
 /// Converts a pair_id to a currency pair.
 ///
 /// e.g "BTC/USD" to ("BTC", "USD")
-/// TODO: handle possible errors
 pub(crate) fn pair_id_to_currency_pair(pair_id: &str) -> (String, String) {
     let parts: Vec<&str> = pair_id.split('/').collect();
     (parts[0].to_string(), parts[1].to_string())
