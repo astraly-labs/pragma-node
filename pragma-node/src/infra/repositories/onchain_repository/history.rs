@@ -110,6 +110,8 @@ async fn get_historical_aggregated_entries(
 /// an alternative route.
 /// TODO: This code is very similar to the one in [entry_repository] ;
 ///       once we have proper E2E tests, we should try to merge the code.
+/// NOTE: We let the possibility to try 1min intervals but they rarely works.
+/// Entries rarely align perfectly, causing insufficient data for routing.
 pub async fn retry_with_routing(
     onchain_pool: &Pool,
     offchain_pool: &Pool,
