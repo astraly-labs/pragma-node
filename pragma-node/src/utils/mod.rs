@@ -26,7 +26,7 @@ mod signing;
 
 const ONE_YEAR_IN_SECONDS: f64 = 3153600_f64;
 
-/// Converts two currenciess pairs to a new router pair id.
+/// Converts two currencies pairs to a new routed pair id.
 ///
 /// e.g "btc/usd" and "eth/usd" to "btc/eth"
 pub(crate) fn currency_pairs_to_routed_pair_id(base_pair: &str, quote_pair: &str) -> String {
