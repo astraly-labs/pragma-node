@@ -190,14 +190,14 @@ pub fn calculate_rebased_price(
             base_decimals,
         )
     };
-    let min_timestamp = std::cmp::max(
+    let max_timestamp = std::cmp::max(
         base_entry.time.and_utc().timestamp(),
         quote_entry.time.and_utc().timestamp(),
     );
     let num_sources = std::cmp::max(base_entry.num_sources, quote_entry.num_sources);
-    let new_timestamp = DateTime::from_timestamp(min_timestamp, 0)
+    let new_timestamp = DateTime::from_timestamp(max_timestamp, 0)
         .ok_or(InfraError::InvalidTimestamp(format!(
-            "Cannot convert to DateTime: {min_timestamp}"
+            "Cannot convert to DateTime: {max_timestamp}"
         )))?
         .naive_utc();
 
