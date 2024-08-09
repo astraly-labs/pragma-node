@@ -11,7 +11,8 @@ use serde::Serialize;
 use crate::infra::repositories::entry_repository::get_decimals;
 use crate::types::timestamp::TimestampRange;
 use crate::utils::{
-    convert_via_quote, currency_pair_to_pair_id, normalize_to_decimals, pair_id_to_currency_pair,
+    convert_via_quote, currency_pairs_to_routed_pair_id, normalize_to_decimals,
+    pair_id_to_currency_pair,
 };
 
 use super::entry::{get_existing_pairs, onchain_pair_exist};
@@ -255,7 +256,7 @@ fn combine_entries(
         .naive_utc();
 
     Ok(HistoricalEntryRaw {
-        pair_id: currency_pair_to_pair_id(&base_entry.pair_id, &quote_entry.pair_id),
+        pair_id: currency_pairs_to_routed_pair_id(&base_entry.pair_id, &quote_entry.pair_id),
         timestamp: new_timestamp,
         median_price: converted_price,
         nb_sources_aggregated: num_sources,

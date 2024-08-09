@@ -26,6 +26,15 @@ mod signing;
 
 const ONE_YEAR_IN_SECONDS: f64 = 3153600_f64;
 
+/// Converts two currencies pairs to a new routed pair id.
+///
+/// e.g "btc/usd" and "eth/usd" to "btc/eth"
+pub(crate) fn currency_pairs_to_routed_pair_id(base_pair: &str, quote_pair: &str) -> String {
+    let (base, _) = pair_id_to_currency_pair(base_pair);
+    let (quote, _) = pair_id_to_currency_pair(quote_pair);
+    format!("{}/{}", base.to_uppercase(), quote.to_uppercase())
+}
+
 /// Converts a currency pair to a pair id.
 ///
 /// e.g "btc" and "usd" to "BTC/USD"
