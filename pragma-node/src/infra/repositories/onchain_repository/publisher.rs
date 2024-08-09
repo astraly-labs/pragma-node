@@ -243,7 +243,7 @@ pub async fn get_publishers_with_components(
     publishers: Vec<RawPublisher>,
     publishers_updates_cache: Cache<String, HashMap<String, RawPublisherUpdates>>,
 ) -> Result<Vec<Publisher>, InfraError> {
-    let table_name = get_onchain_table_name(network, data_type)?;
+    let table_name = get_onchain_table_name(&network, &data_type)?;
     let publisher_names = publishers.iter().map(|p| p.name.clone()).collect();
 
     let updates =

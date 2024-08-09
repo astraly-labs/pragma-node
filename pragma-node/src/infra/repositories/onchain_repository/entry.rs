@@ -79,7 +79,7 @@ pub async fn routing(
     let pair_id = routing_args.pair_id;
     let is_routing = routing_args.is_routing;
 
-    let existing_pair_list = get_existing_pairs(onchain_pool, routing_args.network).await?;
+    let existing_pair_list = get_existing_pairs(onchain_pool, &routing_args.network).await?;
     let mut result: Vec<RawOnchainData> = Vec::new();
 
     if !is_routing || onchain_pair_exist(&existing_pair_list, &pair_id) {
@@ -164,7 +164,7 @@ fn build_sql_query(
     aggregation_mode: AggregationMode,
     timestamp: u64,
 ) -> Result<String, InfraError> {
-    let table_name = get_onchain_table_name(network, DataType::SpotEntry)?;
+    let table_name = get_onchain_table_name(&network, &DataType::SpotEntry)?;
 
     let complete_sql_query = {
         let aggregation_query = get_aggregation_subquery(aggregation_mode)?;
@@ -364,7 +364,7 @@ pub async fn get_last_updated_timestamp(
         ORDER BY timestamp DESC
         LIMIT 1;
     "#,
-        get_onchain_table_name(network, DataType::SpotEntry)?,
+        get_onchain_table_name(&network, &DataType::SpotEntry)?,
         pair_list,
     );
     let conn = pool.get().await.map_err(adapt_infra_error)?;
@@ -475,7 +475,7 @@ pub fn onchain_pair_exist(existing_pair_list: &[EntryPairId], pair_id: &str) -> 
 // TODO(0xevolve): Only works for Spot entries
 pub async fn get_existing_pairs(
     pool: &Pool,
-    network: Network,
+    network: &Network,
 ) -> Result<Vec<EntryPairId>, InfraError> {
     let raw_sql = format!(
         r#"
@@ -484,7 +484,7 @@ pub async fn get_existing_pairs(
         FROM
             {table_name};
     "#,
-        table_name = get_onchain_table_name(network, DataType::SpotEntry)?
+        table_name = get_onchain_table_name(network, &DataType::SpotEntry)?
     );
 
     let conn = pool.get().await.map_err(adapt_infra_error)?;
