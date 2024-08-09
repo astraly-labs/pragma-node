@@ -233,13 +233,14 @@ fn convert_entries_via_quote(
         .collect()
 }
 
-/// Given two entries, determine what should be the resulted timestamp & sources.
-/// Returns the new entry.
+/// Given two entries, determine what should be the resulted pair_id, timestamp
+/// & sources. Returns the new entry afterwards.
 fn combine_entries(
     base_entry: &HistoricalEntryRaw,
     quote_entry: &HistoricalEntryRaw,
     converted_price: BigDecimal,
 ) -> Result<HistoricalEntryRaw, InfraError> {
+    let new_pair_id = construct_new_pair_id(&base_entry.pair_id, &quote_entry.pair_id)?;
     let min_timestamp = std::cmp::max(
         base_entry.timestamp.and_utc().timestamp(),
         quote_entry.timestamp.and_utc().timestamp(),
@@ -255,9 +256,25 @@ fn combine_entries(
         .naive_utc();
 
     Ok(HistoricalEntryRaw {
-        pair_id: base_entry.pair_id.clone(),
+        pair_id: new_pair_id,
         timestamp: new_timestamp,
         median_price: converted_price,
         nb_sources_aggregated: num_sources,
     })
+}
+
+fn construct_new_pair_id(base_pair_id: &str, quote_pair_id: &str) -> Result<String, InfraError> {
+    // Extract base currency from base_entry pair_id
+    let base_currency = base_pair_id
+        .split('/')
+        .next()
+        .ok_or_else(|| InfraError::InternalServerError)?;
+
+    // Extract quote currency from quote_entry pair_id
+    let quote_currency = quote_pair_id
+        .split('/')
+        .next()
+        .ok_or_else(|| InfraError::InternalServerError)?;
+
+    Ok(format!("{}/{}", base_currency, quote_currency))
 }
