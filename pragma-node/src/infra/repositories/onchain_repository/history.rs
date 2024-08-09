@@ -240,7 +240,6 @@ fn combine_entries(
     quote_entry: &HistoricalEntryRaw,
     converted_price: BigDecimal,
 ) -> Result<HistoricalEntryRaw, InfraError> {
-    let new_pair_id = construct_new_pair_id(&base_entry.pair_id, &quote_entry.pair_id)?;
     let min_timestamp = std::cmp::max(
         base_entry.timestamp.and_utc().timestamp(),
         quote_entry.timestamp.and_utc().timestamp(),
@@ -256,7 +255,7 @@ fn combine_entries(
         .naive_utc();
 
     Ok(HistoricalEntryRaw {
-        pair_id: new_pair_id,
+        pair_id: construct_new_pair_id(&base_entry.pair_id, &quote_entry.pair_id)?,
         timestamp: new_timestamp,
         median_price: converted_price,
         nb_sources_aggregated: num_sources,
@@ -264,13 +263,11 @@ fn combine_entries(
 }
 
 fn construct_new_pair_id(base_pair_id: &str, quote_pair_id: &str) -> Result<String, InfraError> {
-    // Extract base currency from base_entry pair_id
     let base_currency = base_pair_id
         .split('/')
         .next()
         .ok_or_else(|| InfraError::InternalServerError)?;
 
-    // Extract quote currency from quote_entry pair_id
     let quote_currency = quote_pair_id
         .split('/')
         .next()
