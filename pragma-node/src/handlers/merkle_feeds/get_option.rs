@@ -7,20 +7,21 @@ use pragma_common::types::options::OptionData;
 use pragma_common::types::Network;
 use pragma_entities::models::merkle_feed_error::MerkleFeedError;
 use serde::{Deserialize, Serialize};
-use utoipa::{IntoParams, ToSchema};
+use utoipa::{IntoParams, ToResponse, ToSchema};
 
 use crate::infra::redis;
 use crate::utils::PathExtractor;
 use crate::AppState;
 
 #[derive(Default, Deserialize, IntoParams, ToSchema)]
+#[into_params(parameter_in = Query)]
 pub struct GetOptionQuery {
     pub network: Option<Network>,
     #[serde(rename = "block_id")]
     pub block_id: Option<BlockId>,
 }
 
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Serialize, Deserialize, ToResponse, ToSchema)]
 pub struct GetOptionResponse {
     #[serde(flatten)]
     pub option_data: OptionData,

@@ -45,6 +45,7 @@ impl From<EntryType> for DataType {
 }
 
 #[derive(Debug, Deserialize, IntoParams, ToSchema)]
+#[into_params(parameter_in = Query)]
 pub struct GetEntryParams {
     /// The unix timestamp in seconds. This endpoint will return the first update whose
     /// timestamp is <= the provided value.

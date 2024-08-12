@@ -3,7 +3,7 @@ use axum::Json;
 use pragma_common::types::{Interval, Network};
 use pragma_entities::EntryError;
 use serde::{Deserialize, Serialize};
-use utoipa::{IntoParams, ToSchema};
+use utoipa::{IntoParams, ToResponse, ToSchema};
 
 use crate::infra::repositories::onchain_repository::history::{
     get_historical_entries_and_decimals, retry_with_routing, HistoricalEntryRaw,
@@ -15,6 +15,7 @@ use crate::AppState;
 use crate::utils::currency_pair_to_pair_id;
 
 #[derive(Debug, Deserialize, IntoParams, ToSchema)]
+#[into_params(parameter_in = Query)]
 pub struct GetOnchainHistoryParams {
     pub network: Network,
     pub timestamp: TimestampRange,
@@ -31,7 +32,7 @@ pub struct GetOnchainHistoryEntry {
     nb_sources_aggregated: u32,
 }
 
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Serialize, Deserialize, ToResponse, ToSchema)]
 pub struct GetOnchainHistoryResponse(pub Vec<GetOnchainHistoryEntry>);
 
 #[utoipa::path(
@@ -43,14 +44,7 @@ pub struct GetOnchainHistoryResponse(pub Vec<GetOnchainHistoryEntry>);
     params(
         ("base" = String, Path, description = "Base Asset"),
         ("quote" = String, Path, description = "Quote Asset"),
-        ("network" = Network, Query, description = "Network"),
-        ("timestamp" = Option<String>, Query, description = "Timestamp range"),
-        (
-            "chunk_interval" = Option<Interval>,
-            Query,
-            description = "Chunk time length for each block of data",
-        ),
-        ("routing" = Option<bool>, Query, description = "Activate routing functionnality"),
+        GetOnchainHistoryParams
     ),
 )]
 pub async fn get_onchain_history(

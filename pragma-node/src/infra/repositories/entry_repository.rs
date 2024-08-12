@@ -7,6 +7,7 @@ use diesel::sql_types::{Double, Jsonb, VarChar};
 use diesel::{ExpressionMethods, QueryDsl, Queryable, RunQueryDsl};
 use pragma_common::errors::ConversionError;
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 use crate::constants::starkex_ws::{
     INITAL_INTERVAL_IN_MS, INTERVAL_INCREMENT_IN_MS, MAX_INTERVAL_WITHOUT_ENTRIES,
@@ -513,7 +514,7 @@ pub async fn get_last_updated_timestamp(
         .map_err(adapt_infra_error)
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Queryable)]
+#[derive(Debug, Clone, Serialize, Deserialize, Queryable, ToSchema)]
 pub struct OHLCEntry {
     pub time: NaiveDateTime,
     pub open: BigDecimal,

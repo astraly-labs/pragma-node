@@ -3,12 +3,23 @@
 use serde::{Deserialize, Deserializer, Serialize};
 use std::str::FromStr;
 use strum::{Display, EnumString};
+use utoipa::ToSchema;
 
 /// Block tag.
 ///
 /// A tag specifying a dynamic reference to a block.
 #[derive(
-    Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Display, EnumString,
+    Debug,
+    Default,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Serialize,
+    Deserialize,
+    Display,
+    EnumString,
+    ToSchema,
 )]
 #[strum(serialize_all = "lowercase")]
 pub enum BlockTag {
@@ -18,7 +29,7 @@ pub enum BlockTag {
 }
 
 /// Block identifier in the form of hash, number or tag.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Display)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Display, ToSchema)]
 pub enum BlockId {
     #[strum(serialize = "{0}")]
     Tag(BlockTag),

@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use pragma_common::types::DataType;
 use pragma_entities::EntryError;
-use utoipa::ToSchema;
+use utoipa::{ToResponse, ToSchema};
 
 use crate::constants::starkex_ws::PRAGMA_ORACLE_NAME_FOR_STARKEX;
 use crate::infra::repositories::entry_repository::MedianEntryWithComponents;
@@ -37,7 +37,7 @@ pub struct AssetOraclePrice {
     pub signed_prices: Vec<SignedPublisherPrice>,
 }
 
-#[derive(Debug, Default, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Default, Serialize, Deserialize, ToResponse, ToSchema)]
 pub struct SubscribeToEntryResponse {
     pub oracle_prices: Vec<AssetOraclePrice>,
     pub timestamp: UnixTimestamp,

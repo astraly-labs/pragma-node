@@ -56,6 +56,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tokio = { version = "1.11.0", features = ["full"] }
 toml = "0.8.8"
 utoipa = "4"
+utoipauto = "0.1.14"
 utoipa-swagger-ui = { version = "4", features = ["axum"] }
 uuid = { version = "1.4", features = ["fast-rng", "v4", "serde"] }
 

@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use starknet::core::types::FieldElement;
 use thiserror::Error;
+use utoipa::ToSchema;
 
 use crate::hash::pedersen_hash;
 
@@ -31,7 +32,7 @@ pub struct MerkleTree {
 pub struct FeltMerkleProof(pub Vec<FieldElement>);
 
 /// The merkle proof but with hexadecimal hashes instead of Field elements.
-#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize, ToSchema)]
 pub struct MerkleProof(pub Vec<String>);
 
 impl From<FeltMerkleProof> for MerkleProof {

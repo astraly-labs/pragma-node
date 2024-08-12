@@ -44,6 +44,7 @@ uuid = { workspace = true, features = ["fast-rng", "v4", "serde"] }
 
 pragma-common = { path = "../pragma-common" }
 pragma-entities = { path = "../pragma-entities" }
+utoipauto = { workspace = true }
 
 [dev-dependencies]
 rstest = { workspace = true }

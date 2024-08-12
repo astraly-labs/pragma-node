@@ -4,7 +4,7 @@ use chrono::{DateTime, Utc};
 use pragma_entities::{EntryError, NewFutureEntry, PublisherError};
 use serde::{Deserialize, Serialize};
 use starknet::core::types::FieldElement;
-use utoipa::ToSchema;
+use utoipa::{ToResponse, ToSchema};
 
 use crate::config::config;
 use crate::infra::kafka;
@@ -31,7 +31,7 @@ impl AsRef<[FutureEntry]> for CreateFutureEntryRequest {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Serialize, Deserialize, ToSchema, ToResponse)]
 pub struct CreateFutureEntryResponse {
     number_entries_created: usize,
 }
@@ -39,9 +39,9 @@ pub struct CreateFutureEntryResponse {
 #[utoipa::path(
     post,
     path = "/node/v1/data/publish_future",
-    request_body = CreatePerpEntryRequest,
+    request_body = CreateFutureEntryRequest,
     responses(
-        (status = 200, description = "Entries published successfuly", body = CreatePerpEntryResponse),
+        (status = 200, description = "Entries published successfuly", body = CreateFutureEntryResponse),
         (status = 401, description = "Unauthorized Publisher", body = EntryError)
     )
 )]

@@ -1,7 +1,7 @@
 use axum::extract::{Query, State};
 use axum::Json;
 use serde::{Deserialize, Serialize};
-use utoipa::{IntoParams, ToSchema};
+use utoipa::{IntoParams, ToResponse, ToSchema};
 
 use crate::infra::repositories::entry_repository::{self, MedianEntry};
 use crate::utils::PathExtractor;
@@ -12,6 +12,7 @@ use crate::utils::{compute_volatility, currency_pair_to_pair_id};
 
 /// Volatility query
 #[derive(Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
 pub struct VolatilityQuery {
     /// Initial timestamp, combined with final_timestamp, it helps define the period over which the mean is computed
     start: u64,
@@ -19,7 +20,7 @@ pub struct VolatilityQuery {
     end: u64,
 }
 
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Serialize, Deserialize, ToResponse, ToSchema)]
 pub struct GetVolatilityResponse {
     pair_id: String,
     volatility: f64,

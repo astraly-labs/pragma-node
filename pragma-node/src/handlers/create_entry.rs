@@ -4,7 +4,7 @@ use chrono::{DateTime, Utc};
 use pragma_entities::{EntryError, NewEntry, PublisherError};
 use serde::{Deserialize, Serialize};
 use starknet::core::types::FieldElement;
-use utoipa::ToSchema;
+use utoipa::{ToResponse, ToSchema};
 
 use crate::config::config;
 use crate::infra::kafka;
@@ -31,7 +31,7 @@ impl AsRef<[Entry]> for CreateEntryRequest {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Serialize, Deserialize, ToSchema, ToResponse)]
 pub struct CreateEntryResponse {
     number_entries_created: usize,
 }
