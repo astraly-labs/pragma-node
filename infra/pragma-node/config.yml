@@ -13,3 +13,5 @@ container_environment:
       - PORT
       - METRICS_PORT
       - KAFKA_BROKERS
+      - REDIS_HOST
+      - REDIS_PORT
