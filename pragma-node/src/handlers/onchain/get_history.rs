@@ -5,9 +5,8 @@ use pragma_entities::EntryError;
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 
-use crate::infra::repositories::entry_repository::get_decimals;
 use crate::infra::repositories::onchain_repository::history::{
-    get_historical_aggregated_entries, HistoricalEntryRaw,
+    get_historical_entries_and_decimals, retry_with_routing, HistoricalEntryRaw,
 };
 use crate::types::timestamp::TimestampRange;
 use crate::utils::{big_decimal_price_to_hex, PathExtractor};
@@ -20,6 +19,7 @@ pub struct GetOnchainHistoryParams {
     pub network: Network,
     pub timestamp: TimestampRange,
     pub chunk_interval: Option<Interval>,
+    pub routing: Option<bool>,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
@@ -49,7 +49,8 @@ pub struct GetOnchainHistoryResponse(pub Vec<GetOnchainHistoryEntry>);
             "chunk_interval" = Option<Interval>,
             Query,
             description = "Chunk time length for each block of data",
-        )
+        ),
+        ("routing" = Option<bool>, Query, description = "Activate routing functionnality"),
     ),
 )]
 pub async fn get_onchain_history(
@@ -61,23 +62,39 @@ pub async fn get_onchain_history(
     let pair_id: String = currency_pair_to_pair_id(&pair.0, &pair.1);
     let network = params.network;
     let timestamp_range = params.timestamp.assert_time_is_valid()?;
-
     let chunk_interval = params.chunk_interval.unwrap_or_default();
+    let with_routing = params.routing.unwrap_or(false);
 
-    let raw_entries: Vec<HistoricalEntryRaw> = get_historical_aggregated_entries(
+    // We first try to get the historical entries for the selected pair
+    let query_result = get_historical_entries_and_decimals(
         &state.onchain_pool,
-        network,
+        &state.offchain_pool,
+        &network,
         pair_id.clone(),
-        timestamp_range,
-        chunk_interval,
+        &timestamp_range,
+        &chunk_interval,
     )
-    .await?;
+    .await;
 
-    if raw_entries.is_empty() {
-        return Err(EntryError::NotFound(pair_id));
-    }
+    // If the request worked, we return the entries.
+    // If it did not succeed and we have have [with_routing] to true,
+    // we try other routes.
+    let (raw_entries, decimals) = match query_result {
+        Ok((raw_entries, decimals)) => (raw_entries, decimals),
+        Err(_) if with_routing => {
+            retry_with_routing(
+                &state.onchain_pool,
+                &state.offchain_pool,
+                &network,
+                pair_id.clone(),
+                &timestamp_range,
+                &chunk_interval,
+            )
+            .await?
+        }
+        Err(e) => return Err(e.to_entry_error(&pair_id)),
+    };
 
-    let decimals = get_decimals(&state.offchain_pool, &pair_id).await?;
     let response = prepare_response(raw_entries, decimals);
     Ok(Json(response))
 }

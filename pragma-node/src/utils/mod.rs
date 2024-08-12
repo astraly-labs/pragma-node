@@ -26,6 +26,15 @@ mod signing;
 
 const ONE_YEAR_IN_SECONDS: f64 = 3153600_f64;
 
+/// Converts two currencies pairs to a new routed pair id.
+///
+/// e.g "btc/usd" and "eth/usd" to "btc/eth"
+pub(crate) fn currency_pairs_to_routed_pair_id(base_pair: &str, quote_pair: &str) -> String {
+    let (base, _) = pair_id_to_currency_pair(base_pair);
+    let (quote, _) = pair_id_to_currency_pair(quote_pair);
+    format!("{}/{}", base.to_uppercase(), quote.to_uppercase())
+}
+
 /// Converts a currency pair to a pair id.
 ///
 /// e.g "btc" and "usd" to "BTC/USD"
@@ -36,7 +45,6 @@ pub(crate) fn currency_pair_to_pair_id(base: &str, quote: &str) -> String {
 /// Converts a pair_id to a currency pair.
 ///
 /// e.g "BTC/USD" to ("BTC", "USD")
-/// TODO: handle possible errors
 pub(crate) fn pair_id_to_currency_pair(pair_id: &str) -> (String, String) {
     let parts: Vec<&str> = pair_id.split('/').collect();
     (parts[0].to_string(), parts[1].to_string())
@@ -96,7 +104,7 @@ pub(crate) fn compute_median_price_and_time(
 /// Given a pair and a network, returns if it exists in the
 /// onchain database.
 pub(crate) async fn is_onchain_existing_pair(pool: &Pool, pair: &String, network: Network) -> bool {
-    let existings_pairs = get_existing_pairs(pool, network)
+    let existings_pairs = get_existing_pairs(pool, &network)
         .await
         .expect("Couldn't get the existing pairs from the database.");
 
