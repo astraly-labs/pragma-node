@@ -15,7 +15,6 @@ use crate::AppState;
 use crate::utils::currency_pair_to_pair_id;
 
 #[derive(Debug, Deserialize, IntoParams, ToSchema)]
-#[into_params(parameter_in = Query)]
 pub struct GetOnchainHistoryParams {
     pub network: Network,
     pub timestamp: TimestampRange,

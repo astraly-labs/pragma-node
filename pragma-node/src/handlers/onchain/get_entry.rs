@@ -17,7 +17,6 @@ use crate::AppState;
 use crate::utils::currency_pair_to_pair_id;
 
 #[derive(Debug, Default, Deserialize, IntoParams, ToSchema)]
-#[into_params(parameter_in = Query)]
 pub struct GetOnchainEntryParams {
     pub network: Network,
     pub aggregation: Option<AggregationMode>,

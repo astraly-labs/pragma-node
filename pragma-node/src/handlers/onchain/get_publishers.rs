@@ -13,7 +13,6 @@ use crate::infra::repositories::onchain_repository::publisher::{
 use crate::AppState;
 
 #[derive(Debug, Default, Deserialize, IntoParams, ToSchema)]
-#[into_params(parameter_in = Query)]
 pub struct GetOnchainPublishersParams {
     pub network: Network,
     pub data_type: DataType,

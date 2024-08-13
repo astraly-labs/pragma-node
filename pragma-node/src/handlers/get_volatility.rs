@@ -12,7 +12,6 @@ use crate::utils::{compute_volatility, currency_pair_to_pair_id};
 
 /// Volatility query
 #[derive(Deserialize, IntoParams)]
-#[into_params(parameter_in = Query)]
 pub struct VolatilityQuery {
     /// Initial timestamp, combined with final_timestamp, it helps define the period over which the mean is computed
     start: u64,

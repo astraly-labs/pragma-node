@@ -21,27 +21,24 @@ impl Modify for SecurityAddon {
         if let Some(components) = openapi.components.as_mut() {
             components.add_security_scheme(
                 "api_key",
-                SecurityScheme::ApiKey(ApiKey::Header(ApiKeyValue::new("pragma_apikey"))),
+                SecurityScheme::ApiKey(ApiKey::Header(ApiKeyValue::new("x-api-key"))),
             )
         }
     }
 }
+#[utoipauto(
+    paths = "./pragma-node/src, ./pragma-common/src from pragma_common, ./pragma-entities/src from pragma_entities"
+)]
+#[derive(OpenApi)]
+#[openapi(
+modifiers(&SecurityAddon),
+tags(
+    (name = "pragma-node", description = "Pragma Node API")
+)
+)]
+pub struct ApiDoc;
 
 pub async fn run_app_server(config: &Config, state: AppState) {
-    #[utoipauto(
-        paths = "./pragma-node/src, ./pragma-common/src from pragma_common, ./pragma-entities/src from pragma_entities"
-    )]
-    #[derive(OpenApi)]
-    #[openapi(
-    modifiers(&SecurityAddon),
-    tags(
-        (name = "pragma-node", description = "Pragma Node API")
-    )
-    )]
-    struct ApiDoc;
-
-    let json = ApiDoc::openapi().to_json().unwrap();
-    std::fs::write("openapi.json", json).unwrap();
 
     let app = app_router::<ApiDoc>(state.clone())
         .with_state(state)

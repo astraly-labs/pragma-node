@@ -14,7 +14,6 @@ use crate::utils::PathExtractor;
 use crate::AppState;
 
 #[derive(Default, Deserialize, IntoParams, ToSchema)]
-#[into_params(parameter_in = Query)]
 pub struct GetOptionQuery {
     pub network: Option<Network>,
     #[serde(rename = "block_id")]

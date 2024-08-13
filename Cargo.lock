@@ -5958,7 +5958,9 @@ dependencies = [
  "proc-macro-error",
  "proc-macro2",
  "quote",
+ "regex",
  "syn 2.0.66",
+ "uuid 1.8.0",
 ]
 
 [[package]]

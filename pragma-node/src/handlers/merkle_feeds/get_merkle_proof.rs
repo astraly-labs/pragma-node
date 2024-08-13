@@ -16,7 +16,6 @@ use crate::utils::PathExtractor;
 use crate::AppState;
 
 #[derive(Default, Deserialize, IntoParams, ToSchema)]
-#[into_params(parameter_in = Query)]
 pub struct GetMerkleProofQuery {
     pub network: Option<Network>,
     pub block_id: Option<BlockId>,

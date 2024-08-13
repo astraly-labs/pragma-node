@@ -16,7 +16,6 @@ pub const DEFAULT_LIMIT: u64 = 100;
 pub const MAX_LIMIT: u64 = 1000;
 
 #[derive(Debug, Deserialize, IntoParams, ToSchema)]
-#[into_params(parameter_in = Query)]
 pub struct GetOnchainCheckpointsParams {
     pub network: Network,
     pub limit: Option<u64>,
