@@ -4,7 +4,7 @@ use axum::Json;
 use pragma_common::types::{DataType, Network};
 use pragma_entities::EntryError;
 use serde::{Deserialize, Serialize};
-use utoipa::{IntoParams, ToSchema};
+use utoipa::{IntoParams, ToResponse, ToSchema};
 
 use crate::infra::repositories::entry_repository::get_all_currencies_decimals;
 use crate::infra::repositories::onchain_repository::publisher::{
@@ -40,7 +40,7 @@ pub struct Publisher {
     pub components: Vec<PublisherEntry>,
 }
 
-#[derive(Debug, Default, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Default, Serialize, Deserialize, ToResponse, ToSchema)]
 pub struct GetOnchainPublishersResponse(pub Vec<Publisher>);
 
 #[utoipa::path(
@@ -50,8 +50,7 @@ pub struct GetOnchainPublishersResponse(pub Vec<Publisher>);
         (status = 200, description = "Get the onchain publishers", body = GetOnchainPublishersResponse)
     ),
     params(
-        ("network" = Network, Query, description = "Network"),
-        ("data_type" = DataType, Query, description = "Data type"),
+       GetOnchainPublishersParams
     ),
 )]
 pub async fn get_onchain_publishers(

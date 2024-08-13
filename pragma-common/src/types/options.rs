@@ -8,11 +8,12 @@ use starknet::core::{
 };
 use strum::{Display, EnumString};
 use thiserror::Error;
+use utoipa::ToSchema;
 
 use crate::utils::field_element_as_hex_string;
 
 /// The available currencies supported.
-#[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Display, EnumString)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Display, EnumString, ToSchema)]
 #[strum(serialize_all = "UPPERCASE")]
 pub enum OptionCurrency {
     BTC,
@@ -28,7 +29,7 @@ impl OptionCurrency {
 }
 
 /// The possible types for an option.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Display, EnumString)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Display, EnumString, ToSchema)]
 #[strum(serialize_all = "UPPERCASE")]
 pub enum OptionType {
     #[strum(serialize = "P")]
@@ -53,11 +54,12 @@ pub enum InstrumentError {
     FieldElement(String),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 /// An instrument.
 pub struct Instrument {
     pub base_currency: OptionCurrency,
     pub expiration_date: NaiveDate,
+    #[schema(value_type = u64)]
     pub strike_price: BigDecimal,
     pub option_type: OptionType,
 }
@@ -118,11 +120,12 @@ macro_rules! instrument {
 }
 
 /// An instrument option with its mark price for a certain timestamp.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct OptionData {
     pub instrument_name: String,
     pub base_currency: OptionCurrency,
     pub current_timestamp: i64,
+    #[schema(value_type = u64)]
     pub mark_price: BigDecimal,
 }
 

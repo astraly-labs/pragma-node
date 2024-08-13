@@ -4,7 +4,7 @@ use axum::Json;
 use pragma_common::types::Network;
 use pragma_entities::CheckpointError;
 use serde::{Deserialize, Serialize};
-use utoipa::{IntoParams, ToSchema};
+use utoipa::{IntoParams, ToResponse, ToSchema};
 
 use crate::infra::repositories::entry_repository::get_decimals;
 use crate::infra::repositories::onchain_repository::checkpoint::get_checkpoints;
@@ -38,7 +38,7 @@ pub struct Checkpoint {
     pub sender_address: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Serialize, Deserialize, ToResponse, ToSchema)]
 pub struct GetOnchainCheckpointsResponse(pub Vec<Checkpoint>);
 
 #[utoipa::path(
@@ -50,8 +50,7 @@ pub struct GetOnchainCheckpointsResponse(pub Vec<Checkpoint>);
     params(
         ("base" = String, Path, description = "Base Asset"),
         ("quote" = String, Path, description = "Quote Asset"),
-        ("network" = Network, Query, description = "Network"),
-        ("limit" = Option<u64>, Query, description = "Limit of response size")
+        GetOnchainCheckpointsParams
     ),
 )]
 pub async fn get_onchain_checkpoints(

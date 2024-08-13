@@ -8,7 +8,7 @@ use pragma_common::types::Network;
 use pragma_entities::models::merkle_feed_error::MerkleFeedError;
 use serde::{Deserialize, Serialize};
 use starknet::core::types::FieldElement;
-use utoipa::{IntoParams, ToSchema};
+use utoipa::{IntoParams, ToResponse, ToSchema};
 
 use crate::infra::redis;
 use crate::types::hex_hash::HexHash;
@@ -21,14 +21,14 @@ pub struct GetMerkleProofQuery {
     pub block_id: Option<BlockId>,
 }
 
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Serialize, Deserialize, ToResponse, ToSchema)]
 pub struct GetMerkleProofResponse(pub MerkleProof);
 
 #[utoipa::path(
     get,
     path = "/node/v1/merkle_feeds/proof/{option_hash}",
     responses(
-        (status = 200, description = "Get the merkle tree", body = [GetMerkleTreeResponse])
+        (status = 200, description = "Get the merkle proof", body = [GetMerkleProofResponse])
     ),
     params(
         ("option_hash" = String, Path, description = "Hexadecimal hash of the option"),
@@ -40,7 +40,7 @@ pub async fn get_merkle_feeds_proof(
     PathExtractor(option_hex_hash): PathExtractor<HexHash>,
     Query(params): Query<GetMerkleProofQuery>,
 ) -> Result<Json<GetMerkleProofResponse>, MerkleFeedError> {
-    tracing::info!("Received get merkle tree request");
+    tracing::info!("Received get merkle proof request");
     if state.redis_client.is_none() {
         return Err(MerkleFeedError::RedisConnection);
     }

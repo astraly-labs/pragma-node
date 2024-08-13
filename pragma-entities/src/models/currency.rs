@@ -9,6 +9,7 @@ use uuid::Uuid;
 pub struct Currency {
     pub id: Uuid,
     pub name: String,
+    #[schema(value_type = u32)]
     pub decimals: BigDecimal,
     pub is_abstract: bool,
     pub ethereum_address: Option<String>,

@@ -5,7 +5,7 @@ use chrono::{DateTime, NaiveDateTime, Utc};
 use pragma_common::types::{AggregationMode, DataType, Interval};
 use pragma_entities::EntryError;
 use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
+use utoipa::{ToResponse, ToSchema};
 
 use crate::infra::repositories::entry_repository::{self, MedianEntry};
 use crate::utils::PathExtractor;
@@ -81,7 +81,7 @@ impl TryFrom<GetEntryParams> for RoutingParams {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Serialize, Deserialize, ToSchema, ToResponse)]
 pub struct GetEntryResponse {
     num_sources_aggregated: usize,
     pair_id: String,
