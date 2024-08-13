@@ -1,17 +1,9 @@
 use diesel::prelude::*;
-use diesel::sql_types::{Bool, Integer, Text, BigInt};
-use crate::AppState;
-use bigdecimal::{BigDecimal, ToPrimitive, Zero};
+use diesel::sql_types::Bool;
 use pragma_entities::error::{adapt_infra_error, InfraError};
 use pragma_monitoring::{models::OORequest, schema::oo_requests};
-use std::fmt;
-use diesel::deserialize::{self, FromSql};
-use crate::handlers::optimistic_oracle::types::{Assertion,SettlementResolution, Status,AssertionDetails,ResolutionDetails, DisputeDetails,DisputeAssertionResponse,ResolvedAssertion,DisputedAssertion};
-use chrono::Utc;
-use diesel::dsl::count_star;
-use diesel::pg::Pg;
-use diesel::prelude::*;
-use diesel::sql_query;
+use crate::handlers::optimistic_oracle::types::{Assertion, Status,AssertionDetails,ResolvedAssertion,DisputedAssertion};
+
 
 
 // if no status provided, returns the list of all the available assertions 
@@ -141,13 +133,6 @@ pub async fn get_disputed_assertions(
         let disputed_assertions: Vec<DisputedAssertion> = results
             .into_iter()
             .map(|request| {
-                // You'll need to implement logic to fetch dispute details
-                let dispute_details = DisputeDetails {
-                    disputer_id: "placeholder_disputer_id".to_string(),
-                    dispute_timestamp: 0, // Placeholder
-                    dispute_bond: 0.0, // Placeholder
-                };
-
                 DisputedAssertion {
                     assertion: Assertion {assertion_id: request.assertion_id.to_string(),
                         claim: request.claim,
@@ -191,11 +176,6 @@ pub async fn get_resolved_assertions(
         let resolved_assertions: Vec<ResolvedAssertion> = results
             .into_iter()
             .map(|request| {
-                // You'll need to implement logic to fetch resolution details
-                let resolution_details = ResolutionDetails {
-                    resolved_timestamp: 0, // Placeholder
-                    resolution: true, // Placeholder
-                };
 
                 ResolvedAssertion {
                     assertion: Assertion {                    

@@ -1,7 +1,7 @@
-use crate::infra::repositories::oo_repository::assertions;
-use crate::AppState;
 use axum::extract::{Path, State};
 use axum::Json;
+use crate::AppState;
+use crate::infra::repositories::oo_repository::assertions;
 
 use crate::handlers::optimistic_oracle::types::AssertionDetails;
 

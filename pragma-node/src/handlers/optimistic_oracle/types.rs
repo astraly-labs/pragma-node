@@ -3,11 +3,6 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 use utoipa::ToSchema;
 use chrono::NaiveDateTime;
-use pragma_entities::error::{adapt_infra_error, InfraError};
-use pragma_monitoring::{models::OORequest, schema::oo_requests};
-use diesel::prelude::*;
-use diesel::dsl::*;
-use diesel::pg::Pg;
 #[derive(Debug, Serialize)]
 pub enum Status {
     Active,
@@ -110,24 +105,6 @@ pub struct GetAssertionsResponse {
 }
 
 #[derive(Debug, Serialize, ToSchema)]
-pub struct DisputeDetails {
-    pub disputer_id: String,
-    pub dispute_timestamp: u64,
-    pub dispute_bond: f64,
-}
-
-#[derive(Debug, Serialize, ToSchema)]
-pub struct ResolutionDetails {
-    pub resolved_timestamp: u64,
-    pub resolution: bool,
-}
-
-
-#[derive(Debug, Serialize, ToSchema)]
-pub struct AssertionDetailsParams {
-    pub assertion_id: String
-}
-#[derive(Debug, Serialize, ToSchema)]
 pub struct AssertionDetails {
     pub assertion: Assertion,
     pub domain_id: String, 
@@ -138,28 +115,6 @@ pub struct AssertionDetails {
     pub caller: String, 
     pub settled: bool,
     pub settlement_resolution: SettlementResolution,
-}
-
-#[derive(Debug, Deserialize, ToSchema)]
-pub struct MakeAssertionRequest {
-    pub claim: String,
-    pub bond: f64,
-    pub expiration_time: i64,
-    pub identifier: String,
-}
-
-#[derive(Debug, Deserialize, ToSchema)]
-pub struct DisputeAssertionRequest {
-    pub dispute_bond: f64,
-}
-
-#[derive(Debug, Serialize, ToSchema)]
-pub struct DisputeAssertionResponse {
-    pub dispute_id: String,
-    pub assertion_id: String,
-    pub disputer_id: String,
-    pub dispute_bond: f64,
-    pub dispute_timestamp: i64,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]

@@ -3,8 +3,6 @@ use crate::infra::repositories::oo_repository::assertions;
 use crate::AppState;
 use axum::extract::{Query, State};
 use axum::Json;
-use chrono::Utc;
-use serde::{Deserialize, Serialize};
 
 #[utoipa::path(
     get,

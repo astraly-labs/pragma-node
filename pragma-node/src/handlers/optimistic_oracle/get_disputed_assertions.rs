@@ -1,8 +1,5 @@
 use axum::extract::{Query, State};
 use axum::Json;
-use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
-
 use crate::handlers::optimistic_oracle::types::{
     GetDisputedAssertionsParams, GetDisputedAssertionsResponse,
 };
