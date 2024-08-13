@@ -50,7 +50,7 @@ impl From<bool> for SettlementResolution {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct GetAssertionsParams {
     pub status: Option<String>,
     pub page: Option<u32>,
@@ -122,6 +122,11 @@ pub struct ResolutionDetails {
     pub resolution: bool,
 }
 
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct AssertionDetailsParams {
+    pub assertion_id: String
+}
 #[derive(Debug, Serialize, ToSchema)]
 pub struct AssertionDetails {
     pub assertion: Assertion,
@@ -157,7 +162,7 @@ pub struct DisputeAssertionResponse {
     pub dispute_timestamp: i64,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct GetDisputedAssertionsParams {
     pub page: Option<u32>,
     pub limit: Option<u32>,
@@ -171,7 +176,7 @@ pub struct GetDisputedAssertionsResponse {
     pub total_pages: u32,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct GetResolvedAssertionsParams {
     pub page: Option<u32>,
     pub limit: Option<u32>,
