@@ -26,19 +26,24 @@ impl Modify for SecurityAddon {
         }
     }
 }
-#[utoipauto(
-    paths = "./pragma-node/src, ./pragma-common/src from pragma_common, ./pragma-entities/src from pragma_entities"
-)]
-#[derive(OpenApi)]
-#[openapi(
-modifiers(&SecurityAddon),
-tags(
-    (name = "pragma-node", description = "Pragma Node API")
-)
-)]
-pub struct ApiDoc;
 
 pub async fn run_app_server(config: &Config, state: AppState) {
+    #[utoipauto(
+        paths = "./pragma-node/src, ./pragma-common/src from pragma_common, ./pragma-entities/src from pragma_entities"
+    )]
+    #[derive(OpenApi)]
+    #[openapi(
+    modifiers(&SecurityAddon),
+    tags(
+        (name = "pragma-node", description = "Pragma Node API")
+    )
+    )]
+    struct ApiDoc;
+
+    // Uncomment to generate openapi.json
+    // TODO: move to a separate bin
+    // let json = ApiDoc::openapi().to_json().unwrap();
+    // std::fs::write("openapi.json", json).unwrap();
 
     let app = app_router::<ApiDoc>(state.clone())
         .with_state(state)

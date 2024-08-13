@@ -15,6 +15,7 @@ use crate::AppState;
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct CreateEntryRequest {
+    #[schema(value_type = Vec<String>)]
     pub signature: Vec<FieldElement>,
     pub entries: Vec<Entry>,
 }

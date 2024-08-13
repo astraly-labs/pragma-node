@@ -24,6 +24,7 @@ pub enum EntryError {
     #[error("infra error: {0}")]
     InfraError(InfraError),
     #[error("invalid signature")]
+    #[schema(value_type = String)]
     InvalidSignature(EcdsaVerifyError),
     #[error("could not sign price")]
     InvalidSigner,

@@ -21,7 +21,6 @@ use crate::infra::repositories::{
 mod aws;
 mod conversion;
 mod custom_extractors;
-pub mod doc_examples;
 mod signing;
 
 const ONE_YEAR_IN_SECONDS: f64 = 3153600_f64;

@@ -517,9 +517,13 @@ pub async fn get_last_updated_timestamp(
 #[derive(Debug, Clone, Serialize, Deserialize, Queryable, ToSchema)]
 pub struct OHLCEntry {
     pub time: NaiveDateTime,
+    #[schema(value_type = u64)]
     pub open: BigDecimal,
+    #[schema(value_type = u64)]
     pub low: BigDecimal,
+    #[schema(value_type = u64)]
     pub high: BigDecimal,
+    #[schema(value_type = u64)]
     pub close: BigDecimal,
 }
 

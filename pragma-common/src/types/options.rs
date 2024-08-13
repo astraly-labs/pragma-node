@@ -59,6 +59,7 @@ pub enum InstrumentError {
 pub struct Instrument {
     pub base_currency: OptionCurrency,
     pub expiration_date: NaiveDate,
+    #[schema(value_type = u64)]
     pub strike_price: BigDecimal,
     pub option_type: OptionType,
 }
@@ -124,6 +125,7 @@ pub struct OptionData {
     pub instrument_name: String,
     pub base_currency: OptionCurrency,
     pub current_timestamp: i64,
+    #[schema(value_type = u64)]
     pub mark_price: BigDecimal,
 }
 

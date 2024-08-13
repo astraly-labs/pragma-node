@@ -40,6 +40,7 @@ pub struct AssetOraclePrice {
 #[derive(Debug, Default, Serialize, Deserialize, ToResponse, ToSchema)]
 pub struct SubscribeToEntryResponse {
     pub oracle_prices: Vec<AssetOraclePrice>,
+    #[schema(value_type = i64)]
     pub timestamp: UnixTimestamp,
 }
 

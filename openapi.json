@@ -1,1 +1,2661 @@
-{"openapi":"3.0.3","info":{"title":"pragma-node","description":"","license":{"name":""},"version":"0.1.0"},"paths":{"/node/v1/aggregation/candlestick/{base}/{quote}":{"get":{"tags":["crate::handlers::get_ohlc"],"operationId":"get_ohlc","parameters":[{"name":"base","in":"path","description":"Base Asset","required":true,"schema":{"type":"string"}},{"name":"quote","in":"path","description":"Quote Asset","required":true,"schema":{"type":"string"}},{"name":"timestamp","in":"path","description":"The unix timestamp in seconds. This endpoint will return the first update whose\ntimestamp is <= the provided value.","required":true,"schema":{"type":"integer","format":"int64"},"example":1717632000},{"name":"interval","in":"path","required":true,"schema":{"allOf":[{"$ref":"#/components/schemas/Interval"}],"nullable":true}},{"name":"routing","in":"path","required":true,"schema":{"type":"boolean","nullable":true}},{"name":"aggregation","in":"path","required":true,"schema":{"allOf":[{"$ref":"#/components/schemas/AggregationMode"}],"nullable":true}},{"name":"entry_type","in":"path","required":true,"schema":{"allOf":[{"$ref":"#/components/schemas/EntryType"}],"nullable":true}},{"name":"expiry","in":"path","required":true,"schema":{"type":"string","nullable":true}}],"responses":{"200":{"description":"Get OHLC data successfuly","content":{"application/json":{"schema":{"type":"array","items":{"$ref":"#/components/schemas/GetOHLCResponse"}}}}}}}},"/node/v1/data/publish":{"post":{"tags":["crate::handlers::create_entry"],"operationId":"create_entries","requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/CreateEntryRequest"}}},"required":true},"responses":{"200":{"description":"Entries published successfuly","content":{"application/json":{"schema":{"$ref":"#/components/schemas/CreateEntryResponse"}}}},"401":{"description":"Unauthorized Publisher","content":{"application/json":{"schema":{"$ref":"#/components/schemas/EntryError"}}}}}}},"/node/v1/data/publish_future":{"post":{"tags":["crate::handlers::create_future_entry"],"operationId":"create_future_entries","requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/CreateFutureEntryRequest"}}},"required":true},"responses":{"200":{"description":"Entries published successfuly","content":{"application/json":{"schema":{"$ref":"#/components/schemas/CreateFutureEntryResponse"}}}},"401":{"description":"Unauthorized Publisher","content":{"application/json":{"schema":{"$ref":"#/components/schemas/EntryError"}}}}}}},"/node/v1/data/subscribe":{"get":{"tags":["crate::handlers::subscribe_to_entry"],"operationId":"subscribe_to_entry","responses":{"200":{"description":"Subscribe to a list of entries","content":{"application/json":{"schema":{"type":"array","items":{"$ref":"#/components/schemas/SubscribeToEntryResponse"}}}}}}}},"/node/v1/data/{base}/{quote}":{"get":{"tags":["crate::handlers::get_entry"],"operationId":"get_entry","parameters":[{"name":"base","in":"path","description":"Base Asset","required":true,"schema":{"type":"string"}},{"name":"quote","in":"path","description":"Quote Asset","required":true,"schema":{"type":"string"}},{"name":"timestamp","in":"path","description":"The unix timestamp in seconds. This endpoint will return the first update whose\ntimestamp is <= the provided value.","required":true,"schema":{"type":"integer","format":"int64"},"example":1717632000},{"name":"interval","in":"path","required":true,"schema":{"allOf":[{"$ref":"#/components/schemas/Interval"}],"nullable":true}},{"name":"routing","in":"path","required":true,"schema":{"type":"boolean","nullable":true}},{"name":"aggregation","in":"path","required":true,"schema":{"allOf":[{"$ref":"#/components/schemas/AggregationMode"}],"nullable":true}},{"name":"entry_type","in":"path","required":true,"schema":{"allOf":[{"$ref":"#/components/schemas/EntryType"}],"nullable":true}},{"name":"expiry","in":"path","required":true,"schema":{"type":"string","nullable":true}}],"responses":{"200":{"description":"Get median entry successfuly","content":{"application/json":{"schema":{"type":"array","items":{"$ref":"#/components/schemas/GetEntryResponse"}}}}}}}},"/node/v1/data/{base}/{quote}/future_expiries":{"get":{"tags":["crate::handlers::get_expiries"],"operationId":"get_expiries","parameters":[{"name":"base","in":"path","description":"Base Asset","required":true,"schema":{"type":"string"}},{"name":"quote","in":"path","description":"Quote Asset","required":true,"schema":{"type":"string"}}],"responses":{"200":{"description":"Get available future expiries for a pair","content":{"application/json":{"schema":{"type":"array","items":{"$ref":"#/components/schemas/GetEntryResponse"}}}}}}}},"/node/v1/merkle_feeds/options/{instrument}":{"get":{"tags":["crate::handlers::merkle_feeds::get_option"],"operationId":"get_merkle_feeds_option","parameters":[{"name":"instrument","in":"path","description":"Name of the instrument","required":true,"schema":{"type":"string"}},{"name":"network","in":"path","required":true,"schema":{"allOf":[{"$ref":"#/components/schemas/Network"}],"nullable":true}},{"name":"block_id","in":"path","required":true,"schema":{"allOf":[{"$ref":"#/components/schemas/BlockId"}],"nullable":true}}],"responses":{"200":{"description":"Get the option","content":{"application/json":{"schema":{"type":"array","items":{"$ref":"#/components/schemas/GetOptionResponse"}}}}}}}},"/node/v1/merkle_feeds/proof/{option_hash}":{"get":{"tags":["crate::handlers::merkle_feeds::get_merkle_proof"],"operationId":"get_merkle_feeds_proof","parameters":[{"name":"option_hash","in":"path","description":"Hexadecimal hash of the option","required":true,"schema":{"type":"string"}},{"name":"network","in":"path","required":true,"schema":{"allOf":[{"$ref":"#/components/schemas/Network"}],"nullable":true}},{"name":"block_id","in":"path","required":true,"schema":{"allOf":[{"$ref":"#/components/schemas/BlockId"}],"nullable":true}}],"responses":{"200":{"description":"Get the merkle proof","content":{"application/json":{"schema":{"type":"array","items":{"$ref":"#/components/schemas/GetMerkleProofResponse"}}}}}}}},"/node/v1/onchain/checkpoints/{base}/{quote}":{"get":{"tags":["crate::handlers::onchain::get_checkpoints"],"operationId":"get_onchain_checkpoints","parameters":[{"name":"base","in":"path","description":"Base Asset","required":true,"schema":{"type":"string"}},{"name":"quote","in":"path","description":"Quote Asset","required":true,"schema":{"type":"string"}},{"name":"network","in":"query","description":"Network","required":true,"schema":{"$ref":"#/components/schemas/Network"}},{"name":"limit","in":"query","description":"Limit of response size","required":false,"schema":{"type":"integer","format":"int64","nullable":true,"minimum":0}}],"responses":{"200":{"description":"Get the onchain checkpoints for a pair","content":{"application/json":{"schema":{"$ref":"#/components/schemas/GetOnchainCheckpointsResponse"}}}}}}},"/node/v1/onchain/history/{base}/{quote}":{"get":{"tags":["crate::handlers::onchain::get_history"],"operationId":"get_onchain_history","parameters":[{"name":"base","in":"path","description":"Base Asset","required":true,"schema":{"type":"string"}},{"name":"quote","in":"path","description":"Quote Asset","required":true,"schema":{"type":"string"}},{"name":"network","in":"query","description":"Network","required":true,"schema":{"$ref":"#/components/schemas/Network"}},{"name":"timestamp","in":"query","description":"Timestamp range","required":false,"schema":{"type":"string","nullable":true}},{"name":"chunk_interval","in":"query","description":"Chunk time length for each block of data","required":false,"schema":{"allOf":[{"$ref":"#/components/schemas/Interval"}],"nullable":true}},{"name":"routing","in":"query","description":"Activate routing functionnality","required":false,"schema":{"type":"boolean","nullable":true}}],"responses":{"200":{"description":"Get the historical onchain median price","content":{"application/json":{"schema":{"$ref":"#/components/schemas/GetOnchainHistoryResponse"}}}}}}},"/node/v1/onchain/ohlc/subscribe":{"get":{"tags":["crate::handlers::onchain::subscribe_to_ohlc"],"operationId":"subscribe_to_onchain_ohlc","responses":{"200":{"description":"Subscribe to a list of OHLC entries","content":{"application/json":{"schema":{"type":"array","items":{"$ref":"#/components/schemas/SubscribeToEntryResponse"}}}}}}}},"/node/v1/onchain/publishers":{"get":{"tags":["crate::handlers::onchain::get_publishers"],"operationId":"get_onchain_publishers","parameters":[{"name":"network","in":"query","description":"Network","required":true,"schema":{"$ref":"#/components/schemas/Network"}},{"name":"data_type","in":"query","description":"Data type","required":true,"schema":{"$ref":"#/components/schemas/DataType"}}],"responses":{"200":{"description":"Get the onchain publishers","content":{"application/json":{"schema":{"$ref":"#/components/schemas/GetOnchainPublishersResponse"}}}}}}},"/node/v1/onchain/{base}/{quote}":{"get":{"tags":["crate::handlers::onchain::get_entry"],"operationId":"get_onchain_entry","parameters":[{"name":"base","in":"path","description":"Base Asset","required":true,"schema":{"type":"string"}},{"name":"quote","in":"path","description":"Quote Asset","required":true,"schema":{"type":"string"}},{"name":"network","in":"query","description":"Network","required":true,"schema":{"$ref":"#/components/schemas/Network"}},{"name":"aggregation","in":"query","description":"Aggregation Mode","required":false,"schema":{"allOf":[{"$ref":"#/components/schemas/AggregationMode"}],"nullable":true}},{"name":"timestamp","in":"query","description":"Timestamp","required":false,"schema":{"type":"integer","format":"int64","nullable":true}}],"responses":{"200":{"description":"Get the onchain entry","content":{"application/json":{"schema":{"$ref":"#/components/schemas/GetOnchainEntryResponse"}}}}}}},"/node/v1/volatility/{quote}/{base}":{"get":{"tags":["crate::handlers::get_volatility"],"operationId":"get_volatility","parameters":[{"name":"quote","in":"path","description":"Quote Asset","required":true,"schema":{"type":"string"}},{"name":"base","in":"path","description":"Base Asset","required":true,"schema":{"type":"string"}},{"name":"start","in":"path","description":"Initial timestamp, combined with final_timestamp, it helps define the period over which the mean is computed","required":true,"schema":{"type":"integer","format":"int64","minimum":0}},{"name":"end","in":"path","description":"Final timestamp","required":true,"schema":{"type":"integer","format":"int64","minimum":0}}],"responses":{"200":{"description":"Get realized volatility successfuly","content":{"application/json":{"schema":{"type":"array","items":{"$ref":"#/components/schemas/GetVolatilityResponse"}}}}}}}}},"components":{"schemas":{"AggregationMode":{"type":"string","enum":["median","mean","twap"]},"AssetOraclePrice":{"type":"object","required":["global_asset_id","median_price","signature","signed_prices"],"properties":{"global_asset_id":{"type":"string"},"median_price":{"type":"string"},"signature":{"type":"string"},"signed_prices":{"type":"array","items":{"$ref":"#/components/schemas/SignedPublisherPrice"}}}},"BaseEntry":{"type":"object","required":["timestamp","source","publisher"],"properties":{"publisher":{"type":"string"},"source":{"type":"string"},"timestamp":{"type":"integer","format":"int64","minimum":0}}},"BlockId":{"oneOf":[{"type":"object","required":["Tag"],"properties":{"Tag":{"$ref":"#/components/schemas/BlockTag"}}},{"type":"object","required":["Number"],"properties":{"Number":{"type":"integer","format":"int64","minimum":0}}}],"description":"Block identifier in the form of hash, number or tag."},"BlockTag":{"type":"string","description":"Block tag.\n\nA tag specifying a dynamic reference to a block.","enum":["Latest","Pending"]},"Checkpoint":{"type":"object","required":["tx_hash","price","timestamp","sender_address"],"properties":{"price":{"type":"string"},"sender_address":{"type":"string"},"timestamp":{"type":"integer","format":"int64","minimum":0},"tx_hash":{"type":"string"}}},"CreateEntryRequest":{"type":"object","required":["signature","entries"],"properties":{"entries":{"type":"array","items":{"$ref":"#/components/schemas/Entry"}},"signature":{"type":"array","items":{"$ref":"#/components/schemas/FieldElement"}}}},"CreateEntryResponse":{"type":"object","required":["number_entries_created"],"properties":{"number_entries_created":{"type":"integer","minimum":0}}},"CreateFutureEntryRequest":{"type":"object","required":["signature","entries"],"properties":{"entries":{"type":"array","items":{"$ref":"#/components/schemas/FutureEntry"}},"signature":{"type":"array","items":{"$ref":"#/components/schemas/FieldElement"}}}},"CreateFutureEntryResponse":{"type":"object","required":["number_entries_created"],"properties":{"number_entries_created":{"type":"integer","minimum":0}}},"Currency":{"type":"object","required":["id","name","decimals","is_abstract"],"properties":{"decimals":{"$ref":"#/components/schemas/BigDecimal"},"ethereum_address":{"type":"string","nullable":true},"id":{"$ref":"#/components/schemas/Uuid"},"is_abstract":{"type":"boolean"},"name":{"type":"string"}}},"CurrencyError":{"oneOf":[{"type":"string","enum":["InternalServerError"]},{"type":"object","required":["NotFound"],"properties":{"NotFound":{"type":"string"}}},{"type":"object","required":["InfraError"],"properties":{"InfraError":{"$ref":"#/components/schemas/InfraError"}}}]},"DataType":{"type":"string","enum":["spot_entry","perp_entry","future_entry"]},"Entry":{"type":"object","required":["id","pair_id","publisher","source","timestamp","price"],"properties":{"id":{"$ref":"#/components/schemas/Uuid"},"pair_id":{"type":"string"},"price":{"type":"integer","minimum":0},"publisher":{"type":"string"},"publisher_signature":{"type":"string","nullable":true},"source":{"type":"string"},"timestamp":{"type":"integer","format":"int64","minimum":0}}},"EntryError":{"oneOf":[{"type":"string","enum":["InternalServerError"]},{"type":"string","enum":["BadRequest"]},{"type":"object","required":["NotFound"],"properties":{"NotFound":{"type":"string"}}},{"type":"object","required":["InfraError"],"properties":{"InfraError":{"$ref":"#/components/schemas/InfraError"}}},{"type":"object","required":["InvalidSignature"],"properties":{"InvalidSignature":{"$ref":"#/components/schemas/EcdsaVerifyError"}}},{"type":"string","enum":["InvalidSigner"]},{"type":"object","required":["Unauthorized"],"properties":{"Unauthorized":{"type":"string"}}},{"type":"object","required":["InvalidTimestamp"],"properties":{"InvalidTimestamp":{"type":"string"}}},{"type":"string","enum":["InvalidExpiry"]},{"type":"object","required":["MissingData"],"properties":{"MissingData":{"type":"string"}}},{"type":"object","required":["PublisherError"],"properties":{"PublisherError":{"$ref":"#/components/schemas/PublisherError"}}},{"type":"object","required":["UnknownPairId"],"properties":{"UnknownPairId":{"type":"string"}}},{"type":"object","required":["VolatilityError"],"properties":{"VolatilityError":{"$ref":"#/components/schemas/VolatilityError"}}},{"type":"object","required":["PublishData"],"properties":{"PublishData":{"type":"string"}}},{"type":"object","required":["BuildPublish"],"properties":{"BuildPublish":{"type":"string"}}}]},"EntryType":{"type":"string","enum":["spot","perp","future"]},"FutureEntry":{"type":"object","required":["id","pair_id","publisher","source","timestamp","publisher_signature","price"],"properties":{"expiration_timestamp":{"type":"integer","format":"int64","nullable":true,"minimum":0},"id":{"$ref":"#/components/schemas/Uuid"},"pair_id":{"type":"string"},"price":{"type":"integer","minimum":0},"publisher":{"type":"string"},"publisher_signature":{"type":"string"},"source":{"type":"string"},"timestamp":{"type":"integer","format":"int64","minimum":0}}},"GetEntryParams":{"type":"object","properties":{"aggregation":{"allOf":[{"$ref":"#/components/schemas/AggregationMode"}],"nullable":true},"entry_type":{"allOf":[{"$ref":"#/components/schemas/EntryType"}],"nullable":true},"expiry":{"type":"string","nullable":true},"interval":{"allOf":[{"$ref":"#/components/schemas/Interval"}],"nullable":true},"routing":{"type":"boolean","nullable":true},"timestamp":{"allOf":[{"$ref":"#/components/schemas/UnixTimestamp"}],"nullable":true}}},"GetEntryResponse":{"type":"object","required":["num_sources_aggregated","pair_id","price","timestamp","decimals"],"properties":{"decimals":{"type":"integer","format":"int32","minimum":0},"num_sources_aggregated":{"type":"integer","minimum":0},"pair_id":{"type":"string"},"price":{"type":"string"},"timestamp":{"type":"integer","format":"int64","minimum":0}}},"GetMerkleProofQuery":{"type":"object","properties":{"block_id":{"allOf":[{"$ref":"#/components/schemas/BlockId"}],"nullable":true},"network":{"allOf":[{"$ref":"#/components/schemas/Network"}],"nullable":true}}},"GetMerkleProofResponse":{"$ref":"#/components/schemas/MerkleProof"},"GetOHLCResponse":{"type":"object","required":["pair_id","data"],"properties":{"data":{"type":"array","items":{"$ref":"#/components/schemas/OHLCEntry"}},"pair_id":{"type":"string"}}},"GetOnchainCheckpointsParams":{"type":"object","required":["network"],"properties":{"limit":{"type":"integer","format":"int64","nullable":true,"minimum":0},"network":{"$ref":"#/components/schemas/Network"}}},"GetOnchainCheckpointsResponse":{"type":"array","items":{"$ref":"#/components/schemas/Checkpoint"}},"GetOnchainEntryParams":{"type":"object","required":["network"],"properties":{"aggregation":{"allOf":[{"$ref":"#/components/schemas/AggregationMode"}],"nullable":true},"components":{"type":"boolean","nullable":true},"network":{"$ref":"#/components/schemas/Network"},"routing":{"type":"boolean","nullable":true},"timestamp":{"type":"integer","format":"int64","nullable":true}}},"GetOnchainEntryResponse":{"type":"object","required":["pair_id","last_updated_timestamp","price","decimals","nb_sources_aggregated","asset_type","variations"],"properties":{"asset_type":{"type":"string"},"components":{"type":"array","items":{"$ref":"#/components/schemas/OnchainEntry"},"nullable":true},"decimals":{"type":"integer","format":"int32","minimum":0},"last_updated_timestamp":{"type":"integer","format":"int64","minimum":0},"nb_sources_aggregated":{"type":"integer","format":"int32","minimum":0},"pair_id":{"type":"string"},"price":{"type":"string"},"variations":{"type":"object","additionalProperties":{"type":"number","format":"float"}}}},"GetOnchainHistoryEntry":{"type":"object","required":["pair_id","timestamp","median_price","decimals","nb_sources_aggregated"],"properties":{"decimals":{"type":"integer","format":"int32","minimum":0},"median_price":{"type":"string"},"nb_sources_aggregated":{"type":"integer","format":"int32","minimum":0},"pair_id":{"type":"string"},"timestamp":{"type":"integer","format":"int64","minimum":0}}},"GetOnchainHistoryParams":{"type":"object","required":["network","timestamp"],"properties":{"chunk_interval":{"allOf":[{"$ref":"#/components/schemas/Interval"}],"nullable":true},"network":{"$ref":"#/components/schemas/Network"},"routing":{"type":"boolean","nullable":true},"timestamp":{"$ref":"#/components/schemas/TimestampRange"}}},"GetOnchainHistoryResponse":{"type":"array","items":{"$ref":"#/components/schemas/GetOnchainHistoryEntry"}},"GetOnchainOHLCResponse":{"type":"object","required":["pair_id","data"],"properties":{"data":{"type":"array","items":{"$ref":"#/components/schemas/OHLCEntry"}},"pair_id":{"type":"string"}}},"GetOnchainPublishersParams":{"type":"object","required":["network","data_type"],"properties":{"data_type":{"$ref":"#/components/schemas/DataType"},"network":{"$ref":"#/components/schemas/Network"}}},"GetOnchainPublishersResponse":{"type":"array","items":{"$ref":"#/components/schemas/Publisher"}},"GetOptionQuery":{"type":"object","properties":{"block_id":{"allOf":[{"$ref":"#/components/schemas/BlockId"}],"nullable":true},"network":{"allOf":[{"$ref":"#/components/schemas/Network"}],"nullable":true}}},"GetOptionResponse":{"allOf":[{"$ref":"#/components/schemas/OptionData"},{"type":"object","required":["hash"],"properties":{"hash":{"type":"string"}}}]},"GetVolatilityResponse":{"type":"object","required":["pair_id","volatility","decimals"],"properties":{"decimals":{"type":"integer","format":"int32","minimum":0},"pair_id":{"type":"string"},"volatility":{"type":"number","format":"double"}}},"InfraError":{"oneOf":[{"type":"string","enum":["InternalServerError"]},{"type":"string","enum":["RoutingError"]},{"type":"string","enum":["NotFound"]},{"type":"object","required":["InvalidTimestamp"],"properties":{"InvalidTimestamp":{"type":"string"}}},{"type":"object","required":["NonZeroU32Conversion"],"properties":{"NonZeroU32Conversion":{"$ref":"#/components/schemas/TryFromIntError"}}},{"type":"object","required":["AxumError"],"properties":{"AxumError":{"$ref":"#/components/schemas/axum.Error"}}}]},"Instrument":{"type":"object","description":"An instrument.","required":["base_currency","expiration_date","strike_price","option_type"],"properties":{"base_currency":{"$ref":"#/components/schemas/OptionCurrency"},"expiration_date":{"$ref":"#/components/schemas/NaiveDate"},"option_type":{"$ref":"#/components/schemas/OptionType"},"strike_price":{"$ref":"#/components/schemas/BigDecimal"}}},"Interval":{"type":"string","enum":["1min","15min","1h","2h","1d","1w"]},"MerkleFeedError":{"oneOf":[{"type":"string","enum":["InternalServerError"]},{"type":"string","enum":["RedisConnection"]},{"type":"object","required":["OptionNotFound"],"properties":{"OptionNotFound":{"type":"array","items":{"type":"object"},"description":"","maxItems":2,"minItems":2}}},{"type":"object","required":["MerkleTreeNotFound"],"properties":{"MerkleTreeNotFound":{"type":"integer","format":"int64","minimum":0}}},{"type":"object","required":["InvalidOptionHash"],"properties":{"InvalidOptionHash":{"type":"string"}}},{"type":"string","enum":["TreeDeserialization"]},{"type":"object","required":["MerkleProof"],"properties":{"MerkleProof":{"type":"string"}}},{"type":"object","required":["NoBlocks"],"properties":{"NoBlocks":{"type":"string"}}}]},"MerkleProof":{"type":"array","items":{"type":"string"},"description":"The merkle proof but with hexadecimal hashes instead of Field elements."},"Network":{"type":"string","enum":["sepolia","mainnet"]},"OHLCEntry":{"type":"object","required":["time","open","low","high","close"],"properties":{"close":{"$ref":"#/components/schemas/BigDecimal"},"high":{"$ref":"#/components/schemas/BigDecimal"},"low":{"$ref":"#/components/schemas/BigDecimal"},"open":{"$ref":"#/components/schemas/BigDecimal"},"time":{"$ref":"#/components/schemas/NaiveDateTime"}}},"OnchainEntry":{"type":"object","required":["publisher","source","price","tx_hash","timestamp"],"properties":{"price":{"type":"string"},"publisher":{"type":"string"},"source":{"type":"string"},"timestamp":{"type":"integer","format":"int64","minimum":0},"tx_hash":{"type":"string"}}},"OptionCurrency":{"type":"string","description":"The available currencies supported.","enum":["BTC","ETH"]},"OptionData":{"type":"object","description":"An instrument option with its mark price for a certain timestamp.","required":["instrument_name","base_currency","current_timestamp","mark_price"],"properties":{"base_currency":{"$ref":"#/components/schemas/OptionCurrency"},"current_timestamp":{"type":"integer","format":"int64"},"instrument_name":{"type":"string"},"mark_price":{"$ref":"#/components/schemas/BigDecimal"}}},"PerpEntry":{"type":"object","required":["base","pair_id","price","volume"],"properties":{"base":{"$ref":"#/components/schemas/BaseEntry"},"pair_id":{"type":"string"},"price":{"type":"integer","minimum":0},"volume":{"type":"integer","minimum":0}}},"Publisher":{"type":"object","required":["id","name","master_key","active_key","account_address","active"],"properties":{"account_address":{"type":"string"},"active":{"type":"boolean"},"active_key":{"type":"string"},"id":{"$ref":"#/components/schemas/Uuid"},"master_key":{"type":"string"},"name":{"type":"string"}}},"PublisherEntry":{"type":"object","required":["pair_id","last_updated_timestamp","price","source","decimals","daily_updates"],"properties":{"daily_updates":{"type":"integer","format":"int32","minimum":0},"decimals":{"type":"integer","format":"int32","minimum":0},"last_updated_timestamp":{"type":"integer","format":"int64","minimum":0},"pair_id":{"type":"string"},"price":{"type":"string"},"source":{"type":"string"}}},"PublisherError":{"oneOf":[{"type":"string","enum":["InternalServerError"]},{"type":"object","required":["InvalidKey"],"properties":{"InvalidKey":{"type":"string"}}},{"type":"object","required":["InvalidAddress"],"properties":{"InvalidAddress":{"type":"string"}}},{"type":"object","required":["InactivePublisher"],"properties":{"InactivePublisher":{"type":"string"}}},{"type":"string","enum":["NotFound"]}]},"RedisError":{"oneOf":[{"type":"string","enum":["InternalServerError"]},{"type":"string","enum":["Connection"]},{"type":"object","required":["OptionNotFound"],"properties":{"OptionNotFound":{"type":"array","items":{"type":"object"},"description":"","maxItems":2,"minItems":2}}},{"type":"object","required":["MerkleTreeNotFound"],"properties":{"MerkleTreeNotFound":{"type":"integer","format":"int64","minimum":0}}},{"type":"object","required":["InvalidOptionHash"],"properties":{"InvalidOptionHash":{"type":"string"}}},{"type":"string","enum":["TreeDeserialization"]},{"type":"object","required":["NoBlocks"],"properties":{"NoBlocks":{"type":"string"}}}]},"SignedPublisherPrice":{"type":"object","required":["oracle_asset_id","oracle_price","signing_key","signature","timestamp"],"properties":{"oracle_asset_id":{"type":"string"},"oracle_price":{"type":"string"},"signature":{"type":"string"},"signing_key":{"type":"string"},"timestamp":{"type":"string"}}},"SubscribeToEntryResponse":{"type":"object","required":["oracle_prices","timestamp"],"properties":{"oracle_prices":{"type":"array","items":{"$ref":"#/components/schemas/AssetOraclePrice"}},"timestamp":{"$ref":"#/components/schemas/UnixTimestamp"}}},"TimestampRange":{"$ref":"#/components/schemas/RangeInclusive"},"VolatilityError":{"oneOf":[{"type":"object","required":["InvalidTimestampsRange"],"properties":{"InvalidTimestampsRange":{"type":"array","items":{"type":"integer","format":"int64","minimum":0},"description":"","maxItems":2,"minItems":2}}}]}},"responses":{"CreateEntryResponse":{"description":"","content":{"application/json":{"schema":{"type":"object","required":["number_entries_created"],"properties":{"number_entries_created":{"type":"integer","minimum":0}}}}}},"CreateFutureEntryResponse":{"description":"","content":{"application/json":{"schema":{"type":"object","required":["number_entries_created"],"properties":{"number_entries_created":{"type":"integer","minimum":0}}}}}},"GetEntryResponse":{"description":"","content":{"application/json":{"schema":{"type":"object","required":["num_sources_aggregated","pair_id","price","timestamp","decimals"],"properties":{"decimals":{"type":"integer","format":"int32","minimum":0},"num_sources_aggregated":{"type":"integer","minimum":0},"pair_id":{"type":"string"},"price":{"type":"string"},"timestamp":{"type":"integer","format":"int64","minimum":0}}}}}},"GetMerkleProofResponse":{"description":"","content":{"application/json":{"schema":{"$ref":"#/components/schemas/MerkleProof"}}}},"GetOHLCResponse":{"description":"","content":{"application/json":{"schema":{"type":"object","required":["pair_id","data"],"properties":{"data":{"type":"array","items":{"$ref":"#/components/schemas/OHLCEntry"}},"pair_id":{"type":"string"}}}}}},"GetOnchainCheckpointsResponse":{"description":"","content":{"application/json":{"schema":{"type":"array","items":{"$ref":"#/components/schemas/Checkpoint"}}}}},"GetOnchainEntryResponse":{"description":"","content":{"application/json":{"schema":{"type":"object","required":["pair_id","last_updated_timestamp","price","decimals","nb_sources_aggregated","asset_type","variations"],"properties":{"asset_type":{"type":"string"},"components":{"type":"array","items":{"$ref":"#/components/schemas/OnchainEntry"},"nullable":true},"decimals":{"type":"integer","format":"int32","minimum":0},"last_updated_timestamp":{"type":"integer","format":"int64","minimum":0},"nb_sources_aggregated":{"type":"integer","format":"int32","minimum":0},"pair_id":{"type":"string"},"price":{"type":"string"},"variations":{"type":"object","additionalProperties":{"type":"number","format":"float"}}}}}}},"GetOnchainHistoryResponse":{"description":"","content":{"application/json":{"schema":{"type":"array","items":{"$ref":"#/components/schemas/GetOnchainHistoryEntry"}}}}},"GetOnchainOHLCResponse":{"description":"","content":{"application/json":{"schema":{"type":"object","required":["pair_id","data"],"properties":{"data":{"type":"array","items":{"$ref":"#/components/schemas/OHLCEntry"}},"pair_id":{"type":"string"}}}}}},"GetOnchainPublishersResponse":{"description":"","content":{"application/json":{"schema":{"type":"array","items":{"$ref":"#/components/schemas/Publisher"}}}}},"GetOptionResponse":{"description":"","content":{"application/json":{"schema":{"allOf":[{"$ref":"#/components/schemas/OptionData"},{"type":"object","required":["hash"],"properties":{"hash":{"type":"string"}}}]}}}},"GetVolatilityResponse":{"description":"","content":{"application/json":{"schema":{"type":"object","required":["pair_id","volatility","decimals"],"properties":{"decimals":{"type":"integer","format":"int32","minimum":0},"pair_id":{"type":"string"},"volatility":{"type":"number","format":"double"}}}}}},"SubscribeToEntryResponse":{"description":"","content":{"application/json":{"schema":{"type":"object","required":["oracle_prices","timestamp"],"properties":{"oracle_prices":{"type":"array","items":{"$ref":"#/components/schemas/AssetOraclePrice"}},"timestamp":{"$ref":"#/components/schemas/UnixTimestamp"}}}}}}},"securitySchemes":{"api_key":{"type":"apiKey","in":"header","name":"pragma_apikey"}}},"tags":[{"name":"pragma-node","description":"Pragma Node API"}]}
+{
+    "openapi": "3.0.3",
+    "info": {
+        "title": "pragma-node",
+        "description": "",
+        "license": {
+            "name": ""
+        },
+        "version": "0.1.0"
+    },
+    "paths": {
+        "/node/v1/aggregation/candlestick/{base}/{quote}": {
+            "get": {
+                "tags": [
+                    "crate::handlers::get_ohlc"
+                ],
+                "operationId": "get_ohlc",
+                "parameters": [
+                    {
+                        "name": "base",
+                        "in": "path",
+                        "description": "Base Asset",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "quote",
+                        "in": "path",
+                        "description": "Quote Asset",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "timestamp",
+                        "in": "query",
+                        "description": "The unix timestamp in seconds. This endpoint will return the first update whose\ntimestamp is <= the provided value.",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "nullable": true
+                        }
+                    },
+                    {
+                        "name": "interval",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/components/schemas/Interval"
+                                }
+                            ],
+                            "nullable": true
+                        }
+                    },
+                    {
+                        "name": "routing",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean",
+                            "nullable": true
+                        }
+                    },
+                    {
+                        "name": "aggregation",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/components/schemas/AggregationMode"
+                                }
+                            ],
+                            "nullable": true
+                        }
+                    },
+                    {
+                        "name": "entry_type",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/components/schemas/EntryType"
+                                }
+                            ],
+                            "nullable": true
+                        }
+                    },
+                    {
+                        "name": "expiry",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "nullable": true
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Get OHLC data successfuly",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/GetOHLCResponse"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/node/v1/data/publish": {
+            "post": {
+                "tags": [
+                    "crate::handlers::create_entry"
+                ],
+                "operationId": "create_entries",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateEntryRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Entries published successfuly",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CreateEntryResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized Publisher",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/EntryError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/node/v1/data/publish_future": {
+            "post": {
+                "tags": [
+                    "crate::handlers::create_future_entry"
+                ],
+                "operationId": "create_future_entries",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateFutureEntryRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Entries published successfuly",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CreateFutureEntryResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized Publisher",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/EntryError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/node/v1/data/subscribe": {
+            "get": {
+                "tags": [
+                    "crate::handlers::subscribe_to_entry"
+                ],
+                "operationId": "subscribe_to_entry",
+                "responses": {
+                    "200": {
+                        "description": "Subscribe to a list of entries",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/SubscribeToEntryResponse"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/node/v1/data/{base}/{quote}": {
+            "get": {
+                "tags": [
+                    "crate::handlers::get_entry"
+                ],
+                "operationId": "get_entry",
+                "parameters": [
+                    {
+                        "name": "base",
+                        "in": "path",
+                        "description": "Base Asset",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "quote",
+                        "in": "path",
+                        "description": "Quote Asset",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "timestamp",
+                        "in": "query",
+                        "description": "The unix timestamp in seconds. This endpoint will return the first update whose\ntimestamp is <= the provided value.",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "nullable": true
+                        }
+                    },
+                    {
+                        "name": "interval",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/components/schemas/Interval"
+                                }
+                            ],
+                            "nullable": true
+                        }
+                    },
+                    {
+                        "name": "routing",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean",
+                            "nullable": true
+                        }
+                    },
+                    {
+                        "name": "aggregation",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/components/schemas/AggregationMode"
+                                }
+                            ],
+                            "nullable": true
+                        }
+                    },
+                    {
+                        "name": "entry_type",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/components/schemas/EntryType"
+                                }
+                            ],
+                            "nullable": true
+                        }
+                    },
+                    {
+                        "name": "expiry",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "nullable": true
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Get median entry successfuly",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/GetEntryResponse"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/node/v1/data/{base}/{quote}/future_expiries": {
+            "get": {
+                "tags": [
+                    "crate::handlers::get_expiries"
+                ],
+                "operationId": "get_expiries",
+                "parameters": [
+                    {
+                        "name": "base",
+                        "in": "path",
+                        "description": "Base Asset",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "quote",
+                        "in": "path",
+                        "description": "Quote Asset",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Get available future expiries for a pair",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/GetEntryResponse"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/node/v1/merkle_feeds/options/{instrument}": {
+            "get": {
+                "tags": [
+                    "crate::handlers::merkle_feeds::get_option"
+                ],
+                "operationId": "get_merkle_feeds_option",
+                "parameters": [
+                    {
+                        "name": "instrument",
+                        "in": "path",
+                        "description": "Name of the instrument",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "network",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/components/schemas/Network"
+                                }
+                            ],
+                            "nullable": true
+                        }
+                    },
+                    {
+                        "name": "block_id",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/components/schemas/BlockId"
+                                }
+                            ],
+                            "nullable": true
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Get the option",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/GetOptionResponse"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/node/v1/merkle_feeds/proof/{option_hash}": {
+            "get": {
+                "tags": [
+                    "crate::handlers::merkle_feeds::get_merkle_proof"
+                ],
+                "operationId": "get_merkle_feeds_proof",
+                "parameters": [
+                    {
+                        "name": "option_hash",
+                        "in": "path",
+                        "description": "Hexadecimal hash of the option",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "network",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/components/schemas/Network"
+                                }
+                            ],
+                            "nullable": true
+                        }
+                    },
+                    {
+                        "name": "block_id",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/components/schemas/BlockId"
+                                }
+                            ],
+                            "nullable": true
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Get the merkle proof",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/GetMerkleProofResponse"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/node/v1/onchain/checkpoints/{base}/{quote}": {
+            "get": {
+                "tags": [
+                    "crate::handlers::onchain::get_checkpoints"
+                ],
+                "operationId": "get_onchain_checkpoints",
+                "parameters": [
+                    {
+                        "name": "base",
+                        "in": "path",
+                        "description": "Base Asset",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "quote",
+                        "in": "path",
+                        "description": "Quote Asset",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "network",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/components/schemas/Network"
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "format": "int64",
+                            "nullable": true,
+                            "minimum": 0
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Get the onchain checkpoints for a pair",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GetOnchainCheckpointsResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/node/v1/onchain/history/{base}/{quote}": {
+            "get": {
+                "tags": [
+                    "crate::handlers::onchain::get_history"
+                ],
+                "operationId": "get_onchain_history",
+                "parameters": [
+                    {
+                        "name": "base",
+                        "in": "path",
+                        "description": "Base Asset",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "quote",
+                        "in": "path",
+                        "description": "Quote Asset",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "network",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/components/schemas/Network"
+                        }
+                    },
+                    {
+                        "name": "timestamp",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/components/schemas/TimestampRange"
+                        }
+                    },
+                    {
+                        "name": "chunk_interval",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/components/schemas/Interval"
+                                }
+                            ],
+                            "nullable": true
+                        }
+                    },
+                    {
+                        "name": "routing",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean",
+                            "nullable": true
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Get the historical onchain median price",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GetOnchainHistoryResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/node/v1/onchain/ohlc/subscribe": {
+            "get": {
+                "tags": [
+                    "crate::handlers::onchain::subscribe_to_ohlc"
+                ],
+                "operationId": "subscribe_to_onchain_ohlc",
+                "responses": {
+                    "200": {
+                        "description": "Subscribe to a list of OHLC entries",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/SubscribeToEntryResponse"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/node/v1/onchain/publishers": {
+            "get": {
+                "tags": [
+                    "crate::handlers::onchain::get_publishers"
+                ],
+                "operationId": "get_onchain_publishers",
+                "parameters": [
+                    {
+                        "name": "network",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/components/schemas/Network"
+                        }
+                    },
+                    {
+                        "name": "data_type",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/components/schemas/DataType"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Get the onchain publishers",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GetOnchainPublishersResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/node/v1/onchain/{base}/{quote}": {
+            "get": {
+                "tags": [
+                    "crate::handlers::onchain::get_entry"
+                ],
+                "operationId": "get_onchain_entry",
+                "parameters": [
+                    {
+                        "name": "base",
+                        "in": "path",
+                        "description": "Base Asset",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "quote",
+                        "in": "path",
+                        "description": "Quote Asset",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "network",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/components/schemas/Network"
+                        }
+                    },
+                    {
+                        "name": "aggregation",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/components/schemas/AggregationMode"
+                                }
+                            ],
+                            "nullable": true
+                        }
+                    },
+                    {
+                        "name": "routing",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean",
+                            "nullable": true
+                        }
+                    },
+                    {
+                        "name": "timestamp",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "format": "int64",
+                            "nullable": true
+                        }
+                    },
+                    {
+                        "name": "components",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean",
+                            "nullable": true
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Get the onchain entry",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GetOnchainEntryResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/node/v1/volatility/{quote}/{base}": {
+            "get": {
+                "tags": [
+                    "crate::handlers::get_volatility"
+                ],
+                "operationId": "get_volatility",
+                "parameters": [
+                    {
+                        "name": "quote",
+                        "in": "path",
+                        "description": "Quote Asset",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "base",
+                        "in": "path",
+                        "description": "Base Asset",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "start",
+                        "in": "query",
+                        "description": "Initial timestamp, combined with final_timestamp, it helps define the period over which the mean is computed",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "format": "int64",
+                            "minimum": 0
+                        }
+                    },
+                    {
+                        "name": "end",
+                        "in": "query",
+                        "description": "Final timestamp",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "format": "int64",
+                            "minimum": 0
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Get realized volatility successfuly",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/GetVolatilityResponse"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "AggregationMode": {
+                "type": "string",
+                "enum": [
+                    "median",
+                    "mean",
+                    "twap"
+                ]
+            },
+            "AssetOraclePrice": {
+                "type": "object",
+                "required": [
+                    "global_asset_id",
+                    "median_price",
+                    "signature",
+                    "signed_prices"
+                ],
+                "properties": {
+                    "global_asset_id": {
+                        "type": "string"
+                    },
+                    "median_price": {
+                        "type": "string"
+                    },
+                    "signature": {
+                        "type": "string"
+                    },
+                    "signed_prices": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/SignedPublisherPrice"
+                        }
+                    }
+                }
+            },
+            "BaseEntry": {
+                "type": "object",
+                "required": [
+                    "timestamp",
+                    "source",
+                    "publisher"
+                ],
+                "properties": {
+                    "publisher": {
+                        "type": "string"
+                    },
+                    "source": {
+                        "type": "string"
+                    },
+                    "timestamp": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 0
+                    }
+                }
+            },
+            "BlockId": {
+                "oneOf": [
+                    {
+                        "type": "object",
+                        "required": [
+                            "Tag"
+                        ],
+                        "properties": {
+                            "Tag": {
+                                "$ref": "#/components/schemas/BlockTag"
+                            }
+                        }
+                    },
+                    {
+                        "type": "object",
+                        "required": [
+                            "Number"
+                        ],
+                        "properties": {
+                            "Number": {
+                                "type": "integer",
+                                "format": "int64",
+                                "minimum": 0
+                            }
+                        }
+                    }
+                ],
+                "description": "Block identifier in the form of hash, number or tag."
+            },
+            "BlockTag": {
+                "type": "string",
+                "description": "Block tag.\n\nA tag specifying a dynamic reference to a block.",
+                "enum": [
+                    "Latest",
+                    "Pending"
+                ]
+            },
+            "Checkpoint": {
+                "type": "object",
+                "required": [
+                    "tx_hash",
+                    "price",
+                    "timestamp",
+                    "sender_address"
+                ],
+                "properties": {
+                    "price": {
+                        "type": "string"
+                    },
+                    "sender_address": {
+                        "type": "string"
+                    },
+                    "timestamp": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 0
+                    },
+                    "tx_hash": {
+                        "type": "string"
+                    }
+                }
+            },
+            "CreateEntryRequest": {
+                "type": "object",
+                "required": [
+                    "signature",
+                    "entries"
+                ],
+                "properties": {
+                    "entries": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/Entry"
+                        }
+                    },
+                    "signature": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "CreateEntryResponse": {
+                "type": "object",
+                "required": [
+                    "number_entries_created"
+                ],
+                "properties": {
+                    "number_entries_created": {
+                        "type": "integer",
+                        "minimum": 0
+                    }
+                }
+            },
+            "CreateFutureEntryRequest": {
+                "type": "object",
+                "required": [
+                    "signature",
+                    "entries"
+                ],
+                "properties": {
+                    "entries": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/FutureEntry"
+                        }
+                    },
+                    "signature": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "CreateFutureEntryResponse": {
+                "type": "object",
+                "required": [
+                    "number_entries_created"
+                ],
+                "properties": {
+                    "number_entries_created": {
+                        "type": "integer",
+                        "minimum": 0
+                    }
+                }
+            },
+            "Currency": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "name",
+                    "decimals",
+                    "is_abstract"
+                ],
+                "properties": {
+                    "decimals": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 0
+                    },
+                    "ethereum_address": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "is_abstract": {
+                        "type": "boolean"
+                    },
+                    "name": {
+                        "type": "string"
+                    }
+                }
+            },
+            "CurrencyError": {
+                "oneOf": [
+                    {
+                        "type": "string",
+                        "enum": [
+                            "InternalServerError"
+                        ]
+                    },
+                    {
+                        "type": "object",
+                        "required": [
+                            "NotFound"
+                        ],
+                        "properties": {
+                            "NotFound": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    {
+                        "type": "object",
+                        "required": [
+                            "InfraError"
+                        ],
+                        "properties": {
+                            "InfraError": {
+                                "$ref": "#/components/schemas/InfraError"
+                            }
+                        }
+                    }
+                ]
+            },
+            "DataType": {
+                "type": "string",
+                "enum": [
+                    "spot_entry",
+                    "perp_entry",
+                    "future_entry"
+                ]
+            },
+            "Entry": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "pair_id",
+                    "publisher",
+                    "source",
+                    "timestamp",
+                    "price"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "pair_id": {
+                        "type": "string"
+                    },
+                    "price": {
+                        "type": "integer",
+                        "minimum": 0
+                    },
+                    "publisher": {
+                        "type": "string"
+                    },
+                    "publisher_signature": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "source": {
+                        "type": "string"
+                    },
+                    "timestamp": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 0
+                    }
+                }
+            },
+            "EntryError": {
+                "oneOf": [
+                    {
+                        "type": "string",
+                        "enum": [
+                            "InternalServerError"
+                        ]
+                    },
+                    {
+                        "type": "string",
+                        "enum": [
+                            "BadRequest"
+                        ]
+                    },
+                    {
+                        "type": "object",
+                        "required": [
+                            "NotFound"
+                        ],
+                        "properties": {
+                            "NotFound": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    {
+                        "type": "object",
+                        "required": [
+                            "InfraError"
+                        ],
+                        "properties": {
+                            "InfraError": {
+                                "$ref": "#/components/schemas/InfraError"
+                            }
+                        }
+                    },
+                    {
+                        "type": "object",
+                        "required": [
+                            "InvalidSignature"
+                        ],
+                        "properties": {
+                            "InvalidSignature": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    {
+                        "type": "string",
+                        "enum": [
+                            "InvalidSigner"
+                        ]
+                    },
+                    {
+                        "type": "object",
+                        "required": [
+                            "Unauthorized"
+                        ],
+                        "properties": {
+                            "Unauthorized": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    {
+                        "type": "object",
+                        "required": [
+                            "InvalidTimestamp"
+                        ],
+                        "properties": {
+                            "InvalidTimestamp": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    {
+                        "type": "string",
+                        "enum": [
+                            "InvalidExpiry"
+                        ]
+                    },
+                    {
+                        "type": "object",
+                        "required": [
+                            "MissingData"
+                        ],
+                        "properties": {
+                            "MissingData": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    {
+                        "type": "object",
+                        "required": [
+                            "PublisherError"
+                        ],
+                        "properties": {
+                            "PublisherError": {
+                                "$ref": "#/components/schemas/PublisherError"
+                            }
+                        }
+                    },
+                    {
+                        "type": "object",
+                        "required": [
+                            "UnknownPairId"
+                        ],
+                        "properties": {
+                            "UnknownPairId": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    {
+                        "type": "object",
+                        "required": [
+                            "VolatilityError"
+                        ],
+                        "properties": {
+                            "VolatilityError": {
+                                "$ref": "#/components/schemas/VolatilityError"
+                            }
+                        }
+                    },
+                    {
+                        "type": "object",
+                        "required": [
+                            "PublishData"
+                        ],
+                        "properties": {
+                            "PublishData": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    {
+                        "type": "object",
+                        "required": [
+                            "BuildPublish"
+                        ],
+                        "properties": {
+                            "BuildPublish": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                ]
+            },
+            "EntryType": {
+                "type": "string",
+                "enum": [
+                    "spot",
+                    "perp",
+                    "future"
+                ]
+            },
+            "FutureEntry": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "pair_id",
+                    "publisher",
+                    "source",
+                    "timestamp",
+                    "publisher_signature",
+                    "price"
+                ],
+                "properties": {
+                    "expiration_timestamp": {
+                        "type": "integer",
+                        "format": "int64",
+                        "nullable": true,
+                        "minimum": 0
+                    },
+                    "id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "pair_id": {
+                        "type": "string"
+                    },
+                    "price": {
+                        "type": "integer",
+                        "minimum": 0
+                    },
+                    "publisher": {
+                        "type": "string"
+                    },
+                    "publisher_signature": {
+                        "type": "string"
+                    },
+                    "source": {
+                        "type": "string"
+                    },
+                    "timestamp": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 0
+                    }
+                }
+            },
+            "GetEntryParams": {
+                "type": "object",
+                "required": [
+                    "timestamp"
+                ],
+                "properties": {
+                    "aggregation": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/AggregationMode"
+                            }
+                        ],
+                        "nullable": true
+                    },
+                    "entry_type": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/EntryType"
+                            }
+                        ],
+                        "nullable": true
+                    },
+                    "expiry": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "interval": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/Interval"
+                            }
+                        ],
+                        "nullable": true
+                    },
+                    "routing": {
+                        "type": "boolean",
+                        "nullable": true
+                    },
+                    "timestamp": {
+                        "type": "integer",
+                        "format": "int64",
+                        "description": "The unix timestamp in seconds. This endpoint will return the first update whose\ntimestamp is <= the provided value."
+                    }
+                }
+            },
+            "GetEntryResponse": {
+                "type": "object",
+                "required": [
+                    "num_sources_aggregated",
+                    "pair_id",
+                    "price",
+                    "timestamp",
+                    "decimals"
+                ],
+                "properties": {
+                    "decimals": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 0
+                    },
+                    "num_sources_aggregated": {
+                        "type": "integer",
+                        "minimum": 0
+                    },
+                    "pair_id": {
+                        "type": "string"
+                    },
+                    "price": {
+                        "type": "string"
+                    },
+                    "timestamp": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 0
+                    }
+                }
+            },
+            "GetMerkleProofQuery": {
+                "type": "object",
+                "properties": {
+                    "block_id": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/BlockId"
+                            }
+                        ],
+                        "nullable": true
+                    },
+                    "network": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/Network"
+                            }
+                        ],
+                        "nullable": true
+                    }
+                }
+            },
+            "GetMerkleProofResponse": {
+                "$ref": "#/components/schemas/MerkleProof"
+            },
+            "GetOHLCResponse": {
+                "type": "object",
+                "required": [
+                    "pair_id",
+                    "data"
+                ],
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/OHLCEntry"
+                        }
+                    },
+                    "pair_id": {
+                        "type": "string"
+                    }
+                }
+            },
+            "GetOnchainCheckpointsParams": {
+                "type": "object",
+                "required": [
+                    "network"
+                ],
+                "properties": {
+                    "limit": {
+                        "type": "integer",
+                        "format": "int64",
+                        "nullable": true,
+                        "minimum": 0
+                    },
+                    "network": {
+                        "$ref": "#/components/schemas/Network"
+                    }
+                }
+            },
+            "GetOnchainCheckpointsResponse": {
+                "type": "array",
+                "items": {
+                    "$ref": "#/components/schemas/Checkpoint"
+                }
+            },
+            "GetOnchainEntryParams": {
+                "type": "object",
+                "required": [
+                    "network"
+                ],
+                "properties": {
+                    "aggregation": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/AggregationMode"
+                            }
+                        ],
+                        "nullable": true
+                    },
+                    "components": {
+                        "type": "boolean",
+                        "nullable": true
+                    },
+                    "network": {
+                        "$ref": "#/components/schemas/Network"
+                    },
+                    "routing": {
+                        "type": "boolean",
+                        "nullable": true
+                    },
+                    "timestamp": {
+                        "type": "integer",
+                        "format": "int64",
+                        "nullable": true
+                    }
+                }
+            },
+            "GetOnchainEntryResponse": {
+                "type": "object",
+                "required": [
+                    "pair_id",
+                    "last_updated_timestamp",
+                    "price",
+                    "decimals",
+                    "nb_sources_aggregated",
+                    "asset_type",
+                    "variations"
+                ],
+                "properties": {
+                    "asset_type": {
+                        "type": "string"
+                    },
+                    "components": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/OnchainEntry"
+                        },
+                        "nullable": true
+                    },
+                    "decimals": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 0
+                    },
+                    "last_updated_timestamp": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 0
+                    },
+                    "nb_sources_aggregated": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 0
+                    },
+                    "pair_id": {
+                        "type": "string"
+                    },
+                    "price": {
+                        "type": "string"
+                    },
+                    "variations": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "number",
+                            "format": "float"
+                        }
+                    }
+                }
+            },
+            "GetOnchainHistoryEntry": {
+                "type": "object",
+                "required": [
+                    "pair_id",
+                    "timestamp",
+                    "median_price",
+                    "decimals",
+                    "nb_sources_aggregated"
+                ],
+                "properties": {
+                    "decimals": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 0
+                    },
+                    "median_price": {
+                        "type": "string"
+                    },
+                    "nb_sources_aggregated": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 0
+                    },
+                    "pair_id": {
+                        "type": "string"
+                    },
+                    "timestamp": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 0
+                    }
+                }
+            },
+            "GetOnchainHistoryParams": {
+                "type": "object",
+                "required": [
+                    "network",
+                    "timestamp"
+                ],
+                "properties": {
+                    "chunk_interval": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/Interval"
+                            }
+                        ],
+                        "nullable": true
+                    },
+                    "network": {
+                        "$ref": "#/components/schemas/Network"
+                    },
+                    "routing": {
+                        "type": "boolean",
+                        "nullable": true
+                    },
+                    "timestamp": {
+                        "$ref": "#/components/schemas/TimestampRange"
+                    }
+                }
+            },
+            "GetOnchainHistoryResponse": {
+                "type": "array",
+                "items": {
+                    "$ref": "#/components/schemas/GetOnchainHistoryEntry"
+                }
+            },
+            "GetOnchainOHLCResponse": {
+                "type": "object",
+                "required": [
+                    "pair_id",
+                    "data"
+                ],
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/OHLCEntry"
+                        }
+                    },
+                    "pair_id": {
+                        "type": "string"
+                    }
+                }
+            },
+            "GetOnchainPublishersParams": {
+                "type": "object",
+                "required": [
+                    "network",
+                    "data_type"
+                ],
+                "properties": {
+                    "data_type": {
+                        "$ref": "#/components/schemas/DataType"
+                    },
+                    "network": {
+                        "$ref": "#/components/schemas/Network"
+                    }
+                }
+            },
+            "GetOnchainPublishersResponse": {
+                "type": "array",
+                "items": {
+                    "$ref": "#/components/schemas/Publisher"
+                }
+            },
+            "GetOptionQuery": {
+                "type": "object",
+                "properties": {
+                    "block_id": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/BlockId"
+                            }
+                        ],
+                        "nullable": true
+                    },
+                    "network": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/Network"
+                            }
+                        ],
+                        "nullable": true
+                    }
+                }
+            },
+            "GetOptionResponse": {
+                "allOf": [
+                    {
+                        "$ref": "#/components/schemas/OptionData"
+                    },
+                    {
+                        "type": "object",
+                        "required": [
+                            "hash"
+                        ],
+                        "properties": {
+                            "hash": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                ]
+            },
+            "GetVolatilityResponse": {
+                "type": "object",
+                "required": [
+                    "pair_id",
+                    "volatility",
+                    "decimals"
+                ],
+                "properties": {
+                    "decimals": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 0
+                    },
+                    "pair_id": {
+                        "type": "string"
+                    },
+                    "volatility": {
+                        "type": "number",
+                        "format": "double"
+                    }
+                }
+            },
+            "InfraError": {
+                "oneOf": [
+                    {
+                        "type": "string",
+                        "enum": [
+                            "InternalServerError"
+                        ]
+                    },
+                    {
+                        "type": "string",
+                        "enum": [
+                            "RoutingError"
+                        ]
+                    },
+                    {
+                        "type": "string",
+                        "enum": [
+                            "NotFound"
+                        ]
+                    },
+                    {
+                        "type": "object",
+                        "required": [
+                            "InvalidTimestamp"
+                        ],
+                        "properties": {
+                            "InvalidTimestamp": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    {
+                        "type": "object",
+                        "required": [
+                            "NonZeroU32Conversion"
+                        ],
+                        "properties": {
+                            "NonZeroU32Conversion": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    {
+                        "type": "object",
+                        "required": [
+                            "AxumError"
+                        ],
+                        "properties": {
+                            "AxumError": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                ]
+            },
+            "Instrument": {
+                "type": "object",
+                "description": "An instrument.",
+                "required": [
+                    "base_currency",
+                    "expiration_date",
+                    "strike_price",
+                    "option_type"
+                ],
+                "properties": {
+                    "base_currency": {
+                        "$ref": "#/components/schemas/OptionCurrency"
+                    },
+                    "expiration_date": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "option_type": {
+                        "$ref": "#/components/schemas/OptionType"
+                    },
+                    "strike_price": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 0
+                    }
+                }
+            },
+            "Interval": {
+                "type": "string",
+                "enum": [
+                    "1min",
+                    "15min",
+                    "1h",
+                    "2h",
+                    "1d",
+                    "1w"
+                ]
+            },
+            "MerkleFeedError": {
+                "oneOf": [
+                    {
+                        "type": "string",
+                        "enum": [
+                            "InternalServerError"
+                        ]
+                    },
+                    {
+                        "type": "string",
+                        "enum": [
+                            "RedisConnection"
+                        ]
+                    },
+                    {
+                        "type": "object",
+                        "required": [
+                            "OptionNotFound"
+                        ],
+                        "properties": {
+                            "OptionNotFound": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object"
+                                },
+                                "description": "",
+                                "maxItems": 2,
+                                "minItems": 2
+                            }
+                        }
+                    },
+                    {
+                        "type": "object",
+                        "required": [
+                            "MerkleTreeNotFound"
+                        ],
+                        "properties": {
+                            "MerkleTreeNotFound": {
+                                "type": "integer",
+                                "format": "int64",
+                                "minimum": 0
+                            }
+                        }
+                    },
+                    {
+                        "type": "object",
+                        "required": [
+                            "InvalidOptionHash"
+                        ],
+                        "properties": {
+                            "InvalidOptionHash": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    {
+                        "type": "string",
+                        "enum": [
+                            "TreeDeserialization"
+                        ]
+                    },
+                    {
+                        "type": "object",
+                        "required": [
+                            "MerkleProof"
+                        ],
+                        "properties": {
+                            "MerkleProof": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    {
+                        "type": "object",
+                        "required": [
+                            "NoBlocks"
+                        ],
+                        "properties": {
+                            "NoBlocks": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                ]
+            },
+            "MerkleProof": {
+                "type": "array",
+                "items": {
+                    "type": "string"
+                },
+                "description": "The merkle proof but with hexadecimal hashes instead of Field elements."
+            },
+            "Network": {
+                "type": "string",
+                "enum": [
+                    "sepolia",
+                    "mainnet"
+                ]
+            },
+            "OHLCEntry": {
+                "type": "object",
+                "required": [
+                    "time",
+                    "open",
+                    "low",
+                    "high",
+                    "close"
+                ],
+                "properties": {
+                    "close": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 0
+                    },
+                    "high": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 0
+                    },
+                    "low": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 0
+                    },
+                    "open": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 0
+                    },
+                    "time": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                }
+            },
+            "OnchainEntry": {
+                "type": "object",
+                "required": [
+                    "publisher",
+                    "source",
+                    "price",
+                    "tx_hash",
+                    "timestamp"
+                ],
+                "properties": {
+                    "price": {
+                        "type": "string"
+                    },
+                    "publisher": {
+                        "type": "string"
+                    },
+                    "source": {
+                        "type": "string"
+                    },
+                    "timestamp": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 0
+                    },
+                    "tx_hash": {
+                        "type": "string"
+                    }
+                }
+            },
+            "OptionCurrency": {
+                "type": "string",
+                "description": "The available currencies supported.",
+                "enum": [
+                    "BTC",
+                    "ETH"
+                ]
+            },
+            "OptionData": {
+                "type": "object",
+                "description": "An instrument option with its mark price for a certain timestamp.",
+                "required": [
+                    "instrument_name",
+                    "base_currency",
+                    "current_timestamp",
+                    "mark_price"
+                ],
+                "properties": {
+                    "base_currency": {
+                        "$ref": "#/components/schemas/OptionCurrency"
+                    },
+                    "current_timestamp": {
+                        "type": "integer",
+                        "format": "int64"
+                    },
+                    "instrument_name": {
+                        "type": "string"
+                    },
+                    "mark_price": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 0
+                    }
+                }
+            },
+            "OptionType": {
+                "type": "string",
+                "description": "The possible types for an option.",
+                "enum": [
+                    "Put",
+                    "Call"
+                ]
+            },
+            "PerpEntry": {
+                "type": "object",
+                "required": [
+                    "base",
+                    "pair_id",
+                    "price",
+                    "volume"
+                ],
+                "properties": {
+                    "base": {
+                        "$ref": "#/components/schemas/BaseEntry"
+                    },
+                    "pair_id": {
+                        "type": "string"
+                    },
+                    "price": {
+                        "type": "integer",
+                        "minimum": 0
+                    },
+                    "volume": {
+                        "type": "integer",
+                        "minimum": 0
+                    }
+                }
+            },
+            "Publisher": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "name",
+                    "master_key",
+                    "active_key",
+                    "account_address",
+                    "active"
+                ],
+                "properties": {
+                    "account_address": {
+                        "type": "string"
+                    },
+                    "active": {
+                        "type": "boolean"
+                    },
+                    "active_key": {
+                        "type": "string"
+                    },
+                    "id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "master_key": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    }
+                }
+            },
+            "PublisherEntry": {
+                "type": "object",
+                "required": [
+                    "pair_id",
+                    "last_updated_timestamp",
+                    "price",
+                    "source",
+                    "decimals",
+                    "daily_updates"
+                ],
+                "properties": {
+                    "daily_updates": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 0
+                    },
+                    "decimals": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 0
+                    },
+                    "last_updated_timestamp": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 0
+                    },
+                    "pair_id": {
+                        "type": "string"
+                    },
+                    "price": {
+                        "type": "string"
+                    },
+                    "source": {
+                        "type": "string"
+                    }
+                }
+            },
+            "PublisherError": {
+                "oneOf": [
+                    {
+                        "type": "string",
+                        "enum": [
+                            "InternalServerError"
+                        ]
+                    },
+                    {
+                        "type": "object",
+                        "required": [
+                            "InvalidKey"
+                        ],
+                        "properties": {
+                            "InvalidKey": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    {
+                        "type": "object",
+                        "required": [
+                            "InvalidAddress"
+                        ],
+                        "properties": {
+                            "InvalidAddress": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    {
+                        "type": "object",
+                        "required": [
+                            "InactivePublisher"
+                        ],
+                        "properties": {
+                            "InactivePublisher": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    {
+                        "type": "string",
+                        "enum": [
+                            "NotFound"
+                        ]
+                    }
+                ]
+            },
+            "RedisError": {
+                "oneOf": [
+                    {
+                        "type": "string",
+                        "enum": [
+                            "InternalServerError"
+                        ]
+                    },
+                    {
+                        "type": "string",
+                        "enum": [
+                            "Connection"
+                        ]
+                    },
+                    {
+                        "type": "object",
+                        "required": [
+                            "OptionNotFound"
+                        ],
+                        "properties": {
+                            "OptionNotFound": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object"
+                                },
+                                "description": "",
+                                "maxItems": 2,
+                                "minItems": 2
+                            }
+                        }
+                    },
+                    {
+                        "type": "object",
+                        "required": [
+                            "MerkleTreeNotFound"
+                        ],
+                        "properties": {
+                            "MerkleTreeNotFound": {
+                                "type": "integer",
+                                "format": "int64",
+                                "minimum": 0
+                            }
+                        }
+                    },
+                    {
+                        "type": "object",
+                        "required": [
+                            "InvalidOptionHash"
+                        ],
+                        "properties": {
+                            "InvalidOptionHash": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    {
+                        "type": "string",
+                        "enum": [
+                            "TreeDeserialization"
+                        ]
+                    },
+                    {
+                        "type": "object",
+                        "required": [
+                            "NoBlocks"
+                        ],
+                        "properties": {
+                            "NoBlocks": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                ]
+            },
+            "SignedPublisherPrice": {
+                "type": "object",
+                "required": [
+                    "oracle_asset_id",
+                    "oracle_price",
+                    "signing_key",
+                    "signature",
+                    "timestamp"
+                ],
+                "properties": {
+                    "oracle_asset_id": {
+                        "type": "string"
+                    },
+                    "oracle_price": {
+                        "type": "string"
+                    },
+                    "signature": {
+                        "type": "string"
+                    },
+                    "signing_key": {
+                        "type": "string"
+                    },
+                    "timestamp": {
+                        "type": "string"
+                    }
+                }
+            },
+            "SubscribeToEntryResponse": {
+                "type": "object",
+                "required": [
+                    "oracle_prices",
+                    "timestamp"
+                ],
+                "properties": {
+                    "oracle_prices": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/AssetOraclePrice"
+                        }
+                    },
+                    "timestamp": {
+                        "type": "integer",
+                        "format": "int64"
+                    }
+                }
+            },
+            "TimestampRange": {
+                "type": "string",
+                "description": "Represents a range of timestamps"
+            },
+            "VolatilityError": {
+                "oneOf": [
+                    {
+                        "type": "object",
+                        "required": [
+                            "InvalidTimestampsRange"
+                        ],
+                        "properties": {
+                            "InvalidTimestampsRange": {
+                                "type": "array",
+                                "items": {
+                                    "type": "integer",
+                                    "format": "int64",
+                                    "minimum": 0
+                                },
+                                "description": "",
+                                "maxItems": 2,
+                                "minItems": 2
+                            }
+                        }
+                    }
+                ]
+            }
+        },
+        "responses": {
+            "CreateEntryResponse": {
+                "description": "",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "required": [
+                                "number_entries_created"
+                            ],
+                            "properties": {
+                                "number_entries_created": {
+                                    "type": "integer",
+                                    "minimum": 0
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "CreateFutureEntryResponse": {
+                "description": "",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "required": [
+                                "number_entries_created"
+                            ],
+                            "properties": {
+                                "number_entries_created": {
+                                    "type": "integer",
+                                    "minimum": 0
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "GetEntryResponse": {
+                "description": "",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "required": [
+                                "num_sources_aggregated",
+                                "pair_id",
+                                "price",
+                                "timestamp",
+                                "decimals"
+                            ],
+                            "properties": {
+                                "decimals": {
+                                    "type": "integer",
+                                    "format": "int32",
+                                    "minimum": 0
+                                },
+                                "num_sources_aggregated": {
+                                    "type": "integer",
+                                    "minimum": 0
+                                },
+                                "pair_id": {
+                                    "type": "string"
+                                },
+                                "price": {
+                                    "type": "string"
+                                },
+                                "timestamp": {
+                                    "type": "integer",
+                                    "format": "int64",
+                                    "minimum": 0
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "GetMerkleProofResponse": {
+                "description": "",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/MerkleProof"
+                        }
+                    }
+                }
+            },
+            "GetOHLCResponse": {
+                "description": "",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "required": [
+                                "pair_id",
+                                "data"
+                            ],
+                            "properties": {
+                                "data": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/OHLCEntry"
+                                    }
+                                },
+                                "pair_id": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "GetOnchainCheckpointsResponse": {
+                "description": "",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/components/schemas/Checkpoint"
+                            }
+                        }
+                    }
+                }
+            },
+            "GetOnchainEntryResponse": {
+                "description": "",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "required": [
+                                "pair_id",
+                                "last_updated_timestamp",
+                                "price",
+                                "decimals",
+                                "nb_sources_aggregated",
+                                "asset_type",
+                                "variations"
+                            ],
+                            "properties": {
+                                "asset_type": {
+                                    "type": "string"
+                                },
+                                "components": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/OnchainEntry"
+                                    },
+                                    "nullable": true
+                                },
+                                "decimals": {
+                                    "type": "integer",
+                                    "format": "int32",
+                                    "minimum": 0
+                                },
+                                "last_updated_timestamp": {
+                                    "type": "integer",
+                                    "format": "int64",
+                                    "minimum": 0
+                                },
+                                "nb_sources_aggregated": {
+                                    "type": "integer",
+                                    "format": "int32",
+                                    "minimum": 0
+                                },
+                                "pair_id": {
+                                    "type": "string"
+                                },
+                                "price": {
+                                    "type": "string"
+                                },
+                                "variations": {
+                                    "type": "object",
+                                    "additionalProperties": {
+                                        "type": "number",
+                                        "format": "float"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "GetOnchainHistoryResponse": {
+                "description": "",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/components/schemas/GetOnchainHistoryEntry"
+                            }
+                        }
+                    }
+                }
+            },
+            "GetOnchainOHLCResponse": {
+                "description": "",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "required": [
+                                "pair_id",
+                                "data"
+                            ],
+                            "properties": {
+                                "data": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/OHLCEntry"
+                                    }
+                                },
+                                "pair_id": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "GetOnchainPublishersResponse": {
+                "description": "",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/components/schemas/Publisher"
+                            }
+                        }
+                    }
+                }
+            },
+            "GetOptionResponse": {
+                "description": "",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/components/schemas/OptionData"
+                                },
+                                {
+                                    "type": "object",
+                                    "required": [
+                                        "hash"
+                                    ],
+                                    "properties": {
+                                        "hash": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
+            "GetVolatilityResponse": {
+                "description": "",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "required": [
+                                "pair_id",
+                                "volatility",
+                                "decimals"
+                            ],
+                            "properties": {
+                                "decimals": {
+                                    "type": "integer",
+                                    "format": "int32",
+                                    "minimum": 0
+                                },
+                                "pair_id": {
+                                    "type": "string"
+                                },
+                                "volatility": {
+                                    "type": "number",
+                                    "format": "double"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "SubscribeToEntryResponse": {
+                "description": "",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "required": [
+                                "oracle_prices",
+                                "timestamp"
+                            ],
+                            "properties": {
+                                "oracle_prices": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/AssetOraclePrice"
+                                    }
+                                },
+                                "timestamp": {
+                                    "type": "integer",
+                                    "format": "int64"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "securitySchemes": {
+            "api_key": {
+                "type": "apiKey",
+                "in": "header",
+                "name": "x-api-key"
+            }
+        }
+    },
+    "tags": [
+        {
+            "name": "pragma-node",
+            "description": "Pragma Node API"
+        }
+    ]
+}

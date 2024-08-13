@@ -10,6 +10,7 @@ pub type UnixTimestamp = i64;
 
 /// Represents a range of timestamps
 #[derive(Debug, Clone, ToSchema)]
+#[schema(value_type = String)]
 pub struct TimestampRange(pub RangeInclusive<UnixTimestamp>);
 
 impl TimestampRange {
