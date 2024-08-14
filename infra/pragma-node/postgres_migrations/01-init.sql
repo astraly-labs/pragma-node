@@ -122,3 +122,28 @@ CREATE TABLE publishers (
     testnet_address VARCHAR,
     publisher_type INTEGER NOT NULL CHECK (publisher_type IN (0, 1)) -- 0 = first party, 1 = 3rd party
 );
+
+
+CREATE TABLE oo_requests (
+    network character varying(255),
+    data_id VARCHAR, 
+    assertion_id  VARCHAR, 
+    domain_id VARCHAR, 
+    claim TEXT, 
+    asserter  character varying(255),
+    disputer character varying(255),
+    disputed BOOLEAN,
+    callback_recipient character varying(255),
+    escalation_manager character varying(255),
+    caller  character varying(255),
+    expiration_timestamp timestamp without time zone,
+    settled BOOLEAN,
+    settlement_resolution BOOLEAN,
+    settle_caller character varying(255),
+    currency  character varying(255),
+    bond NUMERIC, 
+    _cursor int8range,
+    identifier VARCHAR, 
+    updated_at timestamp without time zone,
+    updated_at_tx character varying(255)
+);

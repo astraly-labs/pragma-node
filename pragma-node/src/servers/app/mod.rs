@@ -33,10 +33,10 @@ pub async fn run_app_server(config: &Config, state: AppState) {
     )]
     #[derive(OpenApi)]
     #[openapi(
-    modifiers(&SecurityAddon),
-    tags(
-        (name = "pragma-node", description = "Pragma Node API")
-    )
+        modifiers(&SecurityAddon),
+        tags(
+            (name = "pragma-node", description = "Pragma Node API")
+        )
     )]
     struct ApiDoc;
 

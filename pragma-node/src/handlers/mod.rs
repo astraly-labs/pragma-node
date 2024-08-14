@@ -6,6 +6,7 @@ pub mod get_ohlc;
 pub mod get_volatility;
 pub mod merkle_feeds;
 pub mod onchain;
+pub mod optimistic_oracle;
 pub mod subscribe_to_entry;
 
 pub use create_entry::create_entries;
