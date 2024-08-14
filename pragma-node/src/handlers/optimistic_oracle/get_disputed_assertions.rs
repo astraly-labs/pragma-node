@@ -6,6 +6,8 @@ use crate::handlers::optimistic_oracle::types::{
 use crate::infra::repositories::oo_repository::assertions;
 use crate::AppState;
 
+pub const DEFAULT_LIMIT: u32 = 100;
+
 #[utoipa::path(
     get,
     path = "/disputed-assertions",
@@ -22,15 +24,15 @@ pub async fn get_disputed_assertions(
     Query(params): Query<GetDisputedAssertionsParams>,
 ) -> Result<Json<GetDisputedAssertionsResponse>, axum::http::StatusCode> {
     let page = params.page.unwrap_or(1);
-    let limit = params.limit.unwrap_or(10);
+    let page_size = params.limit.unwrap_or(DEFAULT_LIMIT);
 
     let disputed_assertions=
-        assertions::get_disputed_assertions(&state.onchain_pool, page, limit)
+        assertions::get_disputed_assertions(&state.onchain_pool, page, page_size)
             .await
             .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    let total_count = disputed_assertions.len(); // TO VERIFY
-    let total_pages = (total_count as f64 / limit as f64).ceil() as u32;
+    let total_count = disputed_assertions.len(); 
+    let total_pages = (total_count as f64 / page_size as f64).ceil() as u32;
 
     let response = GetDisputedAssertionsResponse {
         disputed_assertions,
