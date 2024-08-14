@@ -1,8 +1,8 @@
 use diesel::prelude::*;
 use diesel::sql_types::Bool;
-use pragma_entities::error::{adapt_infra_error, InfraError};
 use pragma_monitoring::{models::OORequest, schema::oo_requests};
 use crate::handlers::optimistic_oracle::types::{Assertion, Status,AssertionDetails,ResolvedAssertion,DisputedAssertion};
+use pragma_entities::models::optimistic_oracle_error::OptimisticOracleError;
 
 
 
@@ -12,8 +12,8 @@ pub async fn get_assertions(
     status: Option<String>,
     page: u32,
     limit: u32,
-) -> Result<Vec<Assertion>, InfraError> {
-    let conn = onchain_pool.get().await.map_err(adapt_infra_error)?;
+) -> Result<Vec<Assertion>, OptimisticOracleError> {
+    let conn = onchain_pool.get().await.map_err(|_| OptimisticOracleError::DatabaseConnection)?;
 
 
     conn.interact(move |conn| {
@@ -36,7 +36,7 @@ pub async fn get_assertions(
             .offset(((page - 1) * limit) as i64)
             .limit(limit as i64)
             .load(conn)
-            .map_err(adapt_infra_error)?;
+            .map_err(|_|OptimisticOracleError::DatabaseConnection)?;
 
         let assertions: Vec<Assertion> = results
             .into_iter()
@@ -46,11 +46,7 @@ pub async fn get_assertions(
                 bond: request.bond,
                 expiration_time: request.expiration_timestamp,
                 identifier: request.identifier,
-                status: match (request.disputed, request.settled) {
-                    (Some(true), _) => Status::Disputed,           // Disputed if `disputed` is `true`
-                    (_, Some(true)) => Status::Settled,            // Settled if `settled` is `true`
-                    _ => Status::Active,                           // Active if neither are `true`, or both are `None`
-                },
+                status: get_status(request.disputed, request.settled),
                 timestamp: request.updated_at,
             })
             .collect();
@@ -58,15 +54,15 @@ pub async fn get_assertions(
         Ok(assertions)
     })
     .await
-    .map_err(adapt_infra_error)?
+    .map_err(|_| OptimisticOracleError::DatabaseConnection)?
 }
 
 // Function to get assertion details
 pub async fn get_assertion_details(
     onchain_pool: &deadpool_diesel::postgres::Pool,
     assertion_id: &str,
-) -> Result<AssertionDetails, InfraError> {
-    let conn = onchain_pool.get().await.map_err(adapt_infra_error)?;
+) -> Result<AssertionDetails, OptimisticOracleError> {
+    let conn = onchain_pool.get().await.map_err(|_| OptimisticOracleError::DatabaseConnection)?;
 
     let assertion_id = assertion_id.to_string();
 
@@ -75,15 +71,9 @@ pub async fn get_assertion_details(
             .filter(diesel::dsl::sql::<Bool>("upper(_cursor) IS NULL"))
             .filter(oo_requests::assertion_id.eq(&assertion_id))
             .first(conn)
-            .map_err(adapt_infra_error)?;
+            .map_err(|_| OptimisticOracleError::AssertionDetailsIssue(assertion_id))?;
 
-        let status = match (request.disputed, request.settled) {
-            (Some(true), _) => Status::Disputed,
-            (_, Some(true)) => Status::Settled,
-            _ => Status::Active,
-        };
-
-
+        let status = get_status(request.disputed, request.settled);
         Ok(AssertionDetails {
             assertion: Assertion{
                 assertion_id: request.assertion_id.to_string(),
@@ -105,17 +95,15 @@ pub async fn get_assertion_details(
         })
     })
     .await
-    .map_err(adapt_infra_error)?
+    .map_err(|_| OptimisticOracleError::DatabaseConnection)?
 }
 
-
-// Function to get disputed assertions
 pub async fn get_disputed_assertions(
     onchain_pool: &deadpool_diesel::postgres::Pool,
     page: u32,
     limit: u32,
-) -> Result<Vec<DisputedAssertion>, InfraError> {
-    let conn = onchain_pool.get().await.map_err(adapt_infra_error)?;
+) -> Result<Vec<DisputedAssertion>, OptimisticOracleError> {
+    let conn = onchain_pool.get().await.map_err(|_| OptimisticOracleError::DatabaseConnection)?;
 
     conn.interact(move |conn| {
         let query = oo_requests::table
@@ -124,31 +112,35 @@ pub async fn get_disputed_assertions(
             .offset(((page - 1) * limit) as i64)
             .limit(limit as i64);
 
-        let results: Vec<OORequest> = query.load(conn).map_err(adapt_infra_error)?;
+        let results: Vec<OORequest> = query.load(conn).map_err(|_| OptimisticOracleError::DatabaseConnection)?;
 
-        let disputed_assertions: Vec<DisputedAssertion> = results
+        let disputed_assertions: Result<Vec<DisputedAssertion>, OptimisticOracleError> = results
             .into_iter()
             .map(|request| {
-                DisputedAssertion {
-                    assertion: Assertion {assertion_id: request.assertion_id.to_string(),
+                let disputer = request.disputer
+                    .ok_or_else(|| OptimisticOracleError::DisputerNotSet(request.assertion_id.clone()))?;
+
+                Ok(DisputedAssertion {
+                    assertion: Assertion {
+                        assertion_id: request.assertion_id.to_string(),
                         claim: request.claim,
                         bond: request.bond,
                         expiration_time: request.expiration_timestamp,
                         identifier: request.identifier,
                         status: Status::Disputed,
                         timestamp: request.updated_at,
-                    }, 
-                disputer: request.disputer.ok_or(InfraError::DisputerNotSet)?, 
-                disputed_at: request.updated_at, 
-                disputed_tx: request.updated_at_tx
-            }
+                    },
+                    disputer,
+                    disputed_at: request.updated_at,
+                    disputed_tx: request.updated_at_tx
+                })
             })
             .collect();
 
-        Ok(disputed_assertions)
+        disputed_assertions
     })
     .await
-    .map_err(adapt_infra_error)?
+    .map_err(|_| OptimisticOracleError::DatabaseConnection)?
 }
 
 // Function to get resolved assertions
@@ -156,8 +148,8 @@ pub async fn get_resolved_assertions(
     onchain_pool: &deadpool_diesel::postgres::Pool,
     page: u32,
     limit: u32,
-) -> Result<Vec<ResolvedAssertion>, InfraError> {
-    let conn = onchain_pool.get().await.map_err(adapt_infra_error)?;
+) -> Result<Vec<ResolvedAssertion>, OptimisticOracleError> {
+    let conn = onchain_pool.get().await.map_err(|_| OptimisticOracleError::DatabaseConnection)?;
 
     conn.interact(move |conn| {
         let query = oo_requests::table
@@ -166,14 +158,15 @@ pub async fn get_resolved_assertions(
             .offset(((page - 1) * limit) as i64)
             .limit(limit as i64);
 
+        let results: Vec<OORequest> = query.load(conn).map_err(|_| OptimisticOracleError::DatabaseConnection)?;
 
-        let results: Vec<OORequest> = query.load(conn).map_err(adapt_infra_error)?;
-
-        let resolved_assertions: Vec<ResolvedAssertion> = results
+        let resolved_assertions: Result<Vec<ResolvedAssertion>, OptimisticOracleError> = results
             .into_iter()
             .map(|request| {
+                let settled_address = request.settle_caller
+                    .ok_or_else(|| OptimisticOracleError::SettlerNotSet(request.assertion_id.clone()))?;
 
-                ResolvedAssertion {
+                Ok(ResolvedAssertion {
                     assertion: Assertion {                    
                         assertion_id: request.assertion_id,
                         claim: request.claim,
@@ -183,17 +176,25 @@ pub async fn get_resolved_assertions(
                         status: Status::Settled,
                         timestamp: request.updated_at,
                     }, 
-                    settled_address: request.settle_caller.ok_or(InfraError::SettlerNotSet), 
+                    settled_address,
                     settlement_resolution: request.settlement_resolution.into(),
                     disputed: request.disputed.unwrap_or(false),
                     settled_at: request.updated_at,
                     settlement_tx: request.updated_at_tx,
-                }
+                })
             })
             .collect();
 
-        Ok(resolved_assertions)
+        resolved_assertions
     })
     .await
-    .map_err(adapt_infra_error)?
+    .map_err(|_| OptimisticOracleError::DatabaseConnection)?
+}
+
+fn get_status(disputed: Option<bool>, settled:Option<bool>) -> Status{
+    match (disputed, settled) {
+        (Some(true), _) => Status::Disputed,
+        (_, Some(true)) => Status::Settled,
+        _ => Status::Active,
+    }
 }

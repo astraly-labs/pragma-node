@@ -3,7 +3,9 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 use utoipa::ToSchema;
 use chrono::NaiveDateTime;
-#[derive(Debug, Serialize)]
+use strum::Display;
+
+#[derive(Debug, Serialize, Display)]
 pub enum Status {
     Active,
     Disputed,
@@ -16,19 +18,10 @@ pub enum SettlementResolution {
     False,
     Undefined
 }
-impl fmt::Display for Status {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let status_str = match self {
-            Status::Active => "Active",
-            Status::Disputed => "Disputed",
-            Status::Settled => "Settled",
-        };
-        write!(f, "{}", status_str)
-    }
-}
 
-impl From<std::option::Option<bool>> for SettlementResolution {
-    fn from(res: std::option::Option<bool>) -> Self {
+
+impl From<Option<bool>> for SettlementResolution {
+    fn from(res: Option<bool>) -> Self {
         match res {
             Some(true) => SettlementResolution::True,
             Some(false) => SettlementResolution::False,

@@ -53,6 +53,8 @@ impl From<InfraError> for EntryError {
             InfraError::InternalServerError => Self::InternalServerError,
             InfraError::NotFound => Self::NotFound("Unknown".to_string()),
             InfraError::RoutingError => Self::MissingData("Not enough data".to_string()),
+            InfraError::DisputerNotSet => Self::InternalServerError,
+            InfraError::SettlerNotSet => Self::InternalServerError,
             InfraError::InvalidTimestamp(e) => Self::InvalidTimestamp(e.to_string()),
             InfraError::NonZeroU32Conversion(_) => Self::InternalServerError,
             InfraError::AxumError(_) => Self::InternalServerError,
