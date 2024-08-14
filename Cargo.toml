@@ -59,7 +59,7 @@ utoipa = "4"
 utoipa-swagger-ui = { version = "4", features = ["axum"] }
 uuid = { version = "1.4", features = ["fast-rng", "v4", "serde"] }
 
-pragma-monitoring = { git = "https://github.com/astraly-labs/pragma-monitoring", branch = "feat(optimistic-oracle)-table-definition" }
+pragma-monitoring = { git = "https://github.com/astraly-labs/pragma-monitoring", branch = "main" }
 
 # Test dependencies
 rstest = "0.18.2"

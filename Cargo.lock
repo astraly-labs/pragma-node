@@ -3572,7 +3572,7 @@ dependencies = [
 [[package]]
 name = "pragma-monitoring"
 version = "0.1.0"
-source = "git+https://github.com/astraly-labs/pragma-monitoring?branch=feat(optimistic-oracle)-table-definition#442a9f3220d803154e6863143915bc4359b3c340"
+source = "git+https://github.com/astraly-labs/pragma-monitoring?branch=main#1990c702d50b6cba4e3ed2a498156d35edba4351"
 dependencies = [
  "arc-swap",
  "axum",
