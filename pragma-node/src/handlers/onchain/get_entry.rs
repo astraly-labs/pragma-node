@@ -6,7 +6,7 @@ use bigdecimal::BigDecimal;
 use pragma_common::types::{AggregationMode, Interval, Network};
 use pragma_entities::EntryError;
 use serde::{Deserialize, Serialize};
-use utoipa::{IntoParams, ToSchema};
+use utoipa::{IntoParams, ToResponse, ToSchema};
 
 use crate::infra::repositories::onchain_repository::entry::{
     get_last_updated_timestamp, get_variations, routing, OnchainRoutingArguments,
@@ -34,7 +34,7 @@ pub struct OnchainEntry {
     pub timestamp: u64,
 }
 
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Serialize, Deserialize, ToSchema, ToResponse)]
 pub struct GetOnchainEntryResponse {
     pair_id: String,
     last_updated_timestamp: u64,
@@ -55,9 +55,7 @@ pub struct GetOnchainEntryResponse {
     params(
         ("base" = String, Path, description = "Base Asset"),
         ("quote" = String, Path, description = "Quote Asset"),
-        ("network" = Network, Query, description = "Network"),
-        ("aggregation" = Option<AggregationMode>, Query, description = "Aggregation Mode"),
-        ("timestamp" = Option<i64>, Query, description = "Timestamp")
+        GetOnchainEntryParams
     ),
 )]
 pub async fn get_onchain_entry(

@@ -22,7 +22,7 @@ use utoipa::{IntoParams, ToSchema};
 
 use pragma_common::types::{AggregationMode, DataType, Interval};
 
-use crate::{types::timestamp::UnixTimestamp, utils::doc_examples};
+use crate::types::timestamp::UnixTimestamp;
 
 #[derive(Default, Debug, Deserialize, ToSchema, Clone, Copy)]
 pub enum EntryType {
@@ -49,8 +49,7 @@ impl From<EntryType> for DataType {
 pub struct GetEntryParams {
     /// The unix timestamp in seconds. This endpoint will return the first update whose
     /// timestamp is <= the provided value.
-    #[param(value_type = i64)]
-    #[param(example = doc_examples::timestamp_example)]
+    #[schema(value_type = i64)]
     pub timestamp: Option<UnixTimestamp>,
     pub interval: Option<Interval>,
     pub routing: Option<bool>,

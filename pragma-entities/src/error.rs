@@ -17,8 +17,10 @@ pub enum InfraError {
     SettlerNotSet,
     InvalidTimestamp(String),
     #[error(transparent)]
+    #[schema(value_type = String)]
     NonZeroU32Conversion(#[from] TryFromIntError),
     #[error(transparent)]
+    #[schema(value_type = String)]
     AxumError(#[from] axum::Error),
 }
 
