@@ -1,6 +1,7 @@
 use crate::handlers::optimistic_oracle::types::{
     Assertion, AssertionDetails, DisputedAssertion, ResolvedAssertion, Status,
 };
+#[allow(unused_imports)]
 use diesel::prelude::*;
 use diesel::sql_types::Bool;
 use pragma_entities::models::optimistic_oracle_error::OptimisticOracleError;
@@ -91,7 +92,7 @@ pub async fn get_assertion_details(
                 bond: request.bond,
                 expiration_time: request.expiration_timestamp,
                 identifier: request.identifier,
-                status: status,
+                status,
                 timestamp: request.updated_at,
             },
             domain_id: request.domain_id,
@@ -192,7 +193,7 @@ pub async fn get_resolved_assertions(
                     assertion: Assertion {
                         assertion_id: request.assertion_id,
                         claim: request.claim,
-                        bond: request.bond.into(),
+                        bond: request.bond,
                         expiration_time: request.expiration_timestamp,
                         identifier: request.identifier,
                         status: Status::Settled,
