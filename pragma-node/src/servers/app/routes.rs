@@ -32,7 +32,7 @@ pub fn app_router<T: OpenApiT>(state: AppState) -> Router<AppState> {
         .nest("/node/v1/aggregation", aggregation_routes(state.clone()))
         .nest("/node/v1/volatility", volatility_routes(state.clone()))
         .nest("/node/v1/merkle_feeds", merkle_feeds_routes(state.clone()))
-        .nest("/node/v1/optimistic_oracle", optimistic_oracle_routes(state.clone()))
+        .nest("/node/v1/optimistic", optimistic_oracle_routes(state.clone()))
         .fallback(handler_404)
 }
 
