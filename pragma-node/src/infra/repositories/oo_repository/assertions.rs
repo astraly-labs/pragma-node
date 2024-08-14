@@ -30,17 +30,13 @@ pub async fn get_assertions(
         };
 
         query = query.filter(diesel::dsl::sql::<Bool>("upper(_cursor) IS NULL"));
-        // Execute count query
-        // let total_count: i64 = oo_requests::table
-        //     .select(count_star())
-        //     .first(conn)
-        //     .map_err(adapt_infra_error)?;
+       
         
         let results: Vec<OORequest> = query
             .offset(((page - 1) * limit) as i64)
             .limit(limit as i64)
             .load(conn)
-            .map_err(|e| adapt_infra_error(e))?;
+            .map_err(adapt_infra_error)?;
 
         let assertions: Vec<Assertion> = results
             .into_iter()
@@ -142,7 +138,7 @@ pub async fn get_disputed_assertions(
                         status: Status::Disputed,
                         timestamp: request.updated_at,
                     }, 
-                disputer: request.disputer.expect("Unable to fetch disputer address"), 
+                disputer: request.disputer.ok_or(InfraError::DisputerNotSet)?, 
                 disputed_at: request.updated_at, 
                 disputed_tx: request.updated_at_tx
             }
@@ -187,7 +183,7 @@ pub async fn get_resolved_assertions(
                         status: Status::Settled,
                         timestamp: request.updated_at,
                     }, 
-                    settled_address: request.settle_caller.expect("Unable to fetch settler address"), 
+                    settled_address: request.settle_caller.ok_or(InfraError::SettlerNotSet), 
                     settlement_resolution: request.settlement_resolution.into(),
                     disputed: request.disputed.unwrap_or(false),
                     settled_at: request.updated_at,
