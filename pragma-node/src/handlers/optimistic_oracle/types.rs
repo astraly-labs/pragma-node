@@ -1,9 +1,9 @@
 use bigdecimal::BigDecimal;
+use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 use std::fmt;
-use utoipa::ToSchema;
-use chrono::NaiveDateTime;
 use strum::Display;
+use utoipa::ToSchema;
 
 #[derive(Debug, Serialize, Display)]
 pub enum Status {
@@ -14,11 +14,10 @@ pub enum Status {
 
 #[derive(Debug, Serialize)]
 pub enum SettlementResolution {
-    True, 
+    True,
     False,
-    Undefined
+    Undefined,
 }
-
 
 impl From<Option<bool>> for SettlementResolution {
     fn from(res: Option<bool>) -> Self {
@@ -72,21 +71,21 @@ impl fmt::Display for Assertion {
     }
 }
 #[derive(Debug, Serialize, ToSchema)]
-pub struct ResolvedAssertion{
-    pub assertion: Assertion, 
-    pub settled_address: String, 
+pub struct ResolvedAssertion {
+    pub assertion: Assertion,
+    pub settled_address: String,
     pub settlement_resolution: SettlementResolution,
     pub settled_at: NaiveDateTime,
     pub disputed: bool,
-    pub settlement_tx: String 
+    pub settlement_tx: String,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
 pub struct DisputedAssertion {
-    pub assertion: Assertion, 
-    pub disputer: String, 
-    pub disputed_at: NaiveDateTime, 
-    pub disputed_tx: String, 
+    pub assertion: Assertion,
+    pub disputer: String,
+    pub disputed_at: NaiveDateTime,
+    pub disputed_tx: String,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -100,12 +99,12 @@ pub struct GetAssertionsResponse {
 #[derive(Debug, Serialize, ToSchema)]
 pub struct AssertionDetails {
     pub assertion: Assertion,
-    pub domain_id: String, 
+    pub domain_id: String,
     pub asserter: String,
     pub disputer: String,
     pub disputed: bool,
     pub callback_recipient: String,
-    pub caller: String, 
+    pub caller: String,
     pub settled: bool,
     pub settlement_resolution: SettlementResolution,
 }

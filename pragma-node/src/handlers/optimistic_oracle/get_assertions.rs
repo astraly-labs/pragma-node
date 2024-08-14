@@ -22,7 +22,7 @@ pub const DEFAULT_LIMIT: u32 = 100;
 pub async fn get_assertions(
     State(state): State<AppState>,
     Query(params): Query<GetAssertionsParams>,
-) -> Result<Json<GetAssertionsResponse>,OptimisticOracleError> {
+) -> Result<Json<GetAssertionsResponse>, OptimisticOracleError> {
     let page = params.page.unwrap_or(1);
     let page_size = params.limit.unwrap_or(DEFAULT_LIMIT);
 

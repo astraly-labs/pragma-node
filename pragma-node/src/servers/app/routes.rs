@@ -13,12 +13,14 @@ use crate::handlers::onchain::{
     get_history::get_onchain_history, get_publishers::get_onchain_publishers,
     subscribe_to_ohlc::subscribe_to_onchain_ohlc,
 };
+use crate::handlers::optimistic_oracle::{
+    get_assertion_details::get_assertion_details, get_assertions::get_assertions,
+    get_disputed_assertions::get_disputed_assertions,
+    get_resolved_assertions::get_resolved_assertions,
+};
 use crate::handlers::{
     create_entries, create_future_entries, get_entry, get_expiries, get_ohlc, get_volatility,
     subscribe_to_entry,
-};
-use crate::handlers::optimistic_oracle::{
-    get_assertion_details::get_assertion_details, get_assertions::get_assertions, get_disputed_assertions::get_disputed_assertions, get_resolved_assertions::get_resolved_assertions
 };
 use crate::AppState;
 
@@ -32,7 +34,10 @@ pub fn app_router<T: OpenApiT>(state: AppState) -> Router<AppState> {
         .nest("/node/v1/aggregation", aggregation_routes(state.clone()))
         .nest("/node/v1/volatility", volatility_routes(state.clone()))
         .nest("/node/v1/merkle_feeds", merkle_feeds_routes(state.clone()))
-        .nest("/node/v1/optimistic", optimistic_oracle_routes(state.clone()))
+        .nest(
+            "/node/v1/optimistic",
+            optimistic_oracle_routes(state.clone()),
+        )
         .fallback(handler_404)
 }
 
@@ -88,9 +93,9 @@ fn merkle_feeds_routes(state: AppState) -> Router<AppState> {
 
 fn optimistic_oracle_routes(state: AppState) -> Router<AppState> {
     Router::new()
-    .route("/assertions/:assertion_id", get(get_assertion_details))
-    .route("/assertions", get(get_assertions))
-    .route("/disputed-assertions", get(get_disputed_assertions))
-    .route("/resolved-assertions", get(get_resolved_assertions))
+        .route("/assertions/:assertion_id", get(get_assertion_details))
+        .route("/assertions", get(get_assertions))
+        .route("/disputed-assertions", get(get_disputed_assertions))
+        .route("/resolved-assertions", get(get_resolved_assertions))
         .with_state(state)
 }

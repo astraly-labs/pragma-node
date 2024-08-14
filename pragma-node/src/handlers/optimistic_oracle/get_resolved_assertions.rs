@@ -10,7 +10,6 @@ use pragma_entities::models::optimistic_oracle_error::OptimisticOracleError;
 
 pub const DEFAULT_LIMIT: u32 = 100;
 
-
 #[utoipa::path(
     get,
     path = "/resolved-assertions",
@@ -29,7 +28,7 @@ pub async fn get_resolved_assertions(
     let page = params.page.unwrap_or(1);
     let page_size = params.limit.unwrap_or(DEFAULT_LIMIT);
 
-    let resolved_assertions=
+    let resolved_assertions =
         assertions::get_resolved_assertions(&state.onchain_pool, page, page_size)
             .await
             .map_err(OptimisticOracleError::from)?;
