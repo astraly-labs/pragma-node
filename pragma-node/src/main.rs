@@ -39,8 +39,8 @@ pub struct AppState {
 }
 
 #[tokio::main]
-async fn main() {
-    pragma_common::tracing::init_tracing();
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    pragma_common::tracing::init_tracing()?;
 
     let config = config().await;
 
@@ -97,4 +97,6 @@ async fn main() {
         servers::app::run_app_server(config, state),
         servers::metrics::run_metrics_server(config, metrics_registry)
     );
+
+    Ok(())
 }
