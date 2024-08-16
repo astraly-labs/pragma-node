@@ -1,4 +1,3 @@
-use dotenvy::dotenv;
 use serde::Deserialize;
 use tokio::sync::OnceCell;
 
@@ -101,8 +100,6 @@ impl Config {
 pub static CONFIG: OnceCell<Config> = OnceCell::const_new();
 
 async fn init_config() -> Config {
-    dotenv().ok();
-
     let server_config = envy::from_env::<ServerConfig>().unwrap_or_default();
     let kafka_config = envy::from_env::<KafkaConfig>().unwrap_or_default();
     let redis_config = envy::from_env::<RedisConfig>().unwrap_or_default();

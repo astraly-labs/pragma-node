@@ -19,6 +19,7 @@ starknet = { workspace = true }
 strum = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true }
 tracing = { workspace = true }
+tracing-axiom = "0.7"
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
 utoipa = { workspace = true }
 

@@ -173,6 +173,7 @@ export HOST="0.0.0.0"
 export PORT=3000
 export METRICS_PORT=8080
 export KAFKA_BROKERS="0.0.0.0:9092"
+export AXIOM_TOKEN=xaat- # OPTIONAL
 ```
 
 ### 4. Start the Pragma Node service:

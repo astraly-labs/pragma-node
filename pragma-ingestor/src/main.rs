@@ -11,9 +11,10 @@ mod consumer;
 mod error;
 
 #[tokio::main]
+#[tracing::instrument]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let _ = dotenv(); // .env file is not present in prod
-    pragma_common::tracing::init_tracing();
+    pragma_common::tracing::init_tracing("pragma-ingestor")?;
     info!(
         "kafka configuration : hostname={:?}, group_id={}, topic={}",
         config::CONFIG.brokers,
@@ -35,6 +36,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 }
 
+#[tracing::instrument(skip(pool))]
 async fn process_payload(pool: &Pool, payload: Vec<u8>) -> Result<(), Box<dyn std::error::Error>> {
     let decoded_payload = String::from_utf8_lossy(&payload);
     let is_future_entries = decoded_payload.contains("expiration_timestamp");
@@ -67,6 +69,7 @@ async fn process_payload(pool: &Pool, payload: Vec<u8>) -> Result<(), Box<dyn st
     Ok(())
 }
 
+#[tracing::instrument(skip(pool))]
 pub async fn insert_spot_entries(
     pool: &Pool,
     new_entries: Vec<NewEntry>,
@@ -88,6 +91,7 @@ pub async fn insert_spot_entries(
     Ok(())
 }
 
+#[tracing::instrument(skip(pool))]
 pub async fn insert_future_entries(
     pool: &Pool,
     new_entries: Vec<NewFutureEntry>,
