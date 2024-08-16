@@ -1,15 +1,12 @@
+use std::env;
 use tracing_subscriber::filter::filter_fn;
 use tracing_subscriber::prelude::*;
+use tracing_subscriber::Layer;
 
 pub fn init_tracing(service_name: &str) -> Result<(), Box<dyn std::error::Error>> {
     let axum_layer = tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-        // axum logs rejections from built-in extractors with the `axum::rejection`
-        // target, at `TRACE` level. `axum::rejection=trace` enables showing those events
         "example_tracing_aka_logging=debug,tower_http=debug,axum::rejection=trace".into()
     });
-    let axiom_layer = tracing_axiom::builder_with_env(service_name)?
-        .with_dataset("pragma-node")?
-        .build()?;
 
     let fmt_layer = tracing_subscriber::fmt::layer()
         .compact()
@@ -20,17 +17,25 @@ pub fn init_tracing(service_name: &str) -> Result<(), Box<dyn std::error::Error>
         .pretty();
 
     let filter = filter_fn(|metadata| {
-        // Filter out hyper logs
-        metadata.target() != "hyper" && 
-        // You can add more conditions here if needed
-        metadata.level() <= &tracing::Level::DEBUG
+        metadata.target() != "hyper" && metadata.level() <= &tracing::Level::DEBUG
     });
 
-    tracing_subscriber::registry()
-        .with(fmt_layer.with_filter(filter.clone()))
-        .with(axiom_layer.with_filter(filter.clone()))
-        .with(axum_layer.with_filter(filter))
-        .try_init()?;
+    let mut layers: Vec<Box<dyn Layer<_> + Send + Sync>> = vec![
+        Box::new(fmt_layer.with_filter(filter.clone())),
+        Box::new(axum_layer.with_filter(filter.clone())),
+    ];
+
+    // Check if the Axiom token is set
+    if env::var("AXIOM_TOKEN").is_ok() {
+        if let Ok(axiom_layer) = tracing_axiom::builder_with_env(service_name)?
+            .with_dataset("pragma-node")?
+            .build()
+        {
+            layers.push(Box::new(axiom_layer.with_filter(filter)));
+        }
+    }
+
+    tracing_subscriber::registry().with(layers).try_init()?;
 
     Ok(())
 }
