@@ -46,26 +46,31 @@ mod tests {
 
     #[test]
     fn test_load_from_env() {
-        env::set_var("BROKERS", "localhost:9092");
-        env::set_var("TOPIC", "test_topic");
-        env::set_var("GROUP_ID", "test_group");
+        unsafe {
+            env::set_var("BROKERS", "localhost:9092");
+            env::set_var("TOPIC", "test_topic");
+            env::set_var("GROUP_ID", "test_group");
+        }
 
         let ingestor = Ingestor::from_env().unwrap();
 
         assert_eq!(ingestor.brokers, vec!["localhost:9092".to_string()]);
         assert_eq!(ingestor.topic, "test_topic");
         assert_eq!(ingestor.group_id, "test_group");
-
-        env::remove_var("BROKERS");
-        env::remove_var("TOPIC");
-        env::remove_var("GROUP_ID");
+        unsafe {
+            env::remove_var("BROKERS");
+            env::remove_var("TOPIC");
+            env::remove_var("GROUP_ID");
+        }
     }
 
     #[test]
     fn test_env_error_handling() {
-        env::remove_var("BROKERS");
-        env::remove_var("TOPIC");
-        env::remove_var("GROUP_ID");
+        unsafe {
+            env::remove_var("BROKERS");
+            env::remove_var("TOPIC");
+            env::remove_var("GROUP_ID");
+        }
 
         let result = Ingestor::from_env();
         assert!(result.is_err());

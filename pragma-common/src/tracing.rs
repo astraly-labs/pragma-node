@@ -1,8 +1,8 @@
-use tracing_subscriber::filter::{filter_fn, LevelFilter};
+use tracing_subscriber::filter::filter_fn;
 use tracing_subscriber::prelude::*;
 
-pub fn init_tracing() -> Result<(), Box<dyn std::error::Error>> {
-    let axiom_layer = tracing_axiom::builder_with_env("pragma-node")?
+pub fn init_tracing(service_name: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let axiom_layer = tracing_axiom::builder_with_env(service_name)?
         .with_dataset("pragma-node")?
         .build()?;
 

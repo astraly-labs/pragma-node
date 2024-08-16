@@ -44,7 +44,7 @@ pub struct AppState {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv().ok();
 
-    pragma_common::tracing::init_tracing()?;
+    pragma_common::tracing::init_tracing("pragma-node")?;
 
     let config = config().await;
 
