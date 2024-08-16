@@ -27,6 +27,7 @@ impl Modify for SecurityAddon {
     }
 }
 
+#[tracing::instrument(skip(state))]
 pub async fn run_app_server(config: &Config, state: AppState) {
     #[utoipauto(
         paths = "./pragma-node/src, ./pragma-common/src from pragma_common, ./pragma-entities/src from pragma_entities"

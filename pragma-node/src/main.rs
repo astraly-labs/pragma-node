@@ -9,6 +9,7 @@ mod servers;
 mod types;
 mod utils;
 
+use dotenvy::dotenv;
 use std::sync::Arc;
 
 use caches::CacheRegistry;
@@ -39,7 +40,10 @@ pub struct AppState {
 }
 
 #[tokio::main]
+#[tracing::instrument]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    dotenv().ok();
+
     pragma_common::tracing::init_tracing()?;
 
     let config = config().await;
@@ -97,6 +101,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         servers::app::run_app_server(config, state),
         servers::metrics::run_metrics_server(config, metrics_registry)
     );
+
+    // Ensure that the tracing provider is shutdown correctly
+    opentelemetry::global::shutdown_tracer_provider();
 
     Ok(())
 }
