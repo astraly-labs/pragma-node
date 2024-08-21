@@ -23,6 +23,7 @@ pub struct GetOnchainEntryParams {
     pub routing: Option<bool>,
     pub timestamp: Option<i64>,
     pub components: Option<bool>,
+    pub variations: Option<bool>,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema, Clone)]
@@ -43,7 +44,7 @@ pub struct GetOnchainEntryResponse {
     nb_sources_aggregated: u32,
     asset_type: String,
     components: Option<Vec<OnchainEntry>>,
-    variations: HashMap<Interval, f32>,
+    variations: Option<HashMap<Interval, f32>>,
 }
 
 #[utoipa::path(
@@ -66,6 +67,7 @@ pub async fn get_onchain_entry(
     tracing::info!("Received get onchain entry request for pair {:?}", pair);
     let pair_id: String = currency_pair_to_pair_id(&pair.0, &pair.1);
     let with_components = params.components.unwrap_or(true);
+    let with_variations = params.variations.unwrap_or(true);
 
     let now = chrono::Utc::now().timestamp();
     let timestamp = if let Some(timestamp) = params.timestamp {
@@ -95,9 +97,15 @@ pub async fn get_onchain_entry(
             .await
             .map_err(|db_error| db_error.to_entry_error(&pair_id))?;
 
-    let variations = get_variations(&state.onchain_pool, params.network, pair_id.clone())
-        .await
-        .map_err(|db_error| db_error.to_entry_error(&pair_id))?;
+    let variations = if with_variations {
+        Some(
+            get_variations(&state.onchain_pool, params.network, pair_id.clone())
+                .await
+                .map_err(|db_error| db_error.to_entry_error(&pair_id))?,
+        )
+    } else {
+        None
+    };
 
     Ok(Json(adapt_entries_to_onchain_response(
         pair_id.clone(),
@@ -116,7 +124,7 @@ fn adapt_entries_to_onchain_response(
     sources: Vec<OnchainEntry>,
     aggregated_price: BigDecimal,
     last_updated_timestamp: u64,
-    variations: HashMap<Interval, f32>,
+    variations: Option<HashMap<Interval, f32>>,
     with_components: bool,
 ) -> GetOnchainEntryResponse {
     GetOnchainEntryResponse {
