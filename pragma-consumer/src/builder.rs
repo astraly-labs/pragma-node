@@ -1,5 +1,8 @@
 use pragma_common::types::Network;
-use reqwest::{header::InvalidHeaderValue, StatusCode};
+use reqwest::{
+    header::{HeaderValue, InvalidHeaderValue},
+    StatusCode,
+};
 
 use crate::{
     config::{ApiConfig, PragmaBaseUrl},
@@ -72,12 +75,8 @@ impl PragmaConsumerBuilder {
             .default_headers({
                 let mut headers = reqwest::header::HeaderMap::new();
                 headers.insert(
-                    reqwest::header::AUTHORIZATION,
-                    reqwest::header::HeaderValue::from_str(&format!(
-                        "X-API-KEY: {}",
-                        api_config.api_key
-                    ))
-                    .map_err(BuilderError::Header)?,
+                    "x-api-key",
+                    HeaderValue::from_str(&api_config.api_key).map_err(BuilderError::Header)?,
                 );
                 headers
             })

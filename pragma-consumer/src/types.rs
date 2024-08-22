@@ -33,6 +33,7 @@ impl MerkleFeedCalldata {
             .try_into()
             .map_err(|_| CalldataError::FeltConversion)?;
 
+        calldata.push(felt_proof.0.len().into());
         calldata.extend(felt_proof.0);
 
         let option_calldata = self
