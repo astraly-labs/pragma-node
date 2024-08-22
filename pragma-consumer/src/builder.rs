@@ -1,5 +1,8 @@
 use pragma_common::types::Network;
-use reqwest::{header::{HeaderValue, InvalidHeaderValue}, StatusCode};
+use reqwest::{
+    header::{HeaderValue, InvalidHeaderValue},
+    StatusCode,
+};
 
 use crate::{
     config::{ApiConfig, PragmaBaseUrl},
