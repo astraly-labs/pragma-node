@@ -37,7 +37,7 @@ impl PragmaConsumer {
         instrument: &Instrument,
         block_id: Option<BlockId>,
     ) -> Result<MerkleFeedCalldata, ConsumerError> {
-        let block_id = block_id.unwrap_or(BlockId::Tag(BlockTag::Latest));
+        let block_id = block_id.unwrap_or(BlockId::Tag(BlockTag::Pending));
         let option_data = self.request_option(instrument.name(), block_id).await?;
         let option_hash = option_data
             .pedersen_hash_as_hex_string()
