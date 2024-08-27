@@ -12,7 +12,7 @@ pub const DEFAULT_LIMIT: u32 = 100;
 
 #[utoipa::path(
     get,
-    path = "/resolved-assertions",
+    path = "node/v1/optimistic/resolved-assertions",
     responses(
         (status = 200, description = "Get resolved assertions successfully", body = GetResolvedAssertionsResponse)
     ),

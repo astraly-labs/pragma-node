@@ -8,7 +8,7 @@ use crate::handlers::optimistic_oracle::types::AssertionDetails;
 
 #[utoipa::path(
     get,
-    path = "/assertions/{assertion_id}",
+    path = "node/v1/optimistic/assertions/{assertion_id}",
     responses(
         (status = 200, description = "Get assertion details successfully", body = AssertionDetails)
     ),

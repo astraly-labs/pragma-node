@@ -5,14 +5,14 @@ use std::fmt;
 use strum::Display;
 use utoipa::ToSchema;
 
-#[derive(Debug, Serialize, Display)]
+#[derive(Debug, Serialize, Display, ToSchema)]
 pub enum Status {
     Active,
     Disputed,
     Settled,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub enum SettlementResolution {
     True,
     False,
