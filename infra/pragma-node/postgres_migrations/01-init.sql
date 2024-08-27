@@ -133,6 +133,7 @@ CREATE TABLE oo_requests (
     asserter  character varying(255),
     disputer character varying(255),
     disputed BOOLEAN,
+    dispute_id character varying(255),
     callback_recipient character varying(255),
     escalation_manager character varying(255),
     caller  character varying(255),
