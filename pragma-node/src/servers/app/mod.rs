@@ -6,7 +6,10 @@ use tower_http::{
     trace::{DefaultMakeSpan, TraceLayer},
 };
 use utoipa::{
-    openapi::security::{ApiKey, ApiKeyValue, SecurityScheme},
+    openapi::{
+        security::{ApiKey, ApiKeyValue, SecurityScheme},
+        ServerBuilder, ServerVariableBuilder,
+    },
     Modify, OpenApi,
 };
 use utoipauto::utoipauto;
@@ -27,6 +30,21 @@ impl Modify for SecurityAddon {
     }
 }
 
+struct ServerAddon;
+
+impl Modify for ServerAddon {
+    fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
+        let server_variable = ServerVariableBuilder::new()
+            .default_value("api.dev")
+            .enum_values(Some(vec!["api.dev", "api.prod"]))
+            .build();
+        openapi.servers = Some(vec![ServerBuilder::new()
+            .url("https://{environment}.pragma.build")
+            .parameter("environment", server_variable)
+            .build()]);
+    }
+}
+
 #[tracing::instrument(skip(state))]
 pub async fn run_app_server(config: &Config, state: AppState) {
     #[utoipauto(
@@ -34,10 +52,10 @@ pub async fn run_app_server(config: &Config, state: AppState) {
     )]
     #[derive(OpenApi)]
     #[openapi(
-        modifiers(&SecurityAddon),
+        modifiers(&SecurityAddon, &ServerAddon),
         tags(
             (name = "pragma-node", description = "Pragma Node API")
-        )
+        ),
     )]
     struct ApiDoc;
 
