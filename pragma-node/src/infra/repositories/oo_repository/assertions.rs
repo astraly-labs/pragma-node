@@ -158,7 +158,7 @@ pub async fn get_disputed_assertions(
                     identifier: request.identifier,
                     status: Status::Disputed,
                     timestamp: request.updated_at,
-                    currency: request.currency
+                    currency: request.currency,
                 },
                 disputer,
                 disputed_at: request.updated_at,
@@ -211,7 +211,7 @@ pub async fn get_resolved_assertions(
                     identifier: request.identifier,
                     status: Status::Settled,
                     timestamp: request.updated_at,
-                    currency:request.currency
+                    currency: request.currency,
                 },
                 settled_address,
                 settlement_resolution: request.settlement_resolution.into(),

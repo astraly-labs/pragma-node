@@ -53,7 +53,7 @@ pub struct Assertion {
     pub identifier: String,
     pub status: Status,
     pub timestamp: NaiveDateTime,
-    pub currency: String, 
+    pub currency: String,
 }
 
 impl fmt::Display for Assertion {
@@ -78,10 +78,10 @@ pub struct ResolvedAssertion {
     pub settled_address: String,
     pub settlement_resolution: SettlementResolution,
     pub settled_at: NaiveDateTime,
-    pub settle_caller: String, 
+    pub settle_caller: String,
     pub disputed: bool,
     pub settlement_tx: String,
-    pub dispute_id: String, 
+    pub dispute_id: String,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -89,7 +89,7 @@ pub struct DisputedAssertion {
     pub assertion: Assertion,
     pub disputer: String,
     pub disputed_at: NaiveDateTime,
-    pub dispute_id: String, 
+    pub dispute_id: String,
     pub disputed_tx: String,
 }
 
