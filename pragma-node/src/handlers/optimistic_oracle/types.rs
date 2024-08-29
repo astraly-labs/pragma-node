@@ -53,20 +53,22 @@ pub struct Assertion {
     pub identifier: String,
     pub status: Status,
     pub timestamp: NaiveDateTime,
+    pub currency: String,
 }
 
 impl fmt::Display for Assertion {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "Assertion {{ assertion_id: {}, claim: {}, bond: {}, expiration_time: {}, identifier: {}, status: {}, timestamp: {} }}",
+            "Assertion {{ assertion_id: {}, claim: {}, bond: {}, expiration_time: {}, identifier: {}, status: {}, timestamp: {}, currency: {} }}",
             self.assertion_id,
             self.claim,
             self.bond,
             self.expiration_time,
             self.identifier,
             self.status,
-            self.timestamp
+            self.timestamp,
+            self.currency
         )
     }
 }
@@ -76,8 +78,10 @@ pub struct ResolvedAssertion {
     pub settled_address: String,
     pub settlement_resolution: SettlementResolution,
     pub settled_at: NaiveDateTime,
+    pub settle_caller: String,
     pub disputed: bool,
     pub settlement_tx: String,
+    pub dispute_id: String,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -85,6 +89,7 @@ pub struct DisputedAssertion {
     pub assertion: Assertion,
     pub disputer: String,
     pub disputed_at: NaiveDateTime,
+    pub dispute_id: String,
     pub disputed_tx: String,
 }
 
@@ -103,9 +108,11 @@ pub struct AssertionDetails {
     pub asserter: String,
     pub disputer: String,
     pub disputed: bool,
+    pub dispute_id: String,
     pub callback_recipient: String,
     pub caller: String,
     pub settled: bool,
+    pub settle_caller: String,
     pub settlement_resolution: SettlementResolution,
 }
 

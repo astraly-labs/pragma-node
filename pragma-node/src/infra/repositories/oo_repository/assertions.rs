@@ -61,6 +61,7 @@ pub async fn get_assertions(
             identifier: request.identifier,
             status: get_status(request.disputed, request.settled),
             timestamp: request.updated_at,
+            currency: request.currency,
         })
         .collect();
 
@@ -100,14 +101,17 @@ pub async fn get_assertion_details(
             identifier: request.identifier,
             status,
             timestamp: request.updated_at,
+            currency: request.currency,
         },
         domain_id: request.domain_id,
         asserter: request.asserter,
         disputer: request.disputer.unwrap_or("None".to_string()),
         disputed: request.disputed.unwrap_or(false),
         callback_recipient: request.callback_recipient,
+        dispute_id: request.dispute_id.unwrap_or("None".to_string()),
         caller: request.caller,
         settled: request.settled.unwrap_or(false),
+        settle_caller: request.settle_caller.unwrap_or("None".to_string()),
         settlement_resolution: request.settlement_resolution.into(),
     })
 }
@@ -154,10 +158,12 @@ pub async fn get_disputed_assertions(
                     identifier: request.identifier,
                     status: Status::Disputed,
                     timestamp: request.updated_at,
+                    currency: request.currency,
                 },
                 disputer,
                 disputed_at: request.updated_at,
                 disputed_tx: request.updated_at_tx,
+                dispute_id: request.dispute_id.unwrap_or("None".to_string()),
             })
         })
         .collect()
@@ -192,7 +198,7 @@ pub async fn get_resolved_assertions(
     results
         .into_iter()
         .map(|request| {
-            let settled_address = request.settle_caller.ok_or_else(|| {
+            let settled_address = request.settle_caller.clone().ok_or_else(|| {
                 OptimisticOracleError::SettlerNotSet(request.assertion_id.clone())
             })?;
 
@@ -205,11 +211,14 @@ pub async fn get_resolved_assertions(
                     identifier: request.identifier,
                     status: Status::Settled,
                     timestamp: request.updated_at,
+                    currency: request.currency,
                 },
                 settled_address,
                 settlement_resolution: request.settlement_resolution.into(),
                 disputed: request.disputed.unwrap_or(false),
                 settled_at: request.updated_at,
+                settle_caller: request.settle_caller.unwrap_or("None".to_string()),
+                dispute_id: request.dispute_id.unwrap_or("None".to_string()),
                 settlement_tx: request.updated_at_tx,
             })
         })
