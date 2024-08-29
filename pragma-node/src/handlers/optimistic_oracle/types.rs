@@ -67,7 +67,7 @@ impl fmt::Display for Assertion {
             self.expiration_time,
             self.identifier,
             self.status,
-            self.timestamp, 
+            self.timestamp,
             self.currency
         )
     }
