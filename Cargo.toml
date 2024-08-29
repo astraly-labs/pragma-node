@@ -61,7 +61,7 @@ utoipauto = "0.1.14"
 utoipa-swagger-ui = { version = "4", features = ["axum"] }
 uuid = { version = "1.4", features = ["fast-rng", "v4", "serde"] }
 
-pragma-monitoring = { git = "https://github.com/astraly-labs/pragma-monitoring", branch = "main" }
+pragma-monitoring = { git = "https://github.com/astraly-labs/pragma-monitoring" }
 
 # Test dependencies
 rstest = "0.18.2"
