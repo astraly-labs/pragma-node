@@ -8,6 +8,7 @@ pub mod merkle_feeds;
 pub mod onchain;
 pub mod optimistic_oracle;
 pub mod subscribe_to_entry;
+pub mod subscribe_to_price;
 
 pub use create_entry::create_entries;
 pub use create_future_entry::create_future_entries;
@@ -16,6 +17,7 @@ pub use get_expiries::get_expiries;
 pub use get_ohlc::get_ohlc;
 pub use get_volatility::get_volatility;
 pub use subscribe_to_entry::subscribe_to_entry;
+pub use subscribe_to_price::subscribe_to_price;
 
 use serde::Deserialize;
 use utoipa::{IntoParams, ToSchema};
