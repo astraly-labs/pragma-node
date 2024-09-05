@@ -91,7 +91,7 @@ impl ChannelHandler<SubscriptionState, SubscriptionRequest, EntryError> for WsEn
         subscriber: &mut Subscriber<SubscriptionState>,
         request: SubscriptionRequest,
     ) -> Result<(), EntryError> {
-        let (existing_spot_pairs, existing_perp_pairs) =
+        let (existing_spot_pairs, _existing_perp_pairs) =
             only_existing_pairs(&subscriber.app_state.offchain_pool, request.pairs).await;
         let mut state = subscriber.state.lock().await;
         match request.msg_type {
