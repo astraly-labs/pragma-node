@@ -35,7 +35,6 @@ serde_json = { workspace = true, features = ["arbitrary_precision"] }
 starknet = { workspace = true }
 strum = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true }
-time = { workspace = true }
 tokio = { workspace = true, features = ["sync", "macros", "rt-multi-thread"] }
 tower-http = { workspace = true, features = ["fs", "trace", "cors"] }
 tracing = { workspace = true }
