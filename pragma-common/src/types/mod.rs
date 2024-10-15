@@ -25,6 +25,8 @@ pub enum Network {
     Sepolia,
     #[serde(rename = "mainnet")]
     Mainnet,
+    #[serde(rename = "pragma_devnet")]
+    PragmaDevnet,
 }
 
 #[derive(Default, Debug, Deserialize, ToSchema, Clone, Copy)]
