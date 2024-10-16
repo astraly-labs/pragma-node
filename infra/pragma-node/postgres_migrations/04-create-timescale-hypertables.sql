@@ -1,7 +1,10 @@
+SELECT create_hypertable('pragma_devnet_spot_entry', 'timestamp');
 SELECT create_hypertable('mainnet_spot_entry', 'timestamp');
 SELECT create_hypertable('spot_entry', 'timestamp');
+SELECT create_hypertable('pragma_devnet_future_entry', 'timestamp');
 SELECT create_hypertable('mainnet_future_entry', 'timestamp');
 SELECT create_hypertable('future_entry', 'timestamp');
+SELECT create_hypertable('pragma_devnet_spot_checkpoints', 'timestamp');
 SELECT create_hypertable('mainnet_spot_checkpoints', 'timestamp');
 SELECT create_hypertable('spot_checkpoints', 'timestamp');
 SELECT create_hypertable('vrf_requests', 'updated_at');

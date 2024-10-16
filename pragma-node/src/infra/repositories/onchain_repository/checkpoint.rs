@@ -42,6 +42,7 @@ pub async fn get_checkpoints(
     let table_name = match network {
         Network::Mainnet => "mainnet_spot_checkpoints",
         Network::Sepolia => "spot_checkpoints",
+        Network::PragmaDevnet => "pragma_devnet_spot_checkpoints",
     };
     let raw_sql = format!(
         r#"
