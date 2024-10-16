@@ -31,6 +31,7 @@ pub async fn get_publishers(
     let address_column = match network {
         Network::Mainnet => "mainnet_address",
         Network::Sepolia => "testnet_address",
+        Network::PragmaDevnet => "pragma_devnet_address",
     };
     let raw_sql = format!(
         r#"
