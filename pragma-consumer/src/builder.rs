@@ -43,6 +43,11 @@ impl PragmaConsumerBuilder {
         self.on_network(Network::Sepolia)
     }
 
+    pub fn on_pragma_devnet(self) -> Self {
+        self.on_network(Network::PragmaDevnet)
+    }
+
+
     fn on_network(mut self, network: Network) -> Self {
         self.network = network;
         self
