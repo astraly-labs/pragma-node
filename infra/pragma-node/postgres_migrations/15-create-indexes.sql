@@ -32,6 +32,14 @@ CREATE INDEX future_idx_block_timestamp ON future_entry (block_timestamp DESC);
 CREATE INDEX pragma_devnet_future_idx_pair_id_source ON pragma_devnet_future_entry (pair_id, source);
 CREATE INDEX pragma_devnet_future_idx_block_timestamp ON pragma_devnet_future_entry (block_timestamp DESC);
 
+CREATE INDEX spot_entry_idx_cursor ON spot_entry (_cursor);
+CREATE INDEX mainnet_spot_entry_idx_cursor ON mainnet_spot_entry (_cursor);
+CREATE INDEX future_entry_idx_cursor ON future_entry (_cursor);
+CREATE INDEX mainnet_future_entry_idx_cursor ON mainnet_future_entry (_cursor);
+CREATE INDEX pragma_devnet_spot_entry_idx_cursor ON pragma_devnet_spot_entry (_cursor);
+CREATE INDEX pragma_devnet_future_entry_idx_cursor ON pragma_devnet_future_entry (_cursor);
+CREATE INDEX pragma_devnet_dispatch_idx_cursor ON pragma_devnet_dispatch_event (_cursor);
+
 
 
 
