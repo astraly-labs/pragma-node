@@ -9,6 +9,7 @@ name = "node-tests"
 path = "e2e/main.rs"
 
 [dev-dependencies]
+bollard = { workspace = true }
 diesel = { workspace = true, features = [
   "postgres",
   "extras",
@@ -17,6 +18,7 @@ diesel = { workspace = true, features = [
 ] }
 deadpool-diesel = { workspace = true, features = ["postgres"] }
 futures-util = { workspace = true }
+tar = { workspace = true }
 tracing = { workspace = true }
 tracing-test = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }

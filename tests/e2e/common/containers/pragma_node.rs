@@ -25,7 +25,7 @@ pub async fn setup_pragma_node() -> ContainerAsync<PragmaNode> {
     // 1. Build the pragma-node image
     ImageBuilder::default()
         .with_build_name(PRAGMA_NODE_BUILD_NAME)
-        .with_dockerfile(&pragma_node_dockerfile_path())
+        .with_dockerfile_dir(pragma_node_dockerfile_directory())
         .build()
         .await;
 
@@ -131,14 +131,13 @@ impl Default for PragmaNode {
 
 // Utilities for build
 
-// Returns the path of the Pragma node dockerfile.
-fn pragma_node_dockerfile_path() -> PathBuf {
+// Returns the directory of the Pragma node dockerfile.
+fn pragma_node_dockerfile_directory() -> PathBuf {
     current_dir()
         .unwrap()
         .join("..")
         .join("infra")
         .join("pragma-node")
-        .join("Dockerfile")
 }
 
 // Builds a connection URL from an host & db port.

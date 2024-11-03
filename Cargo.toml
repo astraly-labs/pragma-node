@@ -64,10 +64,12 @@ uuid = { version = "1.4", features = ["fast-rng", "v4", "serde"] }
 pragma-monitoring = { git = "https://github.com/astraly-labs/pragma-monitoring" }
 
 # Test dependencies
+bollard = { version = "0.17.1" }
 rstest = "0.18.2"
 httpmock = { version = "0.7.0" }
-testcontainers = { version = "0.21.1" }
-testcontainers-modules = { version = "0.9.0", features = [
+tar = { version = "0.4.43" }
+testcontainers = { version = "0.23.1" }
+testcontainers-modules = { version = "0.11.3", features = [
   "postgres",
   "kafka",
   "zookeeper",

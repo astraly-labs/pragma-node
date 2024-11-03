@@ -1,13 +1,14 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
-use tokio::process::Command;
-
-const DOCKER_BINARY: &str = "docker";
+use bollard::image::BuildImageOptions;
+use futures_util::StreamExt;
+use tar::Builder;
+use testcontainers::core::client::docker_client_instance;
 
 #[derive(Debug, Clone, Default)]
 pub struct ImageBuilder {
     build_name: String,
-    dockerfile: PathBuf,
+    dockerfile_dir: PathBuf,
 }
 
 impl ImageBuilder {
@@ -16,30 +17,31 @@ impl ImageBuilder {
         self
     }
 
-    pub fn with_dockerfile(mut self, dockerfile_path: &Path) -> Self {
-        self.dockerfile = dockerfile_path.to_path_buf();
+    pub fn with_dockerfile_dir(mut self, dockerfile_dir: PathBuf) -> Self {
+        self.dockerfile_dir = dockerfile_dir;
         self
     }
 
     pub async fn build(&self) {
-        let output = Command::new(DOCKER_BINARY)
-            .args([
-                "buildx",
-                "build",
-                "--file",
-                self.dockerfile.to_str().unwrap(),
-                "--force-rm",
-                "--tag",
-                &self.build_name,
-                "..",
-            ])
-            .output()
-            .await
-            .expect("Failed to execute Docker build command");
+        let docker = docker_client_instance().await.unwrap();
 
-        if !output.status.success() {
-            tracing::error!("{}", String::from_utf8(output.stderr).unwrap());
-            panic!("Failed to build image for {}", &self.build_name);
-        }
+        // Create a tarball of the build context
+        let tarball = self.create_tarball().unwrap();
+
+        let options = BuildImageOptions::<String> {
+            dockerfile: "Dockerfile".to_string(),
+            t: self.build_name.clone(),
+            rm: true,
+            ..Default::default()
+        };
+
+        let mut build_stream = docker.build_image(options, None, Some(tarball.into()));
+        build_stream.next().await.unwrap().unwrap();
+    }
+
+    fn create_tarball(&self) -> std::io::Result<Vec<u8>> {
+        let mut tar_builder = Builder::new(Vec::new());
+        tar_builder.append_dir_all(".", &self.dockerfile_dir)?;
+        tar_builder.into_inner()
     }
 }
