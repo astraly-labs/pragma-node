@@ -3,7 +3,7 @@ use axum::Json;
 use chrono::{DateTime, Utc};
 use pragma_entities::{EntryError, NewFutureEntry, PublisherError};
 use serde::{Deserialize, Serialize};
-use starknet::core::types::FieldElement;
+use starknet::core::types::Felt;
 use utoipa::{ToResponse, ToSchema};
 
 use crate::config::config;
@@ -16,12 +16,12 @@ use crate::AppState;
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct CreateFutureEntryRequest {
     #[schema(value_type = Vec<String>)]
-    pub signature: Vec<FieldElement>,
+    pub signature: Vec<Felt>,
     pub entries: Vec<FutureEntry>,
 }
 
-impl AsRef<[FieldElement]> for CreateFutureEntryRequest {
-    fn as_ref(&self) -> &[FieldElement] {
+impl AsRef<[Felt]> for CreateFutureEntryRequest {
+    fn as_ref(&self) -> &[Felt] {
         &self.signature
     }
 }
@@ -72,7 +72,7 @@ pub async fn create_future_entries(
     // Fetch public key from database
     // TODO: Fetch it from contract
     let public_key = publisher.active_key;
-    let public_key = FieldElement::from_hex_be(&public_key)
+    let public_key = Felt::from_hex(&public_key)
         .map_err(|_| EntryError::PublisherError(PublisherError::InvalidKey(public_key)))?;
 
     tracing::info!(
@@ -87,7 +87,7 @@ pub async fn create_future_entries(
         .await
         .map_err(EntryError::InfraError)?
         .account_address;
-    let account_address = FieldElement::from_hex_be(&account_address)
+    let account_address = Felt::from_hex(&account_address)
         .map_err(|_| EntryError::PublisherError(PublisherError::InvalidAddress(account_address)))?;
 
     tracing::info!(

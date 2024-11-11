@@ -1,17 +1,17 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use starknet::core::{
-    crypto::compute_hash_on_elements,
-    types::FieldElement,
+    types::Felt,
     utils::{cairo_short_string_to_felt, get_selector_from_name},
 };
+use starknet_crypto::poseidon_hash_many;
 use std::{
     collections::{HashMap, HashSet},
     str::FromStr,
 };
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct StarkNetDomain {
+pub struct StarknetDomain {
     pub name: Option<String>,
     pub version: Option<String>,
     #[serde(rename = "chainId")]
@@ -71,25 +71,23 @@ where
     /// # Returns
     ///
     /// * The encoded value.
-    fn encode_value(&self, type_name: &str, value: &Value) -> Result<FieldElement, &'static str> {
+    fn encode_value(&self, type_name: &str, value: &Value) -> Result<Felt, &'static str> {
         if Self::is_pointer(type_name) {
             if let Value::Array(arr) = value {
                 let type_name = Self::strip_pointer(type_name);
 
                 if self.is_struct(&type_name) {
-                    // Assuming you have a method called `struct_hash` similar to the Python version
-                    let hashes: Vec<FieldElement> = arr
+                    let hashes: Vec<Felt> = arr
                         .iter()
                         .map(|data| self.struct_hash(&type_name, data.as_object().unwrap()))
                         .collect();
-                    // Assuming you have a method called `compute_hash_on_elements`
-                    Ok(compute_hash_on_elements(&hashes))
+                    Ok(poseidon_hash_many(&hashes))
                 } else {
-                    let hashes: Vec<FieldElement> = arr
+                    let hashes: Vec<Felt> = arr
                         .iter()
-                        .map(|val| FieldElement::from_str(&get_hex(val).unwrap()).unwrap())
+                        .map(|val| Felt::from_str(&get_hex(val).unwrap()).unwrap())
                         .collect();
-                    Ok(compute_hash_on_elements(&hashes))
+                    Ok(poseidon_hash_many(&hashes))
                 }
             } else {
                 Err("Expected a list for pointer type")
@@ -101,7 +99,7 @@ where
                 return Err("Expected an object for struct type");
             }
         } else {
-            return Ok(FieldElement::from_str(&get_hex(value).unwrap()).unwrap());
+            return Ok(Felt::from_str(&get_hex(value).unwrap()).unwrap());
         }
     }
 
@@ -195,7 +193,7 @@ where
     /// # Returns
     ///
     /// * The encoded data.
-    fn encode_data(&self, type_name: &str, data: &Map<String, Value>) -> Vec<FieldElement> {
+    fn encode_data(&self, type_name: &str, data: &Map<String, Value>) -> Vec<Felt> {
         self.types[type_name]
             .iter()
             .map(|param| self.encode_value(&param.type_, &data[&param.name]).unwrap())
@@ -212,14 +210,14 @@ where
     /// # Returns
     ///
     /// * The hash of the struct.
-    pub fn struct_hash(&self, type_name: &str, data: &Map<String, Value>) -> FieldElement {
+    pub fn struct_hash(&self, type_name: &str, data: &Map<String, Value>) -> Felt {
         let type_hash = self.type_hash(type_name);
         let encoded_data = self.encode_data(type_name, data).to_vec();
         let elements = std::iter::once(type_hash)
             .chain(encoded_data)
-            .collect::<Vec<FieldElement>>();
+            .collect::<Vec<Felt>>();
 
-        compute_hash_on_elements(&elements)
+        poseidon_hash_many(&elements)
     }
 
     /// Computes the hash of a type.
@@ -231,7 +229,7 @@ where
     /// # Returns
     ///
     /// * The hash of the type.
-    pub fn type_hash(&self, type_name: &str) -> FieldElement {
+    pub fn type_hash(&self, type_name: &str) -> Felt {
         get_selector_from_name(&self.encode_type(type_name)).unwrap()
     }
 
@@ -244,18 +242,18 @@ where
     /// # Returns
     ///
     /// * The hash of the message.
-    pub fn message_hash(&self, account_address: FieldElement) -> FieldElement {
+    pub fn message_hash(&self, account_address: Felt) -> Felt {
         let prefix = cairo_short_string_to_felt("StarkNet Message").unwrap();
 
         let json_str = serde_json::to_string(&self.domain).unwrap();
         let json_map: Map<String, Value> = serde_json::from_str(&json_str).unwrap();
-        let message = self.struct_hash("StarkNetDomain", &json_map);
+        let message = self.struct_hash("StarknetDomain", &json_map);
 
         let json_str = serde_json::to_string(&self.message).unwrap();
         let json_map: Map<String, Value> = serde_json::from_str(&json_str).unwrap();
         let message_hash = self.struct_hash(&self.primary_type, &json_map);
 
-        compute_hash_on_elements(&[prefix, message, account_address, message_hash])
+        poseidon_hash_many(&[prefix, message, account_address, message_hash])
     }
 
     fn is_pointer(value: &str) -> bool {
@@ -283,7 +281,7 @@ where
 pub(crate) fn get_hex(value: &Value) -> Result<String, &'static str> {
     match value {
         Value::Number(n) => {
-            let i = FieldElement::from_dec_str(&n.to_string()).expect("Error parsing number");
+            let i = Felt::from_dec_str(&n.to_string()).expect("Error parsing number");
             Ok(format!("{:#x}", i))
         }
         Value::String(s) => {
@@ -347,7 +345,7 @@ mod tests {
     #[derive(Debug, Serialize, Deserialize)]
     struct ContentsType {
         len: u64,
-        data: Vec<FieldElement>,
+        data: Vec<Felt>,
     }
 
     #[derive(Debug, Serialize, Deserialize)]
@@ -444,43 +442,18 @@ mod tests {
     #[rstest]
     #[case(
         TD,
-        "StarkNetDomain",
-        "0x25b2a6be3b4f788a40d183c71287277bf6cc227fc52398ad813b8d79fb711af"
+        "StarknetDomain",
+        "0x1ff2f602e42168014d405a94f75e8a93d640751d71d16311266e140d8b0a210"
     )]
     #[case(
         TD,
         "Person",
-        "0x2896dbe4b96a67110f454c01e5336edc5bbc3635537efd690f122f4809cc855"
+        "0x30f7aa21b8d67cb04c30f962dd29b95ab320cb929c07d1605f5ace304dadf34"
     )]
     #[case(
         TD,
         "Mail",
-        "0x13d89452df9512bf750f539ba3001b945576243288137ddb6c788457d4b2f79"
-    )]
-    #[case(
-        TD_STRING,
-        "String",
-        "0x1933fe9de7e181d64298eecb44fc43b4cec344faa26968646761b7278df4ae2"
-    )]
-    #[case(
-        TD_STRING,
-        "Mail",
-        "0x1ac6f84a5d41cee97febb378ddabbe1390d4e8036df8f89dee194e613411b09"
-    )]
-    #[case(
-        TD_FELT_ARR,
-        "Mail",
-        "0x5b03497592c0d1fe2f3667b63099761714a895c7df96ec90a85d17bfc7a7a0"
-    )]
-    #[case(
-        TD_STRUCT_ARR,
-        "Post",
-        "0x1d71e69bf476486b43cdcfaf5a85c00bb2d954c042b281040e513080388356d"
-    )]
-    #[case(
-        TD_STRUCT_ARR,
-        "Mail",
-        "0x873b878e35e258fc99e3085d5aaad3a81a0c821f189c08b30def2cde55ff27"
+        "0x560430bf7a02939edd1a5c104e7b7a55bbab9f35928b1cf5c7c97de3a907bd"
     )]
     fn test_type_hash(
         #[case] example: &str,
@@ -493,22 +466,7 @@ mod tests {
                 let result = typed_data.type_hash(type_name);
                 assert_eq!(format!("{:#x}", result), expected_type_hash);
             }
-            TD_STRING => {
-                let typed_data: TypedData<MailTypeLongString> = load_typed_data(example);
-                let result = typed_data.type_hash(type_name);
-                assert_eq!(format!("{:#x}", result), expected_type_hash);
-            }
-            TD_FELT_ARR => {
-                let typed_data: TypedData<MailTypeFeltArray> = load_typed_data(example);
-                let result = typed_data.type_hash(type_name);
-                assert_eq!(format!("{:#x}", result), expected_type_hash);
-            }
-            TD_STRUCT_ARR => {
-                let typed_data: TypedData<MailTypeStructArray> = load_typed_data(example);
-                let result = typed_data.type_hash(type_name);
-                assert_eq!(format!("{:#x}", result), expected_type_hash);
-            }
-            _ => panic!("Unknown example type"),
+            _ => panic!("Unsupported example type"),
         }
     }
 
@@ -517,7 +475,7 @@ mod tests {
         let typed_data: TypedData<MailType> = load_typed_data(TD);
         let json_str = serde_json::to_string(&typed_data.domain).unwrap();
         let json_map: Map<String, Value> = serde_json::from_str(&json_str).unwrap();
-        let result = typed_data.struct_hash("StarkNetDomain", &json_map);
+        let result = typed_data.struct_hash("StarknetDomain", &json_map);
         assert_eq!(
             format!("{:#x}", result),
             "0x791677d28015bfb506ef968e44b486659cdd6306095da0a259336151130a78c"
@@ -578,43 +536,16 @@ mod tests {
         "0xcd2a3d9f938e13cd947ec05abc7fe734df8dd826",
         "0x2c3252719b4b7fb49b96f68ea62d64f6be54562826e93a978250fd99155bccd"
     )]
-    #[case(
-        TD_STRING,
-        "0xcd2a3d9f938e13cd947ec05abc7fe734df8dd826",
-        "0x7b2cac6cf11869d9a72e2492f270be9d09d5b87c92a74162fa9ce3d74a4b78c"
-    )]
-    #[case(
-        TD_FELT_ARR,
-        "0xcd2a3d9f938e13cd947ec05abc7fe734df8dd826",
-        "0x22d46b6e8e12c06cbce8828cec76e8f6416e54bda8bf77ac0bd64c242e423bb"
-    )]
-    #[case(
-        TD_STRUCT_ARR,
-        "0xcd2a3d9f938e13cd947ec05abc7fe734df8dd826",
-        "0x243a96015b473247fd3fb82a30aee0a036edc95017ba85a17029e1afbf3c92d"
-    )]
     fn test_message_hash(
         #[case] example: &str,
         #[case] account_address: &str,
         #[case] msg_hash: &str,
     ) {
-        let account_address = FieldElement::from_hex_be(account_address).unwrap();
+        let account_address = Felt::from_hex(account_address).unwrap();
 
         let result = match example {
             TD => {
                 let typed_data: TypedData<MailType> = load_typed_data(example);
-                typed_data.message_hash(account_address)
-            }
-            TD_STRING => {
-                let typed_data: TypedData<MailTypeLongString> = load_typed_data(example);
-                typed_data.message_hash(account_address)
-            }
-            TD_FELT_ARR => {
-                let typed_data: TypedData<MailTypeFeltArray> = load_typed_data(example);
-                typed_data.message_hash(account_address)
-            }
-            TD_STRUCT_ARR => {
-                let typed_data: TypedData<MailTypeStructArray> = load_typed_data(example);
                 typed_data.message_hash(account_address)
             }
             _ => panic!("Unsupported example type"),

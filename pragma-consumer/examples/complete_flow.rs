@@ -3,8 +3,8 @@ use pragma_consumer::config::{ApiConfig, PragmaBaseUrl};
 use pragma_consumer::macros::instrument;
 use pragma_consumer::types::Instrument;
 use reqwest::Url;
-use starknet::accounts::{Account, Call, ExecutionEncoding, SingleOwnerAccount};
-use starknet::core::types::FieldElement;
+use starknet::accounts::{Account, ExecutionEncoding, SingleOwnerAccount};
+use starknet::core::types::{Call, Felt};
 use starknet::core::utils::get_selector_from_name;
 use starknet::providers::jsonrpc::HttpTransport;
 use starknet::providers::JsonRpcClient;
@@ -41,19 +41,18 @@ async fn main() -> Result<(), ()> {
     ));
 
     let signer = LocalWallet::from(SigningKey::from_secret_scalar(
-        FieldElement::from_hex_be("<YOUR_PRIVATE_KEY_HERE>").unwrap(),
+        Felt::from_hex("<YOUR_PRIVATE_KEY_HERE>").unwrap(),
     ));
-    let address = FieldElement::from_hex_be("<YOUR_ACCOUNT_ADDRESS_HERE>").unwrap();
-    let summary_stats_address = FieldElement::from_hex_be(
-        "0x0379afb83d2f8e38ab08252750233665a812a24278aacdde52475618edbf879c",
-    )
-    .unwrap();
+    let address = Felt::from_hex("<YOUR_ACCOUNT_ADDRESS_HERE>").unwrap();
+    let summary_stats_address =
+        Felt::from_hex("0x0379afb83d2f8e38ab08252750233665a812a24278aacdde52475618edbf879c")
+            .unwrap();
 
     let mut account = SingleOwnerAccount::new(
         provider,
         signer,
         address,
-        FieldElement::from_hex_be("0x534e5f5345504f4c4941").unwrap(), // SN_SEPOLIA
+        Felt::from_hex("0x534e5f5345504f4c4941").unwrap(), // SN_SEPOLIA
         ExecutionEncoding::New,
     );
     account.set_block_id(starknet::core::types::BlockId::Tag(
@@ -61,7 +60,7 @@ async fn main() -> Result<(), ()> {
     ));
 
     let result = account
-        .execute(vec![Call {
+        .execute_v1(vec![Call {
             to: summary_stats_address,
             selector: get_selector_from_name("update_options_data").unwrap(),
             calldata,

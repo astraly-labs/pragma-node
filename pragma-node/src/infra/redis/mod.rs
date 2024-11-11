@@ -3,7 +3,7 @@ use std::sync::Arc;
 use moka::future::Cache;
 use redis::{AsyncCommands, JsonAsyncCommands};
 use serde::{Deserialize, Serialize};
-use starknet::core::types::FieldElement;
+use starknet::core::types::Felt;
 
 use pragma_common::types::{
     block_id::{BlockId, BlockTag},
@@ -59,16 +59,16 @@ impl TryFrom<RawMerkleTree> for MerkleTree {
     type Error = MerkleTreeError;
 
     fn try_from(serialized_tree: RawMerkleTree) -> Result<Self, Self::Error> {
-        let leaves: Vec<FieldElement> = serialized_tree
+        let leaves: Vec<Felt> = serialized_tree
             .leaves
             .into_iter()
-            .map(|leaf| FieldElement::from_hex_be(&leaf))
-            .collect::<Result<Vec<FieldElement>, _>>()
+            .map(|leaf| Felt::from_hex(&leaf))
+            .collect::<Result<Vec<Felt>, _>>()
             .map_err(|e| MerkleTreeError::BuildFailed(e.to_string()))?;
 
         let merkle_tree = MerkleTree::new(leaves)?;
 
-        let expected_hash = FieldElement::from_hex_be(&serialized_tree.root_hash)
+        let expected_hash = Felt::from_hex(&serialized_tree.root_hash)
             .map_err(|e| MerkleTreeError::BuildFailed(e.to_string()))?;
 
         if merkle_tree.root_hash != expected_hash {

@@ -7,7 +7,7 @@ pub use pragma_common::types::options::{
 };
 
 use pragma_common::{types::merkle_tree::FeltMerkleProof, utils::field_element_as_hex_string};
-use starknet::core::types::FieldElement;
+use starknet::core::types::Felt;
 
 #[derive(thiserror::Error, Debug)]
 pub enum CalldataError {
@@ -23,8 +23,8 @@ pub struct MerkleFeedCalldata {
 }
 
 impl MerkleFeedCalldata {
-    /// Converts the structure as the Vec<FieldElement>, i.e. a calldata.
-    pub fn as_calldata(&self) -> Result<Vec<FieldElement>, CalldataError> {
+    /// Converts the structure as the Vec<Felt>, i.e. a calldata.
+    pub fn as_calldata(&self) -> Result<Vec<Felt>, CalldataError> {
         let mut calldata = Vec::with_capacity(self.merkle_proof.0.len());
 
         let felt_proof: FeltMerkleProof = self

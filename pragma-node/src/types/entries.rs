@@ -176,7 +176,7 @@ where
                 "entries": raw_entries
             },
             "types": {
-                "StarkNetDomain": [
+                "StarknetDomain": [
                     {"name": "name", "type": "felt"},
                     {"name": "version", "type": "felt"}
                 ],
@@ -211,7 +211,7 @@ where
                 "entries": raw_entries
             },
             "types": {
-                "StarkNetDomain": [
+                "StarknetDomain": [
                     {"name": "name", "type": "felt"},
                     {"name": "version", "type": "felt"},
                     {"name": "chainId", "type": "felt"},
@@ -243,6 +243,5 @@ where
         entry.push(serde_json::json!({"name": "expiration_timestamp", "type": "felt"}));
     }
 
-    let raw_message = raw_message_json.to_string();
-    serde_json::from_str(&raw_message).map_err(|e| EntryError::BuildPublish(e.to_string()))
+    serde_json::from_value(raw_message_json).map_err(|e| EntryError::BuildPublish(e.to_string()))
 }
