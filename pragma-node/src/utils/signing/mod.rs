@@ -90,7 +90,7 @@ where
 {
     let entries: &[E] = new_entries_request.as_ref();
     let published_message = build_publish_message(entries, None)?;
-    let message_hash = published_message.message_hash(*account_address);
+    let message_hash = published_message.encode(*account_address).map_err(EntryError::InvalidMessage)?.message_hash;
 
     let signature_slice: &[Felt] = new_entries_request.as_ref();
     let signature = Signature {
@@ -123,7 +123,7 @@ where
 {
     let entries: &[E] = new_entries_request.as_ref();
     let published_message = build_publish_message(entries, Some(true))?;
-    let message_hash = published_message.message_hash(*account_address);
+    let message_hash = published_message.encode(*account_address).map_err(EntryError::InvalidMessage)?.message_hash;
 
     let signature_slice: &[Felt] = new_entries_request.as_ref();
     let signature = Signature {

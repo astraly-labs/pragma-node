@@ -120,7 +120,7 @@ pub struct PublishMessage<E: EntryTrait + Serialize> {
 pub fn build_publish_message<E>(
     entries: &[E],
     is_legacy: Option<bool>,
-) -> Result<TypedData<PublishMessage<E>>, EntryError>
+) -> Result<TypedData, EntryError>
 where
     E: EntryTrait + Serialize + for<'a> Deserialize<'a>,
 {
@@ -203,7 +203,7 @@ where
                 "name": "Pragma",
                 "version": "1",
                 "chainId": "1",
-                "revision": "0"
+                "revision": "1"
             },
             "primaryType": "Request",
             "message": {
@@ -212,10 +212,10 @@ where
             },
             "types": {
                 "StarknetDomain": [
-                    {"name": "name", "type": "felt"},
-                    {"name": "version", "type": "felt"},
-                    {"name": "chainId", "type": "felt"},
-                    {"name": "revision", "type": "felt"}
+                    {"name": "name", "type": "shortstring"},
+                    {"name": "version", "type": "shortstring"},
+                    {"name": "chainId", "type": "shortstring"},
+                    {"name": "revision", "type": "shortstring"}
                 ],
                 "Request": [
                     {"name": "action", "type": "felt"},

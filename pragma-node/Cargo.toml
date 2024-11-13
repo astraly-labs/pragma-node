@@ -10,6 +10,7 @@ aws-sdk-secretsmanager = { workspace = true }
 axum = { workspace = true, features = ["macros", "ws", "tokio"] }
 axum-macros = { workspace = true }
 bigdecimal = { workspace = true, features = ["serde"] }
+cainome = { workspace = true, features = ["abigen-rs"] }
 chrono = { workspace = true, features = ["serde"] }
 deadpool-diesel = { workspace = true, features = ["postgres"] }
 diesel = { workspace = true, features = [
@@ -22,6 +23,7 @@ dotenvy = { workspace = true }
 envy = { workspace = true }
 futures-util = { workspace = true }
 governor = { workspace = true }
+indexmap = { workspace = true, features = ["serde"] }
 lazy_static = { workspace = true }
 moka = { workspace = true, features = ["future"] }
 nonzero_ext = { workspace = true }
