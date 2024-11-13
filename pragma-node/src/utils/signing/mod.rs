@@ -50,29 +50,11 @@ where
     R: AsRef<[Felt]> + AsRef<[E]>,
     E: EntryTrait + Serialize + for<'de> Deserialize<'de>,
 {
-    // We recently updated our Pragma-SDK. This included a breaking change for how we
-    // sign the entries before publishing them.
-    // We want to support our publishers who are still on the older version and
-    // encourage them to upgrade before removing this legacy code. Until then,
-    // we support both methods.
-    // TODO: Remove this legacy handling while every publishers are on the 2.0 version.
-    let signature = match assert_signature_is_valid::<R, E>(
+    let signature = assert_signature_is_valid::<R, E>(
         new_entries_request,
         publisher_account,
         publisher_public_key,
-    ) {
-        Ok(signature) => signature,
-        Err(_) => {
-            tracing::debug!(
-                "assert_signature_is_valid failed. Trying again with legacy signature..."
-            );
-            assert_legacy_signature_is_valid::<R, E>(
-                new_entries_request,
-                publisher_account,
-                publisher_public_key,
-            )?
-        }
-    };
+    )?;
     Ok(signature)
 }
 
@@ -89,41 +71,11 @@ where
     E: EntryTrait + Serialize + for<'de> Deserialize<'de>,
 {
     let entries: &[E] = new_entries_request.as_ref();
-    let published_message = build_publish_message(entries, None)?;
-    let message_hash = published_message.encode(*account_address).map_err(EntryError::InvalidMessage)?.message_hash;
-
-    let signature_slice: &[Felt] = new_entries_request.as_ref();
-    let signature = Signature {
-        r: signature_slice[0],
-        s: signature_slice[1],
-    };
-
-    if !ecdsa_verify(public_key, &message_hash, &signature).map_err(EntryError::InvalidSignature)? {
-        return Err(EntryError::Unauthorized(format!(
-            "Invalid signature for message hash {:?}",
-            &message_hash
-        )));
-    }
-    Ok(signature)
-}
-
-/// Assert that a legacy request (passed with the request for creating new
-/// entries) is correctly signed by the publisher and in a valid format.
-/// Returns the signature if it is correct.
-/// NOTE: Used for legacy signatures that uses our SDK before version 2.0.
-/// TODO: Remove this function when we stop supporting the old format
-fn assert_legacy_signature_is_valid<R, E>(
-    new_entries_request: &R,
-    account_address: &Felt,
-    public_key: &Felt,
-) -> Result<Signature, EntryError>
-where
-    R: AsRef<[Felt]> + AsRef<[E]>,
-    E: EntryTrait + Serialize + for<'de> Deserialize<'de>,
-{
-    let entries: &[E] = new_entries_request.as_ref();
-    let published_message = build_publish_message(entries, Some(true))?;
-    let message_hash = published_message.encode(*account_address).map_err(EntryError::InvalidMessage)?.message_hash;
+    let published_message = build_publish_message(entries)?;
+    let message_hash = published_message
+        .encode(*account_address)
+        .map_err(EntryError::InvalidMessage)?
+        .hash;
 
     let signature_slice: &[Felt] = new_entries_request.as_ref();
     let signature = Signature {

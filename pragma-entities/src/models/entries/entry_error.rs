@@ -19,7 +19,6 @@ pub enum SigningError {
     InvalidMessageError(String),
 }
 
-
 #[derive(Debug, thiserror::Error, ToSchema)]
 pub enum EntryError {
     #[error("internal server error")]
@@ -117,10 +116,9 @@ impl IntoResponse for EntryError {
                 StatusCode::NOT_FOUND,
                 format!("Unknown pair id: {}", pair_id),
             ),
-            Self::InvalidMessage(err) => (
-                StatusCode::BAD_REQUEST,
-                format!("Invalid message: {}", err),
-            ),
+            Self::InvalidMessage(err) => {
+                (StatusCode::BAD_REQUEST, format!("Invalid message: {}", err))
+            }
             _ => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 String::from("Internal server error"),

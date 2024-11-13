@@ -97,7 +97,10 @@ fn get_preset_types() -> IndexMap<String, Vec<Field>> {
 // Get the fields of a specific type
 // Looks up both the types hashmap as well as the preset types
 // Returns the fields and the hashmap of types
-fn get_fields(name: &str, types: &IndexMap<String, Vec<Field>>) -> Result<Vec<Field>, SigningError> {
+fn get_fields(
+    name: &str,
+    types: &IndexMap<String, Vec<Field>>,
+) -> Result<Vec<Field>, SigningError> {
     if let Some(fields) = types.get(name) {
         return Ok(fields.clone());
     }
@@ -135,7 +138,10 @@ fn get_dependencies(
     Ok(())
 }
 
-pub fn encode_type(name: &str, types: &IndexMap<String, Vec<Field>>) -> Result<String, SigningError> {
+pub fn encode_type(
+    name: &str,
+    types: &IndexMap<String, Vec<Field>>,
+) -> Result<String, SigningError> {
     let mut type_hash = String::new();
 
     // get dependencies
@@ -256,8 +262,9 @@ fn get_hex(value: &str) -> Result<Felt, SigningError> {
         Ok(felt)
     } else {
         // assume its a short string and encode
-        cairo_short_string_to_felt(value)
-            .map_err(|e| SigningError::InvalidMessageError(format!("Invalid shortstring for felt: {}", e)))
+        cairo_short_string_to_felt(value).map_err(|e| {
+            SigningError::InvalidMessageError(format!("Invalid shortstring for felt: {}", e))
+        })
     }
 }
 
@@ -277,12 +284,14 @@ impl PrimitiveType {
 
                 if ctx.base_type == "enum" {
                     let (variant_name, value) = obj.first().ok_or_else(|| {
-                        SigningError::InvalidMessageError("Enum value must be populated".to_string())
+                        SigningError::InvalidMessageError(
+                            "Enum value must be populated".to_string(),
+                        )
                     })?;
                     let variant_type = get_value_type(variant_name, types)?;
 
                     let arr: &Vec<PrimitiveType> = match value {
-                        PrimitiveType::Array(arr) => &arr,
+                        PrimitiveType::Array(arr) => arr,
                         _ => {
                             return Err(SigningError::InvalidMessageError(
                                 "Enum value must be an array".to_string(),
@@ -302,7 +311,9 @@ impl PrimitiveType {
                             .split(',')
                             .nth(idx)
                             .ok_or_else(|| {
-                                SigningError::InvalidMessageError("Invalid enum variant type".to_string())
+                                SigningError::InvalidMessageError(
+                                    "Invalid enum variant type".to_string(),
+                                )
                             })?;
 
                         let field_hash = param.encode(field_type, types, preset_types, ctx)?;
@@ -359,7 +370,10 @@ impl PrimitiveType {
                 "string" => {
                     // split the string into short strings and encode
                     let byte_array = ByteArray::from_string(string).map_err(|e| {
-                        SigningError::InvalidMessageError(format!("Invalid string for bytearray: {}", e))
+                        SigningError::InvalidMessageError(format!(
+                            "Invalid string for bytearray: {}",
+                            e
+                        ))
                     })?;
 
                     let mut hashes = vec![Felt::from(byte_array.data.len())];
@@ -373,8 +387,9 @@ impl PrimitiveType {
 
                     Ok(poseidon_hash_many(hashes.as_slice()))
                 }
-                "selector" => get_selector_from_name(string)
-                    .map_err(|e| SigningError::InvalidMessageError(format!("Invalid selector: {}", e))),
+                "selector" => get_selector_from_name(string).map_err(|e| {
+                    SigningError::InvalidMessageError(format!("Invalid selector: {}", e))
+                }),
                 "felt" => get_hex(string),
                 "ContractAddress" => get_hex(string),
                 "ClassHash" => get_hex(string),
@@ -459,8 +474,10 @@ pub struct TypedDataHash {
     /// The final hash of the entire message.
     pub hash: Felt,
     /// Hash of the `domain_separator` component.
+    #[allow(dead_code)]
     pub domain_separator_hash: Felt,
     /// Hash of the `message` component.
+    #[allow(dead_code)]
     pub message_hash: Felt,
 }
 

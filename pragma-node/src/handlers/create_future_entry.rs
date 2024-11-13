@@ -170,7 +170,7 @@ mod tests {
     #[rstest]
     fn test_build_publish_message_empty() {
         let entries: Vec<PerpEntry> = vec![];
-        let typed_data = build_publish_message(&entries, None).unwrap();
+        let typed_data = build_publish_message(&entries).unwrap();
         assert_eq!(typed_data.primary_type, "Request");
         assert_eq!(typed_data.domain.name, "Pragma");
         assert_eq!(typed_data.domain.version, "1");
@@ -178,7 +178,7 @@ mod tests {
         // assert_eq!(typed_data.message.entries, entries);
 
         let entries: Vec<FutureEntry> = vec![];
-        let typed_data = build_publish_message(&entries, None).unwrap();
+        let typed_data = build_publish_message(&entries).unwrap();
         assert_eq!(typed_data.primary_type, "Request");
         assert_eq!(typed_data.domain.name, "Pragma");
         assert_eq!(typed_data.domain.version, "1");
