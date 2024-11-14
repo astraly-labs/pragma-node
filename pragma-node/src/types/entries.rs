@@ -1,3 +1,5 @@
+use std::fs;
+
 use pragma_entities::EntryError;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -167,25 +169,25 @@ where
         },
         "types": {
             "StarknetDomain": [
-                {"name": "name", "type": "felt"},
-                {"name": "version", "type": "felt"},
-                {"name": "chainId", "type": "felt"},
-                {"name": "revision", "type": "felt"}
+                {"name": "name", "type": "shortstring"},
+                {"name": "version", "type": "shortstring"},
+                {"name": "chainId", "type": "shortstring"},
+                {"name": "revision", "type": "shortstring"}
             ],
             "Request": [
-                {"name": "action", "type": "felt"},
+                {"name": "action", "type": "shortstring"},
                 {"name": "entries", "type": "Entry*"}
             ],
             "Entry": [
                 {"name": "base", "type": "Base"},
-                {"name": "pair_id", "type": "felt"},
-                {"name": "price", "type": "felt"},
-                {"name": "volume", "type": "felt"},
+                {"name": "pair_id", "type": "shortstring"},
+                {"name": "price", "type": "u128"},
+                {"name": "volume", "type": "u128"},
             ],
             "Base": [
-                {"name": "publisher", "type": "felt"},
-                {"name": "source", "type": "felt"},
-                {"name": "timestamp", "type": "felt"}
+                {"name": "publisher", "type": "shortstring"},
+                {"name": "source", "type": "shortstring"},
+                {"name": "timestamp", "type": "timestamp"}
             ]
         }
     });
@@ -194,8 +196,12 @@ where
     if is_future {
         let types = raw_message_json["types"].as_object_mut().unwrap();
         let entry = types["Entry"].as_array_mut().unwrap();
-        entry.push(serde_json::json!({"name": "expiration_timestamp", "type": "felt"}));
+        entry.push(serde_json::json!({"name": "expiration_timestamp", "type": "timestamp"}));
     }
-    println!("raw_message_json: {:?}", raw_message_json);
+    fs::write(
+        "message.json",
+        serde_json::to_string_pretty(&raw_message_json).unwrap(),
+    )
+    .unwrap();
     serde_json::from_value(raw_message_json).map_err(|e| EntryError::BuildPublish(e.to_string()))
 }

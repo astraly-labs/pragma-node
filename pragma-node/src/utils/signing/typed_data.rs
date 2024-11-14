@@ -499,6 +499,10 @@ impl TypedData {
     pub fn encode(&self, account: Felt) -> Result<TypedDataHash, SigningError> {
         let preset_types = get_preset_types();
 
+        // Combine types and preset_types
+        let mut all_types = preset_types.clone();
+        all_types.extend(self.types.clone());
+
         if self.domain.revision.clone().unwrap_or("1".to_string()) != "1" {
             return Err(SigningError::InvalidMessageError(
                 "Legacy revision 0 is not supported".to_string(),
@@ -514,7 +518,7 @@ impl TypedData {
         let message_hash = PrimitiveType::Object(self.message.clone()).encode(
             &self.primary_type,
             &self.types,
-            &preset_types,
+            &all_types,
             &mut Default::default(),
         )?;
 
@@ -531,83 +535,53 @@ impl TypedData {
 
 #[cfg(test)]
 mod tests {
+    use rstest::*;
     use starknet::core::utils::starknet_keccak;
     use starknet_crypto::Felt;
 
     use super::*;
 
-    #[test]
-    fn test_read_json() {
-        // deserialize from json file
-        let reader = std::io::BufReader::new(MAIL_STUCT_ARRAY.as_bytes());
+    #[rstest]
+    #[case(EXAMPLE_BASE_TYPES)]
+    #[case(EXAMPLE_ENUM)]
+    #[case(EXAMPLE_PRESET_TYPES)]
+    #[case(MAIL_STRUCT_ARRAY)]
+    fn test_read_json(#[case] json_data: &str) {
+        let reader = std::io::BufReader::new(json_data.as_bytes());
 
         let typed_data: TypedData = serde_json::from_reader(reader).unwrap();
 
-        println!("{:?}", typed_data);
-
-        let reader = std::io::BufReader::new(EXAMPLE_ENUM.as_bytes());
-
-        let typed_data: TypedData = serde_json::from_reader(reader).unwrap();
-
-        println!("{:?}", typed_data);
-
-        let reader = std::io::BufReader::new(EXAMPLE_PRESET_TYPES.as_bytes());
-
-        let typed_data: TypedData = serde_json::from_reader(reader).unwrap();
-
-        println!("{:?}", typed_data);
+        // Optionally, you can assert certain properties of `typed_data`
+        // For now, we'll just ensure that deserialization succeeds
+        assert!(typed_data.types.len() > 0);
+        assert!(!typed_data.primary_type.is_empty());
     }
 
-    #[test]
-    fn test_type_encode() {
-        let reader = std::io::BufReader::new(EXAMPLE_BASE_TYPES.as_bytes());
+    #[rstest]
+    #[case(
+        EXAMPLE_BASE_TYPES,
+        "\"Example\"(\"n0\":\"felt\",\"n1\":\"bool\",\"n2\":\"string\",\"n3\":\"selector\",\"n4\":\"u128\",\"n5\":\"i128\",\"n6\":\"ContractAddress\",\"n7\":\"ClassHash\",\"n8\":\"timestamp\",\"n9\":\"shortstring\")"
+    )]
+    #[case(
+        MAIL_STRUCT_ARRAY,
+        "\"Mail\"(\"from\":\"Person\",\"to\":\"Person\",\"posts_len\":\"felt\",\"posts\":\"Post*\")\"Person\"(\"name\":\"felt\",\"wallet\":\"felt\")\"Post\"(\"title\":\"felt\",\"content\":\"felt\")"
+    )]
+    #[case(
+        EXAMPLE_ENUM,
+        "\"Example\"(\"someEnum\":\"MyEnum\")\"MyEnum\"(\"Variant 1\":(),\"Variant 2\":(\"u128\",\"u128*\"),\"Variant 3\":(\"u128\"))"
+    )]
+    #[case(
+        EXAMPLE_PRESET_TYPES,
+        "\"Example\"(\"n0\":\"TokenAmount\",\"n1\":\"NftId\")"
+    )]
+    fn test_type_encode(#[case] json_data: &str, #[case] expected_encoded: &str) {
+        let reader = std::io::BufReader::new(json_data.as_bytes());
 
         let typed_data: TypedData = serde_json::from_reader(reader).unwrap();
 
         let encoded = encode_type(&typed_data.primary_type, &typed_data.types).unwrap();
 
-        assert_eq!(
-            encoded,
-            "\"Example\"(\"n0\":\"felt\",\"n1\":\"bool\",\"n2\":\"string\",\"n3\":\"selector\",\"\
-             n4\":\"u128\",\"n5\":\"ContractAddress\",\"n6\":\"ClassHash\",\"n7\":\"timestamp\",\"\
-             n8\":\"shortstring\")"
-        );
-
-        let reader = std::io::BufReader::new(MAIL_STUCT_ARRAY.as_bytes());
-
-        let typed_data: TypedData = serde_json::from_reader(reader).unwrap();
-
-        let encoded = encode_type(&typed_data.primary_type, &typed_data.types).unwrap();
-
-        assert_eq!(
-            encoded,
-            "\"Mail\"(\"from\":\"Person\",\"to\":\"Person\",\"posts_len\":\"felt\",\"posts\":\"\
-             Post*\")\"Person\"(\"name\":\"felt\",\"wallet\":\"felt\")\"Post\"(\"title\":\"felt\",\
-             \"content\":\"felt\")"
-        );
-
-        let reader = std::io::BufReader::new(EXAMPLE_ENUM.as_bytes());
-
-        let typed_data: TypedData = serde_json::from_reader(reader).unwrap();
-
-        let encoded = encode_type(&typed_data.primary_type, &typed_data.types).unwrap();
-
-        assert_eq!(
-            encoded,
-            "\"Example\"(\"someEnum\":\"MyEnum\")\"MyEnum\"(\"Variant 1\":(),\"Variant \
-             2\":(\"u128\",\"u128*\"),\"Variant 3\":(\"u128\"))"
-        );
-
-        let reader = std::io::BufReader::new(EXAMPLE_PRESET_TYPES.as_bytes());
-
-        let typed_data: TypedData = serde_json::from_reader(reader).unwrap();
-
-        let encoded = encode_type(&typed_data.primary_type, &typed_data.types).unwrap();
-
-        assert_eq!(
-            encoded,
-            "\"Example\"(\"n0\":\"TokenAmount\",\"n1\":\"NftId\")"
-        );
+        assert_eq!(encoded, expected_encoded);
     }
 
     #[test]
@@ -645,45 +619,41 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_message_hash() {
-        let address = Felt::from_hex("0xCD2a3d9F938E13CD947Ec05AbC7FE734Df8DD826").unwrap();
+    #[rstest]
+    #[case(
+        EXAMPLE_BASE_TYPES,
+        "0xcd2a3d9f938e13cd947ec05abc7fe734df8dd826",
+        "0x2d80b87b8bc32068247c779b2ef0f15f65c9c449325e44a9df480fb01eb43ec"
+    )]
+    #[case(
+        EXAMPLE_ENUM,
+        "0xcd2a3d9f938e13cd947ec05abc7fe734df8dd826",
+        "0x3df10475ad5a8f49db4345a04a5b09164d2e24b09f6e1e236bc1ccd87627cc"
+    )]
+    #[case(
+        EXAMPLE_PRESET_TYPES,
+        "0xcd2a3d9f938e13cd947ec05abc7fe734df8dd826",
+        "0x185b339d5c566a883561a88fb36da301051e2c0225deb325c91bb7aa2f3473a"
+    )]
+    #[case(
+        EXAMPLE_CUSTOM_MESSAGE,
+        "0x624EBFB99865079BD58CFCFB925B6F5CE940D6F6E41E118B8A72B7163FB435C",
+        "0x53008d692b79b4f6f4267dd29a727355d13df4746c8aa30909413eac3466042"
+    )]
+    fn test_message_hash(
+        #[case] example_data: &str,
+        #[case] address_hex: &str,
+        #[case] expected_hash_hex: &str,
+    ) {
+        let address = Felt::from_str(address_hex).unwrap();
 
-        let reader = std::io::BufReader::new(EXAMPLE_BASE_TYPES.as_bytes());
+        let reader = std::io::BufReader::new(example_data.as_bytes());
 
         let typed_data: TypedData = serde_json::from_reader(reader).unwrap();
 
         let message_hash = typed_data.encode(address).unwrap().hash;
 
-        assert_eq!(
-            message_hash,
-            Felt::from_hex("0x790d9fa99cf9ad91c515aaff9465fcb1c87784d9cfb27271ed193675cd06f9c")
-                .unwrap()
-        );
-
-        let reader = std::io::BufReader::new(EXAMPLE_ENUM.as_bytes());
-
-        let typed_data: TypedData = serde_json::from_reader(reader).unwrap();
-
-        let message_hash = typed_data.encode(address).unwrap().hash;
-
-        assert_eq!(
-            message_hash,
-            Felt::from_hex("0x3df10475ad5a8f49db4345a04a5b09164d2e24b09f6e1e236bc1ccd87627cc")
-                .unwrap()
-        );
-
-        let reader = std::io::BufReader::new(EXAMPLE_PRESET_TYPES.as_bytes());
-
-        let typed_data: TypedData = serde_json::from_reader(reader).unwrap();
-
-        let message_hash = typed_data.encode(address).unwrap().hash;
-
-        assert_eq!(
-            message_hash,
-            Felt::from_hex("0x26e7b8cedfa63cdbed14e7e51b60ee53ac82bdf26724eb1e3f0710cb8987522")
-                .unwrap()
-        );
+        assert_eq!(message_hash, Felt::from_str(expected_hash_hex).unwrap());
     }
 
     const EXAMPLE_BASE_TYPES: &str = r#"
@@ -701,10 +671,11 @@ mod tests {
       { "name": "n2", "type": "string" },
       { "name": "n3", "type": "selector" },
       { "name": "n4", "type": "u128" },
-      { "name": "n5", "type": "ContractAddress" },
-      { "name": "n6", "type": "ClassHash" },
-      { "name": "n7", "type": "timestamp" },
-      { "name": "n8", "type": "shortstring" }
+      { "name": "n5", "type": "i128" },
+      { "name": "n6", "type": "ContractAddress" },
+      { "name": "n7", "type": "ClassHash" },
+      { "name": "n8", "type": "timestamp" },
+      { "name": "n9", "type": "shortstring" }
     ]
   },
   "primaryType": "Example",
@@ -720,10 +691,11 @@ mod tests {
     "n2": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
     "n3": "transfer",
     "n4": "0x3e8",
-    "n5": "0x3e8",
+    "n5": "-170141183460469231731687303715884105727",
     "n6": "0x3e8",
-    "n7": 1000,
-    "n8": "transfer"
+    "n7": "0x3e8",
+    "n8": 1000,
+    "n9": "transfer"
   }
 }"#;
     const EXAMPLE_ENUM: &str = r#"
@@ -793,7 +765,7 @@ mod tests {
     }
   }
 }"#;
-    const MAIL_STUCT_ARRAY: &str = r#"
+    const MAIL_STRUCT_ARRAY: &str = r#"
 {
   "types": {
     "StarknetDomain": [
@@ -835,6 +807,254 @@ mod tests {
     "posts": [
       { "title": "Greeting", "content": "Hello, Bob!" },
       { "title": "Farewell", "content": "Goodbye, Bob!" }
+    ]
+  }
+}"#;
+
+    const EXAMPLE_CUSTOM_MESSAGE: &str = r#"
+{
+  "domain": {
+    "chainId": "1",
+    "name": "Pragma",
+    "revision": "1",
+    "version": "1"
+  },
+  "message": {
+    "action": "Publish",
+    "entries": [
+      {
+        "base": {
+          "publisher": "PRAGMA",
+          "source": "BITSTAMP",
+          "timestamp": 1731556322
+        },
+        "pair_id": "ETH/USD",
+        "price": 320180000000,
+        "volume": 0
+      },
+      {
+        "base": {
+          "publisher": "PRAGMA",
+          "source": "DEFILLAMA",
+          "timestamp": 1731556322
+        },
+        "pair_id": "ETH/USD",
+        "price": 320460000000,
+        "volume": 0
+      },
+      {
+        "base": {
+          "publisher": "PRAGMA",
+          "source": "OKX",
+          "timestamp": 1731556323
+        },
+        "pair_id": "ETH/USD",
+        "price": 319940715629,
+        "volume": 3519153
+      },
+      {
+        "base": {
+          "publisher": "PRAGMA",
+          "source": "GECKOTERMINAL",
+          "timestamp": 1731556322
+        },
+        "pair_id": "ETH/USD",
+        "price": 319649000000,
+        "volume": 2475862539
+      },
+      {
+        "base": {
+          "publisher": "PRAGMA",
+          "source": "HUOBI",
+          "timestamp": 1731556322
+        },
+        "pair_id": "ETH/USD",
+        "price": 319769318639,
+        "volume": 192693494
+      },
+      {
+        "base": {
+          "publisher": "PRAGMA",
+          "source": "KUCOIN",
+          "timestamp": 1731556322
+        },
+        "pair_id": "ETH/USD",
+        "price": 319998000000,
+        "volume": 0
+      },
+      {
+        "base": {
+          "publisher": "PRAGMA",
+          "source": "BYBIT",
+          "timestamp": 1731556323
+        },
+        "pair_id": "ETH/USD",
+        "price": 319813292211,
+        "volume": 0
+      },
+      {
+        "base": {
+          "publisher": "PRAGMA",
+          "source": "BINANCE",
+          "timestamp": 1731556323
+        },
+        "pair_id": "ETH/USD",
+        "price": 319767319840,
+        "volume": 0
+      },
+      {
+        "base": {
+          "publisher": "PRAGMA",
+          "source": "EKUBO",
+          "timestamp": 1731556322
+        },
+        "pair_id": "ETH/USD",
+        "price": 319865436848,
+        "volume": 0
+      },
+      {
+        "base": {
+          "publisher": "PRAGMA",
+          "source": "BITSTAMP",
+          "timestamp": 1731556322
+        },
+        "pair_id": "BTC/USD",
+        "price": 9002900000000,
+        "volume": 0
+      },
+      {
+        "base": {
+          "publisher": "PRAGMA",
+          "source": "DEFILLAMA",
+          "timestamp": 1731556322
+        },
+        "pair_id": "BTC/USD",
+        "price": 9006300000000,
+        "volume": 0
+      },
+      {
+        "base": {
+          "publisher": "PRAGMA",
+          "source": "OKX",
+          "timestamp": 1731556323
+        },
+        "pair_id": "BTC/USD",
+        "price": 8992405564255,
+        "volume": 221061
+      },
+      {
+        "base": {
+          "publisher": "PRAGMA",
+          "source": "GECKOTERMINAL",
+          "timestamp": 1731556321
+        },
+        "pair_id": "BTC/USD",
+        "price": 8975874000000,
+        "volume": 205517790
+      },
+      {
+        "base": {
+          "publisher": "PRAGMA",
+          "source": "HUOBI",
+          "timestamp": 1731556322
+        },
+        "pair_id": "BTC/USD",
+        "price": 8988466431674,
+        "volume": 740183235
+      },
+      {
+        "base": {
+          "publisher": "PRAGMA",
+          "source": "KUCOIN",
+          "timestamp": 1731556322
+        },
+        "pair_id": "BTC/USD",
+        "price": 8993070000000,
+        "volume": 0
+      },
+      {
+        "base": {
+          "publisher": "PRAGMA",
+          "source": "BYBIT",
+          "timestamp": 1731556323
+        },
+        "pair_id": "BTC/USD",
+        "price": 8988891176402,
+        "volume": 0
+      },
+      {
+        "base": {
+          "publisher": "PRAGMA",
+          "source": "BINANCE",
+          "timestamp": 1731556323
+        },
+        "pair_id": "BTC/USD",
+        "price": 8988592355994,
+        "volume": 0
+      }
+    ]
+  },
+  "primaryType": "Request",
+  "types": {
+    "Base": [
+      {
+        "name": "publisher",
+        "type": "shortstring"
+      },
+      {
+        "name": "source",
+        "type": "shortstring"
+      },
+      {
+        "name": "timestamp",
+        "type": "timestamp"
+      }
+    ],
+    "Entry": [
+      {
+        "name": "base",
+        "type": "Base"
+      },
+      {
+        "name": "pair_id",
+        "type": "shortstring"
+      },
+      {
+        "name": "price",
+        "type": "u128"
+      },
+      {
+        "name": "volume",
+        "type": "u128"
+      }
+    ],
+    "Request": [
+      {
+        "name": "action",
+        "type": "shortstring"
+      },
+      {
+        "name": "entries",
+        "type": "Entry*"
+      }
+    ],
+    "StarknetDomain": [
+      {
+        "name": "name",
+        "type": "shortstring"
+      },
+      {
+        "name": "version",
+        "type": "shortstring"
+      },
+      {
+        "name": "chainId",
+        "type": "shortstring"
+      },
+      {
+        "name": "revision",
+        "type": "shortstring"
+      }
     ]
   }
 }"#;
