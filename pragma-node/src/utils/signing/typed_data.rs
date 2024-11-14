@@ -543,7 +543,7 @@ mod tests {
 
         // Optionally, you can assert certain properties of `typed_data`
         // For now, we'll just ensure that deserialization succeeds
-        assert!(typed_data.types.len() > 0);
+        assert!(!typed_data.types.is_empty());
         assert!(!typed_data.primary_type.is_empty());
     }
 
