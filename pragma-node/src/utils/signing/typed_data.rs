@@ -9,7 +9,7 @@ use pragma_entities::models::entry_error::SigningError;
 use serde::{Deserialize, Serialize};
 use serde_json::Number;
 use starknet::core::types::Felt;
-use starknet::core::utils::{cairo_short_string_to_felt, get_selector_from_name, starknet_keccak};
+use starknet::core::utils::{cairo_short_string_to_felt, get_selector_from_name};
 use starknet_crypto::poseidon_hash_many;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -148,8 +148,10 @@ pub fn encode_type(
     let mut dependencies: Vec<String> = Vec::new();
     get_dependencies(name, types, &mut dependencies)?;
 
-    // sort dependencies
-    dependencies.sort_by_key(|dep| dep.to_lowercase());
+    let (_, rest) = dependencies
+        .split_first_mut()
+        .ok_or_else(|| SigningError::InvalidMessageError("No dependencies found".to_string()))?;
+    rest.sort_by_key(|dep| dep.to_lowercase());
 
     for dep in dependencies {
         type_hash += &format!("\"{}\"", dep);
@@ -268,7 +270,6 @@ fn get_hex(value: &str) -> Result<Felt, SigningError> {
     }
 }
 
-
 impl PrimitiveType {
     pub fn encode(
         &self,
@@ -323,8 +324,7 @@ impl PrimitiveType {
                     return Ok(poseidon_hash_many(hashes.as_slice()));
                 }
 
-                let type_hash =
-                    encode_type(r#type, if ctx.is_preset { types } else { types })?;
+                let type_hash = encode_type(r#type, types)?;
                 hashes.push(get_selector_from_name(&type_hash).map_err(|e| {
                     SigningError::InvalidMessageError(format!(
                         "Invalid type {} for selector: {}",
@@ -337,14 +337,10 @@ impl PrimitiveType {
                     ctx.is_preset = types.contains_key(r#type);
 
                     // pass correct types - preset or types
-                    let field_type = get_value_type(
-                        field_name,
-                        if ctx.is_preset { types } else { types },
-                    )?;
+                    let field_type = get_value_type(field_name, types)?;
                     ctx.base_type = field_type.base_type;
                     ctx.parent_type = r#type.to_string();
-                    let field_hash =
-                        value.encode(field_type.r#type.as_str(), types, ctx)?;
+                    let field_hash = value.encode(field_type.r#type.as_str(), types, ctx)?;
                     hashes.push(field_hash);
                 }
 
@@ -450,11 +446,7 @@ impl Domain {
         }
 
         // we dont need to pass our preset types here. domain should never use a preset type
-        PrimitiveType::Object(object).encode(
-            "StarknetDomain",
-            types,
-            &mut Default::default(),
-        )
+        PrimitiveType::Object(object).encode("StarknetDomain", types, &mut Default::default())
     }
 }
 
@@ -633,9 +625,9 @@ mod tests {
         "0x185b339d5c566a883561a88fb36da301051e2c0225deb325c91bb7aa2f3473a"
     )]
     #[case(
-        EXAMPLE_CUSTOM_MESSAGE,
-        "0x624EBFB99865079BD58CFCFB925B6F5CE940D6F6E41E118B8A72B7163FB435C",
-        "0x53008d692b79b4f6f4267dd29a727355d13df4746c8aa30909413eac3466042"
+        MAIL_STRUCT_ARRAY,
+        "0xcd2a3d9f938e13cd947ec05abc7fe734df8dd826",
+        "0x1df06fd32d689b5431a784a33b02314cc7f395f3bda3ecedf97deafaa66ea31"
     )]
     fn test_message_hash(
         #[case] example_data: &str,
@@ -695,6 +687,7 @@ mod tests {
     "n9": "transfer"
   }
 }"#;
+
     const EXAMPLE_ENUM: &str = r#"
 {
   "types": {
@@ -724,6 +717,7 @@ mod tests {
     }
   }
 }"#;
+
     const EXAMPLE_PRESET_TYPES: &str = r#"
 {
   "types": {
@@ -762,13 +756,15 @@ mod tests {
     }
   }
 }"#;
+
     const MAIL_STRUCT_ARRAY: &str = r#"
 {
   "types": {
     "StarknetDomain": [
       { "name": "name", "type": "shortstring" },
       { "name": "version", "type": "shortstring" },
-      { "name": "chainId", "type": "shortstring" }
+      { "name": "chainId", "type": "shortstring" },
+      { "name": "revision", "type": "shortstring" }
     ],
     "Person": [
       { "name": "name", "type": "felt" },
@@ -789,7 +785,8 @@ mod tests {
   "domain": {
     "name": "StarkNet Mail",
     "version": "1",
-    "chainId": "1"
+    "chainId": "1",
+    "revision": "1"
   },
   "message": {
     "from": {
@@ -804,254 +801,6 @@ mod tests {
     "posts": [
       { "title": "Greeting", "content": "Hello, Bob!" },
       { "title": "Farewell", "content": "Goodbye, Bob!" }
-    ]
-  }
-}"#;
-
-    const EXAMPLE_CUSTOM_MESSAGE: &str = r#"
-{
-  "domain": {
-    "chainId": "1",
-    "name": "Pragma",
-    "revision": "1",
-    "version": "1"
-  },
-  "message": {
-    "action": "Publish",
-    "entries": [
-      {
-        "base": {
-          "publisher": "PRAGMA",
-          "source": "BITSTAMP",
-          "timestamp": 1731556322
-        },
-        "pair_id": "ETH/USD",
-        "price": 320180000000,
-        "volume": 0
-      },
-      {
-        "base": {
-          "publisher": "PRAGMA",
-          "source": "DEFILLAMA",
-          "timestamp": 1731556322
-        },
-        "pair_id": "ETH/USD",
-        "price": 320460000000,
-        "volume": 0
-      },
-      {
-        "base": {
-          "publisher": "PRAGMA",
-          "source": "OKX",
-          "timestamp": 1731556323
-        },
-        "pair_id": "ETH/USD",
-        "price": 319940715629,
-        "volume": 3519153
-      },
-      {
-        "base": {
-          "publisher": "PRAGMA",
-          "source": "GECKOTERMINAL",
-          "timestamp": 1731556322
-        },
-        "pair_id": "ETH/USD",
-        "price": 319649000000,
-        "volume": 2475862539
-      },
-      {
-        "base": {
-          "publisher": "PRAGMA",
-          "source": "HUOBI",
-          "timestamp": 1731556322
-        },
-        "pair_id": "ETH/USD",
-        "price": 319769318639,
-        "volume": 192693494
-      },
-      {
-        "base": {
-          "publisher": "PRAGMA",
-          "source": "KUCOIN",
-          "timestamp": 1731556322
-        },
-        "pair_id": "ETH/USD",
-        "price": 319998000000,
-        "volume": 0
-      },
-      {
-        "base": {
-          "publisher": "PRAGMA",
-          "source": "BYBIT",
-          "timestamp": 1731556323
-        },
-        "pair_id": "ETH/USD",
-        "price": 319813292211,
-        "volume": 0
-      },
-      {
-        "base": {
-          "publisher": "PRAGMA",
-          "source": "BINANCE",
-          "timestamp": 1731556323
-        },
-        "pair_id": "ETH/USD",
-        "price": 319767319840,
-        "volume": 0
-      },
-      {
-        "base": {
-          "publisher": "PRAGMA",
-          "source": "EKUBO",
-          "timestamp": 1731556322
-        },
-        "pair_id": "ETH/USD",
-        "price": 319865436848,
-        "volume": 0
-      },
-      {
-        "base": {
-          "publisher": "PRAGMA",
-          "source": "BITSTAMP",
-          "timestamp": 1731556322
-        },
-        "pair_id": "BTC/USD",
-        "price": 9002900000000,
-        "volume": 0
-      },
-      {
-        "base": {
-          "publisher": "PRAGMA",
-          "source": "DEFILLAMA",
-          "timestamp": 1731556322
-        },
-        "pair_id": "BTC/USD",
-        "price": 9006300000000,
-        "volume": 0
-      },
-      {
-        "base": {
-          "publisher": "PRAGMA",
-          "source": "OKX",
-          "timestamp": 1731556323
-        },
-        "pair_id": "BTC/USD",
-        "price": 8992405564255,
-        "volume": 221061
-      },
-      {
-        "base": {
-          "publisher": "PRAGMA",
-          "source": "GECKOTERMINAL",
-          "timestamp": 1731556321
-        },
-        "pair_id": "BTC/USD",
-        "price": 8975874000000,
-        "volume": 205517790
-      },
-      {
-        "base": {
-          "publisher": "PRAGMA",
-          "source": "HUOBI",
-          "timestamp": 1731556322
-        },
-        "pair_id": "BTC/USD",
-        "price": 8988466431674,
-        "volume": 740183235
-      },
-      {
-        "base": {
-          "publisher": "PRAGMA",
-          "source": "KUCOIN",
-          "timestamp": 1731556322
-        },
-        "pair_id": "BTC/USD",
-        "price": 8993070000000,
-        "volume": 0
-      },
-      {
-        "base": {
-          "publisher": "PRAGMA",
-          "source": "BYBIT",
-          "timestamp": 1731556323
-        },
-        "pair_id": "BTC/USD",
-        "price": 8988891176402,
-        "volume": 0
-      },
-      {
-        "base": {
-          "publisher": "PRAGMA",
-          "source": "BINANCE",
-          "timestamp": 1731556323
-        },
-        "pair_id": "BTC/USD",
-        "price": 8988592355994,
-        "volume": 0
-      }
-    ]
-  },
-  "primaryType": "Request",
-  "types": {
-    "Base": [
-      {
-        "name": "publisher",
-        "type": "shortstring"
-      },
-      {
-        "name": "source",
-        "type": "shortstring"
-      },
-      {
-        "name": "timestamp",
-        "type": "timestamp"
-      }
-    ],
-    "Entry": [
-      {
-        "name": "base",
-        "type": "Base"
-      },
-      {
-        "name": "pair_id",
-        "type": "shortstring"
-      },
-      {
-        "name": "price",
-        "type": "u128"
-      },
-      {
-        "name": "volume",
-        "type": "u128"
-      }
-    ],
-    "Request": [
-      {
-        "name": "action",
-        "type": "shortstring"
-      },
-      {
-        "name": "entries",
-        "type": "Entry*"
-      }
-    ],
-    "StarknetDomain": [
-      {
-        "name": "name",
-        "type": "shortstring"
-      },
-      {
-        "name": "version",
-        "type": "shortstring"
-      },
-      {
-        "name": "chainId",
-        "type": "shortstring"
-      },
-      {
-        "name": "revision",
-        "type": "shortstring"
-      }
     ]
   }
 }"#;
