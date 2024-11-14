@@ -9,7 +9,7 @@ use pragma_entities::models::entry_error::SigningError;
 use serde::{Deserialize, Serialize};
 use serde_json::Number;
 use starknet::core::types::Felt;
-use starknet::core::utils::{cairo_short_string_to_felt, get_selector_from_name};
+use starknet::core::utils::{cairo_short_string_to_felt, get_selector_from_name, starknet_keccak};
 use starknet_crypto::poseidon_hash_many;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -268,17 +268,17 @@ fn get_hex(value: &str) -> Result<Felt, SigningError> {
     }
 }
 
+
 impl PrimitiveType {
     pub fn encode(
         &self,
         r#type: &str,
         types: &IndexMap<String, Vec<Field>>,
-        preset_types: &IndexMap<String, Vec<Field>>,
         ctx: &mut Ctx,
     ) -> Result<Felt, SigningError> {
         match self {
             PrimitiveType::Object(obj) => {
-                ctx.is_preset = preset_types.contains_key(r#type);
+                ctx.is_preset = types.contains_key(r#type);
 
                 let mut hashes = Vec::new();
 
@@ -316,7 +316,7 @@ impl PrimitiveType {
                                 )
                             })?;
 
-                        let field_hash = param.encode(field_type, types, preset_types, ctx)?;
+                        let field_hash = param.encode(field_type, types, ctx)?;
                         hashes.push(field_hash);
                     }
 
@@ -324,7 +324,7 @@ impl PrimitiveType {
                 }
 
                 let type_hash =
-                    encode_type(r#type, if ctx.is_preset { preset_types } else { types })?;
+                    encode_type(r#type, if ctx.is_preset { types } else { types })?;
                 hashes.push(get_selector_from_name(&type_hash).map_err(|e| {
                     SigningError::InvalidMessageError(format!(
                         "Invalid type {} for selector: {}",
@@ -334,17 +334,17 @@ impl PrimitiveType {
 
                 for (field_name, value) in obj {
                     // recheck if we're currently in a preset type
-                    ctx.is_preset = preset_types.contains_key(r#type);
+                    ctx.is_preset = types.contains_key(r#type);
 
                     // pass correct types - preset or types
                     let field_type = get_value_type(
                         field_name,
-                        if ctx.is_preset { preset_types } else { types },
+                        if ctx.is_preset { types } else { types },
                     )?;
                     ctx.base_type = field_type.base_type;
                     ctx.parent_type = r#type.to_string();
                     let field_hash =
-                        value.encode(field_type.r#type.as_str(), types, preset_types, ctx)?;
+                        value.encode(field_type.r#type.as_str(), types, ctx)?;
                     hashes.push(field_hash);
                 }
 
@@ -353,7 +353,7 @@ impl PrimitiveType {
             PrimitiveType::Array(array) => Ok(poseidon_hash_many(
                 array
                     .iter()
-                    .map(|x| x.encode(r#type.trim_end_matches('*'), types, preset_types, ctx))
+                    .map(|x| x.encode(r#type.trim_end_matches('*'), types, ctx))
                     .collect::<Result<Vec<_>, _>>()?
                     .as_slice(),
             )),
@@ -453,7 +453,6 @@ impl Domain {
         PrimitiveType::Object(object).encode(
             "StarknetDomain",
             types,
-            &IndexMap::new(),
             &mut Default::default(),
         )
     }
@@ -517,7 +516,6 @@ impl TypedData {
         // encode message
         let message_hash = PrimitiveType::Object(self.message.clone()).encode(
             &self.primary_type,
-            &self.types,
             &all_types,
             &mut Default::default(),
         )?;
@@ -590,14 +588,13 @@ mod tests {
         let selector_hash =
             PrimitiveType::String(starknet_keccak("transfer".as_bytes()).to_string());
 
-        let types = IndexMap::new();
         let preset_types = get_preset_types();
 
         let encoded_selector = selector
-            .encode("selector", &types, &preset_types, &mut Default::default())
+            .encode("selector", &preset_types, &mut Default::default())
             .unwrap();
         let raw_encoded_selector = selector_hash
-            .encode("felt", &types, &preset_types, &mut Default::default())
+            .encode("felt", &preset_types, &mut Default::default())
             .unwrap();
 
         assert_eq!(encoded_selector, raw_encoded_selector);
