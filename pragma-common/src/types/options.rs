@@ -4,7 +4,7 @@ use bigdecimal::BigDecimal;
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 use starknet::core::{
-    crypto::compute_hash_on_elements, types::FieldElement, utils::cairo_short_string_to_felt,
+    crypto::compute_hash_on_elements, types::Felt, utils::cairo_short_string_to_felt,
 };
 use strum::{Display, EnumString};
 use thiserror::Error;
@@ -51,7 +51,7 @@ pub enum InstrumentError {
     #[error("currency must be BTC or ETH, found: {0}")]
     UnsupportedCurrency(String),
     #[error("could not convert {0} to a field element")]
-    FieldElement(String),
+    Felt(String),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -130,21 +130,21 @@ pub struct OptionData {
 }
 
 impl OptionData {
-    /// Converts an option as a Vec of FieldElement - i.e a calldata.
-    pub fn as_calldata(&self) -> Result<Vec<FieldElement>, InstrumentError> {
+    /// Converts an option as a Vec of Felt - i.e a calldata.
+    pub fn as_calldata(&self) -> Result<Vec<Felt>, InstrumentError> {
         Ok(vec![
             cairo_short_string_to_felt(&self.instrument_name)
-                .map_err(|_| InstrumentError::FieldElement("instrument name".to_string()))?,
+                .map_err(|_| InstrumentError::Felt("instrument name".to_string()))?,
             cairo_short_string_to_felt(&self.base_currency.to_string())
-                .map_err(|_| InstrumentError::FieldElement("base currency".to_string()))?,
-            FieldElement::from(self.current_timestamp as u64),
-            FieldElement::from_str(&self.mark_price.to_string())
-                .map_err(|_| InstrumentError::FieldElement("mark price".to_string()))?,
+                .map_err(|_| InstrumentError::Felt("base currency".to_string()))?,
+            Felt::from(self.current_timestamp as u64),
+            Felt::from_str(&self.mark_price.to_string())
+                .map_err(|_| InstrumentError::Felt("mark price".to_string()))?,
         ])
     }
 
     /// Computes the pedersen hash of the Option.
-    pub fn pedersen_hash(&self) -> Result<FieldElement, InstrumentError> {
+    pub fn pedersen_hash(&self) -> Result<Felt, InstrumentError> {
         let elements = self.as_calldata()?;
         Ok(compute_hash_on_elements(&elements))
     }

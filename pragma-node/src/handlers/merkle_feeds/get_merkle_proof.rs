@@ -7,7 +7,7 @@ use pragma_common::types::merkle_tree::MerkleProof;
 use pragma_common::types::Network;
 use pragma_entities::models::merkle_feed_error::MerkleFeedError;
 use serde::{Deserialize, Serialize};
-use starknet::core::types::FieldElement;
+use starknet::core::types::Felt;
 use utoipa::{IntoParams, ToResponse, ToSchema};
 
 use crate::infra::redis;
@@ -58,7 +58,7 @@ pub async fn get_merkle_feeds_proof(
     .await
     .map_err(MerkleFeedError::from)?;
 
-    let option_felt_hash = FieldElement::from_hex_be(&option_hex_hash)
+    let option_felt_hash = Felt::from_hex(&option_hex_hash)
         .map_err(|_| MerkleFeedError::InvalidOptionHash(option_hex_hash.clone()))?;
 
     let merkle_proof = merkle_tree

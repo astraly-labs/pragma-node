@@ -13,6 +13,12 @@ pub enum VolatilityError {
     InvalidTimestampsRange(u64, u64),
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum SigningError {
+    #[error("Invalid message: {0}")]
+    InvalidMessageError(String),
+}
+
 #[derive(Debug, thiserror::Error, ToSchema)]
 pub enum EntryError {
     #[error("internal server error")]
@@ -46,6 +52,8 @@ pub enum EntryError {
     PublishData(String),
     #[error("can't build publish message: {0}")]
     BuildPublish(String),
+    #[error(transparent)]
+    InvalidMessage(#[from] SigningError),
 }
 
 impl From<InfraError> for EntryError {
@@ -95,7 +103,22 @@ impl IntoResponse for EntryError {
                 StatusCode::INTERNAL_SERVER_ERROR,
                 format!("Publisher error: {}", err),
             ),
+            Self::PublishData(err) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Unable to publish data: {}", err),
+            ),
+            Self::BuildPublish(err) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Unable to build publish message: {}", err),
+            ),
             Self::BadRequest => (StatusCode::BAD_REQUEST, "Bad request".to_string()),
+            Self::UnknownPairId(pair_id) => (
+                StatusCode::NOT_FOUND,
+                format!("Unknown pair id: {}", pair_id),
+            ),
+            Self::InvalidMessage(err) => {
+                (StatusCode::BAD_REQUEST, format!("Invalid message: {}", err))
+            }
             _ => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 String::from("Internal server error"),

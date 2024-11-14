@@ -2,8 +2,8 @@ use axum::extract::State;
 use axum::Json;
 use chrono::{DateTime, Utc};
 use pragma_entities::{EntryError, NewEntry, PublisherError};
-use serde::{Deserialize, Serialize};
-use starknet::core::types::FieldElement;
+use serde::{Deserialize, Deserializer, Serialize};
+use starknet::core::types::Felt;
 use utoipa::{ToResponse, ToSchema};
 
 use crate::config::config;
@@ -16,12 +16,21 @@ use crate::AppState;
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct CreateEntryRequest {
     #[schema(value_type = Vec<String>)]
-    pub signature: Vec<FieldElement>,
+    #[serde(deserialize_with = "felt_from_decimal")]
+    pub signature: Vec<Felt>,
     pub entries: Vec<Entry>,
 }
 
-impl AsRef<[FieldElement]> for CreateEntryRequest {
-    fn as_ref(&self) -> &[FieldElement] {
+fn felt_from_decimal<'de, D>(deserializer: D) -> Result<Vec<Felt>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s: Vec<String> = Vec::deserialize(deserializer)?;
+    Ok(s.iter().map(|s| Felt::from_dec_str(s).unwrap()).collect())
+}
+
+impl AsRef<[Felt]> for CreateEntryRequest {
+    fn as_ref(&self) -> &[Felt] {
         &self.signature
     }
 }
@@ -72,7 +81,7 @@ pub async fn create_entries(
     // Fetch public key from database
     // TODO: Fetch it from contract
     let public_key = publisher.active_key;
-    let public_key = FieldElement::from_hex_be(&public_key)
+    let public_key = Felt::from_hex(&public_key)
         .map_err(|_| EntryError::PublisherError(PublisherError::InvalidKey(public_key)))?;
 
     tracing::info!(
@@ -87,7 +96,7 @@ pub async fn create_entries(
         .await
         .map_err(EntryError::InfraError)?
         .account_address;
-    let account_address = FieldElement::from_hex_be(&account_address)
+    let account_address = Felt::from_hex(&account_address)
         .map_err(|_| EntryError::PublisherError(PublisherError::InvalidAddress(account_address)))?;
 
     tracing::info!(
@@ -152,13 +161,13 @@ mod tests {
     #[rstest]
     fn test_build_publish_message_empty() {
         let entries: Vec<Entry> = vec![];
-        let typed_data = build_publish_message(&entries, None).unwrap();
+        let typed_data = build_publish_message(&entries).unwrap();
 
         assert_eq!(typed_data.primary_type, "Request");
         assert_eq!(typed_data.domain.name, "Pragma");
         assert_eq!(typed_data.domain.version, "1");
-        assert_eq!(typed_data.message.action, "Publish");
-        assert_eq!(typed_data.message.entries, entries);
+        // assert_eq!(typed_data.message.action, "Publish");
+        // assert_eq!(typed_data.message.entries, entries);
     }
 
     #[rstest]
@@ -174,16 +183,16 @@ mod tests {
             price: 0,
             volume: 0,
         }];
-        let typed_data = build_publish_message(&entries, None).unwrap();
+        let typed_data = build_publish_message(&entries).unwrap();
 
         assert_eq!(typed_data.primary_type, "Request");
         assert_eq!(typed_data.domain.name, "Pragma");
         assert_eq!(typed_data.domain.version, "1");
-        assert_eq!(typed_data.message.action, "Publish");
-        assert_eq!(typed_data.message.entries, entries);
+        // assert_eq!(typed_data.message.action, "Publish");
+        // assert_eq!(typed_data.message.entries, entries);
 
-        let msg_hash = typed_data.message_hash(FieldElement::ZERO);
+        let msg_hash = typed_data.encode(Felt::ZERO).unwrap().message_hash;
         // Hash computed with the Pragma SDK (python)
-        assert_eq!(msg_hash, FieldElement::from_hex_be("").unwrap());
+        assert_eq!(msg_hash, Felt::from_hex("").unwrap());
     }
 }

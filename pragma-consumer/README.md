@@ -45,7 +45,7 @@ async fn main() -> Result<(), ()> {
     // Use the calldata with the pragma-oracle contract...
     println!("Hex calldata: {}", result.as_hex_calldata());
 
-    // result.calldata() returns the calldata wrapped with FieldElement
+    // result.calldata() returns the calldata wrapped with Felt
     // from starknet-rs 0.9.0
 }
 ```

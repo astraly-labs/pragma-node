@@ -1,6 +1,6 @@
-use starknet::core::types::FieldElement;
+use starknet::core::types::Felt;
 
 /// Returns a Field Element as an hexadecimal string representation.
-pub fn field_element_as_hex_string(f: &FieldElement) -> String {
+pub fn field_element_as_hex_string(f: &Felt) -> String {
     format!("{:#x}", f)
 }

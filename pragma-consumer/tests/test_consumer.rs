@@ -2,7 +2,7 @@ mod common;
 
 use httpmock::MockServer;
 use rstest::*;
-use starknet::core::types::FieldElement;
+use starknet::core::types::Felt;
 
 use pragma_common::{hash::pedersen_hash, instrument, types::Network};
 use pragma_consumer::{
@@ -65,7 +65,7 @@ async fn test_consumer() {
     merkle_proof_mock.assert();
 
     // 4. Verify the proof returned
-    let expected_merkle_root = FieldElement::from_hex_be(&merkle_root_data()).unwrap();
+    let expected_merkle_root = Felt::from_hex(&merkle_root_data()).unwrap();
 
     let mut out_merkle_root = calldata
         .option_data
@@ -73,7 +73,7 @@ async fn test_consumer() {
         .expect("Could not generate the hash of option");
 
     for sibling in calldata.merkle_proof.0 {
-        let felt_sibling = FieldElement::from_hex_be(&sibling).unwrap();
+        let felt_sibling = Felt::from_hex(&sibling).unwrap();
         out_merkle_root = pedersen_hash(&out_merkle_root, &felt_sibling);
     }
 

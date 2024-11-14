@@ -1,625 +1,807 @@
+// Taken from:
+// https://github.com/dojoengine/dojo/blob/34b13caa785c1149558d28f1a9d9fbd700c4aa2d/crates/torii/libp2p/src/typed_data.rs
+
+use std::str::FromStr;
+
+use cainome::cairo_serde::ByteArray;
+use indexmap::IndexMap;
+use pragma_entities::models::entry_error::SigningError;
 use serde::{Deserialize, Serialize};
-use serde_json::{Map, Value};
-use starknet::core::{
-    crypto::compute_hash_on_elements,
-    types::FieldElement,
-    utils::{cairo_short_string_to_felt, get_selector_from_name},
-};
-use std::{
-    collections::{HashMap, HashSet},
-    str::FromStr,
-};
+use serde_json::Number;
+use starknet::core::types::Felt;
+use starknet::core::utils::{cairo_short_string_to_felt, get_selector_from_name};
+use starknet_crypto::poseidon_hash_many;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct StarkNetDomain {
-    pub name: Option<String>,
-    pub version: Option<String>,
-    #[serde(rename = "chainId")]
-    pub chain_id: Option<String>,
-    pub revision: Option<String>,
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SimpleField {
+    pub name: String,
+    pub r#type: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Parameter {
-    #[serde(rename = "name")]
-    name: String,
-    #[serde(rename = "type")]
-    type_: String,
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ParentField {
+    pub name: String,
+    pub r#type: String,
+    pub contains: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct DomainType {
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum Field {
+    ParentType(ParentField),
+    SimpleType(SimpleField),
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum PrimitiveType {
+    // All of object types. Including preset types
+    Object(IndexMap<String, PrimitiveType>),
+    Array(Vec<PrimitiveType>),
+    Bool(bool),
+    // comprehensive representation of
+    // String, ShortString, Selector and Felt
+    String(String),
+    // For JSON numbers. Formed into a Felt
+    Number(Number),
+}
+
+fn get_preset_types() -> IndexMap<String, Vec<Field>> {
+    let mut types = IndexMap::new();
+
+    types.insert(
+        "TokenAmount".to_string(),
+        vec![
+            Field::SimpleType(SimpleField {
+                name: "token_address".to_string(),
+                r#type: "ContractAddress".to_string(),
+            }),
+            Field::SimpleType(SimpleField {
+                name: "amount".to_string(),
+                r#type: "u256".to_string(),
+            }),
+        ],
+    );
+
+    types.insert(
+        "NftId".to_string(),
+        vec![
+            Field::SimpleType(SimpleField {
+                name: "collection_address".to_string(),
+                r#type: "ContractAddress".to_string(),
+            }),
+            Field::SimpleType(SimpleField {
+                name: "token_id".to_string(),
+                r#type: "u256".to_string(),
+            }),
+        ],
+    );
+
+    types.insert(
+        "u256".to_string(),
+        vec![
+            Field::SimpleType(SimpleField {
+                name: "low".to_string(),
+                r#type: "u128".to_string(),
+            }),
+            Field::SimpleType(SimpleField {
+                name: "high".to_string(),
+                r#type: "u128".to_string(),
+            }),
+        ],
+    );
+
+    types
+}
+
+// Get the fields of a specific type
+// Looks up both the types hashmap as well as the preset types
+// Returns the fields and the hashmap of types
+fn get_fields(
+    name: &str,
+    types: &IndexMap<String, Vec<Field>>,
+) -> Result<Vec<Field>, SigningError> {
+    if let Some(fields) = types.get(name) {
+        return Ok(fields.clone());
+    }
+
+    Err(SigningError::InvalidMessageError(format!(
+        "Type {} not found",
+        name
+    )))
+}
+
+fn get_dependencies(
+    name: &str,
+    types: &IndexMap<String, Vec<Field>>,
+    dependencies: &mut Vec<String>,
+) -> Result<(), SigningError> {
+    if dependencies.contains(&name.to_string()) {
+        return Ok(());
+    }
+
+    dependencies.push(name.to_string());
+
+    for field in get_fields(name, types)? {
+        let mut field_type = match field {
+            Field::SimpleType(simple_field) => simple_field.r#type.clone(),
+            Field::ParentType(parent_field) => parent_field.contains.clone(),
+        };
+
+        field_type = field_type.trim_end_matches('*').to_string();
+
+        if types.contains_key(&field_type) && !dependencies.contains(&field_type) {
+            get_dependencies(&field_type, types, dependencies)?;
+        }
+    }
+
+    Ok(())
+}
+
+pub fn encode_type(
+    name: &str,
+    types: &IndexMap<String, Vec<Field>>,
+) -> Result<String, SigningError> {
+    let mut type_hash = String::new();
+
+    // get dependencies
+    let mut dependencies: Vec<String> = Vec::new();
+    get_dependencies(name, types, &mut dependencies)?;
+
+    let (_, rest) = dependencies
+        .split_first_mut()
+        .ok_or_else(|| SigningError::InvalidMessageError("No dependencies found".to_string()))?;
+    rest.sort_by_key(|dep| dep.to_lowercase());
+
+    for dep in dependencies {
+        type_hash += &format!("\"{}\"", dep);
+
+        type_hash += "(";
+
+        let fields = get_fields(&dep, types)?;
+        for (idx, field) in fields.iter().enumerate() {
+            match field {
+                Field::SimpleType(simple_field) => {
+                    // if ( at start and ) at end
+                    if simple_field.r#type.starts_with('(') && simple_field.r#type.ends_with(')') {
+                        let inner_types = &simple_field.r#type[1..simple_field.r#type.len() - 1]
+                            .split(',')
+                            .map(|t| {
+                                if !t.is_empty() {
+                                    format!("\"{}\"", t)
+                                } else {
+                                    t.to_string()
+                                }
+                            })
+                            .collect::<Vec<String>>()
+                            .join(",");
+                        type_hash += &format!("\"{}\":({})", simple_field.name, inner_types);
+                    } else {
+                        type_hash +=
+                            &format!("\"{}\":\"{}\"", simple_field.name, simple_field.r#type);
+                    }
+                }
+                Field::ParentType(parent_field) => {
+                    type_hash +=
+                        &format!("\"{}\":\"{}\"", parent_field.name, parent_field.contains);
+                }
+            }
+
+            if idx < fields.len() - 1 {
+                type_hash += ",";
+            }
+        }
+
+        type_hash += ")";
+    }
+
+    Ok(type_hash)
+}
+
+#[derive(Debug, Default)]
+pub struct Ctx {
+    pub base_type: String,
+    pub parent_type: String,
+    pub is_preset: bool,
+}
+
+pub(crate) struct FieldInfo {
+    _name: String,
+    r#type: String,
+    base_type: String,
+    index: usize,
+}
+
+pub(crate) fn get_value_type(
+    name: &str,
+    types: &IndexMap<String, Vec<Field>>,
+) -> Result<FieldInfo, SigningError> {
+    // iter both "types" and "preset_types" to find the field
+    for (idx, (key, value)) in types.iter().enumerate() {
+        if key == name {
+            return Ok(FieldInfo {
+                _name: name.to_string(),
+                r#type: key.clone(),
+                base_type: "".to_string(),
+                index: idx,
+            });
+        }
+
+        for (idx, field) in value.iter().enumerate() {
+            match field {
+                Field::SimpleType(simple_field) => {
+                    if simple_field.name == name {
+                        return Ok(FieldInfo {
+                            _name: name.to_string(),
+                            r#type: simple_field.r#type.clone(),
+                            base_type: "".to_string(),
+                            index: idx,
+                        });
+                    }
+                }
+                Field::ParentType(parent_field) => {
+                    if parent_field.name == name {
+                        return Ok(FieldInfo {
+                            _name: name.to_string(),
+                            r#type: parent_field.contains.clone(),
+                            base_type: parent_field.r#type.clone(),
+                            index: idx,
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    Err(SigningError::InvalidMessageError(format!(
+        "Field {} not found in types",
+        name
+    )))
+}
+
+fn get_hex(value: &str) -> Result<Felt, SigningError> {
+    if let Ok(felt) = Felt::from_str(value) {
+        Ok(felt)
+    } else {
+        // assume its a short string and encode
+        cairo_short_string_to_felt(value).map_err(|e| {
+            SigningError::InvalidMessageError(format!("Invalid shortstring for felt: {}", e))
+        })
+    }
+}
+
+impl PrimitiveType {
+    pub fn encode(
+        &self,
+        r#type: &str,
+        types: &IndexMap<String, Vec<Field>>,
+        ctx: &mut Ctx,
+    ) -> Result<Felt, SigningError> {
+        match self {
+            PrimitiveType::Object(obj) => {
+                ctx.is_preset = types.contains_key(r#type);
+
+                let mut hashes = Vec::new();
+
+                if ctx.base_type == "enum" {
+                    let (variant_name, value) = obj.first().ok_or_else(|| {
+                        SigningError::InvalidMessageError(
+                            "Enum value must be populated".to_string(),
+                        )
+                    })?;
+                    let variant_type = get_value_type(variant_name, types)?;
+
+                    let arr: &Vec<PrimitiveType> = match value {
+                        PrimitiveType::Array(arr) => arr,
+                        _ => {
+                            return Err(SigningError::InvalidMessageError(
+                                "Enum value must be an array".to_string(),
+                            ));
+                        }
+                    };
+
+                    // variant index
+                    hashes.push(Felt::from(variant_type.index as u32));
+
+                    // variant parameters
+                    for (idx, param) in arr.iter().enumerate() {
+                        let field_type = &variant_type
+                            .r#type
+                            .trim_start_matches('(')
+                            .trim_end_matches(')')
+                            .split(',')
+                            .nth(idx)
+                            .ok_or_else(|| {
+                                SigningError::InvalidMessageError(
+                                    "Invalid enum variant type".to_string(),
+                                )
+                            })?;
+
+                        let field_hash = param.encode(field_type, types, ctx)?;
+                        hashes.push(field_hash);
+                    }
+
+                    return Ok(poseidon_hash_many(hashes.as_slice()));
+                }
+
+                let type_hash = encode_type(r#type, types)?;
+                hashes.push(get_selector_from_name(&type_hash).map_err(|e| {
+                    SigningError::InvalidMessageError(format!(
+                        "Invalid type {} for selector: {}",
+                        r#type, e
+                    ))
+                })?);
+
+                for (field_name, value) in obj {
+                    // recheck if we're currently in a preset type
+                    ctx.is_preset = types.contains_key(r#type);
+
+                    // pass correct types - preset or types
+                    let field_type = get_value_type(field_name, types)?;
+                    ctx.base_type = field_type.base_type;
+                    ctx.parent_type = r#type.to_string();
+                    let field_hash = value.encode(field_type.r#type.as_str(), types, ctx)?;
+                    hashes.push(field_hash);
+                }
+
+                Ok(poseidon_hash_many(hashes.as_slice()))
+            }
+            PrimitiveType::Array(array) => Ok(poseidon_hash_many(
+                array
+                    .iter()
+                    .map(|x| x.encode(r#type.trim_end_matches('*'), types, ctx))
+                    .collect::<Result<Vec<_>, _>>()?
+                    .as_slice(),
+            )),
+            PrimitiveType::Bool(boolean) => {
+                let v = if *boolean {
+                    Felt::from(1_u32)
+                } else {
+                    Felt::from(0_u32)
+                };
+                Ok(v)
+            }
+            PrimitiveType::String(string) => match r#type {
+                "shortstring" => get_hex(string),
+                "string" => {
+                    // split the string into short strings and encode
+                    let byte_array = ByteArray::from_string(string).map_err(|e| {
+                        SigningError::InvalidMessageError(format!(
+                            "Invalid string for bytearray: {}",
+                            e
+                        ))
+                    })?;
+
+                    let mut hashes = vec![Felt::from(byte_array.data.len())];
+
+                    for hash in byte_array.data {
+                        hashes.push(hash.felt());
+                    }
+
+                    hashes.push(byte_array.pending_word);
+                    hashes.push(Felt::from(byte_array.pending_word_len));
+
+                    Ok(poseidon_hash_many(hashes.as_slice()))
+                }
+                "selector" => get_selector_from_name(string).map_err(|e| {
+                    SigningError::InvalidMessageError(format!("Invalid selector: {}", e))
+                }),
+                "felt" => get_hex(string),
+                "ContractAddress" => get_hex(string),
+                "ClassHash" => get_hex(string),
+                "timestamp" => get_hex(string),
+                "u128" => get_hex(string),
+                "i128" => get_hex(string),
+                _ => Err(SigningError::InvalidMessageError(format!(
+                    "Invalid type {} for string",
+                    r#type
+                ))),
+            },
+            PrimitiveType::Number(number) => {
+                let felt = Felt::from_str(&number.to_string()).map_err(|_| {
+                    SigningError::InvalidMessageError(format!("Invalid number {}", number))
+                })?;
+                Ok(felt)
+            }
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Domain {
     pub name: String,
     pub version: String,
     #[serde(rename = "chainId")]
-    pub chain_id: Option<String>,
+    pub chain_id: String,
     pub revision: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct TypedData<T: Serialize> {
-    #[serde(rename = "types")]
-    pub types: HashMap<String, Vec<Parameter>>,
+impl Domain {
+    pub fn new(name: &str, version: &str, chain_id: &str, revision: Option<&str>) -> Self {
+        Self {
+            name: name.to_string(),
+            version: version.to_string(),
+            chain_id: chain_id.to_string(),
+            revision: revision.map(|s| s.to_string()),
+        }
+    }
+
+    pub fn encode(&self, types: &IndexMap<String, Vec<Field>>) -> Result<Felt, SigningError> {
+        let mut object = IndexMap::new();
+
+        object.insert("name".to_string(), PrimitiveType::String(self.name.clone()));
+        object.insert(
+            "version".to_string(),
+            PrimitiveType::String(self.version.clone()),
+        );
+        object.insert(
+            "chainId".to_string(),
+            PrimitiveType::String(self.chain_id.clone()),
+        );
+        if let Some(revision) = &self.revision {
+            object.insert(
+                "revision".to_string(),
+                PrimitiveType::String(revision.clone()),
+            );
+        }
+
+        // we dont need to pass our preset types here. domain should never use a preset type
+        PrimitiveType::Object(object).encode("StarknetDomain", types, &mut Default::default())
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct TypedData {
+    pub types: IndexMap<String, Vec<Field>>,
     #[serde(rename = "primaryType")]
     pub primary_type: String,
-    #[serde(rename = "domain")]
-    pub domain: DomainType,
-    #[serde(rename = "message")]
-    pub message: T,
+    pub domain: Domain,
+    pub message: IndexMap<String, PrimitiveType>,
 }
 
-impl<T> TypedData<T>
-where
-    T: Serialize,
-{
-    /// Returns true if the type is a struct.
-    ///
-    /// # Arguments
-    ///
-    /// * `type_name` - The name of the type to check.
-    fn is_struct(&self, type_name: &str) -> bool {
-        self.types.contains_key(type_name)
-    }
-
-    /// Encodes a value according to the type.
-    ///
-    /// # Arguments
-    ///
-    /// * `type_name` - The name of the type to encode.
-    /// * `value` - The value to encode.
-    ///
-    /// # Returns
-    ///
-    /// * The encoded value.
-    fn encode_value(&self, type_name: &str, value: &Value) -> Result<FieldElement, &'static str> {
-        if Self::is_pointer(type_name) {
-            if let Value::Array(arr) = value {
-                let type_name = Self::strip_pointer(type_name);
-
-                if self.is_struct(&type_name) {
-                    // Assuming you have a method called `struct_hash` similar to the Python version
-                    let hashes: Vec<FieldElement> = arr
-                        .iter()
-                        .map(|data| self.struct_hash(&type_name, data.as_object().unwrap()))
-                        .collect();
-                    // Assuming you have a method called `compute_hash_on_elements`
-                    Ok(compute_hash_on_elements(&hashes))
-                } else {
-                    let hashes: Vec<FieldElement> = arr
-                        .iter()
-                        .map(|val| FieldElement::from_str(&get_hex(val).unwrap()).unwrap())
-                        .collect();
-                    Ok(compute_hash_on_elements(&hashes))
-                }
-            } else {
-                Err("Expected a list for pointer type")
-            }
-        } else if self.is_struct(type_name) {
-            if let Value::Object(obj) = value {
-                return Ok(self.struct_hash(type_name, obj));
-            } else {
-                return Err("Expected an object for struct type");
-            }
-        } else {
-            return Ok(FieldElement::from_str(&get_hex(value).unwrap()).unwrap());
-        }
-    }
-
-    /// Collects all the dependencies of a type.
-    ///
-    /// # Arguments
-    ///
-    /// * `type_name` - The name of the type to collect dependencies for.
-    /// * `types` - A map of all the types.
-    /// * `dependencies` - A mutable set of all the dependencies.
-    fn collect_deps(
-        type_name: &str,
-        types: &HashMap<String, Vec<Parameter>>,
-        dependencies: &mut HashSet<String>,
-    ) {
-        for param in types.get(type_name).unwrap() {
-            let fixed_type = Self::strip_pointer(&param.type_);
-            if types.contains_key(&fixed_type) && !dependencies.contains(&fixed_type) {
-                dependencies.insert(fixed_type.clone());
-                // recursive call
-                Self::collect_deps(&fixed_type, types, dependencies);
-            }
-        }
-    }
-
-    /// Returns all the dependencies of a type.
-    ///
-    /// # Arguments
-    ///
-    /// * `type_name` - The name of the type to get dependencies for.
-    ///
-    /// # Returns
-    ///
-    /// * A vector of all the dependencies.
-    fn get_dependencies(&self, type_name: &str) -> Vec<String> {
-        if !self.types.contains_key(type_name) {
-            // type_name is a primitive type, has no dependencies
-            return vec![];
-        }
-
-        let mut dependencies = HashSet::new();
-
-        // collect dependencies into a set
-        Self::collect_deps(type_name, &self.types, &mut dependencies);
-        let mut result = vec![type_name.to_string()];
-        result.extend(dependencies);
-        result
-    }
-
-    /// Encodes a type.
-    ///
-    /// # Arguments
-    ///
-    /// * `type_name` - The name of the type to encode.
-    ///
-    /// # Returns
-    ///
-    /// * The encoded type.
-    pub fn encode_type(&self, type_name: &str) -> String {
-        let mut dependencies = self.get_dependencies(type_name);
-        let primary = dependencies.remove(0);
-        dependencies.sort();
-
-        let types = std::iter::once(primary)
-            .chain(dependencies)
-            .collect::<Vec<_>>();
-
-        types
-            .into_iter()
-            .map(|dependency| {
-                let lst: Vec<String> = self
-                    .types
-                    .get(&dependency)
-                    .unwrap()
-                    .iter()
-                    .map(|t| format!("{}:{}", t.name, t.type_))
-                    .collect();
-                format!("{}({})", dependency, lst.join(","))
-            })
-            .collect::<Vec<_>>()
-            .join("")
-    }
-
-    /// Encodes the data of a type.
-    ///
-    /// # Arguments
-    ///
-    /// * `type_name` - The name of the type to encode.
-    /// * `data` - The data to encode.
-    ///
-    /// # Returns
-    ///
-    /// * The encoded data.
-    fn encode_data(&self, type_name: &str, data: &Map<String, Value>) -> Vec<FieldElement> {
-        self.types[type_name]
-            .iter()
-            .map(|param| self.encode_value(&param.type_, &data[&param.name]).unwrap())
-            .collect()
-    }
-
-    /// Computes the hash of a struct.
-    ///
-    /// # Arguments
-    ///
-    /// * `type_name` - The name of the type to hash.
-    /// * `data` - The data to hash.
-    ///
-    /// # Returns
-    ///
-    /// * The hash of the struct.
-    pub fn struct_hash(&self, type_name: &str, data: &Map<String, Value>) -> FieldElement {
-        let type_hash = self.type_hash(type_name);
-        let encoded_data = self.encode_data(type_name, data).to_vec();
-        let elements = std::iter::once(type_hash)
-            .chain(encoded_data)
-            .collect::<Vec<FieldElement>>();
-
-        compute_hash_on_elements(&elements)
-    }
-
-    /// Computes the hash of a type.
-    ///
-    /// # Arguments
-    ///
-    /// * `type_name` - The name of the type to hash.
-    ///
-    /// # Returns
-    ///
-    /// * The hash of the type.
-    pub fn type_hash(&self, type_name: &str) -> FieldElement {
-        get_selector_from_name(&self.encode_type(type_name)).unwrap()
-    }
-
-    /// Computes the hash of the message.
-    ///
-    /// # Arguments
-    ///
-    /// * `account_address` - Address of an account.
-    ///
-    /// # Returns
-    ///
-    /// * The hash of the message.
-    pub fn message_hash(&self, account_address: FieldElement) -> FieldElement {
-        let prefix = cairo_short_string_to_felt("StarkNet Message").unwrap();
-
-        let json_str = serde_json::to_string(&self.domain).unwrap();
-        let json_map: Map<String, Value> = serde_json::from_str(&json_str).unwrap();
-        let message = self.struct_hash("StarkNetDomain", &json_map);
-
-        let json_str = serde_json::to_string(&self.message).unwrap();
-        let json_map: Map<String, Value> = serde_json::from_str(&json_str).unwrap();
-        let message_hash = self.struct_hash(&self.primary_type, &json_map);
-
-        compute_hash_on_elements(&[prefix, message, account_address, message_hash])
-    }
-
-    fn is_pointer(value: &str) -> bool {
-        value.ends_with('*')
-    }
-
-    fn strip_pointer(value: &str) -> String {
-        if Self::is_pointer(value) {
-            value[..value.len() - 1].to_string()
-        } else {
-            value.to_string()
-        }
-    }
+/// Breakdown of components that make up a typed message hash.
+#[derive(Debug, Clone)]
+pub struct TypedDataHash {
+    /// The final hash of the entire message.
+    pub hash: Felt,
+    /// Hash of the `domain_separator` component.
+    #[allow(dead_code)]
+    pub domain_separator_hash: Felt,
+    /// Hash of the `message` component.
+    #[allow(dead_code)]
+    pub message_hash: Felt,
 }
 
-/// Computes the hex string of a json value.
-///
-/// # Arguments
-///
-/// * `value` - The value to convert to hex.
-///
-/// # Returns
-///
-/// * The hex string of the value.
-pub(crate) fn get_hex(value: &Value) -> Result<String, &'static str> {
-    match value {
-        Value::Number(n) => {
-            let i = FieldElement::from_dec_str(&n.to_string()).expect("Error parsing number");
-            Ok(format!("{:#x}", i))
+impl TypedData {
+    pub fn new(
+        types: IndexMap<String, Vec<Field>>,
+        primary_type: &str,
+        domain: Domain,
+        message: IndexMap<String, PrimitiveType>,
+    ) -> Self {
+        Self {
+            types,
+            primary_type: primary_type.to_string(),
+            domain,
+            message,
         }
-        Value::String(s) => {
-            if s.starts_with("0x") {
-                Ok(s.clone())
-            } else if s.chars().all(|c| c.is_numeric()) {
-                Ok(format!("{:#x}", s.parse::<i64>().unwrap()))
-            } else {
-                Ok(format!("{:#x}", cairo_short_string_to_felt(s).unwrap()))
-            }
+    }
+
+    pub fn encode(&self, account: Felt) -> Result<TypedDataHash, SigningError> {
+        let preset_types = get_preset_types();
+
+        // Combine types and preset_types
+        let mut all_types = preset_types.clone();
+        all_types.extend(self.types.clone());
+
+        if self.domain.revision.clone().unwrap_or("1".to_string()) != "1" {
+            return Err(SigningError::InvalidMessageError(
+                "Legacy revision 0 is not supported".to_string(),
+            ));
         }
-        _ => Err("Unsupported value type for get_hex"),
+
+        let prefix_message = cairo_short_string_to_felt("StarkNet Message").unwrap();
+
+        // encode domain separator
+        let domain_hash = self.domain.encode(&self.types)?;
+
+        // encode message
+        let message_hash = PrimitiveType::Object(self.message.clone()).encode(
+            &self.primary_type,
+            &all_types,
+            &mut Default::default(),
+        )?;
+
+        // return full hash
+        Ok(TypedDataHash {
+            hash: poseidon_hash_many(
+                vec![prefix_message, domain_hash, account, message_hash].as_slice(),
+            ),
+            domain_separator_hash: domain_hash,
+            message_hash,
+        })
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use rstest::*;
+    use starknet::core::utils::starknet_keccak;
+    use starknet_crypto::Felt;
+
     use super::*;
-    use rstest::rstest;
-    use serde_json::json;
-    use std::fs;
-    use std::io::Read;
-    use std::path::Path;
-
-    const TYPED_DATA_DIR: &str = "src/utils/signing/mock"; // Update this to your actual directory path.
-
-    pub(crate) fn load_typed_data<T>(file_name: &str) -> TypedData<T>
-    where
-        T: Serialize + for<'de> Deserialize<'de>,
-    {
-        let file_path = format!("{}/{}", TYPED_DATA_DIR, file_name);
-        let path = Path::new(&file_path);
-        let mut file = fs::File::open(path).expect("Error opening the file");
-        let mut buff = String::new();
-        file.read_to_string(&mut buff).unwrap();
-        let typed_data: TypedData<T> = serde_json::from_str(&buff).expect("Error parsing the JSON");
-        typed_data
-    }
-
-    #[derive(Debug, Serialize, Deserialize)]
-    struct WalletType {
-        name: String,
-        wallet: String,
-    }
-
-    #[derive(Debug, Serialize, Deserialize)]
-    struct MailType {
-        from: WalletType,
-        to: WalletType,
-        contents: String,
-    }
-
-    #[derive(Debug, Serialize, Deserialize)]
-    struct MailTypeFeltArray {
-        from: WalletType,
-        to: WalletType,
-        felts_len: u64,
-        felts: Vec<u64>,
-    }
-
-    #[derive(Debug, Serialize, Deserialize)]
-    struct ContentsType {
-        len: u64,
-        data: Vec<FieldElement>,
-    }
-
-    #[derive(Debug, Serialize, Deserialize)]
-    struct MailTypeLongString {
-        from: WalletType,
-        to: WalletType,
-        contents: ContentsType,
-    }
-
-    #[derive(Debug, Serialize, Deserialize)]
-    struct Post {
-        title: String,
-        content: String,
-    }
-
-    #[derive(Debug, Serialize, Deserialize)]
-    struct MailTypeStructArray {
-        from: WalletType,
-        to: WalletType,
-        posts_len: u64,
-        posts: Vec<Post>,
-    }
 
     #[rstest]
-    #[case(json!(123), "0x7b")]
-    #[case(json!("123"), "0x7b")]
-    #[case(json!("0x7b"), "0x7b")]
-    #[case(json!("short_string"), "0x73686f72745f737472696e67")]
-    fn test_get_hex(#[case] value: Value, #[case] result: &str) {
-        assert_eq!(get_hex(&value).unwrap(), result);
-    }
+    #[case(EXAMPLE_BASE_TYPES)]
+    #[case(EXAMPLE_ENUM)]
+    #[case(EXAMPLE_PRESET_TYPES)]
+    #[case(MAIL_STRUCT_ARRAY)]
+    fn test_read_json(#[case] json_data: &str) {
+        let reader = std::io::BufReader::new(json_data.as_bytes());
 
-    const TD: &str = "typed_data_example.json";
-    const TD_STRING: &str = "typed_data_long_string_example.json";
-    const TD_FELT_ARR: &str = "typed_data_felt_array_example.json";
-    const TD_STRUCT_ARR: &str = "typed_data_struct_array_example.json";
+        let typed_data: TypedData = serde_json::from_reader(reader).unwrap();
 
-    #[rstest]
-    #[case(
-        TD,
-        "Mail",
-        "Mail(from:Person,to:Person,contents:felt)Person(name:felt,wallet:felt)"
-    )]
-    fn test_encode_type_simple(
-        #[case] example: &str,
-        #[case] type_name: &str,
-        #[case] encoded_type: &str,
-    ) {
-        let typed_data: TypedData<MailType> = load_typed_data(example);
-        let res = typed_data.encode_type(type_name);
-        assert_eq!(res, encoded_type);
+        // Optionally, you can assert certain properties of `typed_data`
+        // For now, we'll just ensure that deserialization succeeds
+        assert!(!typed_data.types.is_empty());
+        assert!(!typed_data.primary_type.is_empty());
     }
 
     #[rstest]
     #[case(
-        TD_FELT_ARR,
-        "Mail",
-        "Mail(from:Person,to:Person,felts_len:felt,felts:felt*)Person(name:felt,wallet:felt)"
+        EXAMPLE_BASE_TYPES,
+        "\"Example\"(\"n0\":\"felt\",\"n1\":\"bool\",\"n2\":\"string\",\"n3\":\"selector\",\"n4\":\"u128\",\"n5\":\"i128\",\"n6\":\"ContractAddress\",\"n7\":\"ClassHash\",\"n8\":\"timestamp\",\"n9\":\"shortstring\")"
     )]
-    fn test_encode_type_felt_array(
-        #[case] example: &str,
-        #[case] type_name: &str,
-        #[case] encoded_type: &str,
-    ) {
-        let typed_data: TypedData<MailTypeFeltArray> = load_typed_data(example);
-        let res = typed_data.encode_type(type_name);
-        assert_eq!(res, encoded_type);
-    }
+    #[case(
+        MAIL_STRUCT_ARRAY,
+        "\"Mail\"(\"from\":\"Person\",\"to\":\"Person\",\"posts_len\":\"felt\",\"posts\":\"Post*\")\"Person\"(\"name\":\"felt\",\"wallet\":\"felt\")\"Post\"(\"title\":\"felt\",\"content\":\"felt\")"
+    )]
+    #[case(
+        EXAMPLE_ENUM,
+        "\"Example\"(\"someEnum\":\"MyEnum\")\"MyEnum\"(\"Variant 1\":(),\"Variant 2\":(\"u128\",\"u128*\"),\"Variant 3\":(\"u128\"))"
+    )]
+    #[case(
+        EXAMPLE_PRESET_TYPES,
+        "\"Example\"(\"n0\":\"TokenAmount\",\"n1\":\"NftId\")"
+    )]
+    fn test_type_encode(#[case] json_data: &str, #[case] expected_encoded: &str) {
+        let reader = std::io::BufReader::new(json_data.as_bytes());
 
-    #[rstest]
-    #[case(TD_STRING, "Mail", "Mail(from:Person,to:Person,contents:String)Person(name:felt,wallet:felt)String(len:felt,data:felt*)")]
-    fn test_encode_type_long_string(
-        #[case] example: &str,
-        #[case] type_name: &str,
-        #[case] encoded_type: &str,
-    ) {
-        let typed_data: TypedData<MailTypeLongString> = load_typed_data(example);
-        let res = typed_data.encode_type(type_name);
-        assert_eq!(res, encoded_type);
-    }
+        let typed_data: TypedData = serde_json::from_reader(reader).unwrap();
 
-    #[rstest]
-    #[case(TD_STRUCT_ARR, "Mail", "Mail(from:Person,to:Person,posts_len:felt,posts:Post*)Person(name:felt,wallet:felt)Post(title:felt,content:felt)")]
-    fn test_encode_type_struct_array(
-        #[case] example: &str,
-        #[case] type_name: &str,
-        #[case] encoded_type: &str,
-    ) {
-        let typed_data: TypedData<MailTypeStructArray> = load_typed_data(example);
-        let res = typed_data.encode_type(type_name);
-        assert_eq!(res, encoded_type);
-    }
+        let encoded = encode_type(&typed_data.primary_type, &typed_data.types).unwrap();
 
-    #[rstest]
-    #[case(
-        TD,
-        "StarkNetDomain",
-        "0x25b2a6be3b4f788a40d183c71287277bf6cc227fc52398ad813b8d79fb711af"
-    )]
-    #[case(
-        TD,
-        "Person",
-        "0x2896dbe4b96a67110f454c01e5336edc5bbc3635537efd690f122f4809cc855"
-    )]
-    #[case(
-        TD,
-        "Mail",
-        "0x13d89452df9512bf750f539ba3001b945576243288137ddb6c788457d4b2f79"
-    )]
-    #[case(
-        TD_STRING,
-        "String",
-        "0x1933fe9de7e181d64298eecb44fc43b4cec344faa26968646761b7278df4ae2"
-    )]
-    #[case(
-        TD_STRING,
-        "Mail",
-        "0x1ac6f84a5d41cee97febb378ddabbe1390d4e8036df8f89dee194e613411b09"
-    )]
-    #[case(
-        TD_FELT_ARR,
-        "Mail",
-        "0x5b03497592c0d1fe2f3667b63099761714a895c7df96ec90a85d17bfc7a7a0"
-    )]
-    #[case(
-        TD_STRUCT_ARR,
-        "Post",
-        "0x1d71e69bf476486b43cdcfaf5a85c00bb2d954c042b281040e513080388356d"
-    )]
-    #[case(
-        TD_STRUCT_ARR,
-        "Mail",
-        "0x873b878e35e258fc99e3085d5aaad3a81a0c821f189c08b30def2cde55ff27"
-    )]
-    fn test_type_hash(
-        #[case] example: &str,
-        #[case] type_name: &str,
-        #[case] expected_type_hash: &str,
-    ) {
-        match example {
-            TD => {
-                let typed_data: TypedData<MailType> = load_typed_data(example);
-                let result = typed_data.type_hash(type_name);
-                assert_eq!(format!("{:#x}", result), expected_type_hash);
-            }
-            TD_STRING => {
-                let typed_data: TypedData<MailTypeLongString> = load_typed_data(example);
-                let result = typed_data.type_hash(type_name);
-                assert_eq!(format!("{:#x}", result), expected_type_hash);
-            }
-            TD_FELT_ARR => {
-                let typed_data: TypedData<MailTypeFeltArray> = load_typed_data(example);
-                let result = typed_data.type_hash(type_name);
-                assert_eq!(format!("{:#x}", result), expected_type_hash);
-            }
-            TD_STRUCT_ARR => {
-                let typed_data: TypedData<MailTypeStructArray> = load_typed_data(example);
-                let result = typed_data.type_hash(type_name);
-                assert_eq!(format!("{:#x}", result), expected_type_hash);
-            }
-            _ => panic!("Unknown example type"),
-        }
+        assert_eq!(encoded, expected_encoded);
     }
 
     #[test]
-    fn test_struct_hash_starknet_domain() {
-        let typed_data: TypedData<MailType> = load_typed_data(TD);
-        let json_str = serde_json::to_string(&typed_data.domain).unwrap();
-        let json_map: Map<String, Value> = serde_json::from_str(&json_str).unwrap();
-        let result = typed_data.struct_hash("StarkNetDomain", &json_map);
-        assert_eq!(
-            format!("{:#x}", result),
-            "0x791677d28015bfb506ef968e44b486659cdd6306095da0a259336151130a78c"
-        );
+    fn test_selector_encode() {
+        let selector = PrimitiveType::String("transfer".to_string());
+        let selector_hash =
+            PrimitiveType::String(starknet_keccak("transfer".as_bytes()).to_string());
+
+        let preset_types = get_preset_types();
+
+        let encoded_selector = selector
+            .encode("selector", &preset_types, &mut Default::default())
+            .unwrap();
+        let raw_encoded_selector = selector_hash
+            .encode("felt", &preset_types, &mut Default::default())
+            .unwrap();
+
+        assert_eq!(encoded_selector, raw_encoded_selector);
+        assert_eq!(encoded_selector, starknet_keccak("transfer".as_bytes()));
     }
 
     #[test]
-    fn test_struct_hash_mail_message() {
-        let typed_data: TypedData<MailType> = load_typed_data(TD);
-        let json_str = serde_json::to_string(&typed_data.message).unwrap();
-        let json_map: Map<String, Value> = serde_json::from_str(&json_str).unwrap();
-        let result = typed_data.struct_hash("Mail", &json_map);
-        assert_eq!(
-            format!("{:#x}", result),
-            "0x4758f1ed5e7503120c228cbcaba626f61514559e9ef5ed653b0b885e0f38aec"
-        );
-    }
+    fn test_domain_hash() {
+        let reader = std::io::BufReader::new(EXAMPLE_BASE_TYPES.as_bytes());
 
-    #[test]
-    fn test_struct_hash_mail_long_string() {
-        let typed_data: TypedData<MailTypeLongString> = load_typed_data(TD_STRING);
-        let json_str = serde_json::to_string(&typed_data.message).unwrap();
-        let json_map: Map<String, Value> = serde_json::from_str(&json_str).unwrap();
-        let result = typed_data.struct_hash("Mail", &json_map);
-        assert_eq!(
-            format!("{:#x}", result),
-            "0x1d16b9b96f7cb7a55950b26cc8e01daa465f78938c47a09d5a066ca58f9936f"
-        );
-    }
+        let typed_data: TypedData = serde_json::from_reader(reader).unwrap();
 
-    #[test]
-    fn test_struct_hash_mail_felt_array() {
-        let typed_data: TypedData<MailTypeFeltArray> = load_typed_data(TD_FELT_ARR);
-        let json_str = serde_json::to_string(&typed_data.message).unwrap();
-        let json_map: Map<String, Value> = serde_json::from_str(&json_str).unwrap();
-        let result = typed_data.struct_hash("Mail", &json_map);
-        assert_eq!(
-            format!("{:#x}", result),
-            "0x26186b02dddb59bf12114f771971b818f48fad83c373534abebaaa39b63a7ce"
-        );
-    }
+        let domain_hash = typed_data.domain.encode(&typed_data.types).unwrap();
 
-    #[test]
-    fn test_struct_hash_mail_struct_array() {
-        let typed_data: TypedData<MailTypeStructArray> = load_typed_data(TD_STRUCT_ARR);
-        let json_str = serde_json::to_string(&typed_data.message).unwrap();
-        let json_map: Map<String, Value> = serde_json::from_str(&json_str).unwrap();
-        let result = typed_data.struct_hash("Mail", &json_map);
         assert_eq!(
-            format!("{:#x}", result),
-            "0x5650ec45a42c4776a182159b9d33118a46860a6e6639bb8166ff71f3c41eaef"
+            domain_hash,
+            Felt::from_hex("0x555f72e550b308e50c1a4f8611483a174026c982a9893a05c185eeb85399657")
+                .unwrap()
         );
     }
 
     #[rstest]
     #[case(
-        TD,
+        EXAMPLE_BASE_TYPES,
         "0xcd2a3d9f938e13cd947ec05abc7fe734df8dd826",
-        "0x2c3252719b4b7fb49b96f68ea62d64f6be54562826e93a978250fd99155bccd"
+        "0x2d80b87b8bc32068247c779b2ef0f15f65c9c449325e44a9df480fb01eb43ec"
     )]
     #[case(
-        TD_STRING,
+        EXAMPLE_ENUM,
         "0xcd2a3d9f938e13cd947ec05abc7fe734df8dd826",
-        "0x7b2cac6cf11869d9a72e2492f270be9d09d5b87c92a74162fa9ce3d74a4b78c"
+        "0x3df10475ad5a8f49db4345a04a5b09164d2e24b09f6e1e236bc1ccd87627cc"
     )]
     #[case(
-        TD_FELT_ARR,
+        EXAMPLE_PRESET_TYPES,
         "0xcd2a3d9f938e13cd947ec05abc7fe734df8dd826",
-        "0x22d46b6e8e12c06cbce8828cec76e8f6416e54bda8bf77ac0bd64c242e423bb"
+        "0x185b339d5c566a883561a88fb36da301051e2c0225deb325c91bb7aa2f3473a"
     )]
     #[case(
-        TD_STRUCT_ARR,
+        MAIL_STRUCT_ARRAY,
         "0xcd2a3d9f938e13cd947ec05abc7fe734df8dd826",
-        "0x243a96015b473247fd3fb82a30aee0a036edc95017ba85a17029e1afbf3c92d"
+        "0x1df06fd32d689b5431a784a33b02314cc7f395f3bda3ecedf97deafaa66ea31"
     )]
     fn test_message_hash(
-        #[case] example: &str,
-        #[case] account_address: &str,
-        #[case] msg_hash: &str,
+        #[case] example_data: &str,
+        #[case] address_hex: &str,
+        #[case] expected_hash_hex: &str,
     ) {
-        let account_address = FieldElement::from_hex_be(account_address).unwrap();
+        let address = Felt::from_str(address_hex).unwrap();
 
-        let result = match example {
-            TD => {
-                let typed_data: TypedData<MailType> = load_typed_data(example);
-                typed_data.message_hash(account_address)
-            }
-            TD_STRING => {
-                let typed_data: TypedData<MailTypeLongString> = load_typed_data(example);
-                typed_data.message_hash(account_address)
-            }
-            TD_FELT_ARR => {
-                let typed_data: TypedData<MailTypeFeltArray> = load_typed_data(example);
-                typed_data.message_hash(account_address)
-            }
-            TD_STRUCT_ARR => {
-                let typed_data: TypedData<MailTypeStructArray> = load_typed_data(example);
-                typed_data.message_hash(account_address)
-            }
-            _ => panic!("Unsupported example type"),
-        };
+        let reader = std::io::BufReader::new(example_data.as_bytes());
 
-        assert_eq!(format!("{:#x}", result), msg_hash);
+        let typed_data: TypedData = serde_json::from_reader(reader).unwrap();
+
+        let message_hash = typed_data.encode(address).unwrap().hash;
+
+        assert_eq!(message_hash, Felt::from_str(expected_hash_hex).unwrap());
     }
+
+    const EXAMPLE_BASE_TYPES: &str = r#"
+{
+  "types": {
+    "StarknetDomain": [
+      { "name": "name", "type": "shortstring" },
+      { "name": "version", "type": "shortstring" },
+      { "name": "chainId", "type": "shortstring" },
+      { "name": "revision", "type": "shortstring" }
+    ],
+    "Example": [
+      { "name": "n0", "type": "felt" },
+      { "name": "n1", "type": "bool" },
+      { "name": "n2", "type": "string" },
+      { "name": "n3", "type": "selector" },
+      { "name": "n4", "type": "u128" },
+      { "name": "n5", "type": "i128" },
+      { "name": "n6", "type": "ContractAddress" },
+      { "name": "n7", "type": "ClassHash" },
+      { "name": "n8", "type": "timestamp" },
+      { "name": "n9", "type": "shortstring" }
+    ]
+  },
+  "primaryType": "Example",
+  "domain": {
+    "name": "StarkNet Mail",
+    "version": "1",
+    "chainId": "1",
+    "revision": "1"
+  },
+  "message": {
+    "n0": "0x3e8",
+    "n1": true,
+    "n2": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+    "n3": "transfer",
+    "n4": "0x3e8",
+    "n5": "-170141183460469231731687303715884105727",
+    "n6": "0x3e8",
+    "n7": "0x3e8",
+    "n8": 1000,
+    "n9": "transfer"
+  }
+}"#;
+
+    const EXAMPLE_ENUM: &str = r#"
+{
+  "types": {
+    "StarknetDomain": [
+      { "name": "name", "type": "shortstring" },
+      { "name": "version", "type": "shortstring" },
+      { "name": "chainId", "type": "shortstring" },
+      { "name": "revision", "type": "shortstring" }
+    ],
+    "Example": [{ "name": "someEnum", "type": "enum", "contains": "MyEnum" }],
+    "MyEnum": [
+      { "name": "Variant 1", "type": "()" },
+      { "name": "Variant 2", "type": "(u128,u128*)" },
+      { "name": "Variant 3", "type": "(u128)" }
+    ]
+  },
+  "primaryType": "Example",
+  "domain": {
+    "name": "StarkNet Mail",
+    "version": "1",
+    "chainId": "1",
+    "revision": "1"
+  },
+  "message": {
+    "someEnum": {
+      "Variant 2": [2, [0, 1]]
+    }
+  }
+}"#;
+
+    const EXAMPLE_PRESET_TYPES: &str = r#"
+{
+  "types": {
+    "StarknetDomain": [
+      { "name": "name", "type": "shortstring" },
+      { "name": "version", "type": "shortstring" },
+      { "name": "chainId", "type": "shortstring" },
+      { "name": "revision", "type": "shortstring" }
+    ],
+    "Example": [
+      { "name": "n0", "type": "TokenAmount" },
+      { "name": "n1", "type": "NftId" }
+    ]
+  },
+  "primaryType": "Example",
+  "domain": {
+    "name": "StarkNet Mail",
+    "version": "1",
+    "chainId": "1",
+    "revision": "1"
+  },
+  "message": {
+    "n0": {
+      "token_address": "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7",
+      "amount": {
+        "low": "0x3e8",
+        "high": "0x0"
+      }
+    },
+    "n1": {
+      "collection_address": "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7",
+      "token_id": {
+        "low": "0x3e8",
+        "high": "0x0"
+      }
+    }
+  }
+}"#;
+
+    const MAIL_STRUCT_ARRAY: &str = r#"
+{
+  "types": {
+    "StarknetDomain": [
+      { "name": "name", "type": "shortstring" },
+      { "name": "version", "type": "shortstring" },
+      { "name": "chainId", "type": "shortstring" },
+      { "name": "revision", "type": "shortstring" }
+    ],
+    "Person": [
+      { "name": "name", "type": "felt" },
+      { "name": "wallet", "type": "felt" }
+    ],
+    "Post": [
+      { "name": "title", "type": "felt" },
+      { "name": "content", "type": "felt" }
+    ],
+    "Mail": [
+      { "name": "from", "type": "Person" },
+      { "name": "to", "type": "Person" },
+      { "name": "posts_len", "type": "felt" },
+      { "name": "posts", "type": "Post*" }
+    ]
+  },
+  "primaryType": "Mail",
+  "domain": {
+    "name": "StarkNet Mail",
+    "version": "1",
+    "chainId": "1",
+    "revision": "1"
+  },
+  "message": {
+    "from": {
+      "name": "Cow",
+      "wallet": "0xCD2a3d9F938E13CD947Ec05AbC7FE734Df8DD826"
+    },
+    "to": {
+      "name": "Bob",
+      "wallet": "0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB"
+    },
+    "posts_len": 2,
+    "posts": [
+      { "title": "Greeting", "content": "Hello, Bob!" },
+      { "title": "Farewell", "content": "Goodbye, Bob!" }
+    ]
+  }
+}"#;
 }
