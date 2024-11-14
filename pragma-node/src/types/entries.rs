@@ -1,5 +1,3 @@
-use std::fs;
-
 use pragma_entities::EntryError;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -198,10 +196,5 @@ where
         let entry = types["Entry"].as_array_mut().unwrap();
         entry.push(serde_json::json!({"name": "expiration_timestamp", "type": "timestamp"}));
     }
-    fs::write(
-        "message.json",
-        serde_json::to_string_pretty(&raw_message_json).unwrap(),
-    )
-    .unwrap();
     serde_json::from_value(raw_message_json).map_err(|e| EntryError::BuildPublish(e.to_string()))
 }
