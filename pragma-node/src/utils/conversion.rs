@@ -3,6 +3,8 @@ use std::str::FromStr;
 use bigdecimal::BigDecimal;
 
 use pragma_entities::InfraError;
+use serde::{Deserialize, Deserializer};
+use starknet_crypto::Felt;
 
 pub fn convert_via_quote(
     a_price: BigDecimal,
@@ -46,4 +48,12 @@ pub fn format_bigdecimal_price(price: BigDecimal, decimals: u32) -> String {
         }
     }
     formatted_price
+}
+
+pub fn felt_from_decimal<'de, D>(deserializer: D) -> Result<Vec<Felt>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s: Vec<String> = Vec::deserialize(deserializer)?;
+    Ok(s.iter().map(|s| Felt::from_dec_str(s).unwrap()).collect())
 }
