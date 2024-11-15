@@ -1,8 +1,13 @@
+use indexmap::IndexMap;
 use pragma_entities::EntryError;
 use serde::{Deserialize, Serialize};
+use serde_json::Number;
 use utoipa::ToSchema;
 
-use crate::utils::TypedData;
+use crate::utils::{
+    typed_data::{Domain, Field, PrimitiveType, SimpleField},
+    TypedData,
+};
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, ToSchema)]
 pub struct BaseEntry {
@@ -120,81 +125,160 @@ pub fn build_publish_message<E>(entries: &[E]) -> Result<TypedData, EntryError>
 where
     E: EntryTrait + Serialize + for<'a> Deserialize<'a>,
 {
-    // TODO(akhercha): ugly, refine
     let mut is_future = false;
 
-    // Construct the raw string with placeholders for the entries
-    let raw_entries: Vec<_> = entries
+    // Construct the raw entries
+    let raw_entries: Vec<PrimitiveType> = entries
         .iter()
         .map(|entry| {
+            let mut entry_map = IndexMap::new();
             let base = entry.base();
-            let pair_id = entry.pair_id();
-            let price = entry.price();
-            let volume = entry.volume();
-            let expiration_timestamp = entry.expiration_timestamp();
 
-            let mut entry_map = serde_json::json!({
-                "base": {
-                    "publisher": base.publisher,
-                    "source": base.source,
-                    "timestamp": base.timestamp
-                },
-                "pair_id": pair_id,
-                "price": price,
-                "volume": volume
-            });
+            // Add base fields
+            let mut base_map = IndexMap::new();
+            base_map.insert(
+                "publisher".to_string(),
+                PrimitiveType::String(base.publisher.clone()),
+            );
+            base_map.insert(
+                "source".to_string(),
+                PrimitiveType::String(base.source.clone()),
+            );
+            base_map.insert(
+                "timestamp".to_string(),
+                PrimitiveType::String(base.timestamp.to_string()),
+            );
 
-            if let Some(expiration) = expiration_timestamp {
+            entry_map.insert("base".to_string(), PrimitiveType::Object(base_map));
+            entry_map.insert(
+                "pair_id".to_string(),
+                PrimitiveType::String(entry.pair_id().to_string()),
+            );
+            entry_map.insert(
+                "price".to_string(),
+                PrimitiveType::Number(Number::from(entry.price())),
+            );
+            entry_map.insert(
+                "volume".to_string(),
+                PrimitiveType::Number(Number::from(entry.volume())),
+            );
+
+            // Handle optional expiration timestamp
+            if let Some(expiration) = entry.expiration_timestamp() {
                 is_future = true;
-                entry_map["expiration_timestamp"] = serde_json::json!(expiration);
+                entry_map.insert(
+                    "expiration_timestamp".to_string(),
+                    PrimitiveType::String(expiration.to_string()),
+                );
             }
 
-            entry_map
+            PrimitiveType::Object(entry_map)
         })
-        .collect::<Vec<_>>();
+        .collect();
 
-    let mut raw_message_json = serde_json::json!({
-        "domain": {
-            "name": "Pragma",
-            "version": "1",
-            "chainId": "1",
-            "revision": "1"
-        },
-        "primaryType": "Request",
-        "message": {
-            "action": "Publish",
-            "entries": raw_entries
-        },
-        "types": {
-            "StarknetDomain": [
-                {"name": "name", "type": "shortstring"},
-                {"name": "version", "type": "shortstring"},
-                {"name": "chainId", "type": "shortstring"},
-                {"name": "revision", "type": "shortstring"}
-            ],
-            "Request": [
-                {"name": "action", "type": "shortstring"},
-                {"name": "entries", "type": "Entry*"}
-            ],
-            "Entry": [
-                {"name": "base", "type": "Base"},
-                {"name": "pair_id", "type": "shortstring"},
-                {"name": "price", "type": "u128"},
-                {"name": "volume", "type": "u128"},
-            ],
-            "Base": [
-                {"name": "publisher", "type": "shortstring"},
-                {"name": "source", "type": "shortstring"},
-                {"name": "timestamp", "type": "timestamp"}
-            ]
-        }
-    });
+    // Define the domain
+    let domain = Domain::new("Pragma", "1", "1", Some("1"));
 
-    // Add the expiration timestamp for the future entries
+    // Define the types
+    let mut types = IndexMap::new();
+
+    // Add "StarknetDomain" type
+    types.insert(
+        "StarknetDomain".to_string(),
+        vec![
+            Field::SimpleType(SimpleField {
+                name: "name".to_string(),
+                r#type: "shortstring".to_string(),
+            }),
+            Field::SimpleType(SimpleField {
+                name: "version".to_string(),
+                r#type: "shortstring".to_string(),
+            }),
+            Field::SimpleType(SimpleField {
+                name: "chainId".to_string(),
+                r#type: "shortstring".to_string(),
+            }),
+            Field::SimpleType(SimpleField {
+                name: "revision".to_string(),
+                r#type: "shortstring".to_string(),
+            }),
+        ],
+    );
+
+    // Define "Entry" type
+    let mut entry_fields = vec![
+        Field::SimpleType(SimpleField {
+            name: "base".to_string(),
+            r#type: "Base".to_string(),
+        }),
+        Field::SimpleType(SimpleField {
+            name: "pair_id".to_string(),
+            r#type: "shortstring".to_string(),
+        }),
+        Field::SimpleType(SimpleField {
+            name: "price".to_string(),
+            r#type: "u128".to_string(),
+        }),
+        Field::SimpleType(SimpleField {
+            name: "volume".to_string(),
+            r#type: "u128".to_string(),
+        }),
+    ];
+
+    // Include "expiration_timestamp" if necessary
     if is_future {
-        let types = raw_message_json["types"].as_object_mut().unwrap();
-        let entry = types["Entry"].as_array_mut().unwrap();
-        entry.push(serde_json::json!({"name": "expiration_timestamp", "type": "timestamp"}));
+        entry_fields.push(Field::SimpleType(SimpleField {
+            name: "expiration_timestamp".to_string(),
+            r#type: "timestamp".to_string(),
+        }));
     }
-    serde_json::from_value(raw_message_json).map_err(|e| EntryError::BuildPublish(e.to_string()))
+
+    types.insert("Entry".to_string(), entry_fields);
+
+    // Define "Base" type
+    types.insert(
+        "Base".to_string(),
+        vec![
+            Field::SimpleType(SimpleField {
+                name: "publisher".to_string(),
+                r#type: "shortstring".to_string(),
+            }),
+            Field::SimpleType(SimpleField {
+                name: "source".to_string(),
+                r#type: "shortstring".to_string(),
+            }),
+            Field::SimpleType(SimpleField {
+                name: "timestamp".to_string(),
+                r#type: "timestamp".to_string(),
+            }),
+        ],
+    );
+
+    // **Add the missing "Request" type**
+    types.insert(
+        "Request".to_string(),
+        vec![
+            Field::SimpleType(SimpleField {
+                name: "action".to_string(),
+                r#type: "shortstring".to_string(),
+            }),
+            Field::SimpleType(SimpleField {
+                name: "entries".to_string(),
+                r#type: "Entry*".to_string(),
+            }),
+        ],
+    );
+
+    // Create the message
+    let mut message = IndexMap::new();
+    message.insert(
+        "action".to_string(),
+        PrimitiveType::String("Publish".to_string()),
+    );
+    message.insert("entries".to_string(), PrimitiveType::Array(raw_entries));
+
+    // Create TypedData
+    let typed_data = TypedData::new(types, "Request", domain, message);
+
+    Ok(typed_data)
 }
