@@ -10,12 +10,13 @@ use crate::config::config;
 use crate::infra::kafka;
 use crate::infra::repositories::publisher_repository;
 use crate::types::entries::FutureEntry;
-use crate::utils::{assert_request_signature_is_valid, JsonExtractor};
+use crate::utils::{assert_request_signature_is_valid, felt_from_decimal, JsonExtractor};
 use crate::AppState;
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct CreateFutureEntryRequest {
     #[schema(value_type = Vec<String>)]
+    #[serde(deserialize_with = "felt_from_decimal")]
     pub signature: Vec<Felt>,
     pub entries: Vec<FutureEntry>,
 }
