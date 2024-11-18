@@ -730,7 +730,7 @@ impl TryFrom<MedianEntryWithComponents> for AssetOraclePrice {
 /// The entries are considered valid if:
 /// - not empty,
 /// - contains at a median price for each pair_id,
-/// - each median price has at least 3 unique publishers.
+/// - each median price has at least `MINIMUM_NUMBER_OF_PUBLISHERS` unique publishers.
 fn get_median_entries_response(
     raw_entries: Vec<RawMedianEntryWithComponents>,
     pairs_ids: &[String],
