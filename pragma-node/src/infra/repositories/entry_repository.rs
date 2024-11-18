@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use bigdecimal::{BigDecimal, FromPrimitive, ToPrimitive};
-use chrono::{DateTime, NaiveDateTime};
+use chrono::{DateTime, NaiveDateTime, Utc};
 use diesel::prelude::QueryableByName;
 use diesel::sql_types::{Double, Jsonb, VarChar};
 use diesel::{ExpressionMethods, QueryDsl, Queryable, RunQueryDsl};
@@ -9,6 +9,7 @@ use pragma_common::errors::ConversionError;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+use crate::constants::others::ROUTING_FRESHNESS_THRESHOLD;
 use crate::constants::starkex_ws::{
     INITAL_INTERVAL_IN_MS, INTERVAL_INCREMENT_IN_MS, MAX_INTERVAL_WITHOUT_ENTRIES,
     MINIMUM_NUMBER_OF_PUBLISHERS,
@@ -141,7 +142,17 @@ pub async fn routing(
     pair_id: String,
     routing_params: RoutingParams,
 ) -> Result<(MedianEntry, u32), InfraError> {
-    if pair_id_exist(pool, pair_id.clone()).await? || !is_routing {
+    // If we have entries for the pair_id and the latest entry is fresh enough,
+    // Or if we are not routing, we can return the price directly.
+    if !is_routing
+        || (pair_id_exist(pool, pair_id.clone()).await?
+            && get_last_updated_timestamp(pool, pair_id.clone())
+                .await?
+                .unwrap_or(NaiveDateTime::default())
+                .and_utc()
+                .timestamp()
+                >= Utc::now().naive_utc().and_utc().timestamp() - ROUTING_FRESHNESS_THRESHOLD)
+    {
         return get_price_and_decimals(pool, pair_id, routing_params).await;
     }
 
