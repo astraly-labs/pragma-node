@@ -7,7 +7,7 @@ pub const PRAGMA_ORACLE_NAME_FOR_STARKEX: &str = "PRGM";
 /// Used for the subscription to the entry websocket.
 /// Represents the maximum interval from now that we check for entries.
 /// If we don't have have any entries for that interval max, we stop searching.
-pub const MAX_INTERVAL_WITHOUT_ENTRIES: u64 = 10000;
+pub const MAX_INTERVAL_WITHOUT_ENTRIES: u64 = 100000;
 
 /// Used for the subscription to the entry websocket.
 /// Represents the initial interval in milliseconds that we check for entries.
