@@ -108,7 +108,7 @@ pub async fn get_entry(
     Query(params): Query<GetEntryParams>,
 ) -> Result<Json<GetEntryResponse>, EntryError> {
     tracing::info!("Received get entry request for pair {:?}", pair);
-    // Construct pair id
+
     let is_routing = params.routing.unwrap_or(false);
 
     let routing_params = RoutingParams::try_from(params)?;
