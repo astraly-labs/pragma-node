@@ -40,7 +40,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 }
 
-#[tracing::instrument(skip(pool))]
+#[tracing::instrument(skip(pool, payload))]
 async fn process_payload(pool: &Pool, payload: Vec<u8>) -> Result<(), Box<dyn std::error::Error>> {
     let decoded_payload = String::from_utf8_lossy(&payload);
     let is_future_entries = decoded_payload.contains("expiration_timestamp");
