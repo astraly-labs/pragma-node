@@ -53,7 +53,7 @@ pub struct GetOnchainPublishersResponse(pub Vec<Publisher>);
        GetOnchainPublishersParams
     ),
 )]
-#[tracing::instrument]
+#[tracing::instrument(skip(state))]
 pub async fn get_onchain_publishers(
     State(state): State<AppState>,
     Query(params): Query<GetOnchainPublishersParams>,

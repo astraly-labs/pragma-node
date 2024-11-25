@@ -102,14 +102,12 @@ pub struct GetEntryResponse {
         GetEntryParams,
     ),
 )]
-#[tracing::instrument]
+#[tracing::instrument(skip(state))]
 pub async fn get_entry(
     State(state): State<AppState>,
     PathExtractor(pair): PathExtractor<(String, String)>,
     Query(params): Query<GetEntryParams>,
 ) -> Result<Json<GetEntryResponse>, EntryError> {
-    tracing::info!("Received get entry request for pair {:?}", pair);
-
     let is_routing = params.routing.unwrap_or(false);
 
     let routing_params = RoutingParams::try_from(params)?;

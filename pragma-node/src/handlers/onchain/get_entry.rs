@@ -59,13 +59,12 @@ pub struct GetOnchainEntryResponse {
         GetOnchainEntryParams
     ),
 )]
-#[tracing::instrument]
+#[tracing::instrument(skip(state))]
 pub async fn get_onchain_entry(
     State(state): State<AppState>,
     PathExtractor(pair): PathExtractor<(String, String)>,
     Query(params): Query<GetOnchainEntryParams>,
 ) -> Result<Json<GetOnchainEntryResponse>, EntryError> {
-    tracing::info!("Received get onchain entry request for pair {:?}", pair);
     let pair_id: String = currency_pair_to_pair_id(&pair.0, &pair.1);
     let with_components = params.components.unwrap_or(true);
     let with_variations = params.variations.unwrap_or(true);

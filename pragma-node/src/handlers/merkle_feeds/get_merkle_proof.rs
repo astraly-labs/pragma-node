@@ -35,13 +35,12 @@ pub struct GetMerkleProofResponse(pub MerkleProof);
         GetMerkleProofQuery
     ),
 )]
-#[tracing::instrument]
+#[tracing::instrument(skip(state))]
 pub async fn get_merkle_feeds_proof(
     State(state): State<AppState>,
     PathExtractor(option_hex_hash): PathExtractor<HexHash>,
     Query(params): Query<GetMerkleProofQuery>,
 ) -> Result<Json<GetMerkleProofResponse>, MerkleFeedError> {
-    tracing::info!("Received get merkle proof request");
     if state.redis_client.is_none() {
         return Err(MerkleFeedError::RedisConnection);
     }

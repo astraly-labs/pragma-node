@@ -32,7 +32,7 @@ pub struct SubscribeToPriceResponse {
     pub timestamp: UnixTimestamp,
 }
 
-#[tracing::instrument]
+#[tracing::instrument(skip(state, ws), fields(endpoint_name = "subscribe_to_price"))]
 pub async fn subscribe_to_price(
     ws: WebSocketUpgrade,
     State(state): State<AppState>,
@@ -44,6 +44,13 @@ pub async fn subscribe_to_price(
 /// Interval in milliseconds that the channel will update the client with the latest prices.
 const CHANNEL_UPDATE_INTERVAL_IN_MS: u64 = 500;
 
+#[tracing::instrument(
+    skip(socket, app_state),
+    fields(
+        subscriber_id,
+        client_ip = %client_addr.ip()
+    )
+)]
 async fn create_new_subscriber(socket: WebSocket, app_state: AppState, client_addr: SocketAddr) {
     let (mut subscriber, _) = match Subscriber::<SubscriptionState>::new(
         "subscribe_to_price".into(),
@@ -77,6 +84,14 @@ async fn create_new_subscriber(socket: WebSocket, app_state: AppState, client_ad
 struct WsEntriesHandler;
 
 impl ChannelHandler<SubscriptionState, SubscriptionRequest, EntryError> for WsEntriesHandler {
+    #[tracing::instrument(
+        skip(self, subscriber),
+        fields(
+            subscriber_id = %subscriber.id,
+            request_type = ?request.msg_type,
+            pairs_count = request.pairs.len()
+        )
+    )]
     async fn handle_client_msg(
         &mut self,
         subscriber: &mut Subscriber<SubscriptionState>,
@@ -112,6 +127,12 @@ impl ChannelHandler<SubscriptionState, SubscriptionRequest, EntryError> for WsEn
         Ok(())
     }
 
+    #[tracing::instrument(
+        skip(self, subscriber),
+        fields(
+            subscriber_id = %subscriber.id
+        )
+    )]
     async fn periodic_interval(
         &mut self,
         subscriber: &mut Subscriber<SubscriptionState>,
@@ -145,6 +166,12 @@ impl ChannelHandler<SubscriptionState, SubscriptionRequest, EntryError> for WsEn
 
 impl WsEntriesHandler {
     /// Get the current median entries for the subscribed pairs and sign them as Pragma.
+    #[tracing::instrument(
+        skip(self, state, subscription),
+        fields(
+            subscribed_pairs = ?subscription.get_subscribed_spot_pairs().len()
+        )
+    )]
     async fn get_subscribed_pairs_medians(
         &self,
         state: &AppState,
@@ -170,6 +197,7 @@ impl WsEntriesHandler {
     }
 
     /// Get index & mark prices for the subscribed pairs.
+    #[tracing::instrument(skip(self, state, subscription))]
     async fn get_all_entries(
         &self,
         state: &AppState,
