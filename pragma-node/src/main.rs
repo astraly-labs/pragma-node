@@ -55,12 +55,9 @@ impl fmt::Debug for AppState {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv().ok();
 
-    // TODO: OTEL_EXPORTER_OTLP_ENDPOINT should be read from env.
-    pragma_common::telemetry::init_telemetry(
-        "pragma-node".into(),
-        "http://localhost:4317".into(),
-        None,
-    )?;
+    let otel_endpoint = std::env::var("OTEL_EXPORTER_OTLP_ENDPOINT")
+        .unwrap_or_else(|_| "http://signoz.dev.pragma.build:4317".to_string());
+    pragma_common::telemetry::init_telemetry("pragma-node".into(), otel_endpoint, None)?;
 
     let config = config().await;
 
