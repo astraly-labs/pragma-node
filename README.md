@@ -174,6 +174,7 @@ export PORT=3000
 export METRICS_PORT=8080
 export KAFKA_BROKERS=localhost:29092
 export AXIOM_TOKEN=xaat- # OPTIONAL
+export OTEL_EXPORTER_OTLP_ENDPOINT=localhost:4317
 ```
 
 ### 4. Start the Pragma Node service:
