@@ -44,7 +44,7 @@ tracing = { workspace = true }
 utoipa = { workspace = true }
 utoipa-swagger-ui = { workspace = true, features = ["axum"] }
 uuid = { workspace = true, features = ["fast-rng", "v4", "serde"] }
-
+axum-tracing-opentelemetry = { workspace = true }
 pragma-common = { path = "../pragma-common" }
 pragma-entities = { path = "../pragma-entities" }
 utoipauto = { workspace = true }
