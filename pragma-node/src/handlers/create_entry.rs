@@ -52,6 +52,7 @@ pub async fn create_entries(
     State(state): State<AppState>,
     extract::Json(new_entries): extract::Json<CreateEntryRequest>,
 ) -> Result<Json<CreateEntryResponse>, EntryError> {
+    tracing::info!("Received new entries: {:?}", new_entries);
     let config = config().await;
 
     if new_entries.entries.is_empty() {

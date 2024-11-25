@@ -1,3 +1,4 @@
+pub(crate) mod middlewares;
 pub(crate) mod routes;
 
 use axum_tracing_opentelemetry::middleware::{OtelAxumLayer, OtelInResponseLayer};
@@ -13,6 +14,7 @@ use utoipa::{
 use utoipauto::utoipauto;
 
 use crate::errors::internal_error;
+use crate::server::middlewares::TimingLayer;
 use crate::{config::Config, server::routes::app_router, AppState};
 
 struct SecurityAddon;
@@ -64,6 +66,7 @@ pub async fn run_api_server(config: &Config, state: AppState) {
 
     let app = app_router::<ApiDoc>(state.clone())
         .with_state(state)
+        .with_timing()
         // Logging so we can see whats going on
         .layer(OtelAxumLayer::default())
         .layer(OtelInResponseLayer)

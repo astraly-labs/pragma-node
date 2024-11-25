@@ -52,6 +52,7 @@ pub async fn create_future_entries(
     State(state): State<AppState>,
     extract::Json(new_entries): extract::Json<CreateFutureEntryRequest>,
 ) -> Result<Json<CreateFutureEntryResponse>, EntryError> {
+    tracing::info!("Received new future entries: {:?}", new_entries);
     let config = config().await;
 
     if new_entries.entries.is_empty() {
