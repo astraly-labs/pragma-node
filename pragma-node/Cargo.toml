@@ -29,7 +29,6 @@ moka = { workspace = true, features = ["future"] }
 nonzero_ext = { workspace = true }
 opentelemetry = { workspace = true }
 pragma-monitoring = { workspace = true }
-prometheus = { workspace = true }
 rdkafka = { workspace = true }
 redis = { workspace = true, features = ["tokio-comp", "json"] }
 serde = { workspace = true, features = ["derive"] }

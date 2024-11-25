@@ -43,7 +43,6 @@ lazy_static = "1.4.0"
 serde = { version = "1.0.204", features = ["derive"] }
 moka = { version = "0.12", features = ["future"] }
 opentelemetry = { version = "0.26.0", features = ["metrics", "logs"] }
-prometheus = "0.13.4"
 nonzero_ext = { version = "0.3.0" }
 serde_json = { version = "1.0.122", features = ["arbitrary_precision"] }
 starknet = "0.12.0"
