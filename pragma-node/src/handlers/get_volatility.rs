@@ -38,13 +38,12 @@ pub struct GetVolatilityResponse {
             VolatilityQuery
         ),
     )]
-#[tracing::instrument]
+#[tracing::instrument(skip(state))]
 pub async fn get_volatility(
     State(state): State<AppState>,
     PathExtractor(pair): PathExtractor<(String, String)>,
     Query(volatility_query): Query<VolatilityQuery>,
 ) -> Result<Json<GetVolatilityResponse>, EntryError> {
-    tracing::info!("Received get volatility request for pair {:?}", pair);
     // Construct pair id
     let pair_id = currency_pair_to_pair_id(&pair.0, &pair.1);
 

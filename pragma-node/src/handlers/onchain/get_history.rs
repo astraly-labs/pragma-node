@@ -46,13 +46,12 @@ pub struct GetOnchainHistoryResponse(pub Vec<GetOnchainHistoryEntry>);
         GetOnchainHistoryParams
     ),
 )]
-#[tracing::instrument]
+#[tracing::instrument(skip(state))]
 pub async fn get_onchain_history(
     State(state): State<AppState>,
     PathExtractor(pair): PathExtractor<(String, String)>,
     Query(params): Query<GetOnchainHistoryParams>,
 ) -> Result<Json<GetOnchainHistoryResponse>, EntryError> {
-    tracing::info!("Received get onchain history request for pair {:?}", pair);
     let pair_id: String = currency_pair_to_pair_id(&pair.0, &pair.1);
     let network = params.network;
     let timestamp_range = params.timestamp.assert_time_is_valid()?;

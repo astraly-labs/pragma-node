@@ -25,6 +25,7 @@ pub struct GetOnchainOHLCResponse {
     pub data: Vec<OHLCEntry>,
 }
 
+#[tracing::instrument(skip(state, ws), fields(endpoint_name = "subscribe_to_onchain_ohlc"))]
 pub async fn subscribe_to_onchain_ohlc(
     ws: WebSocketUpgrade,
     State(state): State<AppState>,
@@ -36,6 +37,13 @@ pub async fn subscribe_to_onchain_ohlc(
 /// Interval in milliseconds that the channel will update the client with the latest prices.
 const CHANNEL_UPDATE_INTERVAL_IN_MS: u64 = 30000; // 30 seconds
 
+#[tracing::instrument(
+    skip(socket, app_state),
+    fields(
+        subscriber_id,
+        client_ip = %client_addr.ip()
+    )
+)]
 async fn create_new_subscriber(socket: WebSocket, app_state: AppState, client_addr: SocketAddr) {
     let (mut subscriber, _) = match Subscriber::<SubscriptionState>::new(
         "subscribe_to_ohlc".into(),
@@ -69,6 +77,15 @@ async fn create_new_subscriber(socket: WebSocket, app_state: AppState, client_ad
 struct WsOHLCHandler;
 
 impl ChannelHandler<SubscriptionState, SubscriptionRequest, InfraError> for WsOHLCHandler {
+    #[tracing::instrument(
+        skip(self, subscriber),
+        fields(
+            subscriber_id = %subscriber.id,
+            network = ?subscription.network,
+            pair = %subscription.pair,
+            interval = ?subscription.interval
+        )
+    )]
     async fn handle_client_msg(
         &mut self,
         subscriber: &mut Subscriber<SubscriptionState>,
@@ -107,6 +124,13 @@ impl ChannelHandler<SubscriptionState, SubscriptionRequest, InfraError> for WsOH
         Ok(())
     }
 
+    #[tracing::instrument(
+        skip(self, subscriber),
+        fields(
+            subscriber_id = %subscriber.id
+        ),
+        err(Debug)
+    )]
     async fn periodic_interval(
         &mut self,
         subscriber: &mut Subscriber<SubscriptionState>,
@@ -180,6 +204,15 @@ impl WsOHLCHandler {
         Ok(())
     }
 
+    #[tracing::instrument(
+        skip(self, subscriber, message),
+        fields(
+            subscriber_id = %subscriber.id,
+            ip = %subscriber.ip_address,
+            msg_len = message.len()
+        )
+    )]
+
     async fn check_rate_limit(
         &self,
         subscriber: &mut Subscriber<SubscriptionState>,
@@ -192,7 +225,7 @@ impl WsOHLCHandler {
             NonZeroU32::new(message.len().try_into()?).ok_or(InfraError::InternalServerError)?,
         ) != Ok(Ok(()))
         {
-            tracing::info!(
+            tracing::warn!(
                 subscriber_id = %subscriber.id,
                 ip = %ip_addr,
                 "Rate limit exceeded. Closing connection.",

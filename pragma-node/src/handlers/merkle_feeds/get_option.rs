@@ -38,16 +38,12 @@ pub struct GetOptionResponse {
         GetOptionQuery
     ),
 )]
-#[tracing::instrument]
+#[tracing::instrument(skip(state))]
 pub async fn get_merkle_feeds_option(
     State(state): State<AppState>,
     PathExtractor(instrument): PathExtractor<String>,
     Query(params): Query<GetOptionQuery>,
 ) -> Result<Json<GetOptionResponse>, MerkleFeedError> {
-    tracing::info!(
-        "Received get option request for instrument {:?}",
-        instrument
-    );
     if state.redis_client.is_none() {
         return Err(MerkleFeedError::RedisConnection);
     }

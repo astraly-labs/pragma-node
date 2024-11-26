@@ -47,13 +47,12 @@ pub struct CreateFutureEntryResponse {
         (status = 401, description = "Unauthorized Publisher", body = EntryError)
     )
 )]
-#[tracing::instrument]
+#[tracing::instrument(skip(state))]
 pub async fn create_future_entries(
     State(state): State<AppState>,
     extract::Json(new_entries): extract::Json<CreateFutureEntryRequest>,
 ) -> Result<Json<CreateFutureEntryResponse>, EntryError> {
     tracing::info!("Received new future entries: {:?}", new_entries);
-
     let config = config().await;
 
     if new_entries.entries.is_empty() {
@@ -77,12 +76,6 @@ pub async fn create_future_entries(
     let public_key = Felt::from_hex(&public_key)
         .map_err(|_| EntryError::PublisherError(PublisherError::InvalidKey(public_key)))?;
 
-    tracing::info!(
-        "Retrieved {:?} public key: {:?}",
-        publisher_name,
-        public_key
-    );
-
     // Fetch account address from database
     // TODO: Cache it
     let account_address = publisher_repository::get(&state.offchain_pool, publisher_name.clone())
@@ -91,12 +84,6 @@ pub async fn create_future_entries(
         .account_address;
     let account_address = Felt::from_hex(&account_address)
         .map_err(|_| EntryError::PublisherError(PublisherError::InvalidAddress(account_address)))?;
-
-    tracing::info!(
-        "Retrieved {:?} account address: {:?}",
-        publisher_name,
-        account_address
-    );
 
     let signature = assert_request_signature_is_valid::<CreateFutureEntryRequest, FutureEntry>(
         &new_entries,

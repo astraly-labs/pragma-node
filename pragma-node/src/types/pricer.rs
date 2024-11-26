@@ -28,6 +28,10 @@ impl Pricer for IndexPricer {
         Self { pairs, pair_type }
     }
 
+    #[tracing::instrument(skip(self, db_pool), fields(
+        pairs_count = self.pairs.len(),
+        pair_type = ?self.pair_type
+    ))]
     async fn compute(&self, db_pool: &Pool) -> Result<Vec<MedianEntryWithComponents>, EntryError> {
         if self.pairs.is_empty() {
             return Ok(vec![]);
@@ -55,6 +59,7 @@ pub struct MarkPricer {
 impl MarkPricer {
     /// Builds the stablecoin/USD pairs from the non USD pairs.
     /// Example: ["BTC/USDT", "ETH/USDT"] -> ["USDT/USD"]
+    #[tracing::instrument]
     fn build_stable_to_usd_pairs(non_usd_pairs: &[String]) -> Vec<String> {
         non_usd_pairs
             .iter()
@@ -63,6 +68,7 @@ impl MarkPricer {
     }
 
     /// Computes the stablecoin/USD pairs median entries.
+    #[tracing::instrument(skip(db_pool))]
     async fn get_stablecoins_index_entries(
         db_pool: &Pool,
         stablecoin_pairs: &[String],
@@ -74,6 +80,7 @@ impl MarkPricer {
 
     /// Retrieves the number of decimals for quote stablecoins.
     /// Example: ["BTC/USDT", "ETH/USDT"] -> {"USDT": 6}
+    #[tracing::instrument(skip(db_pool))]
     async fn get_stablecoins_decimals(
         db_pool: &Pool,
         stablecoin_pairs: Vec<String>,
@@ -98,6 +105,7 @@ impl MarkPricer {
     }
 
     /// Computes the non USD quoted pairs median entries.
+    #[tracing::instrument(skip(db_pool), fields(pairs_count = pairs.len()))]
     async fn get_pairs_entries(
         db_pool: &Pool,
         pairs: &[String],
@@ -110,6 +118,7 @@ impl MarkPricer {
     /// Given the median price of a perp pair, the median price of the spot
     /// stablecoin/USD pair and the number of decimals of the stablecoin, computes
     /// the mark price.
+    #[tracing::instrument]
     fn compute_mark_price(
         perp_pair_price: &BigDecimal,
         spot_usd_price: &BigDecimal,
@@ -126,6 +135,13 @@ impl MarkPricer {
 
     /// Builds the complete list of entries from the median price of the spot
     /// stablecoin/USD pairs and the median price of the perp pairs.
+    #[tracing::instrument(
+        skip(stablecoins_spot_entries, stablecoins_decimals, pairs_perp_entries),
+        fields(
+            spot_entries = stablecoins_spot_entries.len(),
+            perp_entries = pairs_perp_entries.len()
+        )
+    )]
     pub fn merge_entries_from(
         stablecoins_spot_entries: Vec<MedianEntryWithComponents>,
         stablecoins_decimals: HashMap<String, BigDecimal>,
@@ -171,6 +187,13 @@ impl Pricer for MarkPricer {
         Self { pairs, pair_type }
     }
 
+    #[tracing::instrument(
+        skip(self, db_pool),
+        fields(
+            pairs_count = self.pairs.len(),
+            pair_type = ?self.pair_type
+        )
+    )]
     async fn compute(&self, db_pool: &Pool) -> Result<Vec<MedianEntryWithComponents>, EntryError> {
         if self.pairs.is_empty() {
             return Ok(vec![]);

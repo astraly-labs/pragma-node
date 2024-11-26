@@ -21,13 +21,11 @@ use crate::utils::currency_pair_to_pair_id;
         ("quote" = String, Path, description = "Quote Asset"),
     ),
 )]
-#[tracing::instrument]
+#[tracing::instrument(skip(state))]
 pub async fn get_expiries(
     State(state): State<AppState>,
     PathExtractor(pair): PathExtractor<(String, String)>,
 ) -> Result<Json<Vec<NaiveDateTime>>, EntryError> {
-    tracing::info!("Received get expiries for pair {:?}", pair);
-
     let pair_id = currency_pair_to_pair_id(&pair.0, &pair.1);
 
     let req_result = entry_repository::get_expiries_list(&state.offchain_pool, pair_id.clone())

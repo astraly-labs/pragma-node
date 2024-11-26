@@ -30,13 +30,12 @@ pub struct GetOHLCResponse {
             GetEntryParams,
         ),
     )]
-#[tracing::instrument]
+#[tracing::instrument(skip(state))]
 pub async fn get_ohlc(
     State(state): State<AppState>,
     PathExtractor(pair): PathExtractor<(String, String)>,
     Query(params): Query<GetEntryParams>,
 ) -> Result<Json<GetOHLCResponse>, EntryError> {
-    tracing::info!("Received get entry request for pair {:?}", pair);
     // Construct pair id
     let pair_id = currency_pair_to_pair_id(&pair.0, &pair.1);
 
