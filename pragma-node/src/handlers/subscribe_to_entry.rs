@@ -238,15 +238,15 @@ impl WsEntriesHandler {
     ) -> Result<Vec<MedianEntryWithComponents>, EntryError> {
         let index_pricer = IndexPricer::new(
             subscription.get_subscribed_spot_pairs(),
-            DataType::SpotEntry,
+            DataType::StarkexSpotEntry,
         );
 
         let (usd_pairs, non_usd_pairs): (Vec<String>, Vec<String>) = subscription
             .get_subscribed_perp_pairs()
             .into_iter()
             .partition(|pair| pair.ends_with("USD"));
-        let mark_pricer_usd = IndexPricer::new(usd_pairs, DataType::PerpEntry);
-        let mark_pricer_non_usd = MarkPricer::new(non_usd_pairs, DataType::PerpEntry);
+        let mark_pricer_usd = MarkPricer::new(usd_pairs, DataType::StarkexFutureEntry);
+        let mark_pricer_non_usd = MarkPricer::new(non_usd_pairs, DataType::StarkexFutureEntry);
 
         // Compute entries concurrently
         let (index_entries, usd_mark_entries, non_usd_mark_entries) = tokio::join!(

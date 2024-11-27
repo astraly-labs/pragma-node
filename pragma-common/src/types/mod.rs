@@ -38,6 +38,10 @@ pub enum DataType {
     PerpEntry,
     #[serde(rename = "future_entry")]
     FutureEntry,
+    #[serde(rename = "starkex_spot_entry")]
+    StarkexSpotEntry,
+    #[serde(rename = "starkex_future_entry")]
+    StarkexFutureEntry,
 }
 
 // Supported Aggregation Intervals

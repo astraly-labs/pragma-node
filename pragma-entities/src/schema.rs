@@ -24,6 +24,31 @@ diesel::table! {
 }
 
 diesel::table! {
+    starkex_future_entries (id, timestamp) {
+        id -> Uuid,
+        pair_id -> Varchar,
+        publisher -> Text,
+        timestamp -> Timestamptz,
+        expiration_timestamp -> Nullable<Timestamptz>,
+        price -> Numeric,
+        source -> Varchar,
+        publisher_signature -> Varchar,
+    }
+}
+
+diesel::table! {
+    starkex_entries (id, timestamp) {
+        id -> Uuid,
+        pair_id -> Varchar,
+        publisher -> Text,
+        timestamp -> Timestamptz,
+        price -> Numeric,
+        source -> Varchar,
+        publisher_signature -> Nullable<Varchar>,
+    }
+}
+
+diesel::table! {
     future_entries (id, timestamp) {
         id -> Uuid,
         pair_id -> Varchar,

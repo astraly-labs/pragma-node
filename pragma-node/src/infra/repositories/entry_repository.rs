@@ -791,9 +791,8 @@ fn get_median_entries_response(
 /// Retrieves the timescale table name for the given entry type.
 fn get_table_name_from_type(entry_type: DataType) -> &'static str {
     match entry_type {
-        DataType::SpotEntry => "entries",
-        DataType::FutureEntry => "future_entries",
-        DataType::PerpEntry => "future_entries",
+        DataType::SpotEntry | DataType::StarkexSpotEntry => "starkex_entries",
+        DataType::FutureEntry | DataType::StarkexFutureEntry | DataType::PerpEntry => "starkex_future_entries",
     }
 }
 

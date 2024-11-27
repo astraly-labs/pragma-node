@@ -1,6 +1,6 @@
 use crate::dto::entry as dto;
 use crate::models::DieselResult;
-use crate::schema::entries;
+use crate::schema::{entries, starkex_entries};
 use bigdecimal::BigDecimal;
 use diesel::internal::derives::multiconnection::chrono::NaiveDateTime;
 use diesel::upsert::excluded;
@@ -33,6 +33,52 @@ pub struct NewEntry {
     pub timestamp: NaiveDateTime,
     pub publisher_signature: String,
     pub price: BigDecimal,
+}
+
+#[derive(Serialize, Queryable, Selectable)]
+#[diesel(table_name = starkex_entries)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct StarkexEntry {
+    pub id: Uuid,
+    pub pair_id: String,
+    pub publisher: String,
+    pub source: String,
+    pub timestamp: NaiveDateTime,
+    pub publisher_signature: Option<String>,
+    pub price: BigDecimal,
+}
+
+#[derive(Serialize, Deserialize, Insertable, AsChangeset, Debug)]
+#[diesel(table_name = starkex_entries)]
+pub struct NewStarkexEntry {
+    pub pair_id: String,
+    pub publisher: String,
+    pub source: String,
+    pub timestamp: NaiveDateTime,
+    pub publisher_signature: String,
+    pub price: BigDecimal,
+}
+
+impl NewStarkexEntry {
+    pub fn create_many(
+        conn: &mut PgConnection,
+        data: Vec<NewStarkexEntry>,
+    ) -> DieselResult<Vec<StarkexEntry>> {
+        diesel::insert_into(starkex_entries::table)
+            .values(&data)
+            .returning(StarkexEntry::as_returning())
+            .on_conflict((starkex_entries::pair_id, starkex_entries::source, starkex_entries::timestamp))
+            .do_update()
+            .set((
+                starkex_entries::pair_id.eq(excluded(starkex_entries::pair_id)),
+                starkex_entries::publisher.eq(excluded(starkex_entries::publisher)),
+                starkex_entries::source.eq(excluded(starkex_entries::source)),
+                starkex_entries::publisher_signature.eq(excluded(starkex_entries::publisher_signature)),
+                starkex_entries::timestamp.eq(excluded(starkex_entries::timestamp)),
+                starkex_entries::price.eq(excluded(starkex_entries::price)),
+            ))
+            .get_results(conn)
+    }
 }
 
 impl Entry {
@@ -112,5 +158,18 @@ impl Entry {
             .order(entries::timestamp.desc())
             .first(conn)
             .optional()
+    }
+}
+
+impl From<NewEntry> for NewStarkexEntry {
+    fn from(entry: NewEntry) -> NewStarkexEntry {
+        NewStarkexEntry {
+            pair_id: entry.pair_id,
+            publisher: entry.publisher,
+            source: entry.source,
+            timestamp: entry.timestamp,
+            publisher_signature: entry.publisher_signature,
+            price: entry.price,
+        }
     }
 }

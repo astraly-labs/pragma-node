@@ -11,7 +11,7 @@ use diesel::{
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::schema::future_entries;
+use crate::schema::{future_entries, starkex_future_entries};
 
 #[derive(Serialize, Queryable, Selectable)]
 #[diesel(table_name = future_entries)]
@@ -39,6 +39,55 @@ pub struct NewFutureEntry {
     pub expiration_timestamp: Option<NaiveDateTime>,
     pub publisher_signature: String,
     pub price: BigDecimal,
+}
+
+#[derive(Serialize, Queryable, Selectable)]
+#[diesel(table_name = starkex_future_entries)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct StarkexFutureEntry {
+    pub id: Uuid,
+    pub pair_id: String,
+    pub publisher: String,
+    pub source: String,
+    pub timestamp: NaiveDateTime,
+    // If expiration_timestamp is None, it means the entry is a perpetual future
+    // else it is a regular future entry that will expire at the expiration_timestamp.
+    pub expiration_timestamp: Option<NaiveDateTime>,
+    pub publisher_signature: String,
+    pub price: BigDecimal,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Insertable, AsChangeset)]
+#[diesel(table_name = starkex_future_entries)]
+pub struct NewStarkexFutureEntry {
+    pub pair_id: String,
+    pub publisher: String,
+    pub source: String,
+    pub timestamp: NaiveDateTime,
+    pub expiration_timestamp: Option<NaiveDateTime>,
+    pub publisher_signature: String,
+    pub price: BigDecimal,
+}
+
+impl NewStarkexFutureEntry {
+    pub fn create_many(
+        conn: &mut PgConnection,
+        data: Vec<NewStarkexFutureEntry>,
+    ) -> DieselResult<Vec<StarkexFutureEntry>> {
+        use crate::schema::starkex_future_entries;
+
+        diesel::insert_into(starkex_future_entries::table)
+            .values(&data)
+            .returning(StarkexFutureEntry::as_returning())
+            .on_conflict((
+                starkex_future_entries::pair_id,
+                starkex_future_entries::source,
+                starkex_future_entries::timestamp,
+                starkex_future_entries::expiration_timestamp,
+            ))
+            .do_nothing()
+            .get_results(conn)
+    }
 }
 
 impl FutureEntry {
@@ -127,5 +176,19 @@ impl FutureEntry {
             .select(future_entries::pair_id)
             .distinct()
             .load::<String>(conn)
+    }
+}
+
+impl From<NewFutureEntry> for NewStarkexFutureEntry {
+    fn from(entry: NewFutureEntry) -> NewStarkexFutureEntry {
+        NewStarkexFutureEntry {
+            pair_id: entry.pair_id,
+            publisher: entry.publisher,
+            source: entry.source,
+            timestamp: entry.timestamp,
+            expiration_timestamp: entry.expiration_timestamp,
+            publisher_signature: entry.publisher_signature,
+            price: entry.price,
+        }
     }
 }
