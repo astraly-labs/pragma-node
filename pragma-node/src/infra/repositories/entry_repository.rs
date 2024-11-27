@@ -644,7 +644,6 @@ impl TryFrom<RawMedianEntryWithComponents> for MedianEntryWithComponents {
     type Error = ConversionError;
 
     fn try_from(raw: RawMedianEntryWithComponents) -> Result<Self, Self::Error> {
-        tracing::info!("Raw Components: {:?}", raw.components);
         let components: Vec<EntryComponent> =
             serde_json::from_value(raw.components).map_err(|_| Self::Error::FailedSerialization)?;
 
