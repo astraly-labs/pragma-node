@@ -50,3 +50,5 @@ uuid = { workspace = true, features = ["fast-rng", "v4", "serde"] }
 
 [dev-dependencies]
 rstest = { workspace = true }
+tokio-tungstenite = { version = "0.20.1", features = ["connect", "native-tls"] }
+url = "2.5.0"
