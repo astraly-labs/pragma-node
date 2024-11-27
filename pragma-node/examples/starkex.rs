@@ -1,3 +1,4 @@
+use chrono::Utc;
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
     execute,
@@ -18,14 +19,14 @@ use url::Url;
 
 const TEST_PAIRS: &[&str] = &[
     "BTC/USD",
-    "ETH/USD",
-    "SOL/USD",
-    "AVAX/USD",
-    "MATIC/USD",
-    "ARB/USD",
+    // "ETH/USD",
+    // "SOL/USD",
+    // "AVAX/USD",
+    // "MATIC/USD",
+    // "ARB/USD",
 ];
 
-const TEST_MARK_PAIRS: &[&str] = &["BTC/USD", "ETH/USD", "SOL/USD"];
+const TEST_MARK_PAIRS: &[&str] = &["BTC/USD"];
 
 #[derive(Serialize, Deserialize, Debug)]
 struct SubscribeMessage {
@@ -94,6 +95,7 @@ struct App {
     subscription_pairs: Vec<String>,
     latest_update: Option<SubscribeToEntryResponse>,
     should_quit: bool,
+    current_time: i64,
 }
 
 impl App {
@@ -102,6 +104,7 @@ impl App {
             subscription_pairs: Vec::new(),
             latest_update: None,
             should_quit: false,
+            current_time: Utc::now().timestamp(),
         }
     }
 }
@@ -178,6 +181,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Main loop
     loop {
+        app.current_time = Utc::now().timestamp();
         terminal.draw(|f| ui(f, &app))?;
 
         // Handle events
@@ -294,6 +298,22 @@ fn ui(f: &mut Frame, app: &App) {
             Constraint::Min(10),   // Price updates
         ])
         .split(f.size());
+
+    // Add latency display with milliseconds
+    if let Some(update) = &app.latest_update {
+        let latency_ms = (app.current_time - update.timestamp) * 1000; // Convert to milliseconds
+        let latency_text = Paragraph::new(format!("⏱ Latency: {}ms", latency_ms))
+            .alignment(Alignment::Right)
+            .block(Block::default().borders(Borders::ALL));
+
+        let latency_area = Rect {
+            x: chunks[0].width - 25,
+            y: 0,
+            width: 25,
+            height: 3,
+        };
+        f.render_widget(latency_text, latency_area);
+    }
 
     // Subscription header
     let subscribed_pairs = Paragraph::new(format!(

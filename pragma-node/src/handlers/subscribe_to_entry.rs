@@ -244,7 +244,15 @@ impl WsEntriesHandler {
         let (usd_pairs, non_usd_pairs): (Vec<String>, Vec<String>) = subscription
             .get_subscribed_perp_pairs()
             .into_iter()
-            .partition(|pair| pair.ends_with("USD"));
+            .partition(|pair| {
+                tracing::debug!("Checking pair for USD: {}", pair);
+                pair.ends_with("USD")
+            });
+        tracing::debug!(
+            "USD pairs: {:?}, non-USD pairs: {:?}",
+            usd_pairs,
+            non_usd_pairs
+        );
         let mark_pricer_usd = IndexPricer::new(usd_pairs, DataType::PerpEntry);
         let mark_pricer_non_usd = MarkPricer::new(non_usd_pairs, DataType::PerpEntry);
 
