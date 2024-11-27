@@ -47,6 +47,7 @@ utoipa = { workspace = true }
 utoipa-swagger-ui = { workspace = true, features = ["axum"] }
 utoipauto = { workspace = true }
 uuid = { workspace = true, features = ["fast-rng", "v4", "serde"] }
+num-bigint = "0.4.6"
 
 [dev-dependencies]
 rstest = { workspace = true }

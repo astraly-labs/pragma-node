@@ -17,6 +17,7 @@ use crate::constants::starkex_ws::{
 use crate::handlers::get_entry::RoutingParams;
 use crate::handlers::subscribe_to_entry::{AssetOraclePrice, SignedPublisherPrice};
 use crate::utils::{convert_via_quote, normalize_to_decimals, StarkexPrice};
+use num_bigint::BigInt;
 use pragma_common::types::{AggregationMode, DataType, Interval};
 use pragma_entities::dto;
 use pragma_entities::{
@@ -641,23 +642,64 @@ struct RawMedianEntryWithComponents {
 
 impl TryFrom<RawMedianEntryWithComponents> for MedianEntryWithComponents {
     type Error = ConversionError;
-
     fn try_from(raw: RawMedianEntryWithComponents) -> Result<Self, Self::Error> {
-        let components: Vec<EntryComponent> =
-            serde_json::from_value(raw.components).map_err(|_| Self::Error::FailedSerialization)?;
+        let components: Vec<EntryComponent> = raw
+            .components
+            .as_array()
+            .ok_or(Self::Error::FailedSerialization)?
+            .iter()
+            .map(|component_value| {
+                let component_obj = component_value
+                    .as_object()
+                    .ok_or(Self::Error::FailedSerialization)?;
 
-        // The database returns us the timestamp in RFC3339 format, so we
-        // need to convert it to a Unix timestamp before going further.
+                // Explicitly convert price to string to ensure precision
+                let price_str = component_obj
+                    .get("price")
+                    .and_then(|v| v.as_number())
+                    .map(|n| n.to_string())
+                    .ok_or(Self::Error::FailedSerialization)?;
+
+                let price = BigDecimal::new(
+                    BigInt::parse_bytes(price_str.as_bytes(), 10)
+                        .ok_or(Self::Error::BigDecimalConversion)?,
+                    0,
+                );
+
+                Ok(EntryComponent {
+                    pair_id: component_obj
+                        .get("pair_id")
+                        .and_then(|v| v.as_str().map(String::from))
+                        .unwrap_or_else(|| raw.pair_id.clone()),
+                    price: price,
+                    timestamp: component_obj
+                        .get("timestamp")
+                        .and_then(|v| v.as_str().map(String::from))
+                        .ok_or(Self::Error::FailedSerialization)?,
+                    publisher: component_obj
+                        .get("publisher")
+                        .and_then(|v| v.as_str().map(String::from))
+                        .ok_or(Self::Error::FailedSerialization)?,
+                    publisher_address: component_obj
+                        .get("publisher_address")
+                        .and_then(|v| v.as_str().map(String::from))
+                        .ok_or(Self::Error::FailedSerialization)?,
+                    publisher_signature: component_obj
+                        .get("publisher_signature")
+                        .and_then(|v| v.as_str().map(String::from))
+                        .ok_or(Self::Error::FailedSerialization)?,
+                })
+            })
+            .collect::<Result<Vec<EntryComponent>, Self::Error>>()?;
+
         let components = components
             .into_iter()
-            .map(|c| {
-                Ok(EntryComponent {
-                    timestamp: DateTime::parse_from_rfc3339(&c.timestamp)
-                        .map_err(|_| Self::Error::InvalidDateTime)?
-                        .timestamp()
-                        .to_string(),
-                    ..c
-                })
+            .map(|mut c| {
+                c.timestamp = DateTime::parse_from_rfc3339(&c.timestamp)
+                    .map_err(|_| Self::Error::InvalidDateTime)?
+                    .timestamp()
+                    .to_string();
+                Ok(c)
             })
             .collect::<Result<Vec<EntryComponent>, Self::Error>>()?;
 
