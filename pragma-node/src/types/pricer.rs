@@ -195,6 +195,7 @@ impl Pricer for MarkPricer {
         )
     )]
     async fn compute(&self, db_pool: &Pool) -> Result<Vec<MedianEntryWithComponents>, EntryError> {
+        tracing::debug!("Computing mark prices for pairs: {:?}", self.pairs);
         if self.pairs.is_empty() {
             return Ok(vec![]);
         }
