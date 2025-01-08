@@ -725,12 +725,9 @@ impl TryFrom<MedianEntryWithComponents> for AssetOraclePrice {
     }
 }
 
-/// Convert a list of raw entries into a list of valid median entries
-/// if the raw entries are valid.
-/// The entries are considered valid if:
-/// - not empty,
-/// - contains at a median price for each pair_id,
-/// - each median price has at least `MINIMUM_NUMBER_OF_PUBLISHERS` unique publishers.
+/// Convert a list of raw entries into a list of valid median entries.
+/// For each pair_id, check if it has a valid median price with enough unique publishers.
+/// Returns the valid entries, filtering out any invalid ones.
 fn get_median_entries_response(
     raw_entries: Vec<RawMedianEntryWithComponents>,
     pairs_ids: &[String],
@@ -738,19 +735,16 @@ fn get_median_entries_response(
     if raw_entries.is_empty() {
         return None;
     }
-    let pairs_set: HashSet<_> = pairs_ids.iter().collect();
-    let mut found_pairs = HashSet::new();
 
-    let mut median_entries = Vec::with_capacity(raw_entries.len());
+    let mut valid_entries = Vec::new();
+    
     for raw_entry in raw_entries {
-        found_pairs.insert(raw_entry.pair_id.clone());
-
-        let median_entry = MedianEntryWithComponents::try_from(raw_entry);
-        let median_entry = match median_entry {
-            Ok(median_entry) => median_entry,
+        let median_entry = match MedianEntryWithComponents::try_from(raw_entry) {
+            Ok(entry) => entry,
             Err(e) => {
-                tracing::error!("Cannot convert raw median entry to median entry: {:?}", e);
-                return None;
+                tracing::error!("Cannot convert raw median entry to median entry for pair {}: {:?}", 
+                    raw_entry.pair_id, e);
+                continue;
             }
         };
 
@@ -760,16 +754,24 @@ fn get_median_entries_response(
             .map(|c| &c.publisher)
             .collect::<HashSet<_>>()
             .len();
-        if num_unique_publishers < MINIMUM_NUMBER_OF_PUBLISHERS {
-            return None;
-        }
 
-        median_entries.push(median_entry);
+        if num_unique_publishers >= MINIMUM_NUMBER_OF_PUBLISHERS {
+            valid_entries.push(median_entry);
+        } else {
+            tracing::warn!(
+                "Insufficient unique publishers for pair {}: got {}, need {}",
+                median_entry.pair_id,
+                num_unique_publishers,
+                MINIMUM_NUMBER_OF_PUBLISHERS
+            );
+        }
     }
-    if found_pairs.len() == pairs_set.len() {
-        Some(median_entries)
-    } else {
+
+    // Return None only if we couldn't get any valid entries
+    if valid_entries.is_empty() {
         None
+    } else {
+        Some(valid_entries)
     }
 }
 
@@ -781,6 +783,8 @@ fn get_table_name_from_type(entry_type: DataType) -> &'static str {
         DataType::PerpEntry => "future_entries",
     }
 }
+
+const EXCLUDED_PUBLISHER: &str = "PRAGMA";
 
 /// Builds a SQL query that will fetch the recent prices between now and
 /// the given interval for each unique tuple (pair_id, publisher, source)
@@ -811,6 +815,7 @@ fn build_sql_query_for_median_with_components(
                 WHERE 
                     e.pair_id IN ({pairs_list})
                     AND e.timestamp >= NOW() - INTERVAL '{interval_in_ms} milliseconds'
+                    AND e.publisher != '{excluded_publisher}'
                     {perp_filter}
             ),
             filtered_last_prices AS (
@@ -852,6 +857,7 @@ fn build_sql_query_for_median_with_components(
             .collect::<Vec<String>>()
             .join(", "),
         interval_in_ms = interval_in_ms,
+        excluded_publisher = EXCLUDED_PUBLISHER,
         perp_filter = match entry_type {
             DataType::PerpEntry => "AND e.expiration_timestamp IS NULL",
             _ => "",
@@ -861,8 +867,9 @@ fn build_sql_query_for_median_with_components(
 
 /// Compute the median price for each pair_id in the given list of pair_ids
 /// over an interval of time.
-/// The interval is increased until we have at least 3 unique publishers
-/// and at least one entry for each pair_id.
+/// The interval is increased until we have valid entries with enough publishers.
+/// Returns any pairs that have valid data, even if some pairs are invalid.
+/// NOTE: we exclude the PRAGMA publisher from the calculation.
 pub async fn get_current_median_entries_with_components(
     pool: &deadpool_diesel::postgres::Pool,
     pair_ids: &[String],
@@ -870,7 +877,9 @@ pub async fn get_current_median_entries_with_components(
 ) -> Result<Vec<MedianEntryWithComponents>, InfraError> {
     let conn = pool.get().await.map_err(adapt_infra_error)?;
     let mut interval_in_ms = INITAL_INTERVAL_IN_MS;
-    let median_entries = loop {
+    let mut last_valid_entries = Vec::new();
+
+    loop {
         let raw_sql =
             build_sql_query_for_median_with_components(pair_ids, interval_in_ms, entry_type);
 
@@ -882,26 +891,39 @@ pub async fn get_current_median_entries_with_components(
             .map_err(adapt_infra_error)?
             .map_err(adapt_infra_error)?;
 
-        match get_median_entries_response(raw_median_entries, pair_ids) {
-            Some(median_entries) => break median_entries,
-            None => interval_in_ms += INTERVAL_INCREMENT_IN_MS,
+        if let Some(valid_entries) = get_median_entries_response(raw_median_entries, pair_ids) {
+            // Keep track of the valid entries we've found
+            last_valid_entries = valid_entries;
+            
+            // If we have valid entries for all pairs, we can return early
+            let found_pairs: HashSet<_> = last_valid_entries.iter().map(|e| &e.pair_id).collect();
+            let requested_pairs: HashSet<_> = pairs_ids.iter().collect();
+            if found_pairs == requested_pairs {
+                break;
+            }
         }
 
-        // Return an empty list if we could not validate the entries
-        // TODO: bad behaviour - we should check the pairs individually
-        // and return the correct pairs, not cancel everything if only
-        // one pair is invalid.
+        interval_in_ms += INTERVAL_INCREMENT_IN_MS;
+
         if interval_in_ms >= MAX_INTERVAL_WITHOUT_ENTRIES {
-            tracing::error!(
-                "Couldnt compute median entries for: {}, [{:?}]",
-                pair_ids.join(", "),
-                entry_type
-            );
-            return Ok(vec![]);
+            // Log which pairs we couldn't get valid data for
+            let found_pairs: HashSet<_> = last_valid_entries.iter().map(|e| e.pair_id.clone()).collect();
+            let missing_pairs: Vec<_> = pairs_ids.iter()
+                .filter(|p| !found_pairs.contains(*p))
+                .collect();
+            
+            if !missing_pairs.is_empty() {
+                tracing::warn!(
+                    "Could not compute valid median entries for pairs: {}, [{:?}]",
+                    missing_pairs.join(", "),
+                    entry_type
+                );
+            }
+            break;
         }
-    };
+    }
 
-    Ok(median_entries)
+    Ok(last_valid_entries)
 }
 
 pub async fn get_expiries_list(
