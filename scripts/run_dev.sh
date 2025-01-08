@@ -12,9 +12,14 @@ for cmd in docker git cargo apibara cargo-watch; do
     fi
 done
 
-# Step 1: Start the services
-echo "Starting services..."
-docker compose -f compose.dev.yaml up -d --build
+# Step 1: Check if services are running and start them if needed
+echo "Checking services..."
+if ! docker ps --format '{{.Names}}' | grep -q "pragma-node-offchain-db-1\|pragma-node-onchain-db-1\|pragma-node-pragma-kafka\|pragma-node-pragma-zookeeper|pragma-node-pragma-ingestor-1"; then
+    echo "Starting services..."
+    docker compose -f compose.dev.yaml up -d
+else
+    echo "Services are already running"
+fi
 
 # Step 2: Fill the onchain database
 echo "Would you like to run the indexer or use a backup to fill the onchain database? (indexer/backup)"
@@ -43,7 +48,7 @@ if [ "$fill_method" = "indexer" ]; then
         echo "Using STARTING_BLOCK from environment: ${starting_block}"
     else
         # Fetch the latest block number
-        latest_block=$(curl -s --location 'https://juno.sepolia.dev.pragma.build' \
+        latest_block=$(curl -s --location 'https://mainnet-pragma.karnot.xyz' \
             --header 'Content-Type: application/json' \
             --data '{
             "jsonrpc": "2.0",
@@ -63,7 +68,7 @@ if [ "$fill_method" = "indexer" ]; then
 #!/bin/bash
 cd ../indexer-service
 export STARTING_BLOCK=$starting_block
-apibara run --allow-env-from-env=STARTING_BLOCK examples/pragma/testnet/sepolia-script-spot.js -A "$apibara_api_key" --connection-string postgres://postgres:test-password@localhost:5433/pragma --table-name spot_entry --timeout-duration-seconds=240
+apibara run --allow-env-from-env=STARTING_BLOCK examples/pragma/mainnet/mainnet-script-spot.js -A "$apibara_api_key" --connection-string postgres://postgres:test-password@localhost:5433/pragma --table-name spot_entry --timeout-duration-seconds=240
 EOF
 
     chmod +x run_indexer.sh
