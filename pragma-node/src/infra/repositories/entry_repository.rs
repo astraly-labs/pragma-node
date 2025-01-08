@@ -730,7 +730,6 @@ impl TryFrom<MedianEntryWithComponents> for AssetOraclePrice {
 /// Returns the valid entries, filtering out any invalid ones.
 fn get_median_entries_response(
     raw_entries: Vec<RawMedianEntryWithComponents>,
-    pairs_ids: &[String],
 ) -> Option<Vec<MedianEntryWithComponents>> {
     if raw_entries.is_empty() {
         return None;
@@ -739,11 +738,12 @@ fn get_median_entries_response(
     let mut valid_entries = Vec::new();
     
     for raw_entry in raw_entries {
+        let pair_id = raw_entry.pair_id.clone();
         let median_entry = match MedianEntryWithComponents::try_from(raw_entry) {
             Ok(entry) => entry,
             Err(e) => {
                 tracing::error!("Cannot convert raw median entry to median entry for pair {}: {:?}", 
-                    raw_entry.pair_id, e);
+                    pair_id, e);
                 continue;
             }
         };
@@ -767,12 +767,7 @@ fn get_median_entries_response(
         }
     }
 
-    // Return None only if we couldn't get any valid entries
-    if valid_entries.is_empty() {
-        None
-    } else {
-        Some(valid_entries)
-    }
+    (!valid_entries.is_empty()).then_some(valid_entries)
 }
 
 /// Retrieves the timescale table name for the given entry type.
@@ -891,13 +886,13 @@ pub async fn get_current_median_entries_with_components(
             .map_err(adapt_infra_error)?
             .map_err(adapt_infra_error)?;
 
-        if let Some(valid_entries) = get_median_entries_response(raw_median_entries, pair_ids) {
+        if let Some(valid_entries) = get_median_entries_response(raw_median_entries) {
             // Keep track of the valid entries we've found
             last_valid_entries = valid_entries;
             
             // If we have valid entries for all pairs, we can return early
             let found_pairs: HashSet<_> = last_valid_entries.iter().map(|e| &e.pair_id).collect();
-            let requested_pairs: HashSet<_> = pairs_ids.iter().collect();
+            let requested_pairs: HashSet<_> = pair_ids.iter().collect();
             if found_pairs == requested_pairs {
                 break;
             }
@@ -908,14 +903,14 @@ pub async fn get_current_median_entries_with_components(
         if interval_in_ms >= MAX_INTERVAL_WITHOUT_ENTRIES {
             // Log which pairs we couldn't get valid data for
             let found_pairs: HashSet<_> = last_valid_entries.iter().map(|e| e.pair_id.clone()).collect();
-            let missing_pairs: Vec<_> = pairs_ids.iter()
+            let missing_pairs: Vec<_> = pair_ids.iter()
                 .filter(|p| !found_pairs.contains(*p))
                 .collect();
             
             if !missing_pairs.is_empty() {
                 tracing::warn!(
                     "Could not compute valid median entries for pairs: {}, [{:?}]",
-                    missing_pairs.join(", "),
+                    missing_pairs.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", "),
                     entry_type
                 );
             }
