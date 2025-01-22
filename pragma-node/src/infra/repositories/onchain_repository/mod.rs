@@ -16,10 +16,8 @@ pub(crate) fn get_onchain_table_name(
     let table = match (network, data_type) {
         (Network::Sepolia, DataType::SpotEntry) => "spot_entry",
         (Network::Mainnet, DataType::SpotEntry) => "mainnet_spot_entry",
-        (Network::PragmaDevnet, DataType::SpotEntry) => "pragma_devnet_spot_entry",
         (Network::Sepolia, DataType::FutureEntry) => "future_entry",
         (Network::Mainnet, DataType::FutureEntry) => "mainnet_future_entry",
-        (Network::PragmaDevnet, DataType::FutureEntry) => "pragma_devnet_future_entry",
         _ => return Err(InfraError::InternalServerError),
     };
     Ok(table)
@@ -34,10 +32,8 @@ pub(crate) fn get_onchain_ohlc_table_name(
     let prefix_name = match (network, data_type) {
         (Network::Sepolia, DataType::SpotEntry) => "spot",
         (Network::Mainnet, DataType::SpotEntry) => "mainnet_spot",
-        (Network::PragmaDevnet, DataType::SpotEntry) => "pragma_devnet_spot",
         (Network::Sepolia, DataType::FutureEntry) => "future",
         (Network::Mainnet, DataType::FutureEntry) => "mainnet_future",
-        (Network::PragmaDevnet, DataType::FutureEntry) => "pragma_devnet_future",
         _ => return Err(InfraError::InternalServerError),
     };
     let interval_specifier = get_interval_specifier(interval, true)?;
@@ -55,10 +51,8 @@ pub(crate) fn get_onchain_aggregate_table_name(
     let prefix_name = match (network, data_type) {
         (Network::Sepolia, DataType::SpotEntry) => "spot_price",
         (Network::Mainnet, DataType::SpotEntry) => "mainnet_spot_price",
-        (Network::PragmaDevnet, DataType::SpotEntry) => "pragma_devnet_spot_price",
         (Network::Sepolia, DataType::FutureEntry) => "future_price",
         (Network::Mainnet, DataType::FutureEntry) => "mainnet_future_price",
-        (Network::PragmaDevnet, DataType::FutureEntry) => "pragma_devnet_future_price",
         _ => return Err(InfraError::InternalServerError),
     };
     let mut interval_specifier = get_interval_specifier(*interval, true)?;
