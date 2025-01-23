@@ -27,12 +27,12 @@ diesel::table! {
     future_entries (id, timestamp) {
         id -> Uuid,
         pair_id -> Varchar,
-        publisher -> Text,
+        price -> Numeric,
         timestamp -> Timestamptz,
         expiration_timestamp -> Nullable<Timestamptz>,
-        price -> Numeric,
+        publisher -> Text,
+        publisher_signature -> Text,
         source -> Varchar,
-        publisher_signature -> Varchar,
     }
 }
 
@@ -47,4 +47,9 @@ diesel::table! {
     }
 }
 
-diesel::allow_tables_to_appear_in_same_query!(currencies, entries, future_entries, publishers,);
+diesel::allow_tables_to_appear_in_same_query!(
+    currencies,
+    entries,
+    future_entries,
+    publishers,
+);
