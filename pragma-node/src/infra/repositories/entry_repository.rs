@@ -785,7 +785,7 @@ fn get_table_name_from_type(entry_type: DataType) -> &'static str {
 /// We exclude PRAGMA publisher for starkex endpoint as data is not reliable for that use case.
 /// One solution would be to adapt the price-pusher to push prices as soon as they are available.
 /// For now, we prefer to just work with data from 1st party sources.
-const EXCLUDED_PUBLISHER: &str = "PRAGMA";
+const EXCLUDED_PUBLISHER: &str = "";
 
 /// Builds a SQL query that will fetch the recent prices between now and
 /// the given interval for each unique tuple (pair_id, publisher, source)
