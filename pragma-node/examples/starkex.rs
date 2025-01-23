@@ -18,7 +18,7 @@ use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
 use url::Url;
 
 const TEST_PAIRS: &[&str] = &[
-    "BTC/USD",
+    "EUR/USD",
     // "ETH/USD",
     // "SOL/USD",
     // "AVAX/USD",

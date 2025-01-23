@@ -870,7 +870,6 @@ fn build_sql_query_for_median_with_components(
 /// over an interval of time.
 /// The interval is increased until we have valid entries with enough publishers.
 /// Returns any pairs that have valid data, even if some pairs are invalid.
-/// NOTE: we exclude the PRAGMA publisher from the calculation.
 pub async fn get_current_median_entries_with_components(
     pool: &deadpool_diesel::postgres::Pool,
     pair_ids: &[String],
@@ -892,7 +891,14 @@ pub async fn get_current_median_entries_with_components(
             .map_err(adapt_infra_error)?
             .map_err(adapt_infra_error)?;
 
-        if let Some(valid_entries) = get_median_entries_response(raw_median_entries) {
+        if let Some(mut valid_entries) = get_median_entries_response(raw_median_entries) {
+            // Add :MARK suffix to perp entries
+            if entry_type == DataType::PerpEntry {
+                for entry in &mut valid_entries {
+                    entry.pair_id = format!("{}:MARK", entry.pair_id);
+                }
+            }
+            
             // Keep track of the valid entries we've found
             last_valid_entries = valid_entries;
 
