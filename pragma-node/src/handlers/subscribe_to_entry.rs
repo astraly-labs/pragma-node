@@ -270,8 +270,20 @@ impl WsEntriesHandler {
 
         let mut median_entries = vec![];
         median_entries.extend(index_entries.unwrap_or_default());
-        median_entries.extend(usd_mark_entries.unwrap_or_default());
-        median_entries.extend(non_usd_mark_entries.unwrap_or_default());
+
+        // Add :MARK suffix to mark prices
+        let mut usd_mark_entries = usd_mark_entries.unwrap_or_default();
+        for entry in &mut usd_mark_entries {
+            entry.pair_id = format!("{}:MARK", entry.pair_id);
+        }
+        median_entries.extend(usd_mark_entries);
+
+        let mut non_usd_mark_entries = non_usd_mark_entries.unwrap_or_default();
+        for entry in &mut non_usd_mark_entries {
+            entry.pair_id = format!("{}:MARK", entry.pair_id);
+        }
+        median_entries.extend(non_usd_mark_entries);
+
         Ok(median_entries)
     }
 }

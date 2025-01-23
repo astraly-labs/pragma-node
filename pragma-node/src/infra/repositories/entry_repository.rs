@@ -898,14 +898,7 @@ pub async fn get_current_median_entries_with_components(
             .map_err(adapt_infra_error)?
             .map_err(adapt_infra_error)?;
 
-        if let Some(mut valid_entries) = get_median_entries_response(raw_median_entries) {
-            // Add :MARK suffix to perp entries
-            if entry_type == DataType::PerpEntry {
-                for entry in &mut valid_entries {
-                    entry.pair_id = format!("{}:MARK", entry.pair_id);
-                }
-            }
-
+        if let Some(valid_entries) = get_median_entries_response(raw_median_entries) {
             // Keep track of the valid entries we've found
             last_valid_entries = valid_entries;
 
