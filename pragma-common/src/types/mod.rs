@@ -27,7 +27,7 @@ pub enum Network {
     Mainnet,
 }
 
-#[derive(Default, Debug, Deserialize, ToSchema, Clone, Copy)]
+#[derive(Default, Debug, Deserialize, ToSchema, Clone, Copy, PartialEq)]
 pub enum DataType {
     #[serde(rename = "spot_entry")]
     #[default]

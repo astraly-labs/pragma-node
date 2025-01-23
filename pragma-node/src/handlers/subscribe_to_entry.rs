@@ -6,6 +6,7 @@ use axum::extract::ws::{WebSocket, WebSocketUpgrade};
 use axum::extract::{ConnectInfo, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
+use bigdecimal::BigDecimal;
 use serde::{Deserialize, Serialize};
 
 use pragma_common::types::DataType;
@@ -207,21 +208,25 @@ impl WsEntriesHandler {
             .ok_or(EntryError::InternalServerError)?;
 
         for entry in median_entries {
-            let median_price = entry.median_price.clone();
             let pair_id = entry.pair_id.clone();
-            let mut oracle_price: AssetOraclePrice = entry
-                .try_into()
-                .map_err(|_| EntryError::InternalServerError)?;
+            // Scale price from 8 decimals to 18 decimals for StarkEx
+            // TODO: dont hardcode the decimals, deduce it from the currency decimals
+            let price_with_18_decimals =
+                entry.median_price.clone() * BigDecimal::from(10_u64.pow(10));
 
             let starkex_price = StarkexPrice {
                 oracle_name: PRAGMA_ORACLE_NAME_FOR_STARKEX.to_string(),
                 pair_id: pair_id.clone(),
                 timestamp: now as u64,
-                price: median_price,
+                price: price_with_18_decimals.clone(),
             };
             let signature =
                 sign_data(pragma_signer, &starkex_price).map_err(|_| EntryError::InvalidSigner)?;
 
+            // Create AssetOraclePrice with the original entry (it will be scaled in the TryFrom implementation)
+            let mut oracle_price: AssetOraclePrice = entry
+                .try_into()
+                .map_err(|_| EntryError::InternalServerError)?;
             oracle_price.signature = signature;
             response.oracle_prices.push(oracle_price);
         }
@@ -265,8 +270,20 @@ impl WsEntriesHandler {
 
         let mut median_entries = vec![];
         median_entries.extend(index_entries.unwrap_or_default());
-        median_entries.extend(usd_mark_entries.unwrap_or_default());
-        median_entries.extend(non_usd_mark_entries.unwrap_or_default());
+
+        // Add :MARK suffix to mark prices
+        let mut usd_mark_entries = usd_mark_entries.unwrap_or_default();
+        for entry in &mut usd_mark_entries {
+            entry.pair_id = format!("{}:MARK", entry.pair_id);
+        }
+        median_entries.extend(usd_mark_entries);
+
+        let mut non_usd_mark_entries = non_usd_mark_entries.unwrap_or_default();
+        for entry in &mut non_usd_mark_entries {
+            entry.pair_id = format!("{}:MARK", entry.pair_id);
+        }
+        median_entries.extend(non_usd_mark_entries);
+
         Ok(median_entries)
     }
 }
