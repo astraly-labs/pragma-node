@@ -687,9 +687,13 @@ impl TryFrom<EntryComponent> for SignedPublisherPrice {
 
     fn try_from(component: EntryComponent) -> Result<Self, Self::Error> {
         let asset_id = StarkexPrice::get_oracle_asset_id(&component.publisher, &component.pair_id)?;
+
+        // Scale price from 8 decimals to 18 decimals for StarkEx
+        let price_with_18_decimals = component.price * BigDecimal::from(10_u64.pow(10));
+
         Ok(SignedPublisherPrice {
             oracle_asset_id: format!("0x{}", asset_id),
-            oracle_price: component.price.to_string(),
+            oracle_price: price_with_18_decimals.to_string(),
             timestamp: component.timestamp.to_string(),
             signing_key: component.publisher_address,
             signature: component.publisher_signature,
@@ -716,9 +720,12 @@ impl TryFrom<MedianEntryWithComponents> for AssetOraclePrice {
 
         let global_asset_id = StarkexPrice::get_global_asset_id(&median_entry.pair_id)?;
 
+        // Scale price from 8 decimals to 18 decimals for StarkEx
+        let price_with_18_decimals = median_entry.median_price * BigDecimal::from(10_u64.pow(10));
+
         Ok(AssetOraclePrice {
             global_asset_id,
-            median_price: median_entry.median_price.to_string(),
+            median_price: price_with_18_decimals.to_string(),
             signed_prices: signed_prices?,
             signature: Default::default(),
         })
@@ -898,7 +905,7 @@ pub async fn get_current_median_entries_with_components(
                     entry.pair_id = format!("{}:MARK", entry.pair_id);
                 }
             }
-            
+
             // Keep track of the valid entries we've found
             last_valid_entries = valid_entries;
 
