@@ -13,27 +13,35 @@ pub struct StarkexPrice {
 
 impl StarkexPrice {
     pub fn get_global_asset_id(pair_id: &str) -> Result<String, ConversionError> {
-        let pair_id = pair_id.replace('/', ""); // Remove the "/" from the pair_id if it exists
-        let pair_id =
+        let pair_id = pair_id.replace('/', "-");
+        let pair_id = if !pair_id.contains('-') {
+            let (first, second) = pair_id.split_at(3);
+            format!("{}-{}-8", first, second)
+        } else {
+            format!("{}-8", pair_id)
+        };
+
+        let felt =
             cairo_short_string_to_felt(&pair_id).map_err(|_| ConversionError::FeltConversion)?;
-        Ok(format!("0x{:x}", pair_id))
+        let hex = format!("{:x}", felt);
+        Ok(format!("{:0<30}", hex))
     }
 
     pub fn get_oracle_asset_id(
         oracle_name: &str,
         pair_id: &str,
     ) -> Result<String, ConversionError> {
-        let pair_id = pair_id.replace('/', ""); // Remove the "/" from the pair_id if it exists
-        let oracle_name =
+        let market_name = pair_id.replace('/', "").replace('-', "");
+
+        let market_felt = cairo_short_string_to_felt(&market_name)
+            .map_err(|_| ConversionError::FeltConversion)?;
+        let oracle_felt =
             cairo_short_string_to_felt(oracle_name).map_err(|_| ConversionError::FeltConversion)?;
-        let oracle_as_hex = format!("{:x}", oracle_name);
-        let pair_id =
-            cairo_short_string_to_felt(&pair_id).map_err(|_| ConversionError::FeltConversion)?;
-        let pair_id: u128 = pair_id
-            .try_into()
-            .map_err(|_| ConversionError::U128Conversion)?;
-        let pair_as_hex = format!("{:0<width$x}", pair_id, width = 32);
-        Ok(format!("0x{}{}", pair_as_hex, oracle_as_hex))
+
+        let market_hex = format!("{:x}", market_felt);
+        let oracle_hex = format!("{:x}", oracle_felt);
+
+        Ok(format!("{:0<32}{:0<8}00", market_hex, oracle_hex))
     }
 
     /// Builds the first number for the hash computation based on oracle name and pair id.
@@ -53,7 +61,7 @@ impl StarkexPrice {
         let price = price.to_u128().ok_or(ConversionError::U128Conversion)?;
         let price_as_hex = format!("{:x}", price);
         let timestamp_as_hex = format!("{:x}", timestamp);
-        let v = format!("0x{}{}", price_as_hex, timestamp_as_hex);
+        let v = format!("{}{}", price_as_hex, timestamp_as_hex);
         Felt::from_hex(&v).map_err(|_| ConversionError::FeltConversion)
     }
 }
@@ -91,64 +99,70 @@ mod tests {
     use bigdecimal::BigDecimal;
 
     #[rstest]
-    #[case("BTCUSD", "0x425443555344")]
-    #[case("BTC/USD", "0x425443555344")]
-    #[case("ETHUSD", "0x455448555344")]
-    #[case("DOGEUSD", "0x444f4745555344")]
-    #[case("SOLUSD", "0x534f4c555344")]
-    #[case("SOLUSDT", "0x534f4c55534454")]
+    #[case("BTC-USD", "4254432d5553442d38000000000000")]
+    #[case("EUR-USD", "4555522d5553442d38000000000000")]
+    #[case("BTC/USD", "4254432d5553442d38000000000000")]
+    #[case("BTCUSD", "4254432d5553442d38000000000000")]
     fn test_get_encoded_pair_id(#[case] pair_id: &str, #[case] expected_encoded_pair_id: &str) {
         let encoded_pair_id =
             StarkexPrice::get_global_asset_id(pair_id).expect("Could not encode pair id");
         assert_eq!(
-            encoded_pair_id, expected_encoded_pair_id,
+            encoded_pair_id.to_lowercase(),
+            expected_encoded_pair_id.to_lowercase(),
             "Encoded pair id does not match for pair_id: {}",
             pair_id
         );
     }
 
     #[rstest]
-    #[case(
-        "Maker",
-        "BTCUSD",
-        "11512340000000000000000",
-        1577836800,
-        "3e4113feb6c403cb0c954e5c09d239bf88fedb075220270f44173ac3cd41858"
-    )]
-    #[case(
-        "Maker",
-        "BTC/USD",
-        "11512340000000000000000",
-        1577836800,
-        "3e4113feb6c403cb0c954e5c09d239bf88fedb075220270f44173ac3cd41858"
-    )]
+    #[case("PRGM", "BTC-USD", "425443555344000000000000000000005052474d00")]
+    #[case("PRGM", "EUR-USD", "455552555344000000000000000000005052474d00")]
+    #[case("PRGM", "BTC/USD", "425443555344000000000000000000005052474d00")]
+    #[case("PRGM", "BTCUSD", "425443555344000000000000000000005052474d00")]
+    fn test_get_oracle_asset_id(
+        #[case] oracle_name: &str,
+        #[case] pair_id: &str,
+        #[case] expected_id: &str,
+    ) {
+        let oracle_asset_id = StarkexPrice::get_oracle_asset_id(oracle_name, pair_id)
+            .expect("Could not get oracle asset id");
+        assert_eq!(
+            oracle_asset_id.to_lowercase(),
+            expected_id.to_lowercase(),
+            "Oracle asset id does not match for oracle: {}, pair: {}",
+            oracle_name,
+            pair_id
+        );
+    }
+
+    #[rstest]
     #[case(
         "PRGM",
         "SOLUSD",
         "19511280076",
         1577216800,
-        "3d683d36601ab3fd05dfbfecea8971a798f3c2e418fa54594c363e6e6816979"
+        "230d86465a37eaa5221191bc196a86c2fc941e6c573322f24710b165285d23c"
     )]
     #[case(
         "PRGM",
         "ETHUSD",
         "369511280076",
         1577816800,
-        "6641dffd4e3499051ca0cd57e5c12b203bcf184576ce72e18d832de941e9656"
+        "3e87426d2b40470cd314071d1dc93adf59e6906d40b85ad5e0f0c926b49d5f4"
     )]
     #[case(
         "TEST",
         "DOGEUSD",
         "51128006",
         1517816800,
-        "18320fa96c61b1d8f98e1c85ae0a5a1159a46580ad32415122661c470d8d99f"
+        "65de8d73f0359a73e79c6b7f1ffe708159d378cc3da8edd308c92eaf8288d1c"
     )]
     #[case(
         "TEST",
         "DOGE/USD",
         "51128006",
         1517816800,
-        "18320fa96c61b1d8f98e1c85ae0a5a1159a46580ad32415122661c470d8d99f"
+        "65de8d73f0359a73e79c6b7f1ffe708159d378cc3da8edd308c92eaf8288d1c"
     )]
     fn test_get_entry_hash(
         #[case] oracle_name: &str,

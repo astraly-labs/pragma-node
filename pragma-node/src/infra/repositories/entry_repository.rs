@@ -724,7 +724,7 @@ impl TryFrom<MedianEntryWithComponents> for AssetOraclePrice {
         let price_with_18_decimals = median_entry.median_price * BigDecimal::from(10_u64.pow(10));
 
         Ok(AssetOraclePrice {
-            global_asset_id,
+            global_asset_id: format!("0x{}", global_asset_id),
             median_price: price_with_18_decimals.to_string(),
             signed_prices: signed_prices?,
             signature: Default::default(),
