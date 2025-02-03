@@ -11,3 +11,7 @@ pub const PUBLISHERS_UDPATES_CACHE_TIME_TO_IDLE_IN_SECONDS: u64 = 5 * 60; // 5 m
 /// Since this value never change we can cache it for faster iterations.
 pub const MERKLE_FEED_TREE_CACHE_TIME_TO_LIVE_IN_SECONDS: u64 = 6 * 60; // 6 minutes
 pub const MERKLE_FEED_TREE_CACHE_TIME_TO_IDLE_IN_SECONDS: u64 = 60; // 1 minutes
+
+/// Cache of the stored publishers in memory.
+pub const PUBLISHERS_CACHE_TIME_TO_LIVE_IN_SECONDS: u64 = 30 * 60; // 30 minutes
+pub const PUBLISHERS_CACHE_TIME_TO_IDLE_IN_SECONDS: u64 = 5 * 60; // 5 minutes

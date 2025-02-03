@@ -1,16 +1,16 @@
 use axum::extract::{self, State};
 use axum::Json;
-use chrono::{DateTime, Utc};
-use pragma_entities::{EntryError, NewEntry, PublisherError};
+use pragma_entities::{EntryError, NewEntry};
 use serde::{Deserialize, Serialize};
 use starknet::core::types::Felt;
 use utoipa::{ToResponse, ToSchema};
 
 use crate::config::config;
-use crate::infra::kafka;
-use crate::infra::repositories::publisher_repository;
 use crate::types::entries::Entry;
-use crate::utils::{assert_request_signature_is_valid, felt_from_decimal};
+use crate::utils::{
+    assert_request_signature_is_valid, convert_entry_to_db, felt_from_decimal, publish_to_kafka,
+    validate_publisher,
+};
 use crate::AppState;
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
@@ -35,7 +35,7 @@ impl AsRef<[Entry]> for CreateEntryRequest {
 
 #[derive(Debug, Serialize, Deserialize, ToSchema, ToResponse)]
 pub struct CreateEntryResponse {
-    number_entries_created: usize,
+    pub number_entries_created: usize,
 }
 
 #[utoipa::path(
@@ -53,7 +53,6 @@ pub async fn create_entries(
     extract::Json(new_entries): extract::Json<CreateEntryRequest>,
 ) -> Result<Json<CreateEntryResponse>, EntryError> {
     tracing::info!("Received new entries: {:?}", new_entries);
-    let config = config().await;
 
     if new_entries.entries.is_empty() {
         return Ok(Json(CreateEntryResponse {
@@ -62,28 +61,9 @@ pub async fn create_entries(
     }
 
     let publisher_name = new_entries.entries[0].base.publisher.clone();
-
-    let publisher = publisher_repository::get(&state.offchain_pool, publisher_name.clone())
-        .await
-        .map_err(EntryError::InfraError)?;
-
-    // Check if publisher is active
-    publisher.assert_is_active()?;
-
-    // Fetch public key from database
-    // TODO: Fetch it from contract
-    let public_key = publisher.active_key;
-    let public_key = Felt::from_hex(&public_key)
-        .map_err(|_| EntryError::PublisherError(PublisherError::InvalidKey(public_key)))?;
-
-    // Fetch account address from database
-    // TODO: Cache it
-    let account_address = publisher_repository::get(&state.offchain_pool, publisher_name.clone())
-        .await
-        .map_err(EntryError::InfraError)?
-        .account_address;
-    let account_address = Felt::from_hex(&account_address)
-        .map_err(|_| EntryError::PublisherError(PublisherError::InvalidAddress(account_address)))?;
+    let publishers_cache = state.caches.publishers();
+    let (public_key, account_address) =
+        validate_publisher(&state.offchain_pool, &publisher_name, publishers_cache).await?;
 
     let signature = assert_request_signature_is_valid::<CreateEntryRequest, Entry>(
         &new_entries,
@@ -94,37 +74,16 @@ pub async fn create_entries(
     let new_entries_db = new_entries
         .entries
         .iter()
-        .map(|entry| {
-            let dt = match DateTime::<Utc>::from_timestamp(entry.base.timestamp as i64, 0) {
-                Some(dt) => dt.naive_utc(),
-                None => {
-                    return Err(EntryError::InvalidTimestamp(format!(
-                        "Could not convert {} to DateTime",
-                        entry.base.timestamp
-                    )))
-                }
-            };
-
-            Ok(NewEntry {
-                pair_id: entry.pair_id.clone(),
-                publisher: entry.base.publisher.clone(),
-                source: entry.base.source.clone(),
-                timestamp: dt,
-                publisher_signature: format!("0x{}", signature),
-                price: entry.price.into(),
-            })
-        })
+        .map(|entry| convert_entry_to_db(entry, &signature))
         .collect::<Result<Vec<NewEntry>, EntryError>>()?;
 
-    let data =
-        serde_json::to_vec(&new_entries_db).map_err(|e| EntryError::PublishData(e.to_string()))?;
-
-    if let Err(e) = kafka::send_message(config.kafka_topic(), &data, &publisher_name).await {
-        tracing::error!("Error sending message to kafka: {:?}", e);
-        return Err(EntryError::PublishData(String::from(
-            "Error sending message to kafka",
-        )));
-    };
+    let config = config().await;
+    publish_to_kafka(
+        new_entries_db,
+        config.kafka_topic().to_string(),
+        &publisher_name,
+    )
+    .await?;
 
     Ok(Json(CreateEntryResponse {
         number_entries_created: new_entries.entries.len(),

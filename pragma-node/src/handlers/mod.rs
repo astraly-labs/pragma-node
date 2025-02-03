@@ -7,6 +7,7 @@ pub mod get_volatility;
 pub mod merkle_feeds;
 pub mod onchain;
 pub mod optimistic_oracle;
+pub mod publish_entry_ws;
 pub mod subscribe_to_entry;
 pub mod subscribe_to_price;
 

@@ -31,7 +31,7 @@ impl StarkexPrice {
         oracle_name: &str,
         pair_id: &str,
     ) -> Result<String, ConversionError> {
-        let market_name = pair_id.replace('/', "").replace('-', "");
+        let market_name = pair_id.replace(['/', '-'], "");
 
         let market_felt = cairo_short_string_to_felt(&market_name)
             .map_err(|_| ConversionError::FeltConversion)?;

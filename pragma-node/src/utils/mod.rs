@@ -1,54 +1,38 @@
 pub use aws::PragmaSignerBuilder;
 pub use conversion::{
-    convert_via_quote, felt_from_decimal, format_bigdecimal_price, normalize_to_decimals,
+    convert_via_quote, currency_pair_to_pair_id, currency_pairs_to_routed_pair_id,
+    felt_from_decimal, format_bigdecimal_price, normalize_to_decimals, pair_id_to_currency_pair,
 };
 pub use custom_extractors::path_extractor::PathExtractor;
+pub use kafka::publish_to_kafka;
+use moka::future::Cache;
+use pragma_entities::dto::Publisher;
 pub use signing::starkex::StarkexPrice;
 pub use signing::typed_data::TypedData;
 pub use signing::{assert_request_signature_is_valid, sign_data, typed_data};
 
 use bigdecimal::num_bigint::ToBigInt;
 use bigdecimal::{BigDecimal, ToPrimitive};
-use chrono::NaiveDateTime;
+use chrono::{DateTime, NaiveDateTime, Utc};
 use deadpool_diesel::postgres::Pool;
 use pragma_common::types::Network;
-use pragma_entities::{Entry, FutureEntry};
+use pragma_entities::{Entry as EntityEntry, EntryError, FutureEntry, NewEntry, PublisherError};
+use starknet_crypto::{Felt, Signature};
 use std::collections::HashMap;
 
+use crate::infra::repositories::publisher_repository;
 use crate::infra::repositories::{
     entry_repository::MedianEntry, onchain_repository::entry::get_existing_pairs,
 };
+use crate::types::entries::Entry;
 
 mod aws;
 mod conversion;
 mod custom_extractors;
+mod kafka;
 mod signing;
 
 const ONE_YEAR_IN_SECONDS: f64 = 3153600_f64;
-
-/// Converts two currencies pairs to a new routed pair id.
-///
-/// e.g "btc/usd" and "eth/usd" to "btc/eth"
-pub(crate) fn currency_pairs_to_routed_pair_id(base_pair: &str, quote_pair: &str) -> String {
-    let (base, _) = pair_id_to_currency_pair(base_pair);
-    let (quote, _) = pair_id_to_currency_pair(quote_pair);
-    format!("{}/{}", base.to_uppercase(), quote.to_uppercase())
-}
-
-/// Converts a currency pair to a pair id.
-///
-/// e.g "btc" and "usd" to "BTC/USD"
-pub(crate) fn currency_pair_to_pair_id(base: &str, quote: &str) -> String {
-    format!("{}/{}", base.to_uppercase(), quote.to_uppercase())
-}
-
-/// Converts a pair_id to a currency pair.
-///
-/// e.g "BTC/USD" to ("BTC", "USD")
-pub(crate) fn pair_id_to_currency_pair(pair_id: &str) -> (String, String) {
-    let parts: Vec<&str> = pair_id.split('/').collect();
-    (parts[0].to_string(), parts[1].to_string())
-}
 
 /// From a map of currencies and their decimals, returns the number of decimals for a given pair.
 /// If the currency is not found in the map, the default value is 8.
@@ -109,6 +93,35 @@ pub(crate) async fn is_onchain_existing_pair(pool: &Pool, pair: &String, network
         .expect("Couldn't get the existing pairs from the database.");
 
     existings_pairs.into_iter().any(|p| p.pair_id == *pair)
+}
+
+/// Convert entry to database format
+///
+/// Arguments:
+/// * `entry`: Entry to convert
+/// * `signature`: Signature to use
+///
+/// Returns:
+/// * `NewEntry`: New entry
+pub fn convert_entry_to_db(entry: &Entry, signature: &Signature) -> Result<NewEntry, EntryError> {
+    let dt = match DateTime::<Utc>::from_timestamp(entry.base.timestamp as i64, 0) {
+        Some(dt) => dt.naive_utc(),
+        None => {
+            return Err(EntryError::InvalidTimestamp(format!(
+                "Could not convert {} to DateTime",
+                entry.base.timestamp
+            )))
+        }
+    };
+
+    Ok(NewEntry {
+        pair_id: entry.pair_id.clone(),
+        publisher: entry.base.publisher.clone(),
+        source: entry.base.source.clone(),
+        timestamp: dt,
+        publisher_signature: format!("0x{}", signature),
+        price: entry.price.into(),
+    })
 }
 
 /// Computes the volatility from a list of entries.
@@ -180,7 +193,7 @@ pub(crate) async fn only_existing_pairs(
         .map(|pair| pair.to_string())
         .collect::<Vec<String>>();
     let spot_pairs = conn
-        .interact(move |conn| Entry::get_existing_pairs(conn, spot_pairs))
+        .interact(move |conn| EntityEntry::get_existing_pairs(conn, spot_pairs))
         .await
         .expect("Couldn't check if pair exists")
         .expect("Couldn't get table result");
@@ -201,6 +214,49 @@ pub(crate) async fn only_existing_pairs(
         .collect::<Vec<String>>();
 
     (spot_pairs, perp_pairs)
+}
+
+/// Validate publisher and return public key and account address
+///
+/// TODO: Cache it
+///
+/// Arguments:
+/// * `pool`: Database pool
+/// * `publisher_name`: Publisher name
+///
+/// Returns:
+/// * `(public_key, account_address)`: Public key and account address
+pub async fn validate_publisher(
+    pool: &Pool,
+    publisher_name: &str,
+    publishers_cache: &Cache<String, Publisher>,
+) -> Result<(Felt, Felt), EntryError> {
+    let publisher = match publishers_cache.get(publisher_name).await {
+        Some(cached_value) => {
+            tracing::debug!("Found a cached value for publisher: {publisher_name} - using it.");
+            cached_value
+        }
+        None => {
+            tracing::debug!(
+                "No cache found for publisher: {publisher_name}, fetching the database."
+            );
+            publisher_repository::get(pool, publisher_name.to_string())
+                .await
+                .map_err(EntryError::InfraError)?
+        }
+    };
+
+    publisher.assert_is_active()?;
+
+    let public_key = Felt::from_hex(&publisher.active_key).map_err(|_| {
+        EntryError::PublisherError(PublisherError::InvalidKey(publisher.active_key))
+    })?;
+
+    let account_address = Felt::from_hex(&publisher.account_address).map_err(|_| {
+        EntryError::PublisherError(PublisherError::InvalidAddress(publisher.account_address))
+    })?;
+
+    Ok((public_key, account_address))
 }
 
 #[cfg(test)]
