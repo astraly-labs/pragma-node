@@ -1,13 +1,15 @@
 use dashmap::DashMap;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
-use crate::handlers::create_entry::{CreateEntryRequest, CreateEntryResponse};
+use crate::handlers::create_entry::CreateEntryResponse;
 use crate::types::auth::{build_login_message, LoginMessage};
 use crate::types::ws::{ChannelHandler, Subscriber, WebSocketError};
+use crate::types::entries::Entry;
 use crate::utils::{
     assert_login_is_valid, convert_entry_to_db, publish_to_kafka, validate_publisher,
 };
@@ -48,10 +50,18 @@ lazy_static! {
     static ref PUBLISHER_SESSIONS: DashMap<String, PublisherSession> = DashMap::new();
 }
 
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct PublishEntryRequest {
+    pub entries: Vec<Entry>,
+}
+
 #[derive(Debug, Deserialize)]
+#[serde(tag = "msg_type")]
 enum ClientMessage {
+    #[serde(rename = "login")]
     Login(LoginMessage),
-    Publish(CreateEntryRequest),
+    #[serde(rename = "publish")]
+    Publish(PublishEntryRequest),
 }
 
 #[derive(Debug, Default)]
@@ -308,7 +318,7 @@ impl ChannelHandler<PublishEntryState, ClientMessage, WebSocketError> for Publis
 #[tracing::instrument(skip(subscriber))]
 async fn process_entries_without_verification(
     subscriber: &Subscriber<PublishEntryState>,
-    new_entries: CreateEntryRequest,
+    new_entries: PublishEntryRequest,
 ) -> Result<CreateEntryResponse, EntryError> {
     tracing::info!("Received new entries via WebSocket: {:?}", new_entries);
 
