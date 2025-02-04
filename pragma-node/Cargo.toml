@@ -20,6 +20,7 @@ diesel = { workspace = true, features = [
   "postgres_backend",
   "serde_json",
 ] }
+dashmap = { workspace = true }
 dotenvy = { workspace = true }
 envy = { workspace = true }
 futures-util = { workspace = true }

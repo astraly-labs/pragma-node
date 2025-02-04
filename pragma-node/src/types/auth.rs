@@ -10,7 +10,7 @@ use utoipa::ToSchema;
 
 use crate::utils::felt_from_decimal;
 
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct LoginMessage {
     #[schema(value_type = Vec<String>)]
     #[serde(deserialize_with = "felt_from_decimal")]
