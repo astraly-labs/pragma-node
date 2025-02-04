@@ -20,7 +20,7 @@ use crate::handlers::optimistic_oracle::{
 };
 use crate::handlers::{
     create_entries, create_future_entries, get_entry, get_expiries, get_ohlc, get_volatility,
-    subscribe_to_entry, subscribe_to_price,
+    subscribe_to_entry, subscribe_to_price, publish_entry
 };
 use crate::AppState;
 
@@ -56,6 +56,7 @@ fn data_routes(state: AppState) -> Router<AppState> {
     Router::new()
         .route("/publish", post(create_entries))
         .route("/publish_future", post(create_future_entries))
+        .route("/publish_ws", get(publish_entry))
         .route("/:base/:quote", get(get_entry))
         .route("/:base/:quote/future_expiries", get(get_expiries))
         .route("/subscribe", get(subscribe_to_entry))

@@ -19,6 +19,7 @@ pub use get_ohlc::get_ohlc;
 pub use get_volatility::get_volatility;
 pub use subscribe_to_entry::subscribe_to_entry;
 pub use subscribe_to_price::subscribe_to_price;
+pub use publish_entry_ws::publish_entry;
 
 use serde::Deserialize;
 use utoipa::{IntoParams, ToSchema};
