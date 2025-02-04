@@ -20,7 +20,7 @@ use crate::handlers::optimistic_oracle::{
 };
 use crate::handlers::{
     create_entries, create_future_entries, get_entry, get_expiries, get_ohlc, get_volatility,
-    subscribe_to_entry, subscribe_to_price, publish_entry
+    publish_entry, subscribe_to_entry, subscribe_to_price,
 };
 use crate::AppState;
 

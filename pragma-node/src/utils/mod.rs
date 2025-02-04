@@ -9,7 +9,9 @@ use moka::future::Cache;
 use pragma_entities::dto::Publisher;
 pub use signing::starkex::StarkexPrice;
 pub use signing::typed_data::TypedData;
-pub use signing::{assert_request_signature_is_valid, sign_data, typed_data};
+pub use signing::{
+    assert_login_is_valid, assert_request_signature_is_valid, sign_data, typed_data,
+};
 
 use bigdecimal::num_bigint::ToBigInt;
 use bigdecimal::{BigDecimal, ToPrimitive};
@@ -30,6 +32,7 @@ mod aws;
 mod conversion;
 mod custom_extractors;
 mod kafka;
+mod macros;
 mod signing;
 
 const ONE_YEAR_IN_SECONDS: f64 = 3153600_f64;
@@ -217,6 +220,7 @@ pub(crate) async fn only_existing_pairs(
 }
 
 /// Validate publisher and return public key and account address
+/// i.e check if the publisher is active and if the account address is correct
 ///
 /// TODO: Cache it
 ///

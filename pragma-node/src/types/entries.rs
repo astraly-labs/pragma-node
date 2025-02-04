@@ -115,12 +115,6 @@ impl EntryTrait for FutureEntry {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct PublishMessage<E: EntryTrait + Serialize> {
-    pub action: String,
-    pub entries: Vec<E>,
-}
-
 pub fn build_publish_message<E>(entries: &[E]) -> Result<TypedData, EntryError>
 where
     E: EntryTrait + Serialize + for<'a> Deserialize<'a>,

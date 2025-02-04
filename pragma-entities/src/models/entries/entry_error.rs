@@ -54,6 +54,8 @@ pub enum EntryError {
     BuildPublish(String),
     #[error(transparent)]
     InvalidMessage(#[from] SigningError),
+    #[error("invalid login message: {0}")]
+    InvalidLoginMessage(String),
 }
 
 impl From<InfraError> for EntryError {

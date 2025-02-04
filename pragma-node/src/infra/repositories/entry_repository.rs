@@ -696,7 +696,6 @@ impl TryFrom<EntryComponent> for SignedPublisherPrice {
             oracle_price: price_with_18_decimals.to_string(),
             timestamp: component.timestamp.to_string(),
             signing_key: component.publisher_address,
-            signature: component.publisher_signature,
         })
     }
 }
