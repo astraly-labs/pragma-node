@@ -1,7 +1,8 @@
 pub use aws::PragmaSignerBuilder;
 pub use conversion::{
     convert_via_quote, currency_pair_to_pair_id, currency_pairs_to_routed_pair_id,
-    felt_from_decimal, format_bigdecimal_price, normalize_to_decimals, pair_id_to_currency_pair,
+    felt_from_decimal, flexible_u128, format_bigdecimal_price, normalize_to_decimals,
+    pair_id_to_currency_pair,
 };
 pub use custom_extractors::path_extractor::PathExtractor;
 pub use kafka::publish_to_kafka;

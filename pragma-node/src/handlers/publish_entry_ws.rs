@@ -1,15 +1,15 @@
 use dashmap::DashMap;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
+use utoipa::ToSchema;
 
 use crate::handlers::create_entry::CreateEntryResponse;
 use crate::types::auth::{build_login_message, LoginMessage};
-use crate::types::ws::{ChannelHandler, Subscriber, WebSocketError};
 use crate::types::entries::Entry;
+use crate::types::ws::{ChannelHandler, Subscriber, WebSocketError};
 use crate::utils::{
     assert_login_is_valid, convert_entry_to_db, publish_to_kafka, validate_publisher,
 };
@@ -58,10 +58,10 @@ pub struct PublishEntryRequest {
 #[derive(Debug, Deserialize)]
 #[serde(tag = "msg_type")]
 enum ClientMessage {
-    #[serde(rename = "login")]
-    Login(LoginMessage),
     #[serde(rename = "publish")]
     Publish(PublishEntryRequest),
+    #[serde(rename = "login")]
+    Login(LoginMessage),
 }
 
 #[derive(Debug, Default)]

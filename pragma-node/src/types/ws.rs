@@ -235,10 +235,11 @@ where
                 }
             }
             Message::Text(text) => {
-                let msg = serde_json::from_str::<T>(&text);
-                if let Ok(msg) = msg {
+                let maybe_msg = serde_json::from_str::<T>(&text);
+                if let Ok(msg) = maybe_msg {
                     return Ok(Some(msg));
                 } else {
+                    tracing::error!("Failed to decode text message: {:?}", maybe_msg.err());
                     self.send_err("⛔ Incorrect message. Please check the documentation for more information.").await;
                     return Err(WebSocketError::MessageDecode(text));
                 }

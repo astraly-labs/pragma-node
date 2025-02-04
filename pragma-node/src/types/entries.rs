@@ -5,6 +5,7 @@ use serde_json::Number;
 use utoipa::ToSchema;
 
 use crate::utils::{
+    flexible_u128,
     typed_data::{Domain, Field, PrimitiveType, SimpleField},
     TypedData,
 };
@@ -31,7 +32,9 @@ pub trait EntryTrait {
 pub struct Entry {
     pub base: BaseEntry,
     pub pair_id: String,
+    #[serde(deserialize_with = "flexible_u128")]
     pub price: u128,
+    #[serde(deserialize_with = "flexible_u128")]
     pub volume: u128,
 }
 
@@ -57,7 +60,9 @@ impl EntryTrait for Entry {
 pub struct PerpEntry {
     pub base: BaseEntry,
     pub pair_id: String,
+    #[serde(deserialize_with = "flexible_u128")]
     pub price: u128,
+    #[serde(deserialize_with = "flexible_u128")]
     pub volume: u128,
 }
 
@@ -87,7 +92,9 @@ impl EntryTrait for PerpEntry {
 pub struct FutureEntry {
     pub base: BaseEntry,
     pub pair_id: String,
+    #[serde(deserialize_with = "flexible_u128")]
     pub price: u128,
+    #[serde(deserialize_with = "flexible_u128")]
     pub volume: u128,
     // in milliseconds
     pub expiration_timestamp: u64,
