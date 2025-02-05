@@ -1,5 +1,3 @@
-use dashmap::DashMap;
-use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -27,7 +25,7 @@ use axum::response::IntoResponse;
 const SESSION_EXPIRY_MINUTES: u64 = 5;
 
 #[derive(Debug)]
-struct PublisherSession {
+pub struct PublisherSession {
     login_time: SystemTime,
 }
 
@@ -44,10 +42,6 @@ impl PublisherSession {
             .map(|duration| duration > Duration::from_secs(SESSION_EXPIRY_MINUTES * 60))
             .unwrap_or(true)
     }
-}
-
-lazy_static! {
-    static ref PUBLISHER_SESSIONS: DashMap<String, PublisherSession> = DashMap::new();
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
@@ -121,7 +115,10 @@ async fn create_new_subscriber(socket: WebSocket, app_state: AppState, client_ad
     // Clean up session on disconnect
     let state = subscriber.state.lock().await;
     if let Some(publisher_name) = &state.publisher_name {
-        PUBLISHER_SESSIONS.remove(publisher_name);
+        subscriber
+            .app_state
+            .publisher_sessions
+            .remove(publisher_name);
     }
 
     if let Err(e) = status {
@@ -154,10 +151,14 @@ impl ChannelHandler<PublishEntryState, ClientMessage, WebSocketError> for Publis
         subscriber: &mut Subscriber<PublishEntryState>,
         client_message: ClientMessage,
     ) -> Result<(), WebSocketError> {
+        let app_state = subscriber.app_state.clone();
         match client_message {
             ClientMessage::Login(login_message) => {
                 // Check if this publisher already has an active session
-                if let Some(session) = PUBLISHER_SESSIONS.get(&login_message.publisher_name) {
+                if let Some(session) = app_state
+                    .publisher_sessions
+                    .get(&login_message.publisher_name)
+                {
                     if !session.is_expired() {
                         let response = LoginResponse {
                             status: "error".to_string(),
@@ -170,7 +171,10 @@ impl ChannelHandler<PublishEntryState, ClientMessage, WebSocketError> for Publis
                         return Err(WebSocketError::ChannelClose);
                     }
                     // Remove expired session
-                    PUBLISHER_SESSIONS.remove(&login_message.publisher_name);
+                    subscriber
+                        .app_state
+                        .publisher_sessions
+                        .remove(&login_message.publisher_name);
                 }
 
                 let result = process_login(subscriber, login_message.clone()).await;
@@ -178,7 +182,7 @@ impl ChannelHandler<PublishEntryState, ClientMessage, WebSocketError> for Publis
                 let response = match result {
                     Ok(_) => {
                         // Store the new session
-                        PUBLISHER_SESSIONS.insert(
+                        subscriber.app_state.publisher_sessions.insert(
                             login_message.publisher_name.clone(),
                             PublisherSession::new(),
                         );
@@ -222,9 +226,14 @@ impl ChannelHandler<PublishEntryState, ClientMessage, WebSocketError> for Publis
                             data: None,
                         })
                     } else if let Some(publisher_name) = &state.publisher_name {
-                        if let Some(session) = PUBLISHER_SESSIONS.get(publisher_name) {
+                        if let Some(session) =
+                            subscriber.app_state.publisher_sessions.get(publisher_name)
+                        {
                             if session.is_expired() {
-                                PUBLISHER_SESSIONS.remove(publisher_name);
+                                subscriber
+                                    .app_state
+                                    .publisher_sessions
+                                    .remove(publisher_name);
                                 Some(PublishResponse {
                                     status: "error".to_string(),
                                     message: "Session expired, please login again".to_string(),
@@ -284,9 +293,12 @@ impl ChannelHandler<PublishEntryState, ClientMessage, WebSocketError> for Publis
         let should_close = {
             let state = subscriber.state.lock().await;
             if let Some(publisher_name) = &state.publisher_name {
-                if let Some(session) = PUBLISHER_SESSIONS.get(publisher_name) {
+                if let Some(session) = subscriber.app_state.publisher_sessions.get(publisher_name) {
                     if session.is_expired() {
-                        PUBLISHER_SESSIONS.remove(publisher_name);
+                        subscriber
+                            .app_state
+                            .publisher_sessions
+                            .remove(publisher_name);
                         true
                     } else {
                         false

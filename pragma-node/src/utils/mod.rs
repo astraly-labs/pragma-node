@@ -223,7 +223,6 @@ pub(crate) async fn only_existing_pairs(
 /// Validate publisher and return public key and account address
 /// i.e check if the publisher is active and if the account address is correct
 ///
-/// TODO: Cache it
 ///
 /// Arguments:
 /// * `pool`: Database pool

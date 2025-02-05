@@ -1,16 +1,15 @@
 use axum::extract::{self, State};
 use axum::Json;
 use chrono::{DateTime, Utc};
-use pragma_entities::{EntryError, NewFutureEntry, PublisherError};
+use pragma_entities::{EntryError, NewFutureEntry};
 use serde::{Deserialize, Serialize};
 use starknet::core::types::Felt;
 use utoipa::{ToResponse, ToSchema};
 
 use crate::config::config;
 use crate::infra::kafka;
-use crate::infra::repositories::publisher_repository;
 use crate::types::entries::FutureEntry;
-use crate::utils::{assert_request_signature_is_valid, felt_from_decimal};
+use crate::utils::{assert_request_signature_is_valid, felt_from_decimal, validate_publisher};
 use crate::AppState;
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
@@ -63,27 +62,12 @@ pub async fn create_future_entries(
 
     let publisher_name = new_entries.entries[0].base.publisher.clone();
 
-    let publisher = publisher_repository::get(&state.offchain_pool, publisher_name.clone())
-        .await
-        .map_err(EntryError::InfraError)?;
-
-    // Check if publisher is active
-    publisher.assert_is_active()?;
-
-    // Fetch public key from database
-    // TODO: Fetch it from contract
-    let public_key = publisher.active_key;
-    let public_key = Felt::from_hex(&public_key)
-        .map_err(|_| EntryError::PublisherError(PublisherError::InvalidKey(public_key)))?;
-
-    // Fetch account address from database
-    // TODO: Cache it
-    let account_address = publisher_repository::get(&state.offchain_pool, publisher_name.clone())
-        .await
-        .map_err(EntryError::InfraError)?
-        .account_address;
-    let account_address = Felt::from_hex(&account_address)
-        .map_err(|_| EntryError::PublisherError(PublisherError::InvalidAddress(account_address)))?;
+    let (account_address, public_key) = validate_publisher(
+        &state.offchain_pool,
+        &publisher_name,
+        state.caches.publishers(),
+    )
+    .await?;
 
     let signature = assert_request_signature_is_valid::<CreateFutureEntryRequest, FutureEntry>(
         &new_entries,
