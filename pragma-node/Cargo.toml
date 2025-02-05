@@ -13,6 +13,7 @@ axum-tracing-opentelemetry = { workspace = true }
 bigdecimal = { workspace = true, features = ["serde"] }
 cainome = { workspace = true, features = ["abigen-rs"] }
 chrono = { workspace = true, features = ["serde"] }
+dashmap = { workspace = true }
 deadpool-diesel = { workspace = true, features = ["postgres"] }
 diesel = { workspace = true, features = [
   "postgres",
@@ -20,7 +21,6 @@ diesel = { workspace = true, features = [
   "postgres_backend",
   "serde_json",
 ] }
-dashmap = { workspace = true }
 dotenvy = { workspace = true }
 envy = { workspace = true }
 futures-util = { workspace = true }
