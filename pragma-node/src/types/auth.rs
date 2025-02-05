@@ -16,9 +16,13 @@ pub struct LoginMessage {
     #[serde(deserialize_with = "felt_from_decimal")]
     pub signature: Vec<Felt>,
     pub publisher_name: String,
+    pub expiration_timestamp: u64,
 }
 
-pub fn build_login_message(publisher_name: &str) -> Result<TypedData, SigningError> {
+pub fn build_login_message(
+    publisher_name: &str,
+    expiration_timestamp: u64,
+) -> Result<TypedData, SigningError> {
     // Define the domain
     let domain = Domain::new("Pragma", "1", "1", Some("1"));
 
@@ -51,10 +55,16 @@ pub fn build_login_message(publisher_name: &str) -> Result<TypedData, SigningErr
     // Add "Request" type
     types.insert(
         "Request".to_string(),
-        vec![Field::SimpleType(SimpleField {
-            name: "publisher_name".to_string(),
-            r#type: "shortstring".to_string(),
-        })],
+        vec![
+            Field::SimpleType(SimpleField {
+                name: "publisher_name".to_string(),
+                r#type: "shortstring".to_string(),
+            }),
+            Field::SimpleType(SimpleField {
+                name: "expiration_timestamp".to_string(),
+                r#type: "timestamp".to_string(),
+            }),
+        ],
     );
 
     // Create the message
@@ -62,6 +72,10 @@ pub fn build_login_message(publisher_name: &str) -> Result<TypedData, SigningErr
     message.insert(
         "publisher_name".to_string(),
         PrimitiveType::String(publisher_name.to_string()),
+    );
+    message.insert(
+        "expiration_timestamp".to_string(),
+        PrimitiveType::Number(expiration_timestamp.into()),
     );
 
     // Create TypedData

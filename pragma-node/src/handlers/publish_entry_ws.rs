@@ -369,7 +369,15 @@ async fn process_login(
     let publisher_name = login_message.publisher_name;
     let state = subscriber.app_state.clone();
 
-    let message = build_login_message(&publisher_name);
+    // Check if the expiration timestamp is valid
+    let current_time = chrono::Utc::now().timestamp() as u64;
+    if login_message.expiration_timestamp <= current_time {
+        return Err(EntryError::InvalidLoginMessage(
+            "Login message has expired".to_string(),
+        ));
+    }
+
+    let message = build_login_message(&publisher_name, login_message.expiration_timestamp);
 
     let signature = &Signature {
         r: login_message.signature[0],
