@@ -57,3 +57,46 @@ where
     let s: Vec<String> = Vec::deserialize(deserializer)?;
     Ok(s.iter().map(|s| Felt::from_dec_str(s).unwrap()).collect())
 }
+
+pub fn flexible_u128<'de, D>(deserializer: D) -> Result<u128, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    use serde::de::Error;
+
+    // Try deserializing to Value first to handle both formats
+    let value = serde_json::Value::deserialize(deserializer)?;
+
+    match value {
+        serde_json::Value::String(s) => u128::from_str(&s).map_err(D::Error::custom),
+        serde_json::Value::Number(n) => {
+            let s = n.to_string();
+            u128::from_str(&s).map_err(D::Error::custom)
+        }
+        _ => Err(D::Error::custom("expected string or number")),
+    }
+}
+
+/// Converts two currencies pairs to a new routed pair id.
+///
+/// e.g "btc/usd" and "eth/usd" to "btc/eth"
+pub fn currency_pairs_to_routed_pair_id(base_pair: &str, quote_pair: &str) -> String {
+    let (base, _) = pair_id_to_currency_pair(base_pair);
+    let (quote, _) = pair_id_to_currency_pair(quote_pair);
+    format!("{}/{}", base.to_uppercase(), quote.to_uppercase())
+}
+
+/// Converts a currency pair to a pair id.
+///
+/// e.g "btc" and "usd" to "BTC/USD"
+pub fn currency_pair_to_pair_id(base: &str, quote: &str) -> String {
+    format!("{}/{}", base.to_uppercase(), quote.to_uppercase())
+}
+
+/// Converts a pair_id to a currency pair.
+///
+/// e.g "BTC/USD" to ("BTC", "USD")
+pub fn pair_id_to_currency_pair(pair_id: &str) -> (String, String) {
+    let parts: Vec<&str> = pair_id.split('/').collect();
+    (parts[0].to_string(), parts[1].to_string())
+}

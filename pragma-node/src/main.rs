@@ -9,7 +9,9 @@ mod server;
 mod types;
 mod utils;
 
+use dashmap::DashMap;
 use dotenvy::dotenv;
+use handlers::publish_entry_ws::PublisherSession;
 use metrics::MetricsRegistry;
 use std::fmt;
 use std::sync::Arc;
@@ -36,6 +38,8 @@ pub struct AppState {
     pragma_signer: Option<SigningKey>,
     // Metrics
     metrics: Arc<MetricsRegistry>,
+    // Publisher sessions
+    publisher_sessions: Arc<DashMap<String, PublisherSession>>,
 }
 
 impl fmt::Debug for AppState {
@@ -103,6 +107,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         caches: Arc::new(caches),
         pragma_signer,
         metrics: MetricsRegistry::new(),
+        publisher_sessions: Arc::new(DashMap::new()),
     };
 
     server::run_api_server(config, state).await;

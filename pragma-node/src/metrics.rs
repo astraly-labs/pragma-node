@@ -48,7 +48,7 @@ impl WsMetricsRegistry {
         if let Some(metrics) = self.metrics.get(endpoint_name) {
             metrics.record_interaction(interaction, status);
         } else {
-            tracing::warn!("No metrics registered for WS endpoint: {}", endpoint_name);
+            tracing::trace!("No metrics registered for WS endpoint: {}", endpoint_name);
         }
     }
 }

@@ -26,7 +26,6 @@ pub struct SignedPublisherPrice {
     pub oracle_asset_id: String,
     pub oracle_price: String,
     pub signing_key: String,
-    pub signature: String,
     pub timestamp: String,
 }
 

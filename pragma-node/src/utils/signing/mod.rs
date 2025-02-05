@@ -15,6 +15,8 @@ use thiserror::Error;
 
 use crate::types::entries::{build_publish_message, EntryTrait};
 
+use super::TypedData;
+
 #[derive(Debug, Error)]
 pub enum SigningError {
     #[error("cannot convert type")]
@@ -90,4 +92,24 @@ where
         )));
     }
     Ok(signature)
+}
+
+pub fn assert_login_is_valid(
+    login_message: TypedData,
+    signature: &Signature,
+    account_address: &Felt,
+    public_key: &Felt,
+) -> Result<(), EntryError> {
+    let message_hash = login_message
+        .encode(*account_address)
+        .map_err(EntryError::InvalidMessage)?
+        .hash;
+
+    if !ecdsa_verify(public_key, &message_hash, signature).map_err(EntryError::InvalidSignature)? {
+        return Err(EntryError::Unauthorized(format!(
+            "Invalid signature for message hash {:?}",
+            &message_hash
+        )));
+    }
+    Ok(())
 }

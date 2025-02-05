@@ -7,6 +7,7 @@ pub mod get_volatility;
 pub mod merkle_feeds;
 pub mod onchain;
 pub mod optimistic_oracle;
+pub mod publish_entry_ws;
 pub mod subscribe_to_entry;
 pub mod subscribe_to_price;
 
@@ -16,6 +17,7 @@ pub use get_entry::get_entry;
 pub use get_expiries::get_expiries;
 pub use get_ohlc::get_ohlc;
 pub use get_volatility::get_volatility;
+pub use publish_entry_ws::publish_entry;
 pub use subscribe_to_entry::subscribe_to_entry;
 pub use subscribe_to_price::subscribe_to_price;
 
