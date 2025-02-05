@@ -105,7 +105,7 @@ pub fn assert_login_is_valid(
         .map_err(EntryError::InvalidMessage)?
         .hash;
 
-    if !ecdsa_verify(public_key, &message_hash, &signature).map_err(EntryError::InvalidSignature)? {
+    if !ecdsa_verify(public_key, &message_hash, signature).map_err(EntryError::InvalidSignature)? {
         return Err(EntryError::Unauthorized(format!(
             "Invalid signature for message hash {:?}",
             &message_hash
