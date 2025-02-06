@@ -292,7 +292,7 @@ impl PrimitiveType {
                     let variant_type = get_value_type(variant_name, types)?;
 
                     let arr: &Vec<PrimitiveType> = match value {
-                        PrimitiveType::Array(arr) => &arr,
+                        PrimitiveType::Array(arr) => arr,
                         _ => {
                             return Err(SigningError::InvalidMessageError(
                                 "Enum value must be an array".to_string(),
