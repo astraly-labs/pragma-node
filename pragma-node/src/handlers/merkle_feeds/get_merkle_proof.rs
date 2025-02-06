@@ -11,7 +11,7 @@ use starknet::core::types::Felt;
 use utoipa::{IntoParams, ToResponse, ToSchema};
 
 use crate::infra::redis;
-use crate::types::hex_hash::HexHash;
+use pragma_types::hex_hash::HexHash;
 use crate::utils::PathExtractor;
 use crate::AppState;
 

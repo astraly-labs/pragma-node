@@ -4,11 +4,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Number;
 use utoipa::ToSchema;
 
-use crate::utils::{
-    flexible_u128,
-    typed_data::{Domain, Field, PrimitiveType, SimpleField},
-    TypedData,
-};
+use crate::utils::flexible_u128;
+use crate::typed_data::{Domain, Field, PrimitiveType, SimpleField, TypedData};
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, ToSchema)]
 pub struct BaseEntry {

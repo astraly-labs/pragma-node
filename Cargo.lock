@@ -4245,6 +4245,7 @@ dependencies = [
  "pragma-common",
  "pragma-entities",
  "pragma-monitoring",
+ "pragma-types",
  "ratatui",
  "rdkafka",
  "redis",
@@ -4263,6 +4264,30 @@ dependencies = [
  "utoipa",
  "utoipa-swagger-ui",
  "utoipauto",
+ "uuid 1.8.0",
+]
+
+[[package]]
+name = "pragma-types"
+version = "0.1.0"
+dependencies = [
+ "axum 0.7.9",
+ "bigdecimal",
+ "cainome",
+ "chrono",
+ "deadpool-diesel",
+ "futures-util",
+ "indexmap 2.2.6",
+ "pragma-entities",
+ "rstest",
+ "serde",
+ "serde_json",
+ "starknet 0.12.0",
+ "starknet-crypto",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "utoipa",
  "uuid 1.8.0",
 ]
 

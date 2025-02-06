@@ -1,13 +1,10 @@
-use crate::utils::{
-    typed_data::{Domain, Field, PrimitiveType, SimpleField},
-    TypedData,
-};
 use indexmap::IndexMap;
 use pragma_entities::models::entry_error::SigningError;
 use serde::{Deserialize, Serialize};
 use starknet::core::types::Felt;
 use utoipa::ToSchema;
 
+use crate::typed_data::{Domain, Field, PrimitiveType, SimpleField, TypedData};
 use crate::utils::felt_from_decimal;
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]

@@ -6,9 +6,10 @@ use starknet::core::types::Felt;
 use utoipa::{ToResponse, ToSchema};
 
 use crate::config::config;
-use crate::types::entries::Entry;
+use pragma_types::entries::Entry;
+use pragma_types::utils::felt_from_decimal;
 use crate::utils::{
-    assert_request_signature_is_valid, convert_entry_to_db, felt_from_decimal, publish_to_kafka,
+    assert_request_signature_is_valid, convert_entry_to_db, publish_to_kafka,
     validate_publisher,
 };
 use crate::AppState;
@@ -92,7 +93,7 @@ pub async fn create_entries(
 
 #[cfg(test)]
 mod tests {
-    use crate::types::entries::{build_publish_message, BaseEntry, Entry};
+    use pragma_types::entries::{build_publish_message, BaseEntry, Entry};
 
     use super::*;
     use rstest::rstest;

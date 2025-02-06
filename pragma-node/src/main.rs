@@ -6,7 +6,6 @@ mod handlers;
 mod infra;
 mod metrics;
 mod server;
-mod types;
 mod utils;
 
 use dashmap::DashMap;

@@ -6,6 +6,7 @@ members = [
   "pragma-entities",
   "pragma-common",
   "pragma-consumer",
+  "pragma-types",
   "tests",
 ]
 

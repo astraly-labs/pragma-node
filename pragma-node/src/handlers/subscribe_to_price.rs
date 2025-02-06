@@ -12,9 +12,9 @@ use pragma_entities::EntryError;
 use utoipa::{ToResponse, ToSchema};
 
 use crate::infra::repositories::entry_repository::MedianEntryWithComponents;
-use crate::types::pricer::{IndexPricer, Pricer};
-use crate::types::timestamp::UnixTimestamp;
-use crate::types::ws::{ChannelHandler, Subscriber, SubscriptionType};
+use crate::utils::pricer::{IndexPricer, Pricer};
+use pragma_types::timestamp::UnixTimestamp;
+use crate::utils::ws::{ChannelHandler, Subscriber, SubscriptionType};
 use crate::utils::only_existing_pairs;
 use crate::AppState;
 

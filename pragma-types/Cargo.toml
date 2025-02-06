@@ -1,0 +1,34 @@
+[package]
+name = "pragma-types"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+homepage = "https://pragma.build/"
+repository = "https://github.com/astraly-labs/pragma-node/"
+description = "Common types for using Pragma in rust"
+readme = "README.md"
+keywords = ["pragma", "sdk", "consumer", "data", "feeds"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+axum = { workspace = true }
+bigdecimal = { workspace = true, features = ["serde"] }
+cainome = { workspace = true }
+chrono = { workspace = true }
+deadpool-diesel = { workspace = true }
+futures-util = { workspace = true }
+indexmap = { workspace = true }
+pragma-entities = { path = "../pragma-entities" }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+starknet = { workspace = true }
+starknet-crypto = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+utoipa = { workspace = true }
+uuid = { workspace = true }
+
+[dev-dependencies]
+rstest = { workspace = true }

@@ -13,7 +13,7 @@ use utoipa::{ToResponse, ToSchema};
 
 use crate::infra::repositories::entry_repository::OHLCEntry;
 use crate::infra::repositories::onchain_repository;
-use crate::types::ws::{ChannelHandler, Subscriber, SubscriptionType};
+use crate::utils::{ChannelHandler, Subscriber, SubscriptionType};
 use crate::utils::is_onchain_existing_pair;
 use crate::{metrics, AppState};
 
