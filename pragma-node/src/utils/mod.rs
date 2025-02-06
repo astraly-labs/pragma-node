@@ -6,11 +6,9 @@ pub use conversion::{
 pub use custom_extractors::path_extractor::PathExtractor;
 pub use kafka::publish_to_kafka;
 use moka::future::Cache;
+use pragma_common::timestamp::TimestampRangeError;
+use pragma_common::types::entries::Entry;
 use pragma_entities::dto::Publisher;
-use pragma_types::entries::Entry;
-pub use pragma_types::typed_data::TypedData;
-pub use signing::starkex::StarkexPrice;
-pub use signing::{assert_login_is_valid, assert_request_signature_is_valid, sign_data};
 pub use ws::*;
 
 use bigdecimal::num_bigint::ToBigInt;
@@ -32,7 +30,6 @@ mod conversion;
 mod custom_extractors;
 mod kafka;
 mod macros;
-mod signing;
 
 pub mod pricer;
 pub mod ws;
@@ -112,10 +109,9 @@ pub fn convert_entry_to_db(entry: &Entry, signature: &Signature) -> Result<NewEn
     let dt = match DateTime::<Utc>::from_timestamp(entry.base.timestamp as i64, 0) {
         Some(dt) => dt.naive_utc(),
         None => {
-            return Err(EntryError::InvalidTimestamp(format!(
-                "Could not convert {} to DateTime",
-                entry.base.timestamp
-            )))
+            return Err(EntryError::InvalidTimestamp(TimestampRangeError::Other(
+                format!("Could not convert {} to DateTime", entry.base.timestamp),
+            )));
         }
     };
 

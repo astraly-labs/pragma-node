@@ -1,11 +1,10 @@
 use indexmap::IndexMap;
-use pragma_entities::EntryError;
 use serde::{Deserialize, Serialize};
 use serde_json::Number;
 use utoipa::ToSchema;
 
 use crate::typed_data::{Domain, Field, PrimitiveType, SimpleField, TypedData};
-use crate::utils::flexible_u128;
+use crate::types::utils::flexible_u128;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, ToSchema)]
 pub struct BaseEntry {
@@ -119,7 +118,7 @@ impl EntryTrait for FutureEntry {
     }
 }
 
-pub fn build_publish_message<E>(entries: &[E]) -> Result<TypedData, EntryError>
+pub fn build_publish_message<E>(entries: &[E]) -> TypedData
 where
     E: EntryTrait + Serialize + for<'a> Deserialize<'a>,
 {
@@ -275,8 +274,5 @@ where
     );
     message.insert("entries".to_string(), PrimitiveType::Array(raw_entries));
 
-    // Create TypedData
-    let typed_data = TypedData::new(types, "Request", domain, message);
-
-    Ok(typed_data)
+    TypedData::new(types, "Request", domain, message)
 }

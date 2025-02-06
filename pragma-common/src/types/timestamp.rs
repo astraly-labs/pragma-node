@@ -1,4 +1,3 @@
-use pragma_entities::EntryError;
 use serde::{Deserialize, Deserializer};
 use std::ops::RangeInclusive;
 use utoipa::ToSchema;
@@ -13,25 +12,33 @@ pub type UnixTimestamp = i64;
 #[schema(value_type = String)]
 pub struct TimestampRange(pub RangeInclusive<UnixTimestamp>);
 
+#[derive(Debug, thiserror::Error, ToSchema)]
+pub enum TimestampRangeError {
+    #[error("Start timestamp is after end timestamp")]
+    StartAfterEnd,
+    #[error("End timestamp is in the future")]
+    EndInFuture,
+    #[error("Start timestamp equals end timestamp")]
+    StartEqualsEnd,
+    #[error("Could not convert timestamp to DateTime")]
+    ConversionError,
+    #[error("Other error: {0}")]
+    Other(String),
+}
+
 impl TimestampRange {
-    pub fn assert_time_is_valid(self) -> Result<Self, EntryError> {
+    pub fn assert_time_is_valid(self) -> Result<Self, TimestampRangeError> {
         let now = chrono::Utc::now().timestamp();
         let range = &self.0;
 
         if range.start() > range.end() {
-            return Err(EntryError::InvalidTimestamp(
-                "Range timestamp first date is greater than the second date.".into(),
-            ));
+            return Err(TimestampRangeError::StartAfterEnd);
         }
         if *range.end() > now {
-            return Err(EntryError::InvalidTimestamp(
-                "Range timestamp end is in the future.".into(),
-            ));
+            return Err(TimestampRangeError::EndInFuture);
         }
         if *range.start() == *range.end() {
-            return Err(EntryError::InvalidTimestamp(
-                "Range timestamp start and end have the same value.".into(),
-            ));
+            return Err(TimestampRangeError::StartEqualsEnd);
         }
 
         Ok(self)

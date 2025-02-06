@@ -6,12 +6,11 @@ use starknet::core::types::Felt;
 use utoipa::{ToResponse, ToSchema};
 
 use crate::config::config;
-use crate::utils::{
-    assert_request_signature_is_valid, convert_entry_to_db, publish_to_kafka, validate_publisher,
-};
+use crate::utils::{convert_entry_to_db, publish_to_kafka, validate_publisher};
 use crate::AppState;
-use pragma_types::entries::Entry;
-use pragma_types::utils::felt_from_decimal;
+use pragma_common::signing::assert_request_signature_is_valid;
+use pragma_common::types::entries::Entry;
+use pragma_common::types::utils::felt_from_decimal;
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct CreateEntryRequest {
@@ -92,7 +91,7 @@ pub async fn create_entries(
 
 #[cfg(test)]
 mod tests {
-    use pragma_types::entries::{build_publish_message, BaseEntry, Entry};
+    use pragma_common::types::entries::{build_publish_message, BaseEntry, Entry};
 
     use super::*;
     use rstest::rstest;
@@ -100,7 +99,7 @@ mod tests {
     #[rstest]
     fn test_build_publish_message_empty() {
         let entries: Vec<Entry> = vec![];
-        let typed_data = build_publish_message(&entries).unwrap();
+        let typed_data = build_publish_message(&entries);
 
         assert_eq!(typed_data.primary_type, "Request");
         assert_eq!(typed_data.domain.name, "Pragma");
@@ -122,7 +121,7 @@ mod tests {
             price: 0,
             volume: 0,
         }];
-        let typed_data = build_publish_message(&entries).unwrap();
+        let typed_data = build_publish_message(&entries);
 
         assert_eq!(typed_data.primary_type, "Request");
         assert_eq!(typed_data.domain.name, "Pragma");

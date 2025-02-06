@@ -1,4 +1,5 @@
 use deadpool_diesel::InteractError;
+use pragma_common::timestamp::TimestampRangeError;
 use std::{
     fmt::{self, Debug},
     num::TryFromIntError,
@@ -32,7 +33,9 @@ impl InfraError {
             InfraError::RoutingError => EntryError::MissingData(pair_id.to_string()),
             InfraError::DisputerNotSet => EntryError::InternalServerError,
             InfraError::SettlerNotSet => EntryError::InternalServerError,
-            InfraError::InvalidTimestamp(e) => EntryError::InvalidTimestamp(e.to_string()),
+            InfraError::InvalidTimestamp(e) => {
+                EntryError::InvalidTimestamp(TimestampRangeError::Other(e.to_string()))
+            }
             InfraError::NonZeroU32Conversion(_) => EntryError::InternalServerError,
             InfraError::AxumError(_) => EntryError::InternalServerError,
         }

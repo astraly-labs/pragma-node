@@ -16,7 +16,8 @@ use crate::constants::starkex_ws::{
 };
 use crate::handlers::get_entry::RoutingParams;
 use crate::handlers::subscribe_to_entry::{AssetOraclePrice, SignedPublisherPrice};
-use crate::utils::{convert_via_quote, normalize_to_decimals, StarkexPrice};
+use crate::utils::{convert_via_quote, normalize_to_decimals};
+use pragma_common::signing::starkex::StarkexPrice;
 use pragma_common::types::{AggregationMode, DataType, Interval};
 use pragma_entities::dto;
 use pragma_entities::{

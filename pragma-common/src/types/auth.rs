@@ -1,11 +1,10 @@
 use indexmap::IndexMap;
-use pragma_entities::models::entry_error::SigningError;
 use serde::{Deserialize, Serialize};
 use starknet::core::types::Felt;
 use utoipa::ToSchema;
 
 use crate::typed_data::{Domain, Field, PrimitiveType, SimpleField, TypedData};
-use crate::utils::felt_from_decimal;
+use crate::types_utils::felt_from_decimal;
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct LoginMessage {
@@ -16,10 +15,7 @@ pub struct LoginMessage {
     pub expiration_timestamp: u64,
 }
 
-pub fn build_login_message(
-    publisher_name: &str,
-    expiration_timestamp: u64,
-) -> Result<TypedData, SigningError> {
+pub fn build_login_message(publisher_name: &str, expiration_timestamp: u64) -> TypedData {
     // Define the domain
     let domain = Domain::new("Pragma", "1", "1", Some("1"));
 
@@ -76,7 +72,5 @@ pub fn build_login_message(
     );
 
     // Create TypedData
-    let typed_data = TypedData::new(types, "Request", domain, message);
-
-    Ok(typed_data)
+    TypedData::new(types, "Request", domain, message)
 }

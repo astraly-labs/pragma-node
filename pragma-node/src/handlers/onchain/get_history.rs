@@ -10,7 +10,7 @@ use crate::infra::repositories::onchain_repository::history::{
 };
 use crate::utils::{big_decimal_price_to_hex, PathExtractor};
 use crate::AppState;
-use pragma_types::timestamp::TimestampRange;
+use pragma_common::types::timestamp::TimestampRange;
 
 use crate::utils::currency_pair_to_pair_id;
 
@@ -54,7 +54,10 @@ pub async fn get_onchain_history(
 ) -> Result<Json<GetOnchainHistoryResponse>, EntryError> {
     let pair_id: String = currency_pair_to_pair_id(&pair.0, &pair.1);
     let network = params.network;
-    let timestamp_range = params.timestamp.assert_time_is_valid()?;
+    let timestamp_range = params
+        .timestamp
+        .assert_time_is_valid()
+        .map_err(EntryError::InvalidTimestamp)?;
     let chunk_interval = params.chunk_interval.unwrap_or_default();
     let with_routing = params.routing.unwrap_or(false);
 

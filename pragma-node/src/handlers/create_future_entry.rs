@@ -1,6 +1,7 @@
 use axum::extract::{self, State};
 use axum::Json;
 use chrono::{DateTime, Utc};
+use pragma_common::timestamp::TimestampRangeError;
 use pragma_entities::{EntryError, NewFutureEntry};
 use serde::{Deserialize, Serialize};
 use starknet::core::types::Felt;
@@ -8,10 +9,11 @@ use utoipa::{ToResponse, ToSchema};
 
 use crate::config::config;
 use crate::infra::kafka;
-use crate::utils::{assert_request_signature_is_valid, validate_publisher};
+use crate::utils::validate_publisher;
 use crate::AppState;
-use pragma_types::entries::FutureEntry;
-use pragma_types::utils::felt_from_decimal;
+use pragma_common::signing::assert_request_signature_is_valid;
+use pragma_common::types::entries::FutureEntry;
+use pragma_common::types::utils::felt_from_decimal;
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct CreateFutureEntryRequest {
@@ -83,10 +85,9 @@ pub async fn create_future_entries(
             let dt = match DateTime::<Utc>::from_timestamp(future_entry.base.timestamp as i64, 0) {
                 Some(dt) => dt.naive_utc(),
                 None => {
-                    return Err(EntryError::InvalidTimestamp(format!(
-                        "Could not convert {} to DateTime",
-                        future_entry.base.timestamp
-                    )))
+                    return Err(EntryError::InvalidTimestamp(
+                        TimestampRangeError::ConversionError,
+                    ))
                 }
             };
 
@@ -100,10 +101,9 @@ pub async fn create_future_entries(
                 ) {
                     Some(dt) => Some(dt.naive_utc()),
                     None => {
-                        return Err(EntryError::InvalidTimestamp(format!(
-                            "Could not convert {} to DateTime",
-                            future_entry.expiration_timestamp
-                        )))
+                        return Err(EntryError::InvalidTimestamp(
+                            TimestampRangeError::ConversionError,
+                        ))
                     }
                 }
             };
@@ -139,12 +139,12 @@ pub async fn create_future_entries(
 mod tests {
     use rstest::rstest;
 
-    use pragma_types::entries::{build_publish_message, FutureEntry, PerpEntry};
+    use pragma_common::types::entries::{build_publish_message, FutureEntry, PerpEntry};
 
     #[rstest]
     fn test_build_publish_message_empty() {
         let entries: Vec<PerpEntry> = vec![];
-        let typed_data = build_publish_message(&entries).unwrap();
+        let typed_data = build_publish_message(&entries);
         assert_eq!(typed_data.primary_type, "Request");
         assert_eq!(typed_data.domain.name, "Pragma");
         assert_eq!(typed_data.domain.version, "1");
@@ -152,7 +152,7 @@ mod tests {
         // assert_eq!(typed_data.message.entries, entries);
 
         let entries: Vec<FutureEntry> = vec![];
-        let typed_data = build_publish_message(&entries).unwrap();
+        let typed_data = build_publish_message(&entries);
         assert_eq!(typed_data.primary_type, "Request");
         assert_eq!(typed_data.domain.name, "Pragma");
         assert_eq!(typed_data.domain.version, "1");

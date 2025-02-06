@@ -3,6 +3,8 @@ use crate::models::publisher_error::PublisherError;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::Json;
+use pragma_common::signing::SignerError;
+use pragma_common::timestamp::TimestampRangeError;
 use serde_json::json;
 use starknet::core::crypto::EcdsaVerifyError;
 use utoipa::ToSchema;
@@ -11,12 +13,6 @@ use utoipa::ToSchema;
 pub enum VolatilityError {
     #[error("invalid timestamps range: {0} > {1}")]
     InvalidTimestampsRange(u64, u64),
-}
-
-#[derive(Debug, thiserror::Error, ToSchema)]
-pub enum SigningError {
-    #[error("Invalid message: {0}")]
-    InvalidMessageError(String),
 }
 
 #[derive(Debug, thiserror::Error, ToSchema)]
@@ -37,7 +33,7 @@ pub enum EntryError {
     #[error("unauthorized request: {0}")]
     Unauthorized(String),
     #[error("invalid timestamp: {0}")]
-    InvalidTimestamp(String),
+    InvalidTimestamp(#[from] TimestampRangeError),
     #[error("invalid expiry")]
     InvalidExpiry,
     #[error("missing data for routing on pair: {0}")]
@@ -53,7 +49,7 @@ pub enum EntryError {
     #[error("can't build publish message: {0}")]
     BuildPublish(String),
     #[error(transparent)]
-    InvalidMessage(#[from] SigningError),
+    SignerError(#[from] SignerError),
     #[error("invalid login message: {0}")]
     InvalidLoginMessage(String),
 }
@@ -66,7 +62,9 @@ impl From<InfraError> for EntryError {
             InfraError::RoutingError => Self::MissingData("Not enough data".to_string()),
             InfraError::DisputerNotSet => Self::InternalServerError,
             InfraError::SettlerNotSet => Self::InternalServerError,
-            InfraError::InvalidTimestamp(e) => Self::InvalidTimestamp(e.to_string()),
+            InfraError::InvalidTimestamp(e) => {
+                Self::InvalidTimestamp(TimestampRangeError::Other(e.to_string()))
+            }
             InfraError::NonZeroU32Conversion(_) => Self::InternalServerError,
             InfraError::AxumError(_) => Self::InternalServerError,
         }
@@ -118,7 +116,7 @@ impl IntoResponse for EntryError {
                 StatusCode::NOT_FOUND,
                 format!("Unknown pair id: {}", pair_id),
             ),
-            Self::InvalidMessage(err) => {
+            Self::SignerError(err) => {
                 (StatusCode::BAD_REQUEST, format!("Invalid message: {}", err))
             }
             _ => (

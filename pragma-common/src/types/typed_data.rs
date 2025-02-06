@@ -5,12 +5,13 @@ use std::str::FromStr;
 
 use cainome::cairo_serde::ByteArray;
 use indexmap::IndexMap;
-use pragma_entities::models::entry_error::SigningError;
 use serde::{Deserialize, Serialize};
 use serde_json::Number;
 use starknet::core::types::Felt;
 use starknet::core::utils::{cairo_short_string_to_felt, get_selector_from_name};
 use starknet_crypto::poseidon_hash_many;
+
+use crate::signing::SignerError;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SimpleField {
@@ -97,15 +98,12 @@ fn get_preset_types() -> IndexMap<String, Vec<Field>> {
 // Get the fields of a specific type
 // Looks up both the types hashmap as well as the preset types
 // Returns the fields and the hashmap of types
-fn get_fields(
-    name: &str,
-    types: &IndexMap<String, Vec<Field>>,
-) -> Result<Vec<Field>, SigningError> {
+fn get_fields(name: &str, types: &IndexMap<String, Vec<Field>>) -> Result<Vec<Field>, SignerError> {
     if let Some(fields) = types.get(name) {
         return Ok(fields.clone());
     }
 
-    Err(SigningError::InvalidMessageError(format!(
+    Err(SignerError::InvalidMessage(format!(
         "Type {} not found",
         name
     )))
@@ -115,7 +113,7 @@ fn get_dependencies(
     name: &str,
     types: &IndexMap<String, Vec<Field>>,
     dependencies: &mut Vec<String>,
-) -> Result<(), SigningError> {
+) -> Result<(), SignerError> {
     if dependencies.contains(&name.to_string()) {
         return Ok(());
     }
@@ -141,7 +139,7 @@ fn get_dependencies(
 pub fn encode_type(
     name: &str,
     types: &IndexMap<String, Vec<Field>>,
-) -> Result<String, SigningError> {
+) -> Result<String, SignerError> {
     let mut type_hash = String::new();
 
     // get dependencies
@@ -150,7 +148,7 @@ pub fn encode_type(
 
     let (_, rest) = dependencies
         .split_first_mut()
-        .ok_or_else(|| SigningError::InvalidMessageError("No dependencies found".to_string()))?;
+        .ok_or_else(|| SignerError::InvalidMessage("No dependencies found".to_string()))?;
     rest.sort_by_key(|dep| dep.to_lowercase());
 
     for dep in dependencies {
@@ -215,7 +213,7 @@ pub(crate) struct FieldInfo {
 pub(crate) fn get_value_type(
     name: &str,
     types: &IndexMap<String, Vec<Field>>,
-) -> Result<FieldInfo, SigningError> {
+) -> Result<FieldInfo, SignerError> {
     // iter both "types" and "preset_types" to find the field
     for (idx, (key, value)) in types.iter().enumerate() {
         if key == name {
@@ -253,19 +251,19 @@ pub(crate) fn get_value_type(
         }
     }
 
-    Err(SigningError::InvalidMessageError(format!(
+    Err(SignerError::InvalidMessage(format!(
         "Field {} not found in types",
         name
     )))
 }
 
-fn get_hex(value: &str) -> Result<Felt, SigningError> {
+fn get_hex(value: &str) -> Result<Felt, SignerError> {
     if let Ok(felt) = Felt::from_str(value) {
         Ok(felt)
     } else {
         // assume its a short string and encode
         cairo_short_string_to_felt(value).map_err(|e| {
-            SigningError::InvalidMessageError(format!("Invalid shortstring for felt: {}", e))
+            SignerError::InvalidMessage(format!("Invalid shortstring for felt: {}", e))
         })
     }
 }
@@ -276,7 +274,7 @@ impl PrimitiveType {
         r#type: &str,
         types: &IndexMap<String, Vec<Field>>,
         ctx: &mut Ctx,
-    ) -> Result<Felt, SigningError> {
+    ) -> Result<Felt, SignerError> {
         match self {
             PrimitiveType::Object(obj) => {
                 ctx.is_preset = types.contains_key(r#type);
@@ -285,16 +283,14 @@ impl PrimitiveType {
 
                 if ctx.base_type == "enum" {
                     let (variant_name, value) = obj.first().ok_or_else(|| {
-                        SigningError::InvalidMessageError(
-                            "Enum value must be populated".to_string(),
-                        )
+                        SignerError::InvalidMessage("Enum value must be populated".to_string())
                     })?;
                     let variant_type = get_value_type(variant_name, types)?;
 
                     let arr: &Vec<PrimitiveType> = match value {
-                        PrimitiveType::Array(arr) => arr,
+                        PrimitiveType::Array(arr) => &arr,
                         _ => {
-                            return Err(SigningError::InvalidMessageError(
+                            return Err(SignerError::InvalidMessage(
                                 "Enum value must be an array".to_string(),
                             ));
                         }
@@ -312,9 +308,7 @@ impl PrimitiveType {
                             .split(',')
                             .nth(idx)
                             .ok_or_else(|| {
-                                SigningError::InvalidMessageError(
-                                    "Invalid enum variant type".to_string(),
-                                )
+                                SignerError::InvalidMessage("Invalid enum variant type".to_string())
                             })?;
 
                         let field_hash = param.encode(field_type, types, ctx)?;
@@ -326,7 +320,7 @@ impl PrimitiveType {
 
                 let type_hash = encode_type(r#type, types)?;
                 hashes.push(get_selector_from_name(&type_hash).map_err(|e| {
-                    SigningError::InvalidMessageError(format!(
+                    SignerError::InvalidMessage(format!(
                         "Invalid type {} for selector: {}",
                         r#type, e
                     ))
@@ -366,10 +360,7 @@ impl PrimitiveType {
                 "string" => {
                     // split the string into short strings and encode
                     let byte_array = ByteArray::from_string(string).map_err(|e| {
-                        SigningError::InvalidMessageError(format!(
-                            "Invalid string for bytearray: {}",
-                            e
-                        ))
+                        SignerError::InvalidMessage(format!("Invalid string for bytearray: {}", e))
                     })?;
 
                     let mut hashes = vec![Felt::from(byte_array.data.len())];
@@ -383,23 +374,22 @@ impl PrimitiveType {
 
                     Ok(poseidon_hash_many(hashes.as_slice()))
                 }
-                "selector" => get_selector_from_name(string).map_err(|e| {
-                    SigningError::InvalidMessageError(format!("Invalid selector: {}", e))
-                }),
+                "selector" => get_selector_from_name(string)
+                    .map_err(|e| SignerError::InvalidMessage(format!("Invalid selector: {}", e))),
                 "felt" => get_hex(string),
                 "ContractAddress" => get_hex(string),
                 "ClassHash" => get_hex(string),
                 "timestamp" => get_hex(string),
                 "u128" => get_hex(string),
                 "i128" => get_hex(string),
-                _ => Err(SigningError::InvalidMessageError(format!(
+                _ => Err(SignerError::InvalidMessage(format!(
                     "Invalid type {} for string",
                     r#type
                 ))),
             },
             PrimitiveType::Number(number) => {
                 let felt = Felt::from_str(&number.to_string()).map_err(|_| {
-                    SigningError::InvalidMessageError(format!("Invalid number {}", number))
+                    SignerError::InvalidMessage(format!("Invalid number {}", number))
                 })?;
                 Ok(felt)
             }
@@ -426,7 +416,7 @@ impl Domain {
         }
     }
 
-    pub fn encode(&self, types: &IndexMap<String, Vec<Field>>) -> Result<Felt, SigningError> {
+    pub fn encode(&self, types: &IndexMap<String, Vec<Field>>) -> Result<Felt, SignerError> {
         let mut object = IndexMap::new();
 
         object.insert("name".to_string(), PrimitiveType::String(self.name.clone()));
@@ -487,7 +477,7 @@ impl TypedData {
         }
     }
 
-    pub fn encode(&self, account: Felt) -> Result<TypedDataHash, SigningError> {
+    pub fn encode(&self, account: Felt) -> Result<TypedDataHash, SignerError> {
         let preset_types = get_preset_types();
 
         // Combine types and preset_types
@@ -495,7 +485,7 @@ impl TypedData {
         all_types.extend(self.types.clone());
 
         if self.domain.revision.clone().unwrap_or("1".to_string()) != "1" {
-            return Err(SigningError::InvalidMessageError(
+            return Err(SignerError::InvalidMessage(
                 "Legacy revision 0 is not supported".to_string(),
             ));
         }
