@@ -6,7 +6,7 @@ use utoipa::ToSchema;
 use crate::typed_data::{Domain, Field, PrimitiveType, SimpleField, TypedData};
 use crate::types::utils::flexible_u128;
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
 pub struct BaseEntry {
     pub timestamp: u64,
     pub source: String,
@@ -24,7 +24,7 @@ pub trait EntryTrait {
 }
 
 // Entry = SpotEntry
-#[derive(Debug, Serialize, Deserialize, PartialEq, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
 pub struct Entry {
     pub base: BaseEntry,
     pub pair_id: String,
@@ -52,7 +52,7 @@ impl EntryTrait for Entry {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, ToSchema)]
+#[derive(Debug, Clone,Serialize, Deserialize, PartialEq, ToSchema)]
 pub struct PerpEntry {
     pub base: BaseEntry,
     pub pair_id: String,
@@ -84,7 +84,7 @@ impl EntryTrait for PerpEntry {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
 pub struct FutureEntry {
     pub base: BaseEntry,
     pub pair_id: String,
