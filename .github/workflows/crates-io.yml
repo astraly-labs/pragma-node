@@ -91,6 +91,24 @@ jobs:
           profile: "minimal"
           override: true
 
+      - name: "Install PostgreSQL (Windows)"
+        if: matrix.os == 'windows-latest'
+        run: |
+          choco install postgresql14
+          echo "C:\Program Files\PostgreSQL\14\lib" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          echo "C:\Program Files\PostgreSQL\14\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          echo "PQ_LIB_DIR=C:\Program Files\PostgreSQL\14\lib" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "POSTGRES_HOME=C:\Program Files\PostgreSQL\14" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: "Install PostgreSQL dependencies (macOS)"
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install libpq
+          brew link --force libpq
+          echo 'export PATH="/usr/local/opt/libpq/bin:$PATH"' >> ~/.zshrc
+          export LDFLAGS="-L/usr/local/opt/libpq/lib"
+          export CPPFLAGS="-I/usr/local/opt/libpq/include"
+
       - name: "Build crate"
         run: |
           cargo build --package ${{ needs.crate-info.outputs.crate }} --all-targets
