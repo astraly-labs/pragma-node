@@ -5,13 +5,12 @@ use std::time::{Duration, SystemTime};
 use utoipa::ToSchema;
 
 use crate::handlers::create_entry::CreateEntryResponse;
-use crate::utils::{
-    assert_login_is_valid, convert_entry_to_db, publish_to_kafka, validate_publisher,
-};
+use crate::utils::{convert_entry_to_db, publish_to_kafka, validate_publisher};
 use crate::utils::{ChannelHandler, Subscriber, WebSocketError};
 use crate::AppState;
-use pragma_types::auth::{build_login_message, LoginMessage};
-use pragma_types::entries::Entry;
+use pragma_common::signing::assert_login_is_valid;
+use pragma_common::types::auth::{build_login_message, LoginMessage};
+use pragma_common::types::entries::Entry;
 
 use pragma_entities::EntryError;
 use starknet_crypto::{Felt, Signature};
@@ -396,18 +395,11 @@ async fn process_login(
         s: login_message.signature[1],
     };
 
-    match message {
-        Ok(message) => {
-            let publishers_cache = state.caches.publishers();
-            let (public_key, account_address) =
-                validate_publisher(&state.offchain_pool, &publisher_name, publishers_cache).await?;
+    let publishers_cache = state.caches.publishers();
+    let (public_key, account_address) =
+        validate_publisher(&state.offchain_pool, &publisher_name, publishers_cache).await?;
 
-            assert_login_is_valid(message, signature, &account_address, &public_key)?;
-        }
-        Err(e) => {
-            tracing::error!("Failed to build login message: {}", e);
-            return Err(EntryError::InvalidLoginMessage(e.to_string()));
-        }
-    }
+    assert_login_is_valid(message, signature, &account_address, &public_key)
+        .map_err(EntryError::SignerError)?;
     Ok(())
 }

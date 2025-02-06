@@ -1,7 +1,6 @@
 pub mod starkex;
 
-use pragma_common::errors::ConversionError;
-use pragma_entities::EntryError;
+use crate::errors::ConversionError;
 use serde::{Deserialize, Serialize};
 use starknet::{
     core::{
@@ -11,17 +10,25 @@ use starknet::{
     signers::SigningKey,
 };
 use thiserror::Error;
+use utoipa::ToSchema;
 
-use pragma_types::entries::{build_publish_message, EntryTrait};
+use crate::types::entries::{build_publish_message, EntryTrait};
+use crate::types::typed_data::TypedData;
 
-use super::TypedData;
-
-#[derive(Debug, Error)]
-pub enum SigningError {
-    #[error("cannot convert type")]
-    ConversionError,
+#[derive(Debug, Error, ToSchema)]
+pub enum SignerError {
+    #[error(transparent)]
+    ConversionError(#[from] ConversionError),
     #[error("cannot sign: {0}")]
+    #[schema(value_type = String)]
     SigningError(#[from] EcdsaSignError),
+    #[error("invalid signature for message hash {0:?}")]
+    #[schema(value_type = String)]
+    InvalidSignature(Felt),
+    #[error("unauthorized: {0}")]
+    Unauthorized(String),
+    #[error("invalid message: {0}")]
+    InvalidMessage(String),
 }
 
 pub trait Signable {
@@ -29,13 +36,9 @@ pub trait Signable {
 }
 
 /// Sign the passed data with the signer & return the signature 0x prefixed.
-pub fn sign_data(signer: &SigningKey, data: &impl Signable) -> Result<String, SigningError> {
-    let hash_to_sign = data
-        .try_get_hash()
-        .map_err(|_| SigningError::ConversionError)?;
-    let signature = signer
-        .sign(&hash_to_sign)
-        .map_err(SigningError::SigningError)?;
+pub fn sign_data(signer: &SigningKey, data: &impl Signable) -> Result<String, SignerError> {
+    let hash_to_sign = data.try_get_hash()?;
+    let signature = signer.sign(&hash_to_sign)?;
     Ok(format!("0x{:}", signature))
 }
 
@@ -46,7 +49,7 @@ pub fn assert_request_signature_is_valid<R, E>(
     new_entries_request: &R,
     publisher_account: &Felt,
     publisher_public_key: &Felt,
-) -> Result<Signature, EntryError>
+) -> Result<Signature, SignerError>
 where
     R: AsRef<[Felt]> + AsRef<[E]>,
     E: EntryTrait + Serialize + for<'de> Deserialize<'de>,
@@ -66,16 +69,16 @@ fn assert_signature_is_valid<R, E>(
     new_entries_request: &R,
     account_address: &Felt,
     public_key: &Felt,
-) -> Result<Signature, EntryError>
+) -> Result<Signature, SignerError>
 where
     R: AsRef<[Felt]> + AsRef<[E]>,
     E: EntryTrait + Serialize + for<'de> Deserialize<'de>,
 {
     let entries: &[E] = new_entries_request.as_ref();
-    let published_message = build_publish_message(entries)?;
+    let published_message = build_publish_message(entries);
     let message_hash = published_message
         .encode(*account_address)
-        .map_err(EntryError::InvalidMessage)?
+        .map_err(|e| SignerError::InvalidMessage(e.to_string()))?
         .hash;
 
     let signature_slice: &[Felt] = new_entries_request.as_ref();
@@ -84,8 +87,10 @@ where
         s: signature_slice[1],
     };
 
-    if !ecdsa_verify(public_key, &message_hash, &signature).map_err(EntryError::InvalidSignature)? {
-        return Err(EntryError::Unauthorized(format!(
+    if !ecdsa_verify(public_key, &message_hash, &signature)
+        .map_err(|_| SignerError::InvalidSignature(message_hash))?
+    {
+        return Err(SignerError::Unauthorized(format!(
             "Invalid signature for message hash {:?}",
             &message_hash
         )));
@@ -98,14 +103,16 @@ pub fn assert_login_is_valid(
     signature: &Signature,
     account_address: &Felt,
     public_key: &Felt,
-) -> Result<(), EntryError> {
+) -> Result<(), SignerError> {
     let message_hash = login_message
         .encode(*account_address)
-        .map_err(EntryError::InvalidMessage)?
+        .map_err(|e| SignerError::InvalidMessage(e.to_string()))?
         .hash;
 
-    if !ecdsa_verify(public_key, &message_hash, signature).map_err(EntryError::InvalidSignature)? {
-        return Err(EntryError::Unauthorized(format!(
+    if !ecdsa_verify(public_key, &message_hash, signature)
+        .map_err(|_| SignerError::InvalidSignature(message_hash))?
+    {
+        return Err(SignerError::Unauthorized(format!(
             "Invalid signature for message hash {:?}",
             &message_hash
         )));

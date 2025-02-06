@@ -7,7 +7,6 @@ edition = "2021"
 [dependencies]
 pragma-common = { path = "../pragma-common" }
 pragma-entities = { path = "../pragma-entities" }
-pragma-types = { path = "../pragma-types" }
 
 aws-config = { workspace = true, features = ["behavior-version-latest"] }
 aws-sdk-secretsmanager = { workspace = true }

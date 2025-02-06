@@ -16,7 +16,7 @@ use crate::utils::only_existing_pairs;
 use crate::utils::pricer::{IndexPricer, Pricer};
 use crate::utils::ws::{ChannelHandler, Subscriber, SubscriptionType};
 use crate::AppState;
-use pragma_types::timestamp::UnixTimestamp;
+use pragma_common::types::timestamp::UnixTimestamp;
 
 #[derive(Debug, Default, Serialize, Deserialize, ToResponse, ToSchema)]
 pub struct AssetOraclePrice {

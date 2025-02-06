@@ -1,6 +1,12 @@
+pub mod auth;
 pub mod block_id;
+pub mod entries;
+pub mod hex_hash;
 pub mod merkle_tree;
 pub mod options;
+pub mod timestamp;
+pub mod typed_data;
+pub mod utils;
 
 use serde::{Deserialize, Serialize};
 use strum::{Display, EnumString};

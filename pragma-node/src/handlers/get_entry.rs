@@ -2,6 +2,7 @@ use axum::extract::{Query, State};
 use axum::Json;
 use chrono::{DateTime, NaiveDateTime, Utc};
 
+use pragma_common::timestamp::TimestampRangeError;
 use pragma_common::types::{AggregationMode, DataType, Interval};
 use pragma_entities::EntryError;
 use serde::{Deserialize, Serialize};
@@ -37,9 +38,9 @@ impl TryFrom<GetEntryParams> for RoutingParams {
         };
 
         if timestamp > now {
-            return Err(EntryError::InvalidTimestamp(format!(
-                "Timestamp is in the future: {timestamp}"
-            )));
+            return Err(EntryError::InvalidTimestamp(
+                TimestampRangeError::EndInFuture,
+            ));
         }
 
         let interval = if let Some(interval) = params.interval {

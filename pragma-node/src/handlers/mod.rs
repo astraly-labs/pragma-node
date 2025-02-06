@@ -26,7 +26,7 @@ use utoipa::{IntoParams, ToSchema};
 
 use pragma_common::types::{AggregationMode, DataType, Interval};
 
-use pragma_types::timestamp::UnixTimestamp;
+use pragma_common::types::timestamp::UnixTimestamp;
 
 #[derive(Default, Debug, Deserialize, ToSchema, Clone, Copy)]
 pub enum EntryType {

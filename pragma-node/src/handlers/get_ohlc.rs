@@ -1,5 +1,6 @@
 use axum::extract::{Query, State};
 use axum::Json;
+use pragma_common::timestamp::TimestampRangeError;
 use serde::{Deserialize, Serialize};
 use utoipa::{ToResponse, ToSchema};
 
@@ -55,9 +56,9 @@ pub async fn get_ohlc(
 
     // Validate given timestamp
     if timestamp > now {
-        return Err(EntryError::InvalidTimestamp(format!(
-            "Timestamp is in the future: {timestamp}"
-        )));
+        return Err(EntryError::InvalidTimestamp(
+            TimestampRangeError::EndInFuture,
+        ));
     }
 
     let entries =

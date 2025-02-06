@@ -13,7 +13,7 @@ use utoipa::{IntoParams, ToResponse, ToSchema};
 use crate::infra::redis;
 use crate::utils::PathExtractor;
 use crate::AppState;
-use pragma_types::hex_hash::HexHash;
+use pragma_common::types::hex_hash::HexHash;
 
 #[derive(Default, Deserialize, IntoParams, ToSchema, Debug)]
 pub struct GetMerkleProofQuery {
