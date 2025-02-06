@@ -1,18 +1,17 @@
 pub use aws::PragmaSignerBuilder;
 pub use conversion::{
     convert_via_quote, currency_pair_to_pair_id, currency_pairs_to_routed_pair_id,
-    felt_from_decimal, flexible_u128, format_bigdecimal_price, normalize_to_decimals,
-    pair_id_to_currency_pair,
+    format_bigdecimal_price, normalize_to_decimals, pair_id_to_currency_pair,
 };
 pub use custom_extractors::path_extractor::PathExtractor;
 pub use kafka::publish_to_kafka;
 use moka::future::Cache;
 use pragma_entities::dto::Publisher;
+use pragma_types::entries::Entry;
+pub use pragma_types::typed_data::TypedData;
 pub use signing::starkex::StarkexPrice;
-pub use signing::typed_data::TypedData;
-pub use signing::{
-    assert_login_is_valid, assert_request_signature_is_valid, sign_data, typed_data,
-};
+pub use signing::{assert_login_is_valid, assert_request_signature_is_valid, sign_data};
+pub use ws::*;
 
 use bigdecimal::num_bigint::ToBigInt;
 use bigdecimal::{BigDecimal, ToPrimitive};
@@ -27,7 +26,6 @@ use crate::infra::repositories::publisher_repository;
 use crate::infra::repositories::{
     entry_repository::MedianEntry, onchain_repository::entry::get_existing_pairs,
 };
-use crate::types::entries::Entry;
 
 mod aws;
 mod conversion;
@@ -35,6 +33,9 @@ mod custom_extractors;
 mod kafka;
 mod macros;
 mod signing;
+
+pub mod pricer;
+pub mod ws;
 
 const ONE_YEAR_IN_SECONDS: f64 = 3153600_f64;
 

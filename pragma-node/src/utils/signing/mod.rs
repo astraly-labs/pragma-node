@@ -1,5 +1,4 @@
 pub mod starkex;
-pub mod typed_data;
 
 use pragma_common::errors::ConversionError;
 use pragma_entities::EntryError;
@@ -13,7 +12,7 @@ use starknet::{
 };
 use thiserror::Error;
 
-use crate::types::entries::{build_publish_message, EntryTrait};
+use pragma_types::entries::{build_publish_message, EntryTrait};
 
 use super::TypedData;
 

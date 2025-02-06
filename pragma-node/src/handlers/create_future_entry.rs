@@ -8,9 +8,10 @@ use utoipa::{ToResponse, ToSchema};
 
 use crate::config::config;
 use crate::infra::kafka;
-use crate::types::entries::FutureEntry;
-use crate::utils::{assert_request_signature_is_valid, felt_from_decimal, validate_publisher};
+use crate::utils::{assert_request_signature_is_valid, validate_publisher};
 use crate::AppState;
+use pragma_types::entries::FutureEntry;
+use pragma_types::utils::felt_from_decimal;
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct CreateFutureEntryRequest {
@@ -138,7 +139,7 @@ pub async fn create_future_entries(
 mod tests {
     use rstest::rstest;
 
-    use crate::types::entries::{build_publish_message, FutureEntry, PerpEntry};
+    use pragma_types::entries::{build_publish_message, FutureEntry, PerpEntry};
 
     #[rstest]
     fn test_build_publish_message_empty() {

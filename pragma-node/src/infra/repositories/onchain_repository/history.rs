@@ -9,11 +9,11 @@ use pragma_entities::Currency;
 use serde::Serialize;
 
 use crate::infra::repositories::entry_repository::get_decimals;
-use crate::types::timestamp::TimestampRange;
 use crate::utils::{
     convert_via_quote, currency_pairs_to_routed_pair_id, normalize_to_decimals,
     pair_id_to_currency_pair,
 };
+use pragma_types::timestamp::TimestampRange;
 
 use super::entry::{get_existing_pairs, onchain_pair_exist};
 use super::get_onchain_aggregate_table_name;

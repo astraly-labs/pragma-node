@@ -5,6 +5,10 @@ edition = "2021"
 
 
 [dependencies]
+pragma-common = { path = "../pragma-common" }
+pragma-entities = { path = "../pragma-entities" }
+pragma-types = { path = "../pragma-types" }
+
 aws-config = { workspace = true, features = ["behavior-version-latest"] }
 aws-sdk-secretsmanager = { workspace = true }
 axum = { workspace = true, features = ["macros", "ws", "tokio"] }
@@ -30,8 +34,6 @@ lazy_static = { workspace = true }
 moka = { workspace = true, features = ["future"] }
 nonzero_ext = { workspace = true }
 opentelemetry = { workspace = true }
-pragma-common = { path = "../pragma-common" }
-pragma-entities = { path = "../pragma-entities" }
 pragma-monitoring = { workspace = true }
 rdkafka = { workspace = true }
 redis = { workspace = true, features = ["tokio-comp", "json"] }
