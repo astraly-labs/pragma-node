@@ -13,8 +13,8 @@ use utoipa::{ToResponse, ToSchema};
 
 use crate::infra::repositories::entry_repository::OHLCEntry;
 use crate::infra::repositories::onchain_repository;
-use crate::utils::{ChannelHandler, Subscriber, SubscriptionType};
 use crate::utils::is_onchain_existing_pair;
+use crate::utils::{ChannelHandler, Subscriber, SubscriptionType};
 use crate::{metrics, AppState};
 
 use axum::extract::ws::{WebSocket, WebSocketUpgrade};

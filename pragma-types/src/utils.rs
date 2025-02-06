@@ -1,6 +1,6 @@
-use std::str::FromStr;
 use serde::{Deserialize as _, Deserializer};
 use starknet::core::types::Felt;
+use std::str::FromStr;
 
 /// Deserializes a vector of Felt from a JSON array of strings.
 pub fn felt_from_decimal<'de, D>(deserializer: D) -> Result<Vec<Felt>, D::Error>

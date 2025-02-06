@@ -5,13 +5,13 @@ use std::time::{Duration, SystemTime};
 use utoipa::ToSchema;
 
 use crate::handlers::create_entry::CreateEntryResponse;
-use pragma_types::auth::{build_login_message, LoginMessage};
-use pragma_types::entries::Entry;
-use crate::utils::{ChannelHandler, Subscriber, WebSocketError};
 use crate::utils::{
     assert_login_is_valid, convert_entry_to_db, publish_to_kafka, validate_publisher,
 };
+use crate::utils::{ChannelHandler, Subscriber, WebSocketError};
 use crate::AppState;
+use pragma_types::auth::{build_login_message, LoginMessage};
+use pragma_types::entries::Entry;
 
 use pragma_entities::EntryError;
 use starknet_crypto::{Felt, Signature};

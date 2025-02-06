@@ -8,9 +8,9 @@ use utoipa::{IntoParams, ToResponse, ToSchema};
 use crate::infra::repositories::onchain_repository::history::{
     get_historical_entries_and_decimals, retry_with_routing, HistoricalEntryRaw,
 };
-use pragma_types::timestamp::TimestampRange;
 use crate::utils::{big_decimal_price_to_hex, PathExtractor};
 use crate::AppState;
+use pragma_types::timestamp::TimestampRange;
 
 use crate::utils::currency_pair_to_pair_id;
 

@@ -16,10 +16,10 @@ use utoipa::{ToResponse, ToSchema};
 use crate::constants::starkex_ws::PRAGMA_ORACLE_NAME_FOR_STARKEX;
 use crate::infra::repositories::entry_repository::MedianEntryWithComponents;
 use crate::utils::pricer::{IndexPricer, MarkPricer, Pricer};
-use pragma_types::timestamp::UnixTimestamp;
-use crate::utils::{ChannelHandler, Subscriber, SubscriptionType};
 use crate::utils::{only_existing_pairs, sign_data, StarkexPrice};
+use crate::utils::{ChannelHandler, Subscriber, SubscriptionType};
 use crate::AppState;
+use pragma_types::timestamp::UnixTimestamp;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
 pub struct SignedPublisherPrice {

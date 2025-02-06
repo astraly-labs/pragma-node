@@ -12,11 +12,11 @@ use pragma_entities::EntryError;
 use utoipa::{ToResponse, ToSchema};
 
 use crate::infra::repositories::entry_repository::MedianEntryWithComponents;
-use crate::utils::pricer::{IndexPricer, Pricer};
-use pragma_types::timestamp::UnixTimestamp;
-use crate::utils::ws::{ChannelHandler, Subscriber, SubscriptionType};
 use crate::utils::only_existing_pairs;
+use crate::utils::pricer::{IndexPricer, Pricer};
+use crate::utils::ws::{ChannelHandler, Subscriber, SubscriptionType};
 use crate::AppState;
+use pragma_types::timestamp::UnixTimestamp;
 
 #[derive(Debug, Default, Serialize, Deserialize, ToResponse, ToSchema)]
 pub struct AssetOraclePrice {

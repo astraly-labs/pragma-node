@@ -7,12 +7,10 @@ pub use custom_extractors::path_extractor::PathExtractor;
 pub use kafka::publish_to_kafka;
 use moka::future::Cache;
 use pragma_entities::dto::Publisher;
-pub use signing::starkex::StarkexPrice;
-pub use pragma_types::typed_data::TypedData;
 use pragma_types::entries::Entry;
-pub use signing::{
-    assert_login_is_valid, assert_request_signature_is_valid, sign_data,
-};
+pub use pragma_types::typed_data::TypedData;
+pub use signing::starkex::StarkexPrice;
+pub use signing::{assert_login_is_valid, assert_request_signature_is_valid, sign_data};
 pub use ws::*;
 
 use bigdecimal::num_bigint::ToBigInt;

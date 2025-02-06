@@ -526,8 +526,8 @@ impl TypedData {
 #[cfg(test)]
 mod tests {
     use rstest::*;
-    use starknet::core::utils::starknet_keccak;
     use starknet::core::types::Felt;
+    use starknet::core::utils::starknet_keccak;
 
     use super::*;
 
