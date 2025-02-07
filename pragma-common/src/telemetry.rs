@@ -24,8 +24,9 @@ pub fn init_telemetry(
     collection_endpoint: String,
     log_level: Option<Level>,
 ) -> Result<()> {
+    let (layer, _) = build_otel_layer()?;
     let tracing_subscriber = tracing_subscriber::registry()
-        .with(build_otel_layer()?)
+        .with(layer)
         .with(LevelFilter::from_level(log_level.unwrap_or(Level::INFO)))
         .with(
             tracing_subscriber::fmt::layer()
@@ -35,14 +36,16 @@ pub fn init_telemetry(
                 .pretty(),
         );
 
-    let tracer_provider = init_tracer_provider(&app_name, &collection_endpoint)?;
+    // TODO: Add tracer provider
+    // let tracer_provider = init_tracer_provider(&app_name, &collection_endpoint)?;
+
     let logger_provider = init_logs_provider(&app_name, &collection_endpoint)?;
     init_meter_provider(&app_name, &collection_endpoint)?;
 
     tracing_subscriber
-        .with(OpenTelemetryLayer::new(tracer_provider))
+        // .with(OpenTelemetryLayer::new(tracer_provider))
         .with(OpenTelemetryTracingBridge::new(&logger_provider))
-        .init();
+        .try_init()?;
 
     Ok(())
 }

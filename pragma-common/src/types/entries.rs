@@ -52,7 +52,7 @@ impl EntryTrait for Entry {
     }
 }
 
-#[derive(Debug, Clone,Serialize, Deserialize, PartialEq, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
 pub struct PerpEntry {
     pub base: BaseEntry,
     pub pair_id: String,

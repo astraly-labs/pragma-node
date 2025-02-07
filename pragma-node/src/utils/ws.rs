@@ -118,7 +118,7 @@ where
 
     /// Perform the initial handshake with the client - ensure the channel is healthy
     async fn assert_is_healthy(&mut self) -> Result<(), WebSocketError> {
-        let ping_status = self.sender.send(Message::Ping(vec![1, 2, 3])).await;
+        let ping_status = self.sender.send(Message::Ping(vec![1, 2, 3].into())).await;
         if ping_status.is_err() {
             self.record_metric(Interaction::NewConnection, Status::Error);
             return Err(WebSocketError::ChannelInit);
@@ -241,7 +241,7 @@ where
                 } else {
                     tracing::error!("Failed to decode text message: {:?}", maybe_msg.err());
                     self.send_err("⛔ Incorrect message. Please check the documentation for more information.").await;
-                    return Err(WebSocketError::MessageDecode(text));
+                    return Err(WebSocketError::MessageDecode(text.to_string()));
                 }
             }
             Message::Binary(payload) => {
@@ -261,13 +261,16 @@ where
 
     /// Send a message to the client.
     pub async fn send_msg(&mut self, msg: String) -> Result<(), axum::Error> {
-        self.sender.send(Message::Text(msg)).await
+        self.sender.send(Message::Text(msg.into())).await
     }
 
     /// Send an error message to the client without closing the channel.
     pub async fn send_err(&mut self, err: &str) {
         let err = json!({"error": err});
-        let _ = self.sender.send(Message::Text(err.to_string())).await;
+        let _ = self
+            .sender
+            .send(Message::Text(err.to_string().into()))
+            .await;
     }
 
     /// Records a web socket metric.

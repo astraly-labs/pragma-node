@@ -3,7 +3,7 @@ use axum::response::IntoResponse;
 use axum::routing::{get, post};
 use axum::Router;
 use utoipa::OpenApi as OpenApiT;
-use utoipa_swagger_ui::SwaggerUi;
+// use utoipa_swagger_ui::SwaggerUi;
 
 use crate::handlers::merkle_feeds::{
     get_merkle_proof::get_merkle_feeds_proof, get_option::get_merkle_feeds_option,
@@ -25,9 +25,10 @@ use crate::handlers::{
 use crate::AppState;
 
 pub fn app_router<T: OpenApiT>(state: AppState) -> Router<AppState> {
-    let open_api = T::openapi();
+    // let open_api = T::openapi();
+    // TODO: Add swagger ui
     Router::new()
-        .merge(SwaggerUi::new("/node/swagger-ui").url("/node/api-docs/openapi.json", open_api))
+        // .merge(SwaggerUi::new("/node/swagger-ui").url("/node/api-docs/openapi.json", open_api))
         .route("/node", get(root))
         .nest("/node/v1/data", data_routes(state.clone()))
         .nest("/node/v1/onchain", onchain_routes(state.clone()))
@@ -57,8 +58,8 @@ fn data_routes(state: AppState) -> Router<AppState> {
         .route("/publish", post(create_entries))
         .route("/publish_future", post(create_future_entries))
         .route("/publish_ws", get(publish_entry))
-        .route("/:base/:quote", get(get_entry))
-        .route("/:base/:quote/future_expiries", get(get_expiries))
+        .route("/{base}/{quote}", get(get_entry))
+        .route("/{base}/{quote}/future_expiries", get(get_expiries))
         .route("/subscribe", get(subscribe_to_entry))
         .route("/price/subscribe", get(subscribe_to_price))
         .with_state(state)
@@ -66,9 +67,9 @@ fn data_routes(state: AppState) -> Router<AppState> {
 
 fn onchain_routes(state: AppState) -> Router<AppState> {
     Router::new()
-        .route("/:base/:quote", get(get_onchain_entry))
-        .route("/history/:base/:quote", get(get_onchain_history))
-        .route("/checkpoints/:base/:quote", get(get_onchain_checkpoints))
+        .route("/{base}/{quote}", get(get_onchain_entry))
+        .route("/history/{base}/{quote}", get(get_onchain_history))
+        .route("/checkpoints/{base}/{quote}", get(get_onchain_checkpoints))
         .route("/publishers", get(get_onchain_publishers))
         .route("/ohlc/subscribe", get(subscribe_to_onchain_ohlc))
         .with_state(state)
@@ -76,26 +77,26 @@ fn onchain_routes(state: AppState) -> Router<AppState> {
 
 fn volatility_routes(state: AppState) -> Router<AppState> {
     Router::new()
-        .route("/:base/:quote", get(get_volatility))
+        .route("/{base}/{quote}", get(get_volatility))
         .with_state(state)
 }
 
 fn aggregation_routes(state: AppState) -> Router<AppState> {
     Router::new()
-        .route("/candlestick/:base/:quote", get(get_ohlc))
+        .route("/candlestick/{base}/{quote}", get(get_ohlc))
         .with_state(state)
 }
 
 fn merkle_feeds_routes(state: AppState) -> Router<AppState> {
     Router::new()
-        .route("/proof/:option_hash", get(get_merkle_feeds_proof))
-        .route("/options/:instrument", get(get_merkle_feeds_option))
+        .route("/proof/{option_hash}", get(get_merkle_feeds_proof))
+        .route("/options/{instrument}", get(get_merkle_feeds_option))
         .with_state(state)
 }
 
 fn optimistic_oracle_routes(state: AppState) -> Router<AppState> {
     Router::new()
-        .route("/assertions/:assertion_id", get(get_assertion_details))
+        .route("/assertions/{assertion_id}", get(get_assertion_details))
         .route("/assertions", get(get_assertions))
         .route("/disputed-assertions", get(get_disputed_assertions))
         .route("/resolved-assertions", get(get_resolved_assertions))
