@@ -215,6 +215,7 @@ impl ChannelHandler<PublishEntryState, ClientMessage, WebSocketError> for Publis
             }
             ClientMessage::Publish(new_entries) => {
                 // Check login state and session expiry
+                // TODO: make sure that the one sending entries is the same as the one logged in
                 let should_send_error = {
                     let state = subscriber.state.lock().await;
 
