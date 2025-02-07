@@ -26,20 +26,30 @@ const SESSION_EXPIRY_MINUTES: u64 = 5;
 #[derive(Debug)]
 pub struct PublisherSession {
     login_time: SystemTime,
+    ip_address: std::net::IpAddr,
 }
 
 impl PublisherSession {
-    fn new() -> Self {
+    fn new(ip_address: std::net::IpAddr) -> Self {
         Self {
             login_time: SystemTime::now(),
+            ip_address,
         }
     }
 
+    /// Checks if the session has expired
+    /// In that case the publisher should login again
     fn is_expired(&self) -> bool {
         SystemTime::now()
             .duration_since(self.login_time)
             .map(|duration| duration > Duration::from_secs(SESSION_EXPIRY_MINUTES * 60))
             .unwrap_or(true)
+    }
+
+    /// Checks if the IP address matches the one stored in the session
+    /// This is used to check if the publisher is sending entries from the same IP address he logged in from
+    fn validate_ip(&self, ip: &std::net::IpAddr) -> bool {
+        &self.ip_address == ip
     }
 }
 
@@ -180,10 +190,10 @@ impl ChannelHandler<PublishEntryState, ClientMessage, WebSocketError> for Publis
                 let has_login_failed = result.is_err();
                 let response = match result {
                     Ok(_) => {
-                        // Store the new session
+                        // Store the new session with IP address
                         subscriber.app_state.publisher_sessions.insert(
                             login_message.publisher_name.clone(),
-                            PublisherSession::new(),
+                            PublisherSession::new(subscriber.ip_address),
                         );
                         // Update subscriber state
                         {
@@ -214,8 +224,7 @@ impl ChannelHandler<PublishEntryState, ClientMessage, WebSocketError> for Publis
                 }
             }
             ClientMessage::Publish(new_entries) => {
-                // Check login state and session expiry
-                // TODO: make sure that the one sending entries is the same as the one logged in
+                // Check login state, session expiry and IP match
                 let should_send_error = {
                     let state = subscriber.state.lock().await;
 
@@ -237,6 +246,13 @@ impl ChannelHandler<PublishEntryState, ClientMessage, WebSocketError> for Publis
                                 Some(PublishResponse {
                                     status: "error".to_string(),
                                     message: "Session expired, please login again".to_string(),
+                                    data: None,
+                                })
+                            } else if !session.validate_ip(&subscriber.ip_address) {
+                                Some(PublishResponse {
+                                    status: "error".to_string(),
+                                    message: "Invalid IP address for this publisher session"
+                                        .to_string(),
                                     data: None,
                                 })
                             } else {
