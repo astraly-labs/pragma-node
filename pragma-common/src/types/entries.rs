@@ -1,8 +1,8 @@
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Number;
-use utoipa::ToSchema;
 use std::fmt;
+use utoipa::ToSchema;
 
 use crate::typed_data::{Domain, Field, PrimitiveType, SimpleField, TypedData};
 use crate::types::utils::flexible_u128;
@@ -55,9 +55,16 @@ impl EntryTrait for Entry {
 
 impl fmt::Display for Entry {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "SPOT[{}] {} @ {} (vol: {}) from {}/{}",
-            self.pair_id, self.price, self.base.timestamp, self.volume,
-            self.base.source, self.base.publisher)
+        write!(
+            f,
+            "SPOT[{}] {} @ {} (vol: {}) from {}/{}",
+            self.pair_id,
+            self.price,
+            self.base.timestamp,
+            self.volume,
+            self.base.source,
+            self.base.publisher
+        )
     }
 }
 
@@ -95,9 +102,16 @@ impl EntryTrait for PerpEntry {
 
 impl fmt::Display for PerpEntry {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "PERP[{}] {} @ {} (vol: {}) from {}/{}",
-            self.pair_id, self.price, self.base.timestamp, self.volume,
-            self.base.source, self.base.publisher)
+        write!(
+            f,
+            "PERP[{}] {} @ {} (vol: {}) from {}/{}",
+            self.pair_id,
+            self.price,
+            self.base.timestamp,
+            self.volume,
+            self.base.source,
+            self.base.publisher
+        )
     }
 }
 
@@ -137,9 +151,17 @@ impl EntryTrait for FutureEntry {
 
 impl fmt::Display for FutureEntry {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "FUTURE[{}] {} @ {} (vol: {}, exp: {}) from {}/{}",
-            self.pair_id, self.price, self.base.timestamp, self.volume,
-            self.expiration_timestamp, self.base.source, self.base.publisher)
+        write!(
+            f,
+            "FUTURE[{}] {} @ {} (vol: {}, exp: {}) from {}/{}",
+            self.pair_id,
+            self.price,
+            self.base.timestamp,
+            self.volume,
+            self.expiration_timestamp,
+            self.base.source,
+            self.base.publisher
+        )
     }
 }
 

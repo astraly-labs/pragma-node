@@ -23,6 +23,10 @@ use axum::response::IntoResponse;
 // Session expiry time in minutes
 const SESSION_EXPIRY_MINUTES: u64 = 5;
 
+lazy_static::lazy_static! {
+    static ref SESSION_EXPIRY_DURATION: Duration = Duration::from_secs(SESSION_EXPIRY_MINUTES * 60);
+}
+
 #[derive(Debug)]
 pub struct PublisherSession {
     login_time: SystemTime,
@@ -42,7 +46,7 @@ impl PublisherSession {
     fn is_expired(&self) -> bool {
         SystemTime::now()
             .duration_since(self.login_time)
-            .map(|duration| duration > Duration::from_secs(10))
+            .map(|duration| duration > *SESSION_EXPIRY_DURATION)
             .unwrap_or(true)
     }
 
@@ -175,8 +179,8 @@ impl ChannelHandler<PublishEntryState, ClientMessage, WebSocketError> for Publis
                         // Remove expired session
                         subscriber
                             .app_state
-                        .publisher_sessions
-                        .remove(&login_message.publisher_name);
+                            .publisher_sessions
+                            .remove(&login_message.publisher_name);
                     }
                 }
 
