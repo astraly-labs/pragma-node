@@ -42,7 +42,7 @@ impl PublisherSession {
     fn is_expired(&self) -> bool {
         SystemTime::now()
             .duration_since(self.login_time)
-            .map(|duration| duration > Duration::from_secs(SESSION_EXPIRY_MINUTES * 60))
+            .map(|duration| duration > Duration::from_secs(10))
             .unwrap_or(true)
     }
 
@@ -164,26 +164,20 @@ impl ChannelHandler<PublishEntryState, ClientMessage, WebSocketError> for Publis
         match client_message {
             ClientMessage::Login(login_message) => {
                 // Check if this publisher already has an active session
-                if let Some(session) = app_state
+                if let Some(mut session) = app_state
                     .publisher_sessions
-                    .get(&login_message.publisher_name)
+                    .get_mut(&login_message.publisher_name)
                 {
                     if !session.is_expired() {
-                        let response = LoginResponse {
-                            status: "error".to_string(),
-                            message: "Publisher already has an active session".to_string(),
-                        };
+                        // Reset the session login time
+                        session.login_time = SystemTime::now();
+                    } else {
+                        // Remove expired session
                         subscriber
-                            .send_msg(serde_json::to_string(&response).unwrap())
-                            .await
-                            .map_err(|_| WebSocketError::ChannelClose)?;
-                        return Err(WebSocketError::ChannelClose);
-                    }
-                    // Remove expired session
-                    subscriber
-                        .app_state
+                            .app_state
                         .publisher_sessions
                         .remove(&login_message.publisher_name);
+                    }
                 }
 
                 let result = process_login(subscriber, login_message.clone()).await;
