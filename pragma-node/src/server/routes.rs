@@ -24,6 +24,7 @@ use crate::handlers::{
 };
 use crate::AppState;
 
+#[allow(clippy::extra_unused_type_parameters)]
 pub fn app_router<T: OpenApiT>(state: AppState) -> Router<AppState> {
     // let open_api = T::openapi();
     // TODO: Add swagger ui

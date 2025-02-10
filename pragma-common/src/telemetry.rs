@@ -15,7 +15,6 @@ use opentelemetry_sdk::{
 use opentelemetry_semantic_conventions::resource::SERVICE_NAME;
 use tracing::level_filters::LevelFilter;
 use tracing::Level;
-use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
@@ -50,6 +49,7 @@ pub fn init_telemetry(
     Ok(())
 }
 
+#[allow(dead_code)]
 fn init_tracer_provider(app_name: &str, collection_endpoint: &str) -> Result<Tracer> {
     let provider = opentelemetry_otlp::new_pipeline()
         .tracing()
