@@ -1,6 +1,7 @@
 use axum::extract::{Query, State};
 use axum::Json;
 use pragma_common::timestamp::TimestampRangeError;
+use pragma_common::types::pair::Pair;
 use serde::{Deserialize, Serialize};
 use utoipa::{ToResponse, ToSchema};
 
@@ -11,7 +12,6 @@ use crate::AppState;
 use pragma_entities::EntryError;
 
 use super::GetEntryParams;
-use crate::utils::currency_pair_to_pair_id;
 
 #[derive(Debug, Serialize, Deserialize, ToSchema, ToResponse)]
 pub struct GetOHLCResponse {
@@ -37,8 +37,7 @@ pub async fn get_ohlc(
     PathExtractor(pair): PathExtractor<(String, String)>,
     Query(params): Query<GetEntryParams>,
 ) -> Result<Json<GetOHLCResponse>, EntryError> {
-    // Construct pair id
-    let pair_id = currency_pair_to_pair_id(&pair.0, &pair.1);
+    let pair = Pair::from(pair);
 
     let now = chrono::Utc::now().timestamp();
 
@@ -62,11 +61,11 @@ pub async fn get_ohlc(
     }
 
     let entries =
-        entry_repository::get_ohlc(&state.offchain_pool, pair_id.clone(), interval, timestamp)
+        entry_repository::get_ohlc(&state.offchain_pool, pair.to_pair_id(), interval, timestamp)
             .await
-            .map_err(|db_error| db_error.to_entry_error(&pair_id))?;
+            .map_err(|db_error| db_error.to_entry_error(&pair.to_pair_id()))?;
 
-    Ok(Json(adapt_entry_to_entry_response(pair_id, &entries)))
+    Ok(Json(adapt_entry_to_entry_response(pair.into(), &entries)))
 }
 
 fn adapt_entry_to_entry_response(pair_id: String, entries: &[OHLCEntry]) -> GetOHLCResponse {

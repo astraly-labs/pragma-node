@@ -1,5 +1,6 @@
 use axum::extract::{Query, State};
 use axum::Json;
+use pragma_common::types::pair::Pair;
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToResponse, ToSchema};
 
@@ -8,7 +9,7 @@ use crate::utils::PathExtractor;
 use crate::AppState;
 use pragma_entities::{EntryError, VolatilityError};
 
-use crate::utils::{compute_volatility, currency_pair_to_pair_id};
+use crate::utils::compute_volatility;
 
 /// Volatility query
 #[derive(Deserialize, IntoParams, Debug)]
@@ -44,8 +45,7 @@ pub async fn get_volatility(
     PathExtractor(pair): PathExtractor<(String, String)>,
     Query(volatility_query): Query<VolatilityQuery>,
 ) -> Result<Json<GetVolatilityResponse>, EntryError> {
-    // Construct pair id
-    let pair_id = currency_pair_to_pair_id(&pair.0, &pair.1);
+    let pair = Pair::from(pair);
 
     if volatility_query.start > volatility_query.end {
         return Err(EntryError::VolatilityError(
@@ -56,20 +56,22 @@ pub async fn get_volatility(
     // Fetch entries between start and end timestamps
     let entries = entry_repository::get_entries_between(
         &state.offchain_pool,
-        pair_id.clone(),
+        pair.to_pair_id(),
         volatility_query.start,
         volatility_query.end,
     )
     .await?;
 
     if entries.is_empty() {
-        return Err(EntryError::UnknownPairId(pair_id));
+        return Err(EntryError::UnknownPairId(pair.to_pair_id()));
     }
 
-    let decimals = entry_repository::get_decimals(&state.offchain_pool, &pair_id).await?;
+    let decimals = entry_repository::get_decimals(&state.offchain_pool, &pair).await?;
 
     Ok(Json(adapt_entry_to_entry_response(
-        pair_id, &entries, decimals,
+        pair.into(),
+        &entries,
+        decimals,
     )))
 }
 

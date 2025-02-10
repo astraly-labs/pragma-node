@@ -21,11 +21,7 @@ use axum::http::StatusCode;
 use axum::response::IntoResponse;
 
 // Session expiry time in minutes
-const SESSION_EXPIRY_MINUTES: u64 = 5;
-
-lazy_static::lazy_static! {
-    static ref SESSION_EXPIRY_DURATION: Duration = Duration::from_secs(SESSION_EXPIRY_MINUTES * 60);
-}
+const SESSION_EXPIRY_DURATION: Duration = Duration::from_secs(5 * 60);
 
 #[derive(Debug)]
 pub struct PublisherSession {
@@ -46,7 +42,7 @@ impl PublisherSession {
     fn is_expired(&self) -> bool {
         SystemTime::now()
             .duration_since(self.login_time)
-            .map(|duration| duration > *SESSION_EXPIRY_DURATION)
+            .map(|duration| duration > SESSION_EXPIRY_DURATION)
             .unwrap_or(true)
     }
 

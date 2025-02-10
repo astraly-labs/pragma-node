@@ -3,16 +3,14 @@ use chrono::{DateTime, NaiveDateTime};
 use deadpool_diesel::postgres::Pool;
 use diesel::{prelude::QueryableByName, RunQueryDsl};
 
+use pragma_common::types::pair::Pair;
 use pragma_common::types::{DataType, Interval, Network};
 use pragma_entities::error::{adapt_infra_error, InfraError};
 use pragma_entities::Currency;
 use serde::Serialize;
 
 use crate::infra::repositories::entry_repository::get_decimals;
-use crate::utils::{
-    convert_via_quote, currency_pairs_to_routed_pair_id, normalize_to_decimals,
-    pair_id_to_currency_pair,
-};
+use crate::utils::{convert_via_quote, normalize_to_decimals};
 use pragma_common::types::timestamp::TimestampRange;
 
 use super::entry::{get_existing_pairs, onchain_pair_exist};
@@ -24,14 +22,14 @@ pub async fn get_historical_entries_and_decimals(
     onchain_pool: &Pool,
     offchain_pool: &Pool,
     network: &Network,
-    pair_id: String,
+    pair: &Pair,
     timestamp_range: &TimestampRange,
     chunk_interval: &Interval,
 ) -> Result<(Vec<HistoricalEntryRaw>, u32), InfraError> {
     let raw_entries: Vec<HistoricalEntryRaw> = get_historical_aggregated_entries(
         onchain_pool,
         network,
-        pair_id.clone(),
+        pair,
         timestamp_range,
         chunk_interval,
     )
@@ -41,7 +39,7 @@ pub async fn get_historical_entries_and_decimals(
         return Err(InfraError::NotFound);
     }
 
-    let decimals = get_decimals(offchain_pool, &pair_id).await?;
+    let decimals = get_decimals(offchain_pool, pair).await?;
     Ok((raw_entries, decimals))
 }
 
@@ -62,7 +60,7 @@ pub struct HistoricalEntryRaw {
 async fn get_historical_aggregated_entries(
     pool: &Pool,
     network: &Network,
-    pair_id: String,
+    pair: &Pair,
     timestamp: &TimestampRange,
     chunk_interval: &Interval,
 ) -> Result<Vec<HistoricalEntryRaw>, InfraError> {
@@ -91,6 +89,8 @@ async fn get_historical_aggregated_entries(
             get_onchain_aggregate_table_name(network, &DataType::SpotEntry, chunk_interval)?,
     );
 
+    let pair_id = pair.to_string();
+
     let conn = pool.get().await.map_err(adapt_infra_error)?;
     let raw_entries = conn
         .interact(move |conn| {
@@ -117,12 +117,10 @@ pub async fn retry_with_routing(
     onchain_pool: &Pool,
     offchain_pool: &Pool,
     network: &Network,
-    pair_id: String,
+    pair: &Pair,
     timestamp_range: &TimestampRange,
     chunk_interval: &Interval,
 ) -> Result<(Vec<HistoricalEntryRaw>, u32), InfraError> {
-    let (base, quote) = pair_id_to_currency_pair(&pair_id);
-
     let offchain_conn = offchain_pool.get().await.map_err(adapt_infra_error)?;
     let alternative_currencies = offchain_conn
         .interact(Currency::get_abstract_all)
@@ -133,17 +131,17 @@ pub async fn retry_with_routing(
     let existing_pairs = get_existing_pairs(onchain_pool, network).await?;
 
     for alt_currency in alternative_currencies {
-        let base_alt_pair = format!("{}/{}", base, alt_currency);
-        let alt_quote_pair = format!("{}/{}", quote, alt_currency);
+        let base_alt_pair = Pair::from((pair.base.clone(), alt_currency.clone()));
+        let alt_quote_pair = Pair::from((pair.quote.clone(), alt_currency.clone()));
 
-        if onchain_pair_exist(&existing_pairs, &base_alt_pair)
-            && onchain_pair_exist(&existing_pairs, &alt_quote_pair)
+        if onchain_pair_exist(&existing_pairs, &base_alt_pair.to_string())
+            && onchain_pair_exist(&existing_pairs, &alt_quote_pair.to_string())
         {
             let base_alt_result = get_historical_entries_and_decimals(
                 onchain_pool,
                 offchain_pool,
                 network,
-                base_alt_pair,
+                &base_alt_pair,
                 timestamp_range,
                 chunk_interval,
             )
@@ -152,7 +150,7 @@ pub async fn retry_with_routing(
                 onchain_pool,
                 offchain_pool,
                 network,
-                alt_quote_pair,
+                &alt_quote_pair,
                 timestamp_range,
                 chunk_interval,
             )
@@ -255,8 +253,11 @@ fn combine_entries(
         )))?
         .naive_utc();
 
+    let base_pair = Pair::from(base_entry.pair_id.clone());
+    let quote_pair = Pair::from(quote_entry.pair_id.clone());
+
     Ok(HistoricalEntryRaw {
-        pair_id: currency_pairs_to_routed_pair_id(&base_entry.pair_id, &quote_entry.pair_id),
+        pair_id: Pair::create_routed_pair(&base_pair, &quote_pair).to_string(),
         timestamp: new_timestamp,
         median_price: converted_price,
         nb_sources_aggregated: num_sources,

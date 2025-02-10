@@ -3,6 +3,7 @@ use axum::Json;
 use chrono::{DateTime, NaiveDateTime, Utc};
 
 use pragma_common::timestamp::TimestampRangeError;
+use pragma_common::types::pair::Pair;
 use pragma_common::types::{AggregationMode, DataType, Interval};
 use pragma_entities::EntryError;
 use serde::{Deserialize, Serialize};
@@ -12,7 +13,7 @@ use crate::infra::repositories::entry_repository::{self, MedianEntry};
 use crate::utils::PathExtractor;
 use crate::AppState;
 
-use crate::utils::{big_decimal_price_to_hex, currency_pair_to_pair_id};
+use crate::utils::big_decimal_price_to_hex;
 
 use super::GetEntryParams;
 
@@ -113,24 +114,20 @@ pub async fn get_entry(
 
     let routing_params = RoutingParams::try_from(params)?;
 
-    let pair_id = currency_pair_to_pair_id(&pair.0, &pair.1);
+    let pair = Pair::from(pair);
 
-    let (entry, decimals) = entry_repository::routing(
-        &state.offchain_pool,
-        is_routing,
-        pair_id.clone(),
-        routing_params,
-    )
-    .await
-    .map_err(|e| e.to_entry_error(&(pair_id)))?;
+    let (entry, decimals) =
+        entry_repository::routing(&state.offchain_pool, is_routing, &pair, routing_params)
+            .await
+            .map_err(|e| e.to_entry_error(&(pair.to_pair_id())))?;
 
     let last_updated_timestamp: NaiveDateTime =
-        entry_repository::get_last_updated_timestamp(&state.offchain_pool, pair_id.to_owned())
+        entry_repository::get_last_updated_timestamp(&state.offchain_pool, pair.to_pair_id())
             .await?
             .unwrap_or(entry.time);
 
     Ok(Json(adapt_entry_to_entry_response(
-        pair_id,
+        pair.into(),
         &entry,
         decimals,
         last_updated_timestamp,
