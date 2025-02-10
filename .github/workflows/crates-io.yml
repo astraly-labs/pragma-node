@@ -42,7 +42,7 @@ jobs:
 
     steps:
       - name: "Checkout source code"
-        uses: "actions/checkout@v3"
+        uses: "actions/checkout@v4"
         with:
           fetch-depth: 0
 
@@ -63,7 +63,7 @@ jobs:
 
     steps:
       - name: "Checkout source code"
-        uses: "actions/checkout@v3"
+        uses: "actions/checkout@v4"
 
       - name: "Check against Cargo.toml"
         run: |
@@ -92,7 +92,7 @@ jobs:
 
     steps:
       - name: "Checkout source code"
-        uses: "actions/checkout@v3"
+        uses: "actions/checkout@v4"
 
       - name: "Setup stable toolchain"
         uses: "actions-rs/toolchain@v1"
@@ -135,7 +135,7 @@ jobs:
 
     steps:
       - name: "Checkout source code"
-        uses: "actions/checkout@v3"
+        uses: "actions/checkout@v4"
 
       - name: "Login to crates.io"
         run: |
