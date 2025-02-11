@@ -52,7 +52,7 @@ uuid = { workspace = true, features = ["fast-rng", "v4", "serde"] }
 
 [dev-dependencies]
 rstest = { workspace = true }
-tokio-tungstenite = { version = "0.20.1", features = ["connect", "native-tls"] }
-url = "2.5.0"
-ratatui = "0.24.0"
-crossterm = "0.27.0"
+tokio-tungstenite = { version = "0.26.1", features = ["connect", "native-tls"] }
+url = "2.5.4"
+ratatui = "0.29.0"
+crossterm = "0.28.1"
