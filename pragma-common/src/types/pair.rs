@@ -3,6 +3,8 @@ use std::str::FromStr;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+const STABLE_SUFFIXES: [&str; 4] = ["USDT", "USDC", "USD", "DAI"];
+
 /// A pair of assets, e.g. BTC/USD
 ///
 /// This is a simple struct that holds the base and quote assets.
@@ -31,6 +33,23 @@ impl Pair {
             base: base.to_uppercase(),
             quote: quote.to_uppercase(),
         }
+    }
+
+    /// Creates a pair from a stable pair string with or without delimiters
+    /// e.g. "BTCUSDT" -> BTC/USD, "ETH-USDC" -> ETH/USD, "SOL_USDT" -> SOL/USD
+    pub fn from_stable_pair(pair: &str) -> Option<Self> {
+        let pair = pair.to_uppercase();
+        let normalized = pair.replace(['-', '_', '/'], "");
+
+        for stable in STABLE_SUFFIXES {
+            if let Some(base) = normalized.strip_suffix(stable) {
+                return Some(Self {
+                    base: base.to_string(),
+                    quote: "USD".to_string(),
+                });
+            }
+        }
+        None
     }
 
     /// Get the base and quote as a tuple
@@ -202,6 +221,36 @@ mod tests {
         assert_eq!(pair.format_with_separator("-"), "BTC-USD");
         assert_eq!(pair.format_with_separator("_"), "BTC_USD");
         assert_eq!(pair.to_string(), "BTC/USD");
+    }
+
+    #[test]
+    fn test_from_stable_pair() {
+        // Without delimiter
+        let pair = Pair::from_stable_pair("BTCUSDT").unwrap();
+        assert_eq!(pair.base, "BTC");
+        assert_eq!(pair.quote, "USD");
+
+        // With different delimiters
+        let pair = Pair::from_stable_pair("ETH-USDC").unwrap();
+        assert_eq!(pair.base, "ETH");
+        assert_eq!(pair.quote, "USD");
+
+        let pair = Pair::from_stable_pair("SOL_USDT").unwrap();
+        assert_eq!(pair.base, "SOL");
+        assert_eq!(pair.quote, "USD");
+
+        let pair = Pair::from_stable_pair("MATIC/USD").unwrap();
+        assert_eq!(pair.base, "MATIC");
+        assert_eq!(pair.quote, "USD");
+
+        // Case insensitive
+        let pair = Pair::from_stable_pair("dot-usdt").unwrap();
+        assert_eq!(pair.base, "DOT");
+        assert_eq!(pair.quote, "USD");
+
+        // Invalid cases
+        assert!(Pair::from_stable_pair("INVALID").is_none());
+        assert!(Pair::from_stable_pair("BTC-EUR").is_none());
     }
 
     // This test is commented out because it would fail at compile time
