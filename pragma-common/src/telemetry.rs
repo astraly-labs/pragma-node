@@ -1,5 +1,4 @@
 use color_eyre::eyre::Result;
-use init_tracing_opentelemetry::tracing_subscriber_ext::build_otel_layer;
 use opentelemetry::trace::TracerProvider;
 use opentelemetry::{global, KeyValue};
 use opentelemetry_appender_tracing::layer::OpenTelemetryTracingBridge;
@@ -15,6 +14,7 @@ use opentelemetry_sdk::{
 use opentelemetry_semantic_conventions::resource::SERVICE_NAME;
 use tracing::level_filters::LevelFilter;
 use tracing::Level;
+use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
@@ -23,9 +23,7 @@ pub fn init_telemetry(
     collection_endpoint: String,
     log_level: Option<Level>,
 ) -> Result<()> {
-    let (layer, _) = build_otel_layer()?;
     let tracing_subscriber = tracing_subscriber::registry()
-        .with(layer)
         .with(LevelFilter::from_level(log_level.unwrap_or(Level::INFO)))
         .with(
             tracing_subscriber::fmt::layer()
@@ -35,14 +33,13 @@ pub fn init_telemetry(
                 .pretty(),
         );
 
-    // TODO: Add tracer provider
-    // let tracer_provider = init_tracer_provider(&app_name, &collection_endpoint)?;
+    let tracer_provider = init_tracer_provider(&app_name, &collection_endpoint)?;
 
     let logger_provider = init_logs_provider(&app_name, &collection_endpoint)?;
     init_meter_provider(&app_name, &collection_endpoint)?;
 
     tracing_subscriber
-        // .with(OpenTelemetryLayer::new(tracer_provider))
+        .with(OpenTelemetryLayer::new(tracer_provider))
         .with(OpenTelemetryTracingBridge::new(&logger_provider))
         .try_init()?;
 

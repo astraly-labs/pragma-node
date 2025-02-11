@@ -45,7 +45,6 @@ chrono = { version = "0.4.26", features = ["serde"] }
 lazy_static = "1.4.0"
 serde = { version = "1.0.204", features = ["derive"] }
 moka = { version = "0.12", features = ["future"] }
-opentelemetry = { version = "0.26.0", features = ["metrics", "logs"] }
 nonzero_ext = { version = "0.3.0" }
 serde_json = { version = "1.0.122", features = ["arbitrary_precision"] }
 starknet = "0.12.0"
@@ -57,12 +56,10 @@ rdkafka = "0.36.2"
 time = "0.3.29"
 thiserror = "1.0.49"
 strum = { version = "0.26", features = ["derive"] }
-tracing = "0.1.4"
 tracing-test = "0.2.5"
 url = "2.5.0"
 tower = { version = "0.5" }
 tower-http = { version = "0.6.2", features = ["fs", "trace", "cors"] }
-tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 tokio = { version = "^1.43.0", features = ["full"] }
 toml = "0.8.8"
 utoipa = { version = "5.0.0", features = ["axum_extras", "chrono", "uuid"] }
@@ -71,26 +68,25 @@ utoipa-swagger-ui = { version = "8.0.3", features = ["axum"] }
 uuid = { version = "1.4", features = ["fast-rng", "v4", "serde"] }
 
 # David Bernard (sacre jojo)
-axum-tracing-opentelemetry = { git = "https://github.com/davidB/tracing-opentelemetry-instrumentation-sdk", tag = "axum-tracing-opentelemetry-v0.25.0", package = "axum-tracing-opentelemetry" }
-init-tracing-opentelemetry = { git = "https://github.com/davidB/tracing-opentelemetry-instrumentation-sdk", tag = "axum-tracing-opentelemetry-v0.25.0", package = "init-tracing-opentelemetry", features = [
-  "otlp",
-  "tracing_subscriber_ext",
-] }
-tracing-opentelemetry-instrumentation-sdk = { git = "https://github.com/davidB/tracing-opentelemetry-instrumentation-sdk", tag = "axum-tracing-opentelemetry-v0.25.0", package = "tracing-opentelemetry-instrumentation-sdk" }
-
+tracing = "0.1"
+axum-tracing-opentelemetry = "0.23.0"
+opentelemetry = { version = "0.26.0", features = ["metrics", "logs"] }
+opentelemetry_sdk = { version = "0.26.0", features = ["rt-tokio", "logs"] }
+opentelemetry-stdout = { version = "0.26.0" }
 opentelemetry-otlp = { version = "0.26.0", features = [
-  "metrics",
   "tonic",
-  "logs",
-] }
-opentelemetry_sdk = { version = "0.26.0", features = [
   "metrics",
-  "rt-tokio",
   "logs",
 ] }
-tracing-opentelemetry = "0.28.0"
-opentelemetry-appender-tracing = "0.26.0"
-opentelemetry-semantic-conventions = "0.26.0"
+opentelemetry-semantic-conventions = { version = "0.26.0" }
+opentelemetry-appender-tracing = { version = "0.26.0", default-features = false }
+tracing-core = { version = "0.1.32", default-features = false }
+tracing-subscriber = { version = "0.3.18", features = [
+  "env-filter",
+  "registry",
+  "std",
+] }
+tracing-opentelemetry = "0.27.0"
 
 pragma-monitoring = { git = "https://github.com/astraly-labs/pragma-monitoring" }
 

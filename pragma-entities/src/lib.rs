@@ -10,7 +10,6 @@ pub use error::{adapt_infra_error, InfraError};
 pub use models::{
     checkpoint_error::CheckpointError,
     currency::Currency,
-    currency_error::CurrencyError,
     entry::{Entry, NewEntry},
     entry_error::{EntryError, VolatilityError},
     future_entry::{FutureEntry, NewFutureEntry},

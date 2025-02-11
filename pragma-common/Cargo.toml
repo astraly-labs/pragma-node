@@ -20,7 +20,6 @@ color-eyre = { workspace = true }
 deadpool-diesel = { workspace = true }
 futures-util = { workspace = true }
 indexmap = { workspace = true }
-init-tracing-opentelemetry = { workspace = true }
 opentelemetry = { workspace = true }
 opentelemetry-appender-tracing = { workspace = true }
 opentelemetry-otlp = { workspace = true }

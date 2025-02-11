@@ -1,6 +1,5 @@
 pub mod checkpoint_error;
 pub mod currency;
-pub mod currency_error;
 pub mod entries;
 pub mod merkle_feed_error;
 pub mod optimistic_oracle_error;
