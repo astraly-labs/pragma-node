@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -76,6 +78,14 @@ impl From<String> for Pair {
     }
 }
 
+impl FromStr for Pair {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self::from(s))
+    }
+}
+
 impl From<(String, String)> for Pair {
     fn from(pair: (String, String)) -> Self {
         Self {
@@ -86,7 +96,7 @@ impl From<(String, String)> for Pair {
 }
 
 #[macro_export]
-macro_rules! generate_pair {
+macro_rules! pair {
     ($pair_str:expr) => {{
         #[allow(dead_code)]
         const fn validate_pair(s: &str) -> bool {
@@ -121,24 +131,24 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_generate_pair_macro() {
-        let pair1 = generate_pair!("BTC/USD");
+    fn test_pair_macro() {
+        let pair1 = pair!("BTC/USD");
         assert_eq!(pair1.base, "BTC");
         assert_eq!(pair1.quote, "USD");
 
-        let pair2 = generate_pair!("btc-usd");
+        let pair2 = pair!("btc-usd");
         assert_eq!(pair2.base, "BTC");
         assert_eq!(pair2.quote, "USD");
 
-        let pair3 = generate_pair!("eth_usdt");
+        let pair3 = pair!("eth_usdt");
         assert_eq!(pair3.base, "ETH");
         assert_eq!(pair3.quote, "USDT");
 
-        let pair4 = generate_pair!("SOL/usdc");
+        let pair4 = pair!("SOL/usdc");
         assert_eq!(pair4.base, "SOL");
         assert_eq!(pair4.quote, "USDC");
 
-        let pair5 = generate_pair!("bTc/uSDt");
+        let pair5 = pair!("bTc/uSDt");
         assert_eq!(pair5.base, "BTC");
         assert_eq!(pair5.quote, "USDT");
     }
