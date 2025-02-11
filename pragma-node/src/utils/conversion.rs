@@ -47,27 +47,3 @@ pub fn format_bigdecimal_price(price: BigDecimal, decimals: u32) -> String {
     }
     formatted_price
 }
-
-/// Converts two currencies pairs to a new routed pair id.
-///
-/// e.g "btc/usd" and "eth/usd" to "btc/eth"
-pub fn currency_pairs_to_routed_pair_id(base_pair: &str, quote_pair: &str) -> String {
-    let (base, _) = pair_id_to_currency_pair(base_pair);
-    let (quote, _) = pair_id_to_currency_pair(quote_pair);
-    format!("{}/{}", base.to_uppercase(), quote.to_uppercase())
-}
-
-/// Converts a currency pair to a pair id.
-///
-/// e.g "btc" and "usd" to "BTC/USD"
-pub fn currency_pair_to_pair_id(base: &str, quote: &str) -> String {
-    format!("{}/{}", base.to_uppercase(), quote.to_uppercase())
-}
-
-/// Converts a pair_id to a currency pair.
-///
-/// e.g "BTC/USD" to ("BTC", "USD")
-pub fn pair_id_to_currency_pair(pair_id: &str) -> (String, String) {
-    let parts: Vec<&str> = pair_id.split('/').collect();
-    (parts[0].to_string(), parts[1].to_string())
-}

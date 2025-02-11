@@ -6,6 +6,7 @@ use diesel::prelude::QueryableByName;
 use diesel::sql_types::{Double, Jsonb, VarChar};
 use diesel::{ExpressionMethods, QueryDsl, Queryable, RunQueryDsl};
 use pragma_common::errors::ConversionError;
+use pragma_common::types::pair::Pair;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -140,30 +141,24 @@ pub struct ExpiriesListRaw {
 pub async fn routing(
     pool: &deadpool_diesel::postgres::Pool,
     is_routing: bool,
-    pair_id: String,
+    pair: &Pair,
     routing_params: RoutingParams,
 ) -> Result<(MedianEntry, u32), InfraError> {
     // If we have entries for the pair_id and the latest entry is fresh enough,
     // Or if we are not routing, we can return the price directly.
     if !is_routing
-        || (pair_id_exist(pool, pair_id.clone()).await?
-            && get_last_updated_timestamp(pool, pair_id.clone())
+        || (pair_id_exist(pool, pair).await?
+            && get_last_updated_timestamp(pool, pair.to_pair_id())
                 .await?
                 .unwrap_or(NaiveDateTime::default())
                 .and_utc()
                 .timestamp()
                 >= Utc::now().naive_utc().and_utc().timestamp() - ROUTING_FRESHNESS_THRESHOLD)
     {
-        return get_price_and_decimals(pool, pair_id, routing_params).await;
+        return get_price_and_decimals(pool, pair, routing_params).await;
     }
 
-    let [base, quote]: [&str; 2] = pair_id
-        .split('/')
-        .collect::<Vec<_>>()
-        .try_into()
-        .map_err(|_| InfraError::InternalServerError)?;
-
-    match find_alternative_pair_price(pool, base, quote, routing_params).await {
+    match find_alternative_pair_price(pool, pair, routing_params).await {
         Ok(result) => Ok(result),
         Err(_) => Err(InfraError::NotFound),
     }
@@ -225,8 +220,7 @@ pub fn calculate_rebased_price(
 
 async fn find_alternative_pair_price(
     pool: &deadpool_diesel::postgres::Pool,
-    base: &str,
-    quote: &str,
+    pair: &Pair,
     routing_params: RoutingParams,
 ) -> Result<(MedianEntry, u32), InfraError> {
     let conn = pool.get().await.map_err(adapt_infra_error)?;
@@ -238,16 +232,16 @@ async fn find_alternative_pair_price(
         .map_err(adapt_infra_error)?;
 
     for alt_currency in alternative_currencies {
-        let base_alt_pair = format!("{}/{}", base, alt_currency);
-        let alt_quote_pair = format!("{}/{}", quote, alt_currency);
+        let base_alt_pair = Pair::from((pair.base.clone(), alt_currency.clone()));
+        let alt_quote_pair = Pair::from((pair.quote.clone(), alt_currency.clone()));
 
-        if pair_id_exist(pool, base_alt_pair.clone()).await?
-            && pair_id_exist(pool, alt_quote_pair.clone()).await?
+        if pair_id_exist(pool, &base_alt_pair.clone()).await?
+            && pair_id_exist(pool, &alt_quote_pair.clone()).await?
         {
             let base_alt_result =
-                get_price_and_decimals(pool, base_alt_pair, routing_params.clone()).await?;
+                get_price_and_decimals(pool, &base_alt_pair, routing_params.clone()).await?;
             let alt_quote_result =
-                get_price_and_decimals(pool, alt_quote_pair, routing_params).await?;
+                get_price_and_decimals(pool, &alt_quote_pair, routing_params).await?;
 
             return calculate_rebased_price(base_alt_result, alt_quote_result);
         }
@@ -258,12 +252,13 @@ async fn find_alternative_pair_price(
 
 async fn pair_id_exist(
     pool: &deadpool_diesel::postgres::Pool,
-    pair_id: String,
+    pair: &Pair,
 ) -> Result<bool, InfraError> {
     let conn = pool.get().await.map_err(adapt_infra_error)?;
 
+    let pair_str = pair.to_string();
     let res = conn
-        .interact(move |conn| Entry::exists(conn, pair_id))
+        .interact(move |conn| Entry::exists(conn, pair_str))
         .await
         .map_err(adapt_infra_error)?
         .map_err(adapt_infra_error)?;
@@ -273,16 +268,18 @@ async fn pair_id_exist(
 
 async fn get_price_and_decimals(
     pool: &deadpool_diesel::postgres::Pool,
-    pair_id: String,
+    pair: &Pair,
     routing_params: RoutingParams,
 ) -> Result<(MedianEntry, u32), InfraError> {
     let entry = match routing_params.aggregation_mode {
-        AggregationMode::Median => get_median_price(pool, pair_id.clone(), routing_params).await?,
-        AggregationMode::Twap => get_twap_price(pool, pair_id.clone(), routing_params).await?,
+        AggregationMode::Median => {
+            get_median_price(pool, pair.to_pair_id(), routing_params).await?
+        }
+        AggregationMode::Twap => get_twap_price(pool, pair.to_pair_id(), routing_params).await?,
         AggregationMode::Mean => Err(InfraError::InternalServerError)?,
     };
 
-    let decimals = get_decimals(pool, &(pair_id)).await?;
+    let decimals = get_decimals(pool, pair).await?;
 
     Ok((entry, decimals))
 }
@@ -477,18 +474,17 @@ pub async fn get_entries_between(
 
 pub async fn get_decimals(
     pool: &deadpool_diesel::postgres::Pool,
-    pair_id: &str,
+    pair: &Pair,
 ) -> Result<u32, InfraError> {
     let conn = pool.get().await.map_err(adapt_infra_error)?;
 
-    let quote_currency = pair_id.split('/').last().unwrap().to_uppercase();
-    let base_currency = pair_id.split('/').next().unwrap().to_uppercase();
+    let (quote, base) = pair.as_tuple();
 
     // Fetch currency in DB
     let quote_decimals: BigDecimal = conn
         .interact(move |conn| {
             currencies::table
-                .filter(currencies::name.eq(quote_currency))
+                .filter(currencies::name.eq(quote))
                 .select(currencies::decimals)
                 .first::<BigDecimal>(conn)
         })
@@ -498,7 +494,7 @@ pub async fn get_decimals(
     let base_decimals: BigDecimal = conn
         .interact(move |conn| {
             currencies::table
-                .filter(currencies::name.eq(base_currency))
+                .filter(currencies::name.eq(base))
                 .select(currencies::decimals)
                 .first::<BigDecimal>(conn)
         })

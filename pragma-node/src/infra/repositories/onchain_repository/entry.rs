@@ -5,6 +5,7 @@ use deadpool_diesel::postgres::Pool;
 use diesel::sql_types::{Numeric, Text, Timestamp, VarChar};
 use diesel::{Queryable, QueryableByName, RunQueryDsl};
 
+use pragma_common::types::pair::Pair;
 use pragma_common::types::{AggregationMode, DataType, Interval, Network};
 use pragma_entities::error::{adapt_infra_error, InfraError};
 use pragma_entities::Currency;
@@ -92,7 +93,8 @@ pub async fn routing(
         )
         .await?;
         if !prices_and_entries.is_empty() {
-            let decimal = get_decimals(offchain_pool, &pair_id).await?;
+            let pair = Pair::from(pair_id.clone());
+            let decimal = get_decimals(offchain_pool, &pair).await?;
             for row in prices_and_entries {
                 result.push(RawOnchainData {
                     price: row.aggregated_price,
@@ -134,7 +136,8 @@ pub async fn routing(
                 routing_args.aggregation_mode,
             )
             .await?;
-            let base_alt_decimal = get_decimals(offchain_pool, &base_alt_pair).await?;
+            let base_alt_decimal =
+                get_decimals(offchain_pool, &Pair::from(base_alt_pair.clone())).await?;
             let quote_alt_result = get_sources_and_aggregate(
                 onchain_pool,
                 routing_args.network,
@@ -143,7 +146,8 @@ pub async fn routing(
                 routing_args.aggregation_mode,
             )
             .await?;
-            let quote_alt_decimal = get_decimals(offchain_pool, &alt_quote_pair).await?;
+            let quote_alt_decimal =
+                get_decimals(offchain_pool, &Pair::from(alt_quote_pair.clone())).await?;
 
             let result = compute_multiple_rebased_price(
                 &mut base_alt_result,

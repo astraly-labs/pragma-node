@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use axum::extract::{Query, State};
 use axum::Json;
 use bigdecimal::BigDecimal;
+use pragma_common::types::pair::Pair;
 use pragma_common::types::{AggregationMode, Interval, Network};
 use pragma_entities::EntryError;
 use serde::{Deserialize, Serialize};
@@ -13,8 +14,6 @@ use crate::infra::repositories::onchain_repository::entry::{
 };
 use crate::utils::{big_decimal_price_to_hex, PathExtractor};
 use crate::AppState;
-
-use crate::utils::currency_pair_to_pair_id;
 
 #[derive(Debug, Default, Deserialize, IntoParams, ToSchema)]
 pub struct GetOnchainEntryParams {
@@ -65,7 +64,8 @@ pub async fn get_onchain_entry(
     PathExtractor(pair): PathExtractor<(String, String)>,
     Query(params): Query<GetOnchainEntryParams>,
 ) -> Result<Json<GetOnchainEntryResponse>, EntryError> {
-    let pair_id: String = currency_pair_to_pair_id(&pair.0, &pair.1);
+    let pair = Pair::from(pair);
+
     let with_components = params.components.unwrap_or(true);
     let with_variations = params.variations.unwrap_or(true);
 
@@ -77,7 +77,7 @@ pub async fn get_onchain_entry(
     };
 
     let routing_arguments = OnchainRoutingArguments {
-        pair_id: pair_id.clone(),
+        pair_id: pair.to_pair_id(),
         network: params.network,
         timestamp: (timestamp as u64),
         aggregation_mode: params.aggregation.unwrap_or_default(),
@@ -86,29 +86,29 @@ pub async fn get_onchain_entry(
 
     let raw_data = routing(&state.onchain_pool, &state.offchain_pool, routing_arguments)
         .await
-        .map_err(|db_error| db_error.to_entry_error(&pair_id))?;
+        .map_err(|db_error| db_error.to_entry_error(&pair.to_pair_id()))?;
 
     let entry = raw_data
         .first()
-        .ok_or_else(|| EntryError::NotFound(pair_id.to_string()))?;
+        .ok_or_else(|| EntryError::NotFound(pair.to_pair_id()))?;
 
     let last_updated_timestamp =
         get_last_updated_timestamp(&state.onchain_pool, params.network, entry.pair_used.clone())
             .await
-            .map_err(|db_error| db_error.to_entry_error(&pair_id))?;
+            .map_err(|db_error| db_error.to_entry_error(&pair.to_pair_id()))?;
 
     let variations = if with_variations {
         Some(
-            get_variations(&state.onchain_pool, params.network, pair_id.clone())
+            get_variations(&state.onchain_pool, params.network, pair.to_pair_id())
                 .await
-                .map_err(|db_error| db_error.to_entry_error(&pair_id))?,
+                .map_err(|db_error| db_error.to_entry_error(&pair.to_pair_id()))?,
         )
     } else {
         None
     };
 
     Ok(Json(adapt_entries_to_onchain_response(
-        pair_id.clone(),
+        pair.to_pair_id(),
         entry.decimal,
         entry.sources.clone(),
         entry.price.clone(),

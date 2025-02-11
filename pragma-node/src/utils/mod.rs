@@ -1,13 +1,11 @@
 pub use aws::PragmaSignerBuilder;
-pub use conversion::{
-    convert_via_quote, currency_pair_to_pair_id, currency_pairs_to_routed_pair_id,
-    format_bigdecimal_price, normalize_to_decimals, pair_id_to_currency_pair,
-};
+pub use conversion::{convert_via_quote, format_bigdecimal_price, normalize_to_decimals};
 pub use custom_extractors::path_extractor::PathExtractor;
 pub use kafka::publish_to_kafka;
 use moka::future::Cache;
 use pragma_common::timestamp::TimestampRangeError;
 use pragma_common::types::entries::Entry;
+use pragma_common::types::pair::Pair;
 use pragma_entities::dto::Publisher;
 pub use ws::*;
 
@@ -42,13 +40,13 @@ pub(crate) fn get_decimals_for_pair(
     currencies: &HashMap<String, BigDecimal>,
     pair_id: &str,
 ) -> u32 {
-    let (base, quote) = pair_id_to_currency_pair(pair_id);
+    let pair = Pair::from(pair_id);
     let base_decimals = currencies
-        .get(&base)
+        .get(&pair.base)
         .map(|d| d.to_u32().unwrap_or(8))
         .unwrap_or(8);
     let quote_decimals = currencies
-        .get(&quote)
+        .get(&pair.quote)
         .map(|d| d.to_u32().unwrap_or(8))
         .unwrap_or(8);
     std::cmp::min(base_decimals, quote_decimals)

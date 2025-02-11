@@ -1,6 +1,7 @@
 use axum::extract::{Query, State};
 use axum::Json;
 
+use pragma_common::types::pair::Pair;
 use pragma_common::types::Network;
 use pragma_entities::CheckpointError;
 use serde::{Deserialize, Serialize};
@@ -8,7 +9,6 @@ use utoipa::{IntoParams, ToResponse, ToSchema};
 
 use crate::infra::repositories::entry_repository::get_decimals;
 use crate::infra::repositories::onchain_repository::checkpoint::get_checkpoints;
-use crate::utils::currency_pair_to_pair_id;
 use crate::utils::PathExtractor;
 use crate::AppState;
 
@@ -59,21 +59,21 @@ pub async fn get_onchain_checkpoints(
     PathExtractor(pair): PathExtractor<(String, String)>,
     Query(params): Query<GetOnchainCheckpointsParams>,
 ) -> Result<Json<GetOnchainCheckpointsResponse>, CheckpointError> {
-    let pair_id: String = currency_pair_to_pair_id(&pair.0, &pair.1);
+    let pair = Pair::from(pair);
 
     let limit = params.limit.unwrap_or(DEFAULT_LIMIT);
     if !(1..=MAX_LIMIT).contains(&limit) {
         return Err(CheckpointError::InvalidLimit(limit));
     }
 
-    let decimals = get_decimals(&state.offchain_pool, &pair_id)
+    let decimals = get_decimals(&state.offchain_pool, &pair)
         .await
         .map_err(CheckpointError::from)?;
 
     let checkpoints = get_checkpoints(
         &state.onchain_pool,
         params.network,
-        pair_id.clone(),
+        pair.into(),
         decimals,
         limit,
     )

@@ -1,5 +1,6 @@
 use axum::extract::{Query, State};
 use axum::Json;
+use pragma_common::types::pair::Pair;
 use pragma_common::types::{Interval, Network};
 use pragma_entities::EntryError;
 use serde::{Deserialize, Serialize};
@@ -11,8 +12,6 @@ use crate::infra::repositories::onchain_repository::history::{
 use crate::utils::{big_decimal_price_to_hex, PathExtractor};
 use crate::AppState;
 use pragma_common::types::timestamp::TimestampRange;
-
-use crate::utils::currency_pair_to_pair_id;
 
 #[derive(Debug, Deserialize, IntoParams, ToSchema)]
 pub struct GetOnchainHistoryParams {
@@ -52,7 +51,8 @@ pub async fn get_onchain_history(
     PathExtractor(pair): PathExtractor<(String, String)>,
     Query(params): Query<GetOnchainHistoryParams>,
 ) -> Result<Json<GetOnchainHistoryResponse>, EntryError> {
-    let pair_id: String = currency_pair_to_pair_id(&pair.0, &pair.1);
+    let pair = Pair::from(pair);
+
     let network = params.network;
     let timestamp_range = params
         .timestamp
@@ -66,7 +66,7 @@ pub async fn get_onchain_history(
         &state.onchain_pool,
         &state.offchain_pool,
         &network,
-        pair_id.clone(),
+        &pair,
         &timestamp_range,
         &chunk_interval,
     )
@@ -82,13 +82,13 @@ pub async fn get_onchain_history(
                 &state.onchain_pool,
                 &state.offchain_pool,
                 &network,
-                pair_id.clone(),
+                &pair,
                 &timestamp_range,
                 &chunk_interval,
             )
             .await?
         }
-        Err(e) => return Err(e.to_entry_error(&pair_id)),
+        Err(e) => return Err(e.to_entry_error(&pair.to_pair_id())),
     };
 
     let response = prepare_response(raw_entries, decimals);
