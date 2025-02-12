@@ -28,6 +28,8 @@ pub async fn stream_entry(
     let pair = Pair::from(pair);
     let is_routing = params.routing.unwrap_or(false);
 
+    let interval = params.interval.unwrap_or_default();
+
     let generator: BoxedStreamItem = match RoutingParams::try_from(params) {
         Ok(routing_params) => {
             let state = state.clone();
@@ -63,7 +65,7 @@ pub async fn stream_entry(
 
     Sse::new(stream).keep_alive(
         axum::response::sse::KeepAlive::new()
-            .interval(Duration::from_secs(30))
+            .interval(Duration::from_secs(interval as u64))
             .text("keep-alive-text"),
     )
 }
