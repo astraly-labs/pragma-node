@@ -61,11 +61,11 @@ pub async fn stream_entry(
     let stream = stream::repeat_with(generator)
         .then(|future| future)
         .map(Ok)
-        .throttle(Duration::from_secs(30));
+        .throttle(Duration::from_secs(interval.to_seconds() as u64));
 
     Sse::new(stream).keep_alive(
         axum::response::sse::KeepAlive::new()
-            .interval(Duration::from_secs(interval as u64))
+            .interval(Duration::from_secs(60))
             .text("keep-alive-text"),
     )
 }
