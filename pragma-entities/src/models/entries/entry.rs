@@ -105,9 +105,17 @@ impl Entry {
     pub fn get_last_updated_timestamp(
         conn: &mut PgConnection,
         pair: String,
+        max_timestamp: i64,
     ) -> DieselResult<Option<chrono::NaiveDateTime>> {
+        let Some(max_timestamp) = chrono::DateTime::from_timestamp(max_timestamp, 0) else {
+            return Err(diesel::result::Error::DatabaseError(
+                diesel::result::DatabaseErrorKind::CheckViolation,
+                Box::new(format!("Invalid timestamp value: {}", max_timestamp)),
+            ));
+        };
         entries::table
             .filter(entries::pair_id.eq(pair))
+            .filter(entries::timestamp.le(max_timestamp))
             .select(entries::timestamp)
             .order(entries::timestamp.desc())
             .first(conn)

@@ -117,14 +117,17 @@ pub async fn get_entry(
     let pair = Pair::from(pair);
 
     let (entry, decimals) =
-        entry_repository::routing(&state.offchain_pool, is_routing, &pair, routing_params)
+        entry_repository::routing(&state.offchain_pool, is_routing, &pair, &routing_params)
             .await
             .map_err(|e| e.to_entry_error(&(pair.to_pair_id())))?;
 
-    let last_updated_timestamp: NaiveDateTime =
-        entry_repository::get_last_updated_timestamp(&state.offchain_pool, pair.to_pair_id())
-            .await?
-            .unwrap_or(entry.time);
+    let last_updated_timestamp: NaiveDateTime = entry_repository::get_last_updated_timestamp(
+        &state.offchain_pool,
+        pair.to_pair_id(),
+        routing_params.timestamp,
+    )
+    .await?
+    .unwrap_or(entry.time);
 
     Ok(Json(adapt_entry_to_entry_response(
         pair.into(),
