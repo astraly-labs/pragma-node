@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use bigdecimal::{BigDecimal, FromPrimitive, ToPrimitive};
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::{DateTime, NaiveDateTime};
 use diesel::prelude::QueryableByName;
 use diesel::sql_types::{Double, Jsonb, VarChar};
 use diesel::{ExpressionMethods, QueryDsl, Queryable, RunQueryDsl};
@@ -153,7 +153,7 @@ pub async fn routing(
                 .unwrap_or(NaiveDateTime::default())
                 .and_utc()
                 .timestamp()
-                >= Utc::now().naive_utc().and_utc().timestamp() - ROUTING_FRESHNESS_THRESHOLD)
+                >= routing_params.timestamp - ROUTING_FRESHNESS_THRESHOLD)
     {
         return get_price_and_decimals(pool, pair, routing_params).await;
     }
