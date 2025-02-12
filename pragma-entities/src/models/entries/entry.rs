@@ -1,6 +1,8 @@
+use crate::convert_timestamp_to_datetime;
 use crate::dto::entry as dto;
 use crate::models::DieselResult;
 use crate::schema::entries;
+use crate::EntryError;
 use bigdecimal::BigDecimal;
 use diesel::internal::derives::multiconnection::chrono::NaiveDateTime;
 use diesel::upsert::excluded;
@@ -107,12 +109,12 @@ impl Entry {
         pair: String,
         max_timestamp: i64,
     ) -> DieselResult<Option<chrono::NaiveDateTime>> {
-        let Some(max_timestamp) = chrono::DateTime::from_timestamp(max_timestamp, 0) else {
-            return Err(diesel::result::Error::DatabaseError(
+        let max_timestamp = convert_timestamp_to_datetime!(max_timestamp).map_err(|_| {
+            diesel::result::Error::DatabaseError(
                 diesel::result::DatabaseErrorKind::CheckViolation,
                 Box::new(format!("Invalid timestamp value: {}", max_timestamp)),
-            ));
-        };
+            )
+        })?;
         entries::table
             .filter(entries::pair_id.eq(pair))
             .filter(entries::timestamp.le(max_timestamp))
