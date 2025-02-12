@@ -134,7 +134,7 @@ pub async fn get_entry(
     )))
 }
 
-fn adapt_entry_to_entry_response(
+pub fn adapt_entry_to_entry_response(
     pair_id: String,
     entry: &MedianEntry,
     decimals: u32,

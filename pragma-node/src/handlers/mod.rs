@@ -8,6 +8,7 @@ pub mod merkle_feeds;
 pub mod onchain;
 pub mod optimistic_oracle;
 pub mod publish_entry_ws;
+pub mod stream_entry;
 pub mod subscribe_to_entry;
 pub mod subscribe_to_price;
 

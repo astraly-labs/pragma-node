@@ -18,6 +18,7 @@ use crate::handlers::optimistic_oracle::{
     get_disputed_assertions::get_disputed_assertions,
     get_resolved_assertions::get_resolved_assertions,
 };
+use crate::handlers::stream_entry::stream_entry;
 use crate::handlers::{
     create_entries, create_future_entries, get_entry, get_expiries, get_ohlc, get_volatility,
     publish_entry, subscribe_to_entry, subscribe_to_price,
@@ -63,6 +64,7 @@ fn data_routes(state: AppState) -> Router<AppState> {
         .route("/{base}/{quote}/future_expiries", get(get_expiries))
         .route("/subscribe", get(subscribe_to_entry))
         .route("/price/subscribe", get(subscribe_to_price))
+        .route("/price/stream", get(stream_entry))
         .with_state(state)
 }
 
