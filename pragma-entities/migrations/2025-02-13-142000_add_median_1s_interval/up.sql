@@ -1,4 +1,3 @@
--- Your SQL goes here
 CREATE MATERIALIZED VIEW price_1_s_agg
 WITH (timescaledb.continuous, timescaledb.materialized_only = false)
 AS SELECT 
@@ -9,3 +8,8 @@ AS SELECT
 FROM entries
 GROUP BY bucket, pair_id
 WITH NO DATA;
+
+SELECT add_continuous_aggregate_policy('price_1_s_agg',
+  start_offset => INTERVAL '1 day',
+  end_offset => INTERVAL '2 seconds',
+  schedule_interval => INTERVAL '1 second');

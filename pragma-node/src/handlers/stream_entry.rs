@@ -55,7 +55,7 @@ pub async fn stream_entry(
         historical_prices
     );
 
-    let generator: BoxedStreamItem = if !is_routing
+    let generator: BoxedStreamItem = if is_routing
         || matches!(
             params.get_entry_params.aggregation,
             Some(AggregationMode::Twap | AggregationMode::Mean)
@@ -83,6 +83,7 @@ pub async fn stream_entry(
                     let state = state.clone();
                     let pair = pair.clone();
                     let params = routing_params.clone();
+
                     let is_first = first_batch;
                     first_batch = false;
 
