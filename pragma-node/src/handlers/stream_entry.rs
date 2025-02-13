@@ -1,4 +1,5 @@
-use crate::{infra::repositories::entry_repository, utils::PathExtractor, AppState};
+use std::{convert::Infallible, pin::Pin, time::Duration};
+
 use axum::{
     extract::{Query, State},
     response::sse::{Event, Sse},
@@ -8,17 +9,19 @@ use futures::{
     stream::{self, Stream},
     Future,
 };
-use pragma_common::types::{pair::Pair, AggregationMode};
-use pragma_entities::EntryError;
 use serde::Deserialize;
-use std::{convert::Infallible, pin::Pin, time::Duration};
 use tokio_stream::StreamExt;
 use utoipa::{IntoParams, ToSchema};
+
+use pragma_common::types::{pair::Pair, AggregationMode};
+use pragma_entities::EntryError;
 
 use super::{
     get_entry::{adapt_entry_to_entry_response, GetEntryResponse, RoutingParams},
     GetEntryParams,
 };
+
+use crate::{infra::repositories::entry_repository, utils::PathExtractor, AppState};
 
 const DEFAULT_HISTORICAL_PRICES: usize = 50;
 
@@ -52,51 +55,75 @@ pub async fn stream_entry(
         historical_prices
     );
 
-    let generator: BoxedStreamItem = match RoutingParams::try_from(params.get_entry_params) {
-        Ok(routing_params) => {
-            let mut first_batch = true;
+    let generator: BoxedStreamItem = if !is_routing
+        || matches!(
+            params.get_entry_params.aggregation,
+            Some(AggregationMode::Twap | AggregationMode::Mean)
+        ) {
+        let mut sent_error = false;
+        Box::new(move || {
+            let first = !sent_error;
+            sent_error = true;
 
-            Box::new(move || {
-                let state = state.clone();
-                let pair = pair.clone();
-                let params = routing_params.clone();
-                let is_first = first_batch;
-                first_batch = false;
+            Box::pin(async move {
+                if first {
+                    Event::default()
+                        .data("SSE streaming for entries only works with no routing & for median.")
+                } else {
+                    Event::default()
+                }
+            })
+        })
+    } else {
+        match RoutingParams::try_from(params.get_entry_params) {
+            Ok(routing_params) => {
+                let mut first_batch = true;
 
-                Box::pin(async move {
-                    if is_first {
-                        // For the first batch, get historical prices
-                        match get_historical_entries(&state, &pair, &params, historical_prices)
-                            .await
-                        {
-                            Ok(entries) => {
-                                let json = serde_json::to_string(&entries).unwrap_or_default();
-                                Event::default().data(json).event("historical")
-                            }
-                            Err(e) => Event::default()
-                                .data(format!("Error fetching historical entries: {e}")),
-                        }
-                    } else {
-                        // For subsequent updates, get latest price
-                        match get_latest_entry(&state, &pair, is_routing, &params).await {
-                            Ok(entry_response) => match serde_json::to_string(&entry_response) {
-                                Ok(json) => Event::default().data(json),
-                                Err(e) => {
-                                    Event::default().data(format!("Serialization error: {e}"))
+                Box::new(move || {
+                    let state = state.clone();
+                    let pair = pair.clone();
+                    let params = routing_params.clone();
+                    let is_first = first_batch;
+                    first_batch = false;
+
+                    Box::pin(async move {
+                        if is_first {
+                            // For the first batch, get historical prices
+                            match get_historical_entries(&state, &pair, &params, historical_prices)
+                                .await
+                            {
+                                Ok(entries) => {
+                                    let json = serde_json::to_string(&entries).unwrap_or_default();
+                                    Event::default().data(json).event("historical")
                                 }
-                            },
-                            Err(e) => Event::default().data(format!("Error fetching entry: {e}")),
+                                Err(e) => Event::default()
+                                    .data(format!("Error fetching historical entries: {e}")),
+                            }
+                        } else {
+                            // For subsequent updates, get latest price
+                            match get_latest_entry(&state, &pair, is_routing, &params).await {
+                                Ok(entry_response) => {
+                                    match serde_json::to_string(&entry_response) {
+                                        Ok(json) => Event::default().data(json),
+                                        Err(e) => Event::default()
+                                            .data(format!("Serialization error: {e}")),
+                                    }
+                                }
+                                Err(e) => {
+                                    Event::default().data(format!("Error fetching entry: {e}"))
+                                }
+                            }
                         }
-                    }
-                }) as BoxedFuture
-            })
-        }
-        Err(e) => {
-            let error_message = format!("Error: {e}");
-            Box::new(move || {
-                let msg = error_message.clone();
-                Box::pin(async move { Event::default().data(msg) }) as BoxedFuture
-            })
+                    }) as BoxedFuture
+                })
+            }
+            Err(e) => {
+                let error_message = format!("Error: {e}");
+                Box::new(move || {
+                    let msg = error_message.clone();
+                    Box::pin(async move { Event::default().data(msg) }) as BoxedFuture
+                })
+            }
         }
     };
 
