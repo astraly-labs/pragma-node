@@ -118,6 +118,7 @@ CREATE TABLE publishers (
     name VARCHAR NOT NULL,
     website_url VARCHAR NOT NULL,
     mainnet_address VARCHAR,
+    testnet_address VARCHAR,
     publisher_type INTEGER NOT NULL CHECK (publisher_type IN (0, 1)) -- 0 = first party, 1 = 3rd party
 );
 
