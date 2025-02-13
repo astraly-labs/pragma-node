@@ -22,17 +22,18 @@ pub enum SettlementResolution {
 impl From<Option<bool>> for SettlementResolution {
     fn from(res: Option<bool>) -> Self {
         match res {
-            Some(true) => SettlementResolution::True,
-            Some(false) => SettlementResolution::False,
-            None => SettlementResolution::Undefined,
+            Some(true) => Self::True,
+            Some(false) => Self::False,
+            None => Self::Undefined,
         }
     }
 }
 impl From<bool> for SettlementResolution {
     fn from(res: bool) -> Self {
-        match res {
-            true => SettlementResolution::True,
-            false => SettlementResolution::False,
+        if res {
+            Self::True
+        } else {
+            Self::False
         }
     }
 }

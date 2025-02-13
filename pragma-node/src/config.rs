@@ -44,7 +44,7 @@ impl Default for RedisConfig {
     }
 }
 
-#[derive(Default, Debug, Deserialize, PartialEq)]
+#[derive(Default, Debug, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum Mode {
     Dev,
@@ -74,7 +74,7 @@ impl Config {
         &self.server.host
     }
 
-    pub fn server_port(&self) -> u16 {
+    pub const fn server_port(&self) -> u16 {
         self.server.port
     }
 
@@ -86,7 +86,7 @@ impl Config {
         &self.redis.redis_host
     }
 
-    pub fn redis_port(&self) -> u16 {
+    pub const fn redis_port(&self) -> u16 {
         self.redis.redis_port
     }
 }

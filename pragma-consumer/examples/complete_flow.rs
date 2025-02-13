@@ -14,7 +14,7 @@ use starknet::signers::{LocalWallet, SigningKey};
 async fn main() -> Result<(), ()> {
     let api_config = ApiConfig {
         base_url: PragmaBaseUrl::Dev,
-        api_key: "".into(),
+        api_key: String::new(),
     };
 
     let consumer = PragmaConsumerBuilder::new()

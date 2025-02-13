@@ -33,10 +33,11 @@ pub async fn get_assertions(
             .map_err(OptimisticOracleError::from)?;
 
     let total_count = assertions.len();
-    let total_pages = (total_count as f64 / page_size as f64).ceil() as u32;
+    let total_pages = (total_count as u32).div_ceil(page_size);
 
     let response = GetAssertionsResponse {
         assertions,
+        #[allow(clippy::cast_possible_wrap)]
         total_count: total_count as i64,
         current_page: page,
         total_pages,

@@ -54,8 +54,6 @@ pub async fn stream_entry(
 
     let generator: BoxedStreamItem = match RoutingParams::try_from(params.get_entry_params) {
         Ok(routing_params) => {
-            let state = state.clone();
-            let pair = pair.clone();
             let mut first_batch = true;
 
             Box::new(move || {
@@ -76,7 +74,7 @@ pub async fn stream_entry(
                                 Event::default().data(json).event("historical")
                             }
                             Err(e) => Event::default()
-                                .data(format!("Error fetching historical entries: {}", e)),
+                                .data(format!("Error fetching historical entries: {e}")),
                         }
                     } else {
                         // For subsequent updates, get latest price
@@ -84,17 +82,17 @@ pub async fn stream_entry(
                             Ok(entry_response) => match serde_json::to_string(&entry_response) {
                                 Ok(json) => Event::default().data(json),
                                 Err(e) => {
-                                    Event::default().data(format!("Serialization error: {}", e))
+                                    Event::default().data(format!("Serialization error: {e}"))
                                 }
                             },
-                            Err(e) => Event::default().data(format!("Error fetching entry: {}", e)),
+                            Err(e) => Event::default().data(format!("Error fetching entry: {e}")),
                         }
                     }
                 }) as BoxedFuture
             })
         }
         Err(e) => {
-            let error_message = format!("Error: {}", e);
+            let error_message = format!("Error: {e}");
             Box::new(move || {
                 let msg = error_message.clone();
                 Box::pin(async move { Event::default().data(msg) }) as BoxedFuture

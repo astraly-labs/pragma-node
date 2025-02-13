@@ -100,6 +100,7 @@ async fn create_new_subscriber(socket: WebSocket, app_state: AppState, client_ad
 
 struct WsEntriesHandler;
 
+#[async_trait::async_trait]
 impl ChannelHandler<SubscriptionState, SubscriptionRequest, EntryError> for WsEntriesHandler {
     #[tracing::instrument(
         skip(self, subscriber),
@@ -346,7 +347,7 @@ impl SubscriptionState {
     fn get_fmt_subscribed_perp_pairs(&self) -> Vec<String> {
         self.perp_pairs
             .iter()
-            .map(|pair| format!("{}:MARK", pair))
+            .map(|pair| format!("{pair}:MARK"))
             .collect()
     }
 

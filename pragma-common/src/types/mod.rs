@@ -34,7 +34,7 @@ pub enum Network {
     Mainnet,
 }
 
-#[derive(Default, Debug, Deserialize, ToSchema, Clone, Copy, PartialEq)]
+#[derive(Default, Debug, Deserialize, ToSchema, Clone, Copy, PartialEq, Eq)]
 pub enum DataType {
     #[serde(rename = "spot_entry")]
     #[default]
@@ -64,18 +64,18 @@ pub enum Interval {
 }
 
 impl Interval {
-    pub fn to_minutes(&self) -> i64 {
+    pub const fn to_minutes(&self) -> i64 {
         match self {
-            Interval::OneMinute => 1,
-            Interval::FifteenMinutes => 15,
-            Interval::OneHour => 60,
-            Interval::TwoHours => 120,
-            Interval::OneDay => 1400,
-            Interval::OneWeek => 10080,
+            Self::OneMinute => 1,
+            Self::FifteenMinutes => 15,
+            Self::OneHour => 60,
+            Self::TwoHours => 120,
+            Self::OneDay => 1400,
+            Self::OneWeek => 10080,
         }
     }
 
-    pub fn to_seconds(&self) -> i64 {
+    pub const fn to_seconds(&self) -> i64 {
         self.to_minutes() * 60
     }
 }

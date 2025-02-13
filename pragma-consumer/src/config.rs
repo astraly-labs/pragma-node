@@ -1,4 +1,4 @@
-/// PragmAPI Base url. Can be either Dev, Prod or a Custom url.
+/// `PragmAPI` Base url. Can be either Dev, Prod or a Custom url.
 #[derive(Debug, Clone)]
 pub enum PragmaBaseUrl {
     Dev,
@@ -9,14 +9,14 @@ pub enum PragmaBaseUrl {
 impl PragmaBaseUrl {
     pub fn url(&self) -> &str {
         match self {
-            PragmaBaseUrl::Dev => "https://api.dev.pragma.build",
-            PragmaBaseUrl::Prod => "https://api.prod.pragma.build",
-            PragmaBaseUrl::Custom(url) => url,
+            Self::Dev => "https://api.dev.pragma.build",
+            Self::Prod => "https://api.prod.pragma.build",
+            Self::Custom(url) => url,
         }
     }
 }
 
-/// Required fields to connect to our PragmAPI.
+/// Required fields to connect to our `PragmAPI`.
 #[derive(Debug, Clone)]
 pub struct ApiConfig {
     pub base_url: PragmaBaseUrl,

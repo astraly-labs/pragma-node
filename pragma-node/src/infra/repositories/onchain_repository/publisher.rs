@@ -45,7 +45,6 @@ pub async fn get_publishers(
         ORDER BY
             name ASC;
     "#,
-        address_column = address_column,
     );
 
     let conn = pool.get().await.map_err(adapt_infra_error)?;
@@ -73,7 +72,10 @@ pub struct RawLastPublisherEntryForPair {
 }
 
 impl RawLastPublisherEntryForPair {
-    pub fn to_publisher_entry(&self, currencies: &HashMap<String, BigDecimal>) -> PublisherEntry {
+    pub fn to_publisher_entry<S: ::std::hash::BuildHasher>(
+        &self,
+        currencies: &HashMap<String, BigDecimal, S>,
+    ) -> PublisherEntry {
         PublisherEntry {
             pair_id: self.pair_id.clone(),
             last_updated_timestamp: self.last_updated_timestamp.and_utc().timestamp() as u64,
@@ -128,8 +130,6 @@ async fn get_all_publishers_updates(
         GROUP BY 
             publisher;
         "#,
-        table_name = table_name,
-        publishers_list = publishers_list,
     );
 
     let conn = pool.get().await.map_err(adapt_infra_error)?;
@@ -152,12 +152,12 @@ async fn get_all_publishers_updates(
     Ok(updates)
 }
 
-async fn get_publisher_with_components(
+async fn get_publisher_with_components<S: ::std::hash::BuildHasher>(
     pool: &Pool,
     table_name: &str,
     publisher: &RawPublisher,
     publisher_updates: &RawPublisherUpdates,
-    currencies: &HashMap<String, BigDecimal>,
+    currencies: &HashMap<String, BigDecimal, S>,
 ) -> Result<Publisher, InfraError> {
     let raw_sql_entries = format!(
         r#"
@@ -235,15 +235,16 @@ async fn get_publisher_with_components(
     Ok(publisher)
 }
 
-pub async fn get_publishers_with_components(
+#[allow(clippy::implicit_hasher)]
+pub async fn get_publishers_with_components<S: ::std::hash::BuildHasher>(
     pool: &Pool,
     network: Network,
     data_type: DataType,
-    currencies: HashMap<String, BigDecimal>,
+    currencies: HashMap<String, BigDecimal, S>,
     publishers: Vec<RawPublisher>,
     publishers_updates_cache: Cache<String, HashMap<String, RawPublisherUpdates>>,
 ) -> Result<Vec<Publisher>, InfraError> {
-    let table_name = get_onchain_table_name(&network, &data_type)?;
+    let table_name = get_onchain_table_name(network, data_type)?;
     let publisher_names = publishers.iter().map(|p| p.name.clone()).collect();
 
     let updates =
@@ -251,10 +252,9 @@ pub async fn get_publishers_with_components(
             .await?;
     let mut publishers_response = Vec::with_capacity(publishers.len());
 
-    for publisher in publishers.iter() {
-        let publisher_updates = match updates.get(&publisher.name) {
-            Some(updates) => updates,
-            None => continue,
+    for publisher in &publishers {
+        let Some(publisher_updates) = updates.get(&publisher.name) else {
+            continue;
         };
         if publisher_updates.daily_updates == 0 {
             continue;

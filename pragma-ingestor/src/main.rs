@@ -1,14 +1,16 @@
+pub mod config;
+pub mod consumer;
+mod error;
+
 use deadpool_diesel::postgres::Pool;
 use dotenvy::dotenv;
+use tokio::sync::mpsc;
+use tracing::{error, info};
+
 use pragma_entities::connection::ENV_OFFCHAIN_DATABASE_URL;
 use pragma_entities::{
     adapt_infra_error, Entry, FutureEntry, InfraError, NewEntry, NewFutureEntry,
 };
-use tokio::sync::mpsc;
-use tracing::{error, info};
-mod config;
-mod consumer;
-mod error;
 
 #[tokio::main]
 #[tracing::instrument]

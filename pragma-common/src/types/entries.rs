@@ -7,7 +7,7 @@ use utoipa::ToSchema;
 use crate::typed_data::{Domain, Field, PrimitiveType, SimpleField, TypedData};
 use crate::types::utils::flexible_u128;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 pub struct BaseEntry {
     pub timestamp: u64,
     pub source: String,
@@ -25,7 +25,7 @@ pub trait EntryTrait {
 }
 
 // Entry = SpotEntry
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 pub struct Entry {
     pub base: BaseEntry,
     pub pair_id: String,
@@ -68,7 +68,7 @@ impl fmt::Display for Entry {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 pub struct PerpEntry {
     pub base: BaseEntry,
     pub pair_id: String,
@@ -115,7 +115,7 @@ impl fmt::Display for PerpEntry {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 pub struct FutureEntry {
     pub base: BaseEntry,
     pub pair_id: String,
@@ -165,6 +165,7 @@ impl fmt::Display for FutureEntry {
     }
 }
 
+#[allow(clippy::too_many_lines)]
 pub fn build_publish_message<E>(entries: &[E]) -> TypedData
 where
     E: EntryTrait + Serialize + for<'a> Deserialize<'a>,

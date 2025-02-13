@@ -42,20 +42,20 @@ pub struct NewFutureEntry {
 }
 
 impl FutureEntry {
-    pub fn create_one(conn: &mut PgConnection, data: NewFutureEntry) -> DieselResult<FutureEntry> {
+    pub fn create_one(conn: &mut PgConnection, data: NewFutureEntry) -> DieselResult<Self> {
         diesel::insert_into(future_entries::table)
             .values(data)
-            .returning(FutureEntry::as_returning())
+            .returning(Self::as_returning())
             .get_result(conn)
     }
 
     pub fn create_many(
         conn: &mut PgConnection,
         data: Vec<NewFutureEntry>,
-    ) -> DieselResult<Vec<FutureEntry>> {
+    ) -> DieselResult<Vec<Self>> {
         diesel::insert_into(future_entries::table)
             .values(&data)
-            .returning(FutureEntry::as_returning())
+            .returning(Self::as_returning())
             .on_conflict((
                 future_entries::pair_id,
                 future_entries::source,
@@ -76,17 +76,17 @@ impl FutureEntry {
         .get_result(conn)
     }
 
-    pub fn get_by_pair_id(conn: &mut PgConnection, pair_id: String) -> DieselResult<FutureEntry> {
+    pub fn get_by_pair_id(conn: &mut PgConnection, pair_id: String) -> DieselResult<Self> {
         future_entries::table
             .filter(future_entries::pair_id.eq(pair_id))
-            .select(FutureEntry::as_select())
+            .select(Self::as_select())
             .get_result(conn)
     }
 
     pub fn with_filters(
         conn: &mut PgConnection,
         filters: dto::EntriesFilter,
-    ) -> DieselResult<Vec<FutureEntry>> {
+    ) -> DieselResult<Vec<Self>> {
         let mut query = future_entries::table.into_boxed::<diesel::pg::Pg>();
 
         if let Some(pair_id) = filters.pair_id {
@@ -95,12 +95,10 @@ impl FutureEntry {
 
         if let Some(publisher_contains) = filters.publisher_contains {
             query =
-                query.filter(future_entries::publisher.ilike(format!("%{}%", publisher_contains)));
+                query.filter(future_entries::publisher.ilike(format!("%{publisher_contains}%")));
         }
 
-        query
-            .select(FutureEntry::as_select())
-            .load::<FutureEntry>(conn)
+        query.select(Self::as_select()).load::<Self>(conn)
     }
 
     pub fn get_existing_pairs(

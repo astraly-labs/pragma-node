@@ -59,6 +59,7 @@ pub struct Subscriber<ChannelState> {
 /// If the limit is exceeded, the connection is closed.
 const BYTES_LIMIT_PER_IP_PER_SECOND: u32 = 256 * 1024; // 256 KiB
 
+#[async_trait::async_trait]
 pub trait ChannelHandler<ChannelState, CM, Err> {
     /// Called after a message is received from the client.
     /// The handler should process the message and update the state.
@@ -92,7 +93,7 @@ where
         let (sender, receiver) = socket.split();
         let (notify_sender, notify_receiver) = mpsc::channel::<Message>(32);
 
-        let mut subscriber = Subscriber {
+        let mut subscriber = Self {
             id,
             endpoint_name,
             ip_address,
@@ -151,7 +152,7 @@ where
                 _ = self.update_interval.tick() => {
                     let status = handler.periodic_interval(self).await;
                     match status {
-                        Ok(_) => {
+                        Ok(()) => {
                             self.record_metric(Interaction::ChannelUpdate, Status::Success);
                         },
                         Err(e) => {
@@ -198,7 +199,7 @@ where
                 self.record_metric(Interaction::ClientMessageDecode, Status::Success);
                 let status = handler.handle_client_msg(self, client_msg).await;
                 match status {
-                    Ok(_) => {
+                    Ok(()) => {
                         self.record_metric(Interaction::ClientMessageProcess, Status::Success);
                     }
                     Err(e) => {
@@ -238,20 +239,24 @@ where
                 let maybe_msg = serde_json::from_str::<T>(&text);
                 if let Ok(msg) = maybe_msg {
                     return Ok(Some(msg));
-                } else {
-                    tracing::error!("Failed to decode text message: {:?}", maybe_msg.err());
-                    self.send_err("⛔ Incorrect message. Please check the documentation for more information.").await;
-                    return Err(WebSocketError::MessageDecode(text.to_string()));
                 }
+                tracing::error!("Failed to decode text message: {:?}", maybe_msg.err());
+                self.send_err(
+                    "⛔ Incorrect message. Please check the documentation for more information.",
+                )
+                .await;
+                return Err(WebSocketError::MessageDecode(text.to_string()));
             }
             Message::Binary(payload) => {
                 let maybe_msg = serde_json::from_slice::<T>(&payload);
                 if let Ok(msg) = maybe_msg {
                     return Ok(Some(msg));
-                } else {
-                    self.send_err("⛔ Incorrect message. Please check the documentation for more information.").await;
-                    return Err(WebSocketError::MessageDecode(format!("{:?}", payload)));
                 }
+                self.send_err(
+                    "⛔ Incorrect message. Please check the documentation for more information.",
+                )
+                .await;
+                return Err(WebSocketError::MessageDecode(format!("{payload:?}")));
             }
             // Ignore pings and pongs messages
             _ => {}

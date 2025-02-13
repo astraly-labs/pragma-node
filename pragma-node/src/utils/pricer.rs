@@ -9,6 +9,7 @@ use crate::infra::repositories::entry_repository::{
     get_current_median_entries_with_components, MedianEntryWithComponents,
 };
 
+#[async_trait::async_trait]
 pub trait Pricer {
     fn new(pairs: Vec<String>, pair_type: DataType) -> Self;
     async fn compute(&self, db_pool: &Pool) -> Result<Vec<MedianEntryWithComponents>, EntryError>;
@@ -23,6 +24,7 @@ pub struct IndexPricer {
 
 /// Computes the most recent index price for a list of pairs.
 /// The index price is the median of the pairs.
+#[async_trait::async_trait]
 impl Pricer for IndexPricer {
     fn new(pairs: Vec<String>, pair_type: DataType) -> Self {
         Self { pairs, pair_type }
@@ -152,7 +154,7 @@ impl MarkPricer {
         for perp_median_entry in pairs_perp_entries {
             // safe unwrap since we know the pairs are formatted "XXX/YYY"
             let stable_coin_name = perp_median_entry.pair_id.split('/').last().unwrap();
-            let related_usd_spot = format!("{}/USD", stable_coin_name);
+            let related_usd_spot = format!("{stable_coin_name}/USD");
 
             let spot_usd_median_entry = stablecoins_spot_entries
                 .iter()
@@ -182,6 +184,7 @@ impl MarkPricer {
     }
 }
 
+#[async_trait::async_trait]
 impl Pricer for MarkPricer {
     fn new(pairs: Vec<String>, pair_type: DataType) -> Self {
         Self { pairs, pair_type }

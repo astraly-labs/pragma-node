@@ -13,7 +13,7 @@ use utoipa::ToSchema;
 use crate::utils::field_element_as_hex_string;
 
 /// The available currencies supported.
-#[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Display, EnumString, ToSchema)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone, Display, EnumString, ToSchema)]
 #[strum(serialize_all = "UPPERCASE")]
 pub enum OptionCurrency {
     BTC,
@@ -29,7 +29,7 @@ impl OptionCurrency {
 }
 
 /// The possible types for an option.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Display, EnumString, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Display, EnumString, ToSchema)]
 #[strum(serialize_all = "UPPERCASE")]
 pub enum OptionType {
     #[strum(serialize = "P")]
@@ -77,13 +77,13 @@ impl Instrument {
             .map_err(|_| InstrumentError::DateFormat(parts[1].to_owned()))?;
         let strike_price = BigDecimal::from_str(parts[2])
             .map_err(|_| InstrumentError::MarkPrice(parts[2].to_owned()))?;
-        let option_type = match parts[3] {
-            "P" => OptionType::Put,
-            "C" => OptionType::Call,
+        let option_type = match parts.get(3) {
+            Some(&"P") => OptionType::Put,
+            Some(&"C") => OptionType::Call,
             _ => return Err(InstrumentError::OptionType(parts[3].to_owned())),
         };
 
-        Ok(Instrument {
+        Ok(Self {
             base_currency,
             expiration_date,
             strike_price,
@@ -171,7 +171,7 @@ mod tests {
         2025,
         6,
         27,
-        80000,
+        80_000,
         OptionType::Put
     )]
     #[case(
@@ -180,7 +180,7 @@ mod tests {
         2024,
         8,
         16,
-        59000,
+        59_000,
         OptionType::Put
     )]
     #[case(
@@ -189,7 +189,7 @@ mod tests {
         2024,
         8,
         16,
-        54000,
+        54_000,
         OptionType::Call
     )]
     #[case(
@@ -198,7 +198,7 @@ mod tests {
         2024,
         12,
         27,
-        20000,
+        20_000,
         OptionType::Put
     )]
     #[case(
@@ -207,7 +207,7 @@ mod tests {
         2024,
         8,
         3,
-        61500,
+        61_500,
         OptionType::Call
     )]
     #[case(
@@ -216,7 +216,7 @@ mod tests {
         2024,
         12,
         27,
-        28000,
+        28_000,
         OptionType::Put
     )]
     #[case(
@@ -225,7 +225,7 @@ mod tests {
         2024,
         8,
         3,
-        61000,
+        61_000,
         OptionType::Put
     )]
     #[case(
@@ -234,7 +234,7 @@ mod tests {
         2024,
         8,
         30,
-        78000,
+        78_000,
         OptionType::Put
     )]
     #[case(
@@ -243,7 +243,7 @@ mod tests {
         2024,
         12,
         27,
-        105000,
+        105_000,
         OptionType::Call
     )]
     #[case(
@@ -252,7 +252,7 @@ mod tests {
         2024,
         8,
         4,
-        56000,
+        56_000,
         OptionType::Put
     )]
     fn test_instrument_from_name(

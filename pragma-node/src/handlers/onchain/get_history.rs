@@ -65,10 +65,10 @@ pub async fn get_onchain_history(
     let query_result = get_historical_entries_and_decimals(
         &state.onchain_pool,
         &state.offchain_pool,
-        &network,
+        network,
         &pair,
         &timestamp_range,
-        &chunk_interval,
+        chunk_interval,
     )
     .await;
 
@@ -81,10 +81,10 @@ pub async fn get_onchain_history(
             retry_with_routing(
                 &state.onchain_pool,
                 &state.offchain_pool,
-                &network,
+                network,
                 &pair,
                 &timestamp_range,
-                &chunk_interval,
+                chunk_interval,
             )
             .await?
         }

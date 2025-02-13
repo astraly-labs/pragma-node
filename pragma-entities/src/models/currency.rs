@@ -5,7 +5,7 @@ use diesel::{ExpressionMethods, OptionalExtension, PgConnection, QueryDsl, RunQu
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-#[derive(Clone, Debug, PartialEq, ToSchema)]
+#[derive(Clone, Debug, PartialEq, Eq, ToSchema)]
 pub struct Currency {
     pub id: Uuid,
     pub name: String,

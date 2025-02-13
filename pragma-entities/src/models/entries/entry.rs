@@ -36,17 +36,17 @@ pub struct NewEntry {
 }
 
 impl Entry {
-    pub fn create_one(conn: &mut PgConnection, data: NewEntry) -> DieselResult<Entry> {
+    pub fn create_one(conn: &mut PgConnection, data: NewEntry) -> DieselResult<Self> {
         diesel::insert_into(entries::table)
             .values(data)
-            .returning(Entry::as_returning())
+            .returning(Self::as_returning())
             .get_result(conn)
     }
 
-    pub fn create_many(conn: &mut PgConnection, data: Vec<NewEntry>) -> DieselResult<Vec<Entry>> {
+    pub fn create_many(conn: &mut PgConnection, data: Vec<NewEntry>) -> DieselResult<Vec<Self>> {
         diesel::insert_into(entries::table)
             .values(data)
-            .returning(Entry::as_returning())
+            .returning(Self::as_returning())
             .on_conflict((entries::pair_id, entries::source, entries::timestamp))
             .do_update()
             .set((
@@ -67,17 +67,17 @@ impl Entry {
         .get_result(conn)
     }
 
-    pub fn get_by_pair_id(conn: &mut PgConnection, pair_id: String) -> DieselResult<Entry> {
+    pub fn get_by_pair_id(conn: &mut PgConnection, pair_id: String) -> DieselResult<Self> {
         entries::table
             .filter(entries::pair_id.eq(pair_id))
-            .select(Entry::as_select())
+            .select(Self::as_select())
             .get_result(conn)
     }
 
     pub fn with_filters(
         conn: &mut PgConnection,
         filters: dto::EntriesFilter,
-    ) -> DieselResult<Vec<Entry>> {
+    ) -> DieselResult<Vec<Self>> {
         let mut query = entries::table.into_boxed::<diesel::pg::Pg>();
 
         if let Some(pair_id) = filters.pair_id {
@@ -85,10 +85,10 @@ impl Entry {
         }
 
         if let Some(publisher_contains) = filters.publisher_contains {
-            query = query.filter(entries::publisher.ilike(format!("%{}%", publisher_contains)));
+            query = query.filter(entries::publisher.ilike(format!("%{publisher_contains}%")));
         }
 
-        query.select(Entry::as_select()).load::<Entry>(conn)
+        query.select(Self::as_select()).load::<Self>(conn)
     }
 
     pub fn get_existing_pairs(

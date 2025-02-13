@@ -23,7 +23,6 @@ pub enum PublisherError {
 impl From<InfraError> for PublisherError {
     fn from(error: InfraError) -> Self {
         match error {
-            InfraError::InternalServerError => Self::InternalServerError,
             InfraError::NotFound => Self::NotFound,
             _ => Self::InternalServerError,
         }
@@ -35,18 +34,18 @@ impl IntoResponse for PublisherError {
         let (status, err_msg) = match self {
             Self::InvalidKey(key) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Invalid Public Key {}", key),
+                format!("Invalid Public Key {key}"),
             ),
             Self::InvalidAddress(address) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Invalid Address: {}", address),
+                format!("Invalid Address: {address}"),
             ),
             Self::InactivePublisher(publisher_name) => (
                 StatusCode::FORBIDDEN,
-                format!("Inactive Publisher: {}", publisher_name),
+                format!("Inactive Publisher: {publisher_name}"),
             ),
             Self::NotFound => (StatusCode::NOT_FOUND, "No publishers found".to_string()),
-            _ => (
+            Self::InternalServerError => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "Internal Server Error".to_string(),
             ),

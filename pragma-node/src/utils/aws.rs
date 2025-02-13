@@ -15,18 +15,20 @@ pub struct PragmaSignerBuilder {
 }
 
 impl PragmaSignerBuilder {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             is_production: false,
         }
     }
 
-    pub fn production_mode(mut self) -> Self {
+    #[must_use]
+    pub const fn production_mode(mut self) -> Self {
         self.is_production = true;
         self
     }
 
-    pub fn non_production_mode(mut self) -> Self {
+    #[must_use]
+    pub const fn non_production_mode(mut self) -> Self {
         self.is_production = false;
         self
     }
@@ -37,6 +39,12 @@ impl PragmaSignerBuilder {
         } else {
             Some(SigningKey::from_random())
         }
+    }
+}
+
+impl Default for PragmaSignerBuilder {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

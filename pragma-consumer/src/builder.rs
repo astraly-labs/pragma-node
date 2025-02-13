@@ -32,31 +32,35 @@ pub struct PragmaConsumerBuilder {
 
 impl PragmaConsumerBuilder {
     pub fn new() -> Self {
-        PragmaConsumerBuilder::default()
+        Self::default()
     }
 
-    pub fn on_mainnet(self) -> Self {
+    #[must_use]
+    pub const fn on_mainnet(self) -> Self {
         self.on_network(Network::Mainnet)
     }
 
-    pub fn on_sepolia(self) -> Self {
+    #[must_use]
+    pub const fn on_sepolia(self) -> Self {
         self.on_network(Network::Sepolia)
     }
 
-    fn on_network(mut self, network: Network) -> Self {
+    #[must_use]
+    const fn on_network(mut self, network: Network) -> Self {
         self.network = network;
         self
     }
 
-    /// Perform an health check with the PragmAPI to make sur the connection is
+    /// Perform an health check with the `PragmAPI` to make sur the connection is
     /// successfuly established.
-    pub fn check_api_health(mut self) -> Self {
+    #[must_use]
+    pub const fn check_api_health(mut self) -> Self {
         self.check_api_health = true;
         self
     }
 
     pub async fn with_http(self, api_config: ApiConfig) -> Result<PragmaConsumer, BuilderError> {
-        let http_client = self.build_http_client(&api_config)?;
+        let http_client = Self::build_http_client(&api_config)?;
 
         if self.check_api_health {
             self.http_health_check(&http_client, &api_config.base_url)
@@ -70,7 +74,7 @@ impl PragmaConsumerBuilder {
         })
     }
 
-    fn build_http_client(&self, api_config: &ApiConfig) -> Result<reqwest::Client, BuilderError> {
+    fn build_http_client(api_config: &ApiConfig) -> Result<reqwest::Client, BuilderError> {
         Ok(reqwest::Client::builder()
             .default_headers({
                 let mut headers = reqwest::header::HeaderMap::new();

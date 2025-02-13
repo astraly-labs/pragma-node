@@ -15,6 +15,38 @@ edition = "2021"
 repository = "https://github.com/astraly-labs/pragma-node/"
 authors = ["Pragma Labs <support@pragma.build>"]
 
+[workspace.lints]
+rust.missing_debug_implementations = "allow"
+rust.unreachable_pub = "warn"
+rust.unused_must_use = "deny"
+rust.rust_2018_idioms = { level = "deny", priority = -1 }
+rustdoc.all = "warn"
+
+[workspace.lints.clippy]
+# all lints that are on by default (correctness, suspicious, style, complexity, perf)
+all = { level = "warn", priority = -1 }
+
+# new lints that are still under development
+nursery = { level = "warn", priority = -1 }
+# avoid lints that are too pedantic
+future_not_send = "allow"
+fallible_impl_from = "allow"
+
+# lints which are rather strict or have occasional false positives
+pedantic = { level = "warn", priority = -1 }
+# avoid lints that are too pedantic
+must_use_candidate = "allow"
+cast_possible_truncation = "allow"
+cast_precision_loss = "allow"
+cast_sign_loss = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+default_trait_access = "allow"
+module_name_repetitions = "allow"
+needless_pass_by_value = "allow"
+or_fun_call = "allow"
+redundant_pub_crate = "allow"
+
 [workspace.dependencies]
 color-eyre = "0.6"
 aws-config = { version = "1.5.1", features = ["behavior-version-latest"] }
@@ -22,6 +54,7 @@ aws-sdk-secretsmanager = "1.32.0"
 axum = { version = "0.8", features = ["macros", "ws", "tokio"] }
 axum-extra = { version = "0.10.0", features = ["typed-header"] }
 axum-macros = "0.5"
+async-trait = "0.1.86"
 cainome = { git = "https://github.com/cartridge-gg/cainome", tag = "v0.4.5", features = [
   "abigen-rs",
 ] }

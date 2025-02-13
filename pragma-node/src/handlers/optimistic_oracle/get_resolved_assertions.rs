@@ -35,7 +35,7 @@ pub async fn get_resolved_assertions(
             .map_err(OptimisticOracleError::from)?;
 
     let total_count = resolved_assertions.len(); // TO VERIFY
-    let total_pages = (total_count as f64 / page_size as f64).ceil() as u32;
+    let total_pages = (total_count as u32).div_ceil(page_size);
 
     let response = GetResolvedAssertionsResponse {
         resolved_assertions,

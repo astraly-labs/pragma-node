@@ -14,17 +14,17 @@ pub struct StarkexPrice {
 impl StarkexPrice {
     pub fn get_global_asset_id(pair_id: &str) -> Result<String, ConversionError> {
         let pair_id = pair_id.replace('/', "-");
-        let pair_id = if !pair_id.contains('-') {
-            let (first, second) = pair_id.split_at(3);
-            format!("{}-{}-8", first, second)
+        let pair_id = if pair_id.contains('-') {
+            format!("{pair_id}-8")
         } else {
-            format!("{}-8", pair_id)
+            let (first, second) = pair_id.split_at(3);
+            format!("{first}-{second}-8")
         };
 
         let felt =
             cairo_short_string_to_felt(&pair_id).map_err(|_| ConversionError::FeltConversion)?;
-        let hex = format!("{:x}", felt);
-        Ok(format!("{:0<30}", hex))
+        let hex = format!("{felt:x}");
+        Ok(format!("{hex:0<30}"))
     }
 
     pub fn get_oracle_asset_id(
@@ -38,10 +38,10 @@ impl StarkexPrice {
         let oracle_felt =
             cairo_short_string_to_felt(oracle_name).map_err(|_| ConversionError::FeltConversion)?;
 
-        let market_hex = format!("{:x}", market_felt);
-        let oracle_hex = format!("{:x}", oracle_felt);
+        let market_hex = format!("{market_felt:x}");
+        let oracle_hex = format!("{oracle_felt:x}");
 
-        Ok(format!("{:0<32}{:0<8}00", market_hex, oracle_hex))
+        Ok(format!("{market_hex:0<32}{oracle_hex:0<8}00"))
     }
 
     /// Builds the first number for the hash computation based on oracle name and pair id.
@@ -59,9 +59,9 @@ impl StarkexPrice {
         price: &BigDecimal,
     ) -> Result<Felt, ConversionError> {
         let price = price.to_u128().ok_or(ConversionError::U128Conversion)?;
-        let price_as_hex = format!("{:x}", price);
-        let timestamp_as_hex = format!("{:x}", timestamp);
-        let v = format!("{}{}", price_as_hex, timestamp_as_hex);
+        let price_as_hex = format!("{price:x}");
+        let timestamp_as_hex = format!("{timestamp:x}");
+        let v = format!("{price_as_hex}{timestamp_as_hex}");
         Felt::from_hex(&v).map_err(|_| ConversionError::FeltConversion)
     }
 }
@@ -69,11 +69,11 @@ impl StarkexPrice {
 impl Signable for StarkexPrice {
     /// Computes a signature-ready message based on oracle, asset, timestamp
     /// and price.
-    /// The signature is the pedersen hash of two FieldElements:
+    /// The signature is the pedersen hash of two `FieldElements`:
     ///
-    /// first number (oracle_asset_id):
+    /// first number (`oracle_asset_id`):
     ///  ---------------------------------------------------------------------------------
-    ///  | asset_name (rest of the number)  - 211 bits       |   oracle_name (40 bits)   |
+    ///  | `asset_name` (rest of the number)  - 211 bits       |   `oracle_name` (40 bits)   |
     ///  ---------------------------------------------------------------------------------
     ///
     /// second number:
@@ -82,10 +82,10 @@ impl Signable for StarkexPrice {
     ///  ---------------------------------------------------------------------------------
     ///
     /// See:
-    /// https://docs.starkware.co/starkex/perpetual/becoming-an-oracle-provider-for-starkex.html#signing_prices
+    /// <https://docs.starkware.co/starkex/perpetual/becoming-an-oracle-provider-for-starkex.html#signing_prices>
     fn try_get_hash(&self) -> Result<Felt, ConversionError> {
         let first_number = Self::build_external_asset_id(&self.oracle_name, &self.pair_id)?;
-        let second_number = Self::build_second_number(self.timestamp as u128, &self.price)?;
+        let second_number = Self::build_second_number(u128::from(self.timestamp), &self.price)?;
         Ok(pedersen_hash(&first_number, &second_number))
     }
 }
@@ -109,8 +109,7 @@ mod tests {
         assert_eq!(
             encoded_pair_id.to_lowercase(),
             expected_encoded_pair_id.to_lowercase(),
-            "Encoded pair id does not match for pair_id: {}",
-            pair_id
+            "Encoded pair id does not match for pair_id: {pair_id}"
         );
     }
 
@@ -129,9 +128,7 @@ mod tests {
         assert_eq!(
             oracle_asset_id.to_lowercase(),
             expected_id.to_lowercase(),
-            "Oracle asset id does not match for oracle: {}, pair: {}",
-            oracle_name,
-            pair_id
+            "Oracle asset id does not match for oracle: {oracle_name}, pair: {pair_id}",
         );
     }
 
@@ -140,28 +137,28 @@ mod tests {
         "PRGM",
         "SOLUSD",
         "19511280076",
-        1577216800,
+        1_577_216_800,
         "230d86465a37eaa5221191bc196a86c2fc941e6c573322f24710b165285d23c"
     )]
     #[case(
         "PRGM",
         "ETHUSD",
         "369511280076",
-        1577816800,
+        1_577_816_800,
         "3e87426d2b40470cd314071d1dc93adf59e6906d40b85ad5e0f0c926b49d5f4"
     )]
     #[case(
         "TEST",
         "DOGEUSD",
         "51128006",
-        1517816800,
+        1_517_816_800,
         "65de8d73f0359a73e79c6b7f1ffe708159d378cc3da8edd308c92eaf8288d1c"
     )]
     #[case(
         "TEST",
         "DOGE/USD",
         "51128006",
-        1517816800,
+        1_517_816_800,
         "65de8d73f0359a73e79c6b7f1ffe708159d378cc3da8edd308c92eaf8288d1c"
     )]
     fn test_get_entry_hash(
@@ -182,8 +179,7 @@ mod tests {
         let expected_data = Felt::from_hex(expected_hash).unwrap();
         assert_eq!(
             hashed_data, expected_data,
-            "Hashes do not match for oracle_name: {}, pair_id: {}, price: {}, timestamp: {}",
-            oracle_name, pair_id, price, timestamp
+            "Hashes do not match for oracle_name: {oracle_name}, pair_id: {pair_id}, price: {price}, timestamp: {timestamp}",
         );
     }
 }

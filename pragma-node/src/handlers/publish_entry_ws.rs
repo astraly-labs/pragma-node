@@ -122,8 +122,8 @@ async fn create_new_subscriber(socket: WebSocket, app_state: AppState, client_ad
     let status = subscriber.listen(handler).await;
 
     // Clean up session on disconnect
-    let state = subscriber.state.lock().await;
-    if let Some(publisher_name) = &state.publisher_name {
+    let publisher_name = &subscriber.state.lock().await.publisher_name;
+    if let Some(publisher_name) = publisher_name {
         subscriber
             .app_state
             .publisher_sessions
@@ -154,7 +154,9 @@ struct LoginResponse {
     message: String,
 }
 
+#[async_trait::async_trait]
 impl ChannelHandler<PublishEntryState, ClientMessage, WebSocketError> for PublishEntryHandler {
+    #[allow(clippy::too_many_lines)]
     async fn handle_client_msg(
         &mut self,
         subscriber: &mut Subscriber<PublishEntryState>,
@@ -168,22 +170,22 @@ impl ChannelHandler<PublishEntryState, ClientMessage, WebSocketError> for Publis
                     .publisher_sessions
                     .get_mut(&login_message.publisher_name)
                 {
-                    if !session.is_expired() {
-                        // Reset the session login time
-                        session.login_time = SystemTime::now();
-                    } else {
+                    if session.is_expired() {
                         // Remove expired session
                         subscriber
                             .app_state
                             .publisher_sessions
                             .remove(&login_message.publisher_name);
+                    } else {
+                        // Reset the session login time
+                        session.login_time = SystemTime::now();
                     }
                 }
 
                 let result = process_login(subscriber, login_message.clone()).await;
                 let has_login_failed = result.is_err();
                 let response = match result {
-                    Ok(_) => {
+                    Ok(()) => {
                         // Store the new session with IP address
                         subscriber.app_state.publisher_sessions.insert(
                             login_message.publisher_name.clone(),
@@ -350,9 +352,8 @@ async fn process_entries_without_verification(
         });
     }
 
-    let state = subscriber.state.lock().await;
-    let publisher_name = state
-        .publisher_name
+    let publisher_name = &subscriber.state.lock().await.publisher_name;
+    let publisher_name = publisher_name
         .as_ref()
         .ok_or_else(|| EntryError::NotFound("No publisher name in session state".to_string()))?;
 

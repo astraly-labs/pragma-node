@@ -32,11 +32,7 @@ impl TryFrom<GetEntryParams> for RoutingParams {
     fn try_from(params: GetEntryParams) -> Result<Self, Self::Error> {
         let now = chrono::Utc::now().timestamp();
 
-        let timestamp = if let Some(timestamp) = params.timestamp {
-            timestamp
-        } else {
-            now
-        };
+        let timestamp = params.timestamp.map_or(now, |timestamp| timestamp);
 
         if timestamp > now {
             return Err(EntryError::InvalidTimestamp(
@@ -44,23 +40,17 @@ impl TryFrom<GetEntryParams> for RoutingParams {
             ));
         }
 
-        let interval = if let Some(interval) = params.interval {
-            interval
-        } else {
-            Interval::TwoHours
-        };
+        let interval = params
+            .interval
+            .map_or(Interval::TwoHours, |interval| interval);
 
-        let aggregation_mode = if let Some(aggregation_mode) = params.aggregation {
-            aggregation_mode
-        } else {
-            AggregationMode::Twap
-        };
+        let aggregation_mode = params
+            .aggregation
+            .map_or(AggregationMode::Twap, |aggregation_mode| aggregation_mode);
 
-        let data_type = if let Some(entry_type) = params.entry_type {
-            DataType::from(entry_type)
-        } else {
-            DataType::SpotEntry
-        };
+        let data_type = params
+            .entry_type
+            .map_or(DataType::SpotEntry, DataType::from);
 
         let expiry = if let Some(expiry) = params.expiry {
             let expiry_dt = NaiveDateTime::parse_from_str(&expiry, "%Y-%m-%dT%H:%M:%S")
@@ -73,7 +63,7 @@ impl TryFrom<GetEntryParams> for RoutingParams {
             String::default()
         };
 
-        Ok(RoutingParams {
+        Ok(Self {
             interval,
             timestamp,
             aggregation_mode,

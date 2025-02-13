@@ -30,7 +30,7 @@ pub struct PragmaConsumer {
 }
 
 impl PragmaConsumer {
-    /// Query the PragmAPI and returns the necessary calldata to use
+    /// Query the `PragmAPI` and returns the necessary calldata to use
     /// with our Oracle contract.
     pub async fn get_merkle_feed_calldata(
         &self,
@@ -51,7 +51,7 @@ impl PragmaConsumer {
         })
     }
 
-    /// Requests from our PragmAPI the option data for a given instrument name at a
+    /// Requests from our `PragmAPI` the option data for a given instrument name at a
     /// certain block.
     async fn request_option(
         &self,
@@ -76,7 +76,7 @@ impl PragmaConsumer {
         serde_json::from_str(&contents).map_err(ConsumerError::Serde)
     }
 
-    /// Requests from our PragmAPI the merkle proof for an hash at a certain block.
+    /// Requests from our `PragmAPI` the merkle proof for an hash at a certain block.
     async fn request_merkle_proof(
         &self,
         option_hash: String,

@@ -34,7 +34,7 @@ pub async fn get_disputed_assertions(
             .map_err(OptimisticOracleError::from)?;
 
     let total_count = disputed_assertions.len();
-    let total_pages = (total_count as f64 / page_size as f64).ceil() as u32;
+    let total_pages = (total_count as u32).div_ceil(page_size);
 
     let response = GetDisputedAssertionsResponse {
         disputed_assertions,

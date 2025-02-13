@@ -34,7 +34,7 @@ pub async fn get_assertions(
                             oo_requests::settled
                                 .is_null()
                                 .and(oo_requests::disputed.is_null()),
-                        )
+                        );
                     }
                     _ => {}
                 }
@@ -43,8 +43,8 @@ pub async fn get_assertions(
             query = query.filter(diesel::dsl::sql::<Bool>("upper(_cursor) IS NULL"));
 
             query
-                .offset(((page - 1) * limit) as i64)
-                .limit(limit as i64)
+                .offset(i64::from((page - 1) * limit))
+                .limit(i64::from(limit))
                 .load(conn)
                 .map_err(|_| OptimisticOracleError::DatabaseConnection)
         })
@@ -132,8 +132,8 @@ pub async fn get_disputed_assertions(
             let query = oo_requests::table
                 .filter(diesel::dsl::sql::<Bool>("upper(_cursor) IS NULL"))
                 .filter(oo_requests::disputed.eq(true))
-                .offset(((page - 1) * limit) as i64)
-                .limit(limit as i64);
+                .offset(i64::from((page - 1) * limit))
+                .limit(i64::from(limit));
 
             query
                 .load(conn)
@@ -185,8 +185,8 @@ pub async fn get_resolved_assertions(
             let query = oo_requests::table
                 .filter(diesel::dsl::sql::<Bool>("upper(_cursor) IS NULL"))
                 .filter(oo_requests::settled.eq(true))
-                .offset(((page - 1) * limit) as i64)
-                .limit(limit as i64);
+                .offset(i64::from((page - 1) * limit))
+                .limit(i64::from(limit));
 
             query
                 .load(conn)
@@ -225,7 +225,7 @@ pub async fn get_resolved_assertions(
         .collect()
 }
 
-fn get_status(disputed: Option<bool>, settled: Option<bool>) -> Status {
+const fn get_status(disputed: Option<bool>, settled: Option<bool>) -> Status {
     match (disputed, settled) {
         (Some(true), _) => Status::Disputed,
         (_, Some(true)) => Status::Settled,

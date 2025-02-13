@@ -18,14 +18,14 @@ pub enum CheckpointError {
 impl From<InfraError> for CheckpointError {
     fn from(error: InfraError) -> Self {
         match error {
-            InfraError::InternalServerError => Self::InternalServerError,
             InfraError::NotFound => Self::NotFound,
-            InfraError::RoutingError => Self::InternalServerError,
-            InfraError::DisputerNotSet => Self::InternalServerError,
-            InfraError::SettlerNotSet => Self::InternalServerError,
-            InfraError::InvalidTimestamp(_) => Self::InternalServerError,
-            InfraError::NonZeroU32Conversion(_) => Self::InternalServerError,
-            InfraError::AxumError(_) => Self::InternalServerError,
+            InfraError::InternalServerError
+            | InfraError::RoutingError
+            | InfraError::DisputerNotSet
+            | InfraError::SettlerNotSet
+            | InfraError::InvalidTimestamp(_)
+            | InfraError::NonZeroU32Conversion(_)
+            | InfraError::AxumError(_) => Self::InternalServerError,
         }
     }
 }
@@ -34,13 +34,13 @@ impl IntoResponse for CheckpointError {
     fn into_response(self) -> axum::response::Response {
         let (status, err_msg) = match self {
             Self::InvalidLimit(limit) => {
-                (StatusCode::BAD_REQUEST, format!("Invalid Limit {}", limit))
+                (StatusCode::BAD_REQUEST, format!("Invalid Limit {limit}"))
             }
             Self::NotFound => (
                 StatusCode::NOT_FOUND,
                 String::from("No checkpoints found for requested pair"),
             ),
-            _ => (
+            Self::InternalServerError => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 String::from("Internal server error"),
             ),

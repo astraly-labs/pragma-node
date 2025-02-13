@@ -43,9 +43,9 @@ pub enum EntryType {
 impl From<EntryType> for DataType {
     fn from(value: EntryType) -> Self {
         match value {
-            EntryType::Spot => DataType::SpotEntry,
-            EntryType::Future => DataType::FutureEntry,
-            EntryType::Perp => DataType::PerpEntry,
+            EntryType::Spot => Self::SpotEntry,
+            EntryType::Future => Self::FutureEntry,
+            EntryType::Perp => Self::PerpEntry,
         }
     }
 }

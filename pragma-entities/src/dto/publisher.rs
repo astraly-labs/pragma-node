@@ -4,7 +4,7 @@ use uuid::Uuid;
 
 use crate::PublisherError;
 
-#[derive(Clone, Debug, PartialEq, ToSchema)]
+#[derive(Clone, Debug, PartialEq, Eq, ToSchema)]
 pub struct Publisher {
     pub id: Uuid,
     pub name: String,

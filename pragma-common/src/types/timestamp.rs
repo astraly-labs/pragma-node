@@ -2,9 +2,11 @@ use serde::{Deserialize, Deserializer};
 use std::ops::RangeInclusive;
 use utoipa::ToSchema;
 
-/// The number of seconds since the Unix epoch (00:00:00 UTC on 1 Jan 1970). The timestamp is
-/// always positive, but represented as a signed integer because that's the standard on Unix
-/// systems and allows easy subtraction to compute durations.
+/// The number of seconds since the Unix epoch (00:00:00 UTC on 1 Jan 1970).
+///
+/// The timestamp is always positive, but represented as a signed integer
+/// because that's the standard on Unix systems and allows easy subtraction
+/// to compute durations.
 pub type UnixTimestamp = i64;
 
 /// Represents a range of timestamps
@@ -57,6 +59,6 @@ impl<'de> Deserialize<'de> for TimestampRange {
             .ok_or_else(|| serde::de::Error::custom("Expected format: start,end"))?;
         let start = start.parse().map_err(serde::de::Error::custom)?;
         let end = end.parse().map_err(serde::de::Error::custom)?;
-        Ok(TimestampRange(start..=end))
+        Ok(Self(start..=end))
     }
 }

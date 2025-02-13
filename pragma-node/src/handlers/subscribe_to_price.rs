@@ -83,6 +83,7 @@ async fn create_new_subscriber(socket: WebSocket, app_state: AppState, client_ad
 
 struct WsEntriesHandler;
 
+#[async_trait::async_trait]
 impl ChannelHandler<SubscriptionState, SubscriptionRequest, EntryError> for WsEntriesHandler {
     #[tracing::instrument(
         skip(self, subscriber),

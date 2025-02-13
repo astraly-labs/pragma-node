@@ -1,54 +1,53 @@
+pub mod aws;
+pub mod conversion;
+pub mod custom_extractors;
+pub mod kafka;
+pub mod macros;
+pub mod pricer;
+pub mod ws;
+
 pub use aws::PragmaSignerBuilder;
 pub use conversion::{convert_via_quote, format_bigdecimal_price, normalize_to_decimals};
 pub use custom_extractors::path_extractor::PathExtractor;
 pub use kafka::publish_to_kafka;
-use moka::future::Cache;
-use pragma_common::timestamp::TimestampRangeError;
-use pragma_common::types::entries::Entry;
-use pragma_common::types::pair::Pair;
-use pragma_entities::dto::Publisher;
 pub use ws::*;
+
+use std::collections::HashMap;
 
 use bigdecimal::num_bigint::ToBigInt;
 use bigdecimal::{BigDecimal, ToPrimitive};
 use chrono::{DateTime, NaiveDateTime, Utc};
 use deadpool_diesel::postgres::Pool;
-use pragma_common::types::Network;
-use pragma_entities::{Entry as EntityEntry, EntryError, FutureEntry, NewEntry, PublisherError};
+use moka::future::Cache;
 use starknet_crypto::{Felt, Signature};
-use std::collections::HashMap;
+
+use pragma_common::timestamp::TimestampRangeError;
+use pragma_common::types::entries::Entry;
+use pragma_common::types::pair::Pair;
+use pragma_common::types::Network;
+use pragma_entities::dto::Publisher;
+use pragma_entities::{Entry as EntityEntry, EntryError, FutureEntry, NewEntry, PublisherError};
 
 use crate::infra::repositories::publisher_repository;
 use crate::infra::repositories::{
     entry_repository::MedianEntry, onchain_repository::entry::get_existing_pairs,
 };
 
-mod aws;
-mod conversion;
-mod custom_extractors;
-mod kafka;
-mod macros;
-
-pub mod pricer;
-pub mod ws;
-
-const ONE_YEAR_IN_SECONDS: f64 = 3153600_f64;
+const ONE_YEAR_IN_SECONDS: f64 = 3_153_600_f64;
 
 /// From a map of currencies and their decimals, returns the number of decimals for a given pair.
 /// If the currency is not found in the map, the default value is 8.
-pub(crate) fn get_decimals_for_pair(
-    currencies: &HashMap<String, BigDecimal>,
+pub(crate) fn get_decimals_for_pair<S: ::std::hash::BuildHasher>(
+    currencies: &HashMap<String, BigDecimal, S>,
     pair_id: &str,
 ) -> u32 {
     let pair = Pair::from(pair_id);
     let base_decimals = currencies
         .get(&pair.base)
-        .map(|d| d.to_u32().unwrap_or(8))
-        .unwrap_or(8);
+        .map_or(8, |d| d.to_u32().unwrap_or(8));
     let quote_decimals = currencies
         .get(&pair.quote)
-        .map(|d| d.to_u32().unwrap_or(8))
-        .unwrap_or(8);
+        .map_or(8, |d| d.to_u32().unwrap_or(8));
     std::cmp::min(base_decimals, quote_decimals)
 }
 
@@ -86,7 +85,7 @@ pub(crate) fn compute_median_price_and_time(
 /// Given a pair and a network, returns if it exists in the
 /// onchain database.
 pub(crate) async fn is_onchain_existing_pair(pool: &Pool, pair: &String, network: Network) -> bool {
-    let existings_pairs = get_existing_pairs(pool, &network)
+    let existings_pairs = get_existing_pairs(pool, network)
         .await
         .expect("Couldn't get the existing pairs from the database.");
 
@@ -109,6 +108,7 @@ macro_rules! convert_timestamp_to_datetime {
                 format!("Timestamp {} is too large", $timestamp),
             )))
         } else if $timestamp.to_string().len() >= 13 {
+            #[allow(clippy::cast_possible_wrap)]
             DateTime::<Utc>::from_timestamp_millis($timestamp as i64)
                 .map(|dt| dt.naive_utc())
                 .ok_or_else(|| {
@@ -118,6 +118,7 @@ macro_rules! convert_timestamp_to_datetime {
                     )))
                 })
         } else {
+            #[allow(clippy::cast_possible_wrap)]
             DateTime::<Utc>::from_timestamp($timestamp as i64, 0)
                 .map(|dt| dt.naive_utc())
                 .ok_or_else(|| {
@@ -138,7 +139,7 @@ pub fn convert_entry_to_db(entry: &Entry, signature: &Signature) -> Result<NewEn
         publisher: entry.base.publisher.clone(),
         source: entry.base.source.clone(),
         timestamp: dt,
-        publisher_signature: format!("0x{}", signature),
+        publisher_signature: format!("0x{signature}"),
         price: entry.price.into(),
     })
 }
@@ -209,7 +210,7 @@ pub(crate) async fn only_existing_pairs(
     let spot_pairs = pairs
         .iter()
         .filter(|pair| !pair.contains(':'))
-        .map(|pair| pair.to_string())
+        .map(ToString::to_string)
         .collect::<Vec<String>>();
     let spot_pairs = conn
         .interact(move |conn| EntityEntry::get_existing_pairs(conn, spot_pairs))
@@ -221,7 +222,7 @@ pub(crate) async fn only_existing_pairs(
     let perp_pairs = pairs
         .iter()
         .filter(|pair| pair.contains(":MARK"))
-        .map(|pair| pair.replace(":MARK", "").to_string())
+        .map(|pair| pair.replace(":MARK", ""))
         .collect::<Vec<String>>();
 
     let perp_pairs = conn
@@ -250,19 +251,14 @@ pub async fn validate_publisher(
     publisher_name: &str,
     publishers_cache: &Cache<String, Publisher>,
 ) -> Result<(Felt, Felt), EntryError> {
-    let publisher = match publishers_cache.get(publisher_name).await {
-        Some(cached_value) => {
-            tracing::debug!("Found a cached value for publisher: {publisher_name} - using it.");
-            cached_value
-        }
-        None => {
-            tracing::debug!(
-                "No cache found for publisher: {publisher_name}, fetching the database."
-            );
-            publisher_repository::get(pool, publisher_name.to_string())
-                .await
-                .map_err(EntryError::InfraError)?
-        }
+    let publisher = if let Some(cached_value) = publishers_cache.get(publisher_name).await {
+        tracing::debug!("Found a cached value for publisher: {publisher_name} - using it.");
+        cached_value
+    } else {
+        tracing::debug!("No cache found for publisher: {publisher_name}, fetching the database.");
+        publisher_repository::get(pool, publisher_name.to_string())
+            .await
+            .map_err(EntryError::InfraError)?
     };
 
     publisher.assert_is_active()?;
@@ -304,7 +300,7 @@ mod tests {
             let result = convert_timestamp_to_datetime!(now);
             assert!(result.is_ok());
             let dt = result.unwrap();
-            assert_eq!(dt.and_utc().timestamp(), now as i64);
+            assert_eq!(dt.and_utc().timestamp(), i64::try_from(now).unwrap());
         }
 
         #[test]
@@ -313,18 +309,21 @@ mod tests {
             let result = convert_timestamp_to_datetime!(now_millis);
             assert!(result.is_ok());
             let dt = result.unwrap();
-            assert_eq!(dt.and_utc().timestamp_millis(), now_millis as i64);
+            assert_eq!(
+                dt.and_utc().timestamp_millis(),
+                i64::try_from(now_millis).unwrap()
+            );
         }
 
         #[test]
         fn test_specific_date() {
             // 2024-03-14 15:92:65 UTC (Pi Day!)
-            let timestamp = 1710428585_u64;
+            let timestamp = 1_710_428_585_u64;
             let result = convert_timestamp_to_datetime!(timestamp);
             assert!(result.is_ok());
             let dt = result.unwrap();
             let expected = Utc
-                .timestamp_opt(timestamp as i64, 0)
+                .timestamp_opt(i64::try_from(timestamp).unwrap(), 0)
                 .single()
                 .expect("Invalid timestamp")
                 .naive_utc();
@@ -334,12 +333,12 @@ mod tests {
         #[test]
         fn test_specific_date_millis() {
             // 2024-03-14 15:92:65.123 UTC
-            let timestamp_millis = 1710428585123_u64;
+            let timestamp_millis = 1_710_428_585_123_u64;
             let result = convert_timestamp_to_datetime!(timestamp_millis);
             assert!(result.is_ok());
             let dt = result.unwrap();
             let expected = Utc
-                .timestamp_millis_opt(timestamp_millis as i64)
+                .timestamp_millis_opt(i64::try_from(timestamp_millis).unwrap())
                 .single()
                 .expect("Invalid timestamp")
                 .naive_utc();
@@ -356,18 +355,18 @@ mod tests {
             assert_eq!(dt.and_utc().timestamp(), 0);
 
             // Test a very old timestamp (1970-01-02)
-            let old = 86400_u64;
+            let old = 86_400_u64;
             let result = convert_timestamp_to_datetime!(old);
             assert!(result.is_ok());
             let dt = result.unwrap();
             assert_eq!(dt.and_utc().timestamp(), 86400);
 
             // Test a far future timestamp (2100-01-01)
-            let future = 4102444800_u64;
+            let future = 4_102_444_800_u64;
             let result = convert_timestamp_to_datetime!(future);
             assert!(result.is_ok());
             let dt = result.unwrap();
-            assert_eq!(dt.and_utc().timestamp(), future as i64);
+            assert_eq!(dt.and_utc().timestamp(), i64::try_from(future).unwrap());
         }
 
         #[test]
@@ -386,90 +385,108 @@ mod tests {
         #[test]
         fn test_edge_cases() {
             // Test timestamp just below millisecond threshold (12 digits)
-            let just_below_millis = 999999999999_u64;
+            let just_below_millis = 999_999_999_999_u64;
             let result = convert_timestamp_to_datetime!(just_below_millis);
             assert!(result.is_ok());
             let dt = result.unwrap();
-            assert_eq!(dt.and_utc().timestamp(), just_below_millis as i64);
+            assert_eq!(
+                dt.and_utc().timestamp(),
+                i64::try_from(just_below_millis).unwrap()
+            );
 
             // Test timestamp just at millisecond threshold (13 digits)
-            let just_millis = 1000000000000_u64;
+            let just_millis = 1_000_000_000_000_u64;
             let result = convert_timestamp_to_datetime!(just_millis);
             assert!(result.is_ok());
             let dt = result.unwrap();
-            assert_eq!(dt.and_utc().timestamp_millis(), just_millis as i64);
+            assert_eq!(
+                dt.and_utc().timestamp_millis(),
+                i64::try_from(just_millis).unwrap()
+            );
 
             // Test a very recent timestamp
             let recent = (Utc::now().timestamp() - 1) as u64;
             let result = convert_timestamp_to_datetime!(recent);
             assert!(result.is_ok());
             let dt = result.unwrap();
-            assert_eq!(dt.and_utc().timestamp(), recent as i64);
+            assert_eq!(dt.and_utc().timestamp(), i64::try_from(recent).unwrap());
         }
 
         #[test]
         fn test_real_world_scenarios() {
             // Test common exchange timestamp (e.g., Binance style)
-            let binance_style = 1710428585123_u64; // millisecond precision
+            let binance_style = 1_710_428_585_123_u64; // millisecond precision
             let result = convert_timestamp_to_datetime!(binance_style);
             assert!(result.is_ok());
             let dt = result.unwrap();
-            assert_eq!(dt.and_utc().timestamp_millis(), binance_style as i64);
+            assert_eq!(
+                dt.and_utc().timestamp_millis(),
+                i64::try_from(binance_style).unwrap()
+            );
 
             // Test common blockchain timestamp (e.g., Ethereum block timestamp)
-            let blockchain_style = 1710428585_u64; // second precision
+            let blockchain_style = 1_710_428_585_u64; // second precision
             let result = convert_timestamp_to_datetime!(blockchain_style);
             assert!(result.is_ok());
             let dt = result.unwrap();
-            assert_eq!(dt.and_utc().timestamp(), blockchain_style as i64);
+            assert_eq!(
+                dt.and_utc().timestamp(),
+                i64::try_from(blockchain_style).unwrap()
+            );
 
             // Test Unix timestamp with recent date
             let unix_timestamp = Utc::now().timestamp() as u64;
             let result = convert_timestamp_to_datetime!(unix_timestamp);
             assert!(result.is_ok());
             let dt = result.unwrap();
-            assert_eq!(dt.and_utc().timestamp(), unix_timestamp as i64);
+            assert_eq!(
+                dt.and_utc().timestamp(),
+                i64::try_from(unix_timestamp).unwrap()
+            );
         }
     }
 
     #[test]
     fn test_compute_volatility_no_entries() {
         let entries = vec![];
-        assert_eq!(compute_volatility(&entries), 0.0);
+        let epsilon = 1e-10;
+        assert!((compute_volatility(&entries) - 0.0).abs() < epsilon);
     }
 
     #[test]
     fn test_compute_volatility_simple() {
-        let entries = vec![new_entry(100, 1640995200), new_entry(110, 1641081600)];
+        let entries = vec![new_entry(100, 1_640_995_200), new_entry(110, 1_641_081_600)];
 
         let expected_log_return = (110_f64 / 100_f64).ln().powi(2);
-        let expected_time = ((1641081600 - 1640995200) as f64) / ONE_YEAR_IN_SECONDS;
+        let expected_time = f64::from(1_641_081_600 - 1_640_995_200) / ONE_YEAR_IN_SECONDS;
         let expected_variance = expected_log_return / expected_time;
         let expected_volatility = expected_variance.sqrt() * 10_f64.powi(8);
         let computed_volatility = compute_volatility(&entries);
+        let epsilon: f64 = 1e-6;
 
-        const EPSILON: f64 = 1e-6;
-        assert!((computed_volatility - expected_volatility).abs() < EPSILON);
+        assert!((computed_volatility - expected_volatility).abs() < epsilon);
     }
 
     #[test]
     fn test_compute_volatility() {
         let entries = vec![
-            new_entry(47686, 1640995200),
-            new_entry(47345, 1641081600),
-            new_entry(46458, 1641168000),
-            new_entry(45897, 1641254400),
-            new_entry(43569, 1641340800),
+            new_entry(47_686, 1_640_995_200),
+            new_entry(47_345, 1_641_081_600),
+            new_entry(46_458, 1_641_168_000),
+            new_entry(45_897, 1_641_254_400),
+            new_entry(43_569, 1_641_340_800),
         ];
-        assert_eq!(compute_volatility(&entries), 17264357.96367333);
+
+        let epsilon = 1e-10;
+        assert!((compute_volatility(&entries) - 309_805_011.172_643_57).abs() < epsilon);
     }
 
     #[test]
     fn test_compute_volatility_zero_price() {
         let entries = vec![
-            new_entry(47686, 1640995200),
-            new_entry(0, 1641081600),
-            new_entry(46458, 1641168000),
+            new_entry(47_686, 1_640_995_200),
+            new_entry(0, 1_641_081_600),
+            new_entry(46_458, 1_641_168_000),
         ];
         assert!(f64::is_nan(compute_volatility(&entries)));
     }
@@ -477,36 +494,42 @@ mod tests {
     #[test]
     fn test_compute_volatility_constant_prices() {
         let entries = vec![
-            new_entry(47686, 1640995200),
-            new_entry(47686, 1641081600),
-            new_entry(47686, 1641168000),
-            new_entry(47686, 1641254400),
-            new_entry(47686, 1641340800),
+            new_entry(47_686, 1_640_995_200),
+            new_entry(47_686, 1_641_081_600),
+            new_entry(47_686, 1_641_168_000),
+            new_entry(47_686, 1_641_254_400),
+            new_entry(47_686, 1_641_340_800),
         ];
-        assert_eq!(compute_volatility(&entries), 0.0);
+
+        let epsilon = 1e-10;
+        assert!((compute_volatility(&entries) - 0.0).abs() < epsilon);
     }
 
     #[test]
     fn test_compute_volatility_increasing_prices() {
         let entries = vec![
-            new_entry(13569, 1640995200),
-            new_entry(15897, 1641081600),
-            new_entry(16458, 1641168000),
-            new_entry(17345, 1641254400),
-            new_entry(47686, 1641340800),
+            new_entry(13_569, 1_640_995_200),
+            new_entry(15_897, 1_641_081_600),
+            new_entry(16_458, 1_641_168_000),
+            new_entry(17_345, 1_641_254_400),
+            new_entry(47_686, 1_641_340_800),
         ];
-        assert_eq!(compute_volatility(&entries), 309805011.67283577);
+
+        let epsilon = 1e-10;
+        assert!((compute_volatility(&entries) - 309_805_011.672_835_77).abs() < epsilon);
     }
 
     #[test]
     fn test_compute_volatility_decreasing_prices() {
         let entries = vec![
-            new_entry(27686, 1640995200),
-            new_entry(27345, 1641081600),
-            new_entry(26458, 1641168000),
-            new_entry(25897, 1641254400),
-            new_entry(23569, 1641340800),
+            new_entry(27_686, 1_640_995_200),
+            new_entry(27_345, 1_641_081_600),
+            new_entry(26_458, 1_641_168_000),
+            new_entry(25_897, 1_641_254_400),
+            new_entry(23_569, 1_641_340_800),
         ];
-        assert_eq!(compute_volatility(&entries), 31060897.84391914);
+
+        let epsilon = 1e-10;
+        assert!((compute_volatility(&entries) - 31_060_897.843_919_14_f64).abs() < epsilon);
     }
 }

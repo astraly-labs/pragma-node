@@ -7,7 +7,7 @@ use pragma_consumer::types::{BlockId, Instrument};
 async fn main() -> Result<(), ()> {
     let api_config = ApiConfig {
         base_url: PragmaBaseUrl::Prod,
-        api_key: "".into(),
+        api_key: String::new(),
     };
 
     let consumer = PragmaConsumerBuilder::new()

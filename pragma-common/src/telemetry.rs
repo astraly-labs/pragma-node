@@ -33,7 +33,7 @@ pub fn init_telemetry(
                 .pretty(),
         );
 
-    let tracer_provider = init_tracer_provider(&app_name, &collection_endpoint)?;
+    let tracer_provider = init_tracer_provider(&app_name, &collection_endpoint);
 
     let logger_provider = init_logs_provider(&app_name, &collection_endpoint)?;
     init_meter_provider(&app_name, &collection_endpoint)?;
@@ -47,7 +47,7 @@ pub fn init_telemetry(
 }
 
 #[allow(dead_code)]
-fn init_tracer_provider(app_name: &str, collection_endpoint: &str) -> Result<Tracer> {
+fn init_tracer_provider(app_name: &str, collection_endpoint: &str) -> Tracer {
     let provider = opentelemetry_otlp::new_pipeline()
         .tracing()
         .with_batch_config(BatchConfigBuilder::default().build())
@@ -66,7 +66,7 @@ fn init_tracer_provider(app_name: &str, collection_endpoint: &str) -> Result<Tra
         .expect("Failed to install tracer provider");
 
     global::set_tracer_provider(provider.clone());
-    Ok(provider.tracer(format!("{app_name}-subscriber")))
+    provider.tracer(format!("{app_name}-subscriber"))
 }
 
 fn init_logs_provider(app_name: &str, collection_endpoint: &str) -> Result<LoggerProvider> {

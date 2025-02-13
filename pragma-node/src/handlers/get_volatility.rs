@@ -14,7 +14,7 @@ use crate::utils::compute_volatility;
 /// Volatility query
 #[derive(Deserialize, IntoParams, Debug)]
 pub struct VolatilityQuery {
-    /// Initial timestamp, combined with final_timestamp, it helps define the period over which the mean is computed
+    /// Initial timestamp, combined with `end`, it helps define the period over which the mean is computed
     start: u64,
     /// Final timestamp
     end: u64,
