@@ -1,6 +1,8 @@
+use crate::convert_timestamp_to_datetime;
 use crate::dto::entry as dto;
 use crate::models::DieselResult;
 use crate::schema::entries;
+use crate::EntryError;
 use bigdecimal::BigDecimal;
 use diesel::internal::derives::multiconnection::chrono::NaiveDateTime;
 use diesel::upsert::excluded;
@@ -105,9 +107,17 @@ impl Entry {
     pub fn get_last_updated_timestamp(
         conn: &mut PgConnection,
         pair: String,
+        max_timestamp: i64,
     ) -> DieselResult<Option<chrono::NaiveDateTime>> {
+        let max_timestamp = convert_timestamp_to_datetime!(max_timestamp).map_err(|_| {
+            diesel::result::Error::DatabaseError(
+                diesel::result::DatabaseErrorKind::CheckViolation,
+                Box::new(format!("Invalid timestamp value: {max_timestamp}")),
+            )
+        })?;
         entries::table
             .filter(entries::pair_id.eq(pair))
+            .filter(entries::timestamp.le(max_timestamp))
             .select(entries::timestamp)
             .order(entries::timestamp.desc())
             .first(conn)

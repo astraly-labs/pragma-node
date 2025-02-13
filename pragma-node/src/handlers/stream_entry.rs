@@ -178,19 +178,18 @@ async fn get_latest_entry(
     is_routing: bool,
     routing_params: &RoutingParams,
 ) -> Result<GetEntryResponse, EntryError> {
-    let (entry, decimals) = entry_repository::routing(
-        &state.offchain_pool,
-        is_routing,
-        pair,
-        routing_params.clone(),
-    )
-    .await
-    .map_err(|e| e.to_entry_error(&(pair.to_pair_id())))?;
+    let (entry, decimals) =
+        entry_repository::routing(&state.offchain_pool, is_routing, pair, routing_params)
+            .await
+            .map_err(|e| e.to_entry_error(&(pair.to_pair_id())))?;
 
-    let last_updated_timestamp =
-        entry_repository::get_last_updated_timestamp(&state.offchain_pool, pair.to_pair_id())
-            .await?
-            .unwrap_or(entry.time);
+    let last_updated_timestamp = entry_repository::get_last_updated_timestamp(
+        &state.offchain_pool,
+        pair.to_pair_id(),
+        routing_params.timestamp,
+    )
+    .await?
+    .unwrap_or(entry.time);
 
     Ok(adapt_entry_to_entry_response(
         pair.to_pair_id(),

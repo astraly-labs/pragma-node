@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use bigdecimal::{BigDecimal, FromPrimitive, ToPrimitive};
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::{DateTime, NaiveDateTime};
 use diesel::prelude::QueryableByName;
 use diesel::sql_types::{Double, Jsonb, VarChar};
 use diesel::{ExpressionMethods, QueryDsl, Queryable, RunQueryDsl};
@@ -30,7 +30,7 @@ use pragma_entities::{
 // SQL statement used to filter the expiration timestamp for future entries
 fn get_expiration_timestamp_filter(
     data_type: DataType,
-    expiry: String,
+    expiry: &str,
 ) -> Result<String, InfraError> {
     match data_type {
         DataType::SpotEntry => Ok(String::default()),
@@ -142,18 +142,18 @@ pub async fn routing(
     pool: &deadpool_diesel::postgres::Pool,
     is_routing: bool,
     pair: &Pair,
-    routing_params: RoutingParams,
+    routing_params: &RoutingParams,
 ) -> Result<(MedianEntry, u32), InfraError> {
     // If we have entries for the pair_id and the latest entry is fresh enough,
     // Or if we are not routing, we can return the price directly.
     if !is_routing
         || (pair_id_exist(pool, pair).await?
-            && get_last_updated_timestamp(pool, pair.to_pair_id())
+            && get_last_updated_timestamp(pool, pair.to_pair_id(), routing_params.timestamp)
                 .await?
                 .unwrap_or(NaiveDateTime::default())
                 .and_utc()
                 .timestamp()
-                >= Utc::now().naive_utc().and_utc().timestamp() - ROUTING_FRESHNESS_THRESHOLD)
+                >= routing_params.timestamp - ROUTING_FRESHNESS_THRESHOLD)
     {
         return get_price_and_decimals(pool, pair, routing_params).await;
     }
@@ -219,7 +219,7 @@ pub fn calculate_rebased_price(
 async fn find_alternative_pair_price(
     pool: &deadpool_diesel::postgres::Pool,
     pair: &Pair,
-    routing_params: RoutingParams,
+    routing_params: &RoutingParams,
 ) -> Result<(MedianEntry, u32), InfraError> {
     let conn = pool.get().await.map_err(adapt_infra_error)?;
 
@@ -237,7 +237,7 @@ async fn find_alternative_pair_price(
             && pair_id_exist(pool, &alt_quote_pair.clone()).await?
         {
             let base_alt_result =
-                get_price_and_decimals(pool, &base_alt_pair, routing_params.clone()).await?;
+                get_price_and_decimals(pool, &base_alt_pair, routing_params).await?;
             let alt_quote_result =
                 get_price_and_decimals(pool, &alt_quote_pair, routing_params).await?;
 
@@ -267,7 +267,7 @@ async fn pair_id_exist(
 async fn get_price_and_decimals(
     pool: &deadpool_diesel::postgres::Pool,
     pair: &Pair,
-    routing_params: RoutingParams,
+    routing_params: &RoutingParams,
 ) -> Result<(MedianEntry, u32), InfraError> {
     let entry = match routing_params.aggregation_mode {
         AggregationMode::Median => {
@@ -303,7 +303,7 @@ pub async fn get_all_currencies_decimals(
 pub async fn get_twap_price(
     pool: &deadpool_diesel::postgres::Pool,
     pair_id: String,
-    routing_params: RoutingParams,
+    routing_params: &RoutingParams,
 ) -> Result<MedianEntry, InfraError> {
     let conn = pool.get().await.map_err(adapt_infra_error)?;
 
@@ -327,7 +327,7 @@ pub async fn get_twap_price(
     "#,
         get_interval_specifier(routing_params.interval, true)?,
         get_table_suffix(routing_params.data_type)?,
-        get_expiration_timestamp_filter(routing_params.data_type, routing_params.expiry)?,
+        get_expiration_timestamp_filter(routing_params.data_type, &routing_params.expiry)?,
     );
 
     let date_time = DateTime::from_timestamp(routing_params.timestamp, 0).ok_or(
@@ -362,7 +362,7 @@ pub async fn get_twap_price(
 pub async fn get_median_price(
     pool: &deadpool_diesel::postgres::Pool,
     pair_id: String,
-    routing_params: RoutingParams,
+    routing_params: &RoutingParams,
 ) -> Result<MedianEntry, InfraError> {
     let conn = pool.get().await.map_err(adapt_infra_error)?;
 
@@ -386,7 +386,7 @@ pub async fn get_median_price(
     "#,
         get_interval_specifier(routing_params.interval, false)?,
         get_table_suffix(routing_params.data_type)?,
-        get_expiration_timestamp_filter(routing_params.data_type, routing_params.expiry)?,
+        get_expiration_timestamp_filter(routing_params.data_type, &routing_params.expiry)?,
     );
 
     let date_time = DateTime::from_timestamp(routing_params.timestamp, 0).ok_or(
@@ -508,7 +508,7 @@ pub async fn get_median_prices_between(
     "#,
         get_interval_specifier(routing_params.interval, false)?,
         get_table_suffix(routing_params.data_type)?,
-        get_expiration_timestamp_filter(routing_params.data_type, routing_params.expiry)?,
+        get_expiration_timestamp_filter(routing_params.data_type, &routing_params.expiry)?,
     );
 
     let raw_entries = conn
@@ -571,7 +571,7 @@ pub async fn get_twap_prices_between(
     "#,
         get_interval_specifier(routing_params.interval, true)?,
         get_table_suffix(routing_params.data_type)?,
-        get_expiration_timestamp_filter(routing_params.data_type, routing_params.expiry)?,
+        get_expiration_timestamp_filter(routing_params.data_type, &routing_params.expiry)?,
     );
 
     let raw_entries = conn
@@ -640,9 +640,10 @@ pub async fn get_decimals(
 pub async fn get_last_updated_timestamp(
     pool: &deadpool_diesel::postgres::Pool,
     pair_id: String,
+    max_timestamp: i64,
 ) -> Result<Option<NaiveDateTime>, InfraError> {
     let conn = pool.get().await.map_err(adapt_infra_error)?;
-    conn.interact(|conn| Entry::get_last_updated_timestamp(conn, pair_id))
+    conn.interact(move |conn| Entry::get_last_updated_timestamp(conn, pair_id, max_timestamp))
         .await
         .map_err(adapt_infra_error)?
         .map_err(adapt_infra_error)
