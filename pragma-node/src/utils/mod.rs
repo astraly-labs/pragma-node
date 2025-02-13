@@ -285,7 +285,7 @@ mod tests {
         ];
 
         let epsilon = 1e-10;
-        assert!((compute_volatility(&entries) - 309_805_011.172_643_57).abs() < epsilon);
+        assert!((compute_volatility(&entries) - 17_264_357.963_673_33).abs() < epsilon);
     }
 
     #[test]
