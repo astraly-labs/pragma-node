@@ -59,6 +59,7 @@ pub const fn get_interval_specifier(
     is_twap: bool,
 ) -> Result<&'static str, InfraError> {
     match interval {
+        Interval::OneSecond => Ok("1_s"),
         Interval::OneMinute => Ok("1_min"),
         Interval::FifteenMinutes => Ok("15_min"),
         Interval::OneHour if is_twap => Ok("1_hour"),

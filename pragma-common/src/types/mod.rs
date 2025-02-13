@@ -48,6 +48,8 @@ pub enum DataType {
 // Supported Aggregation Intervals
 #[derive(Default, Debug, Serialize, Deserialize, ToSchema, Clone, Copy, Eq, PartialEq, Hash)]
 pub enum Interval {
+    #[serde(rename = "1s")]
+    OneSecond,
     #[serde(rename = "1min")]
     #[default]
     OneMinute,
@@ -66,6 +68,7 @@ pub enum Interval {
 impl Interval {
     pub const fn to_minutes(&self) -> i64 {
         match self {
+            Self::OneSecond => 0,
             Self::OneMinute => 1,
             Self::FifteenMinutes => 15,
             Self::OneHour => 60,
@@ -76,6 +79,9 @@ impl Interval {
     }
 
     pub const fn to_seconds(&self) -> i64 {
+        if matches!(self, Self::OneSecond) {
+            return 1;
+        }
         self.to_minutes() * 60
     }
 }

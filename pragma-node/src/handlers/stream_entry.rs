@@ -170,24 +170,7 @@ async fn get_historical_entries(
 
             (entries, decimals)
         }
-        AggregationMode::Twap => {
-            let entries = entry_repository::get_twap_prices_between(
-                &state.offchain_pool,
-                pair.to_pair_id(),
-                routing_params.clone(),
-                start_timestamp,
-                end_timestamp,
-            )
-            .await
-            .map_err(|e| e.to_entry_error(&pair.to_pair_id()))?;
-
-            let decimals = entry_repository::get_decimals(&state.offchain_pool, pair)
-                .await
-                .map_err(|e| e.to_entry_error(&pair.to_pair_id()))?;
-
-            (entries, decimals)
-        }
-        AggregationMode::Mean => return Err(EntryError::BadRequest),
+        AggregationMode::Mean | AggregationMode::Twap => unreachable!(),
     };
 
     let responses: Vec<GetEntryResponse> = entries
