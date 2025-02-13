@@ -3,48 +3,92 @@ use axum::{
     extract::{Query, State},
     response::sse::{Event, Sse},
 };
+use axum_extra::{headers, TypedHeader};
 use futures::{
     stream::{self, Stream},
     Future,
 };
-use pragma_common::types::pair::Pair;
+use pragma_common::types::{pair::Pair, AggregationMode};
 use pragma_entities::EntryError;
+use serde::Deserialize;
 use std::{convert::Infallible, pin::Pin, time::Duration};
 use tokio_stream::StreamExt;
+use utoipa::{IntoParams, ToSchema};
 
 use super::{
     get_entry::{adapt_entry_to_entry_response, GetEntryResponse, RoutingParams},
     GetEntryParams,
 };
 
+const DEFAULT_HISTORICAL_PRICES: usize = 50;
+
 type BoxedFuture = Pin<Box<dyn Future<Output = Event> + Send>>;
 type BoxedStreamItem = Box<dyn FnMut() -> BoxedFuture + Send>;
+
+#[derive(Debug, Deserialize, IntoParams, ToSchema)]
+pub struct StreamEntryParams {
+    #[serde(flatten)]
+    pub get_entry_params: GetEntryParams,
+    pub historical_prices: Option<usize>,
+}
 
 pub async fn stream_entry(
     State(state): State<AppState>,
     PathExtractor(pair): PathExtractor<(String, String)>,
-    Query(params): Query<GetEntryParams>,
+    Query(params): Query<StreamEntryParams>,
+    TypedHeader(user_agent): TypedHeader<headers::UserAgent>,
 ) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
     let pair = Pair::from(pair);
-    let is_routing = params.routing.unwrap_or(false);
+    let is_routing = params.get_entry_params.routing.unwrap_or(false);
+    let interval = params.get_entry_params.interval.unwrap_or_default();
+    let historical_prices = params
+        .historical_prices
+        .unwrap_or(DEFAULT_HISTORICAL_PRICES);
 
-    let interval = params.interval.unwrap_or_default();
+    tracing::info!(
+        "`{}` connected to price feed {} with {} historical prices",
+        user_agent.as_str(),
+        pair.to_pair_id(),
+        historical_prices
+    );
 
-    let generator: BoxedStreamItem = match RoutingParams::try_from(params) {
+    let generator: BoxedStreamItem = match RoutingParams::try_from(params.get_entry_params) {
         Ok(routing_params) => {
             let state = state.clone();
             let pair = pair.clone();
+            let mut first_batch = true;
+
             Box::new(move || {
                 let state = state.clone();
                 let pair = pair.clone();
                 let params = routing_params.clone();
+                let is_first = first_batch;
+                first_batch = false;
+
                 Box::pin(async move {
-                    match get_latest_entry(&state, &pair, is_routing, &params).await {
-                        Ok(entry_response) => match serde_json::to_string(&entry_response) {
-                            Ok(json) => Event::default().data(json),
-                            Err(e) => Event::default().data(format!("Serialization error: {}", e)),
-                        },
-                        Err(e) => Event::default().data(format!("Error fetching entry: {}", e)),
+                    if is_first {
+                        // For the first batch, get historical prices
+                        match get_historical_entries(&state, &pair, &params, historical_prices)
+                            .await
+                        {
+                            Ok(entries) => {
+                                let json = serde_json::to_string(&entries).unwrap_or_default();
+                                Event::default().data(json).event("historical")
+                            }
+                            Err(e) => Event::default()
+                                .data(format!("Error fetching historical entries: {}", e)),
+                        }
+                    } else {
+                        // For subsequent updates, get latest price
+                        match get_latest_entry(&state, &pair, is_routing, &params).await {
+                            Ok(entry_response) => match serde_json::to_string(&entry_response) {
+                                Ok(json) => Event::default().data(json),
+                                Err(e) => {
+                                    Event::default().data(format!("Serialization error: {}", e))
+                                }
+                            },
+                            Err(e) => Event::default().data(format!("Error fetching entry: {}", e)),
+                        }
                     }
                 }) as BoxedFuture
             })
@@ -68,6 +112,66 @@ pub async fn stream_entry(
             .interval(Duration::from_secs(60))
             .text("keep-alive-text"),
     )
+}
+
+async fn get_historical_entries(
+    state: &AppState,
+    pair: &Pair,
+    routing_params: &RoutingParams,
+    count: usize,
+) -> Result<Vec<GetEntryResponse>, EntryError> {
+    let interval = routing_params.interval;
+    // Get current timestamp
+    let end_timestamp = chrono::Utc::now().timestamp() as u64;
+    // Get timestamp from count minutes ago
+    let start_timestamp = end_timestamp.saturating_sub(count as u64 * interval.to_seconds() as u64);
+
+    // Get entries based on aggregation mode
+    let (entries, decimals) = match routing_params.aggregation_mode {
+        AggregationMode::Median => {
+            let entries = entry_repository::get_median_prices_between(
+                &state.offchain_pool,
+                pair.to_pair_id(),
+                routing_params.clone(),
+                start_timestamp,
+                end_timestamp,
+            )
+            .await
+            .map_err(|e| e.to_entry_error(&pair.to_pair_id()))?;
+
+            let decimals = entry_repository::get_decimals(&state.offchain_pool, pair)
+                .await
+                .map_err(|e| e.to_entry_error(&pair.to_pair_id()))?;
+
+            (entries, decimals)
+        }
+        AggregationMode::Twap => {
+            let entries = entry_repository::get_twap_prices_between(
+                &state.offchain_pool,
+                pair.to_pair_id(),
+                routing_params.clone(),
+                start_timestamp,
+                end_timestamp,
+            )
+            .await
+            .map_err(|e| e.to_entry_error(&pair.to_pair_id()))?;
+
+            let decimals = entry_repository::get_decimals(&state.offchain_pool, pair)
+                .await
+                .map_err(|e| e.to_entry_error(&pair.to_pair_id()))?;
+
+            (entries, decimals)
+        }
+        AggregationMode::Mean => return Err(EntryError::BadRequest),
+    };
+
+    let responses: Vec<GetEntryResponse> = entries
+        .into_iter()
+        .take(count)
+        .map(|entry| adapt_entry_to_entry_response(pair.to_pair_id(), &entry, decimals, entry.time))
+        .collect();
+
+    Ok(responses)
 }
 
 async fn get_latest_entry(

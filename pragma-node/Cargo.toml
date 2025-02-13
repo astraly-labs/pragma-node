@@ -12,6 +12,7 @@ aws-config = { workspace = true, features = ["behavior-version-latest"] }
 aws-sdk-secretsmanager = { workspace = true }
 axum = { workspace = true, features = ["macros", "ws", "tokio"] }
 axum-macros = { workspace = true }
+axum-extra = { workspace = true }
 axum-tracing-opentelemetry = { workspace = true }
 bigdecimal = { workspace = true, features = ["serde"] }
 cainome = { workspace = true, features = ["abigen-rs"] }

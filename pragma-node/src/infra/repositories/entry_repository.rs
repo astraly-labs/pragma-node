@@ -420,7 +420,7 @@ pub async fn get_median_price(
     Ok(entry)
 }
 
-pub async fn get_entries_between(
+pub async fn get_median_entries_1_min_between(
     pool: &deadpool_diesel::postgres::Pool,
     pair_id: String,
     start_timestamp: u64,
@@ -451,6 +451,128 @@ pub async fn get_entries_between(
     let raw_entries = conn
         .interact(move |conn| {
             diesel::sql_query(raw_sql)
+                .bind::<diesel::sql_types::Text, _>(pair_id)
+                .bind::<diesel::sql_types::Timestamptz, _>(start_datetime)
+                .bind::<diesel::sql_types::Timestamptz, _>(end_datetime)
+                .load::<MedianEntryRaw>(conn)
+        })
+        .await
+        .map_err(adapt_infra_error)?
+        .map_err(adapt_infra_error)?;
+
+    let entries: Vec<MedianEntry> = raw_entries
+        .into_iter()
+        .map(|raw_entry| MedianEntry {
+            time: raw_entry.time,
+            median_price: raw_entry.median_price,
+            num_sources: raw_entry.num_sources,
+        })
+        .collect();
+
+    Ok(entries)
+}
+
+pub async fn get_median_prices_between(
+    pool: &deadpool_diesel::postgres::Pool,
+    pair_id: String,
+    routing_params: RoutingParams,
+    start_timestamp: u64,
+    end_timestamp: u64,
+) -> Result<Vec<MedianEntry>, InfraError> {
+    let conn = pool.get().await.map_err(adapt_infra_error)?;
+    let start_datetime = DateTime::from_timestamp(start_timestamp as i64, 0).ok_or(
+        InfraError::InvalidTimestamp(format!("Cannot convert to DateTime: {start_timestamp}")),
+    )?;
+    let end_datetime = DateTime::from_timestamp(end_timestamp as i64, 0).ok_or(
+        InfraError::InvalidTimestamp(format!("Cannot convert to DateTime: {end_timestamp}")),
+    )?;
+
+    let sql_request: String = format!(
+        r#"
+        -- query the materialized realtime view
+        SELECT
+            bucket AS time,
+            median_price,
+            num_sources
+        FROM
+            price_{}_agg{}
+        WHERE
+            pair_id = $1
+            AND
+            bucket BETWEEN $2 AND $3
+            {}
+        ORDER BY
+            time DESC;
+    "#,
+        get_interval_specifier(routing_params.interval, false)?,
+        get_table_suffix(routing_params.data_type)?,
+        get_expiration_timestamp_filter(routing_params.data_type, routing_params.expiry)?,
+    );
+
+    let raw_entries = conn
+        .interact(move |conn| {
+            diesel::sql_query(&sql_request)
+                .bind::<diesel::sql_types::Text, _>(pair_id)
+                .bind::<diesel::sql_types::Timestamptz, _>(start_datetime)
+                .bind::<diesel::sql_types::Timestamptz, _>(end_datetime)
+                .load::<MedianEntryRaw>(conn)
+        })
+        .await
+        .map_err(adapt_infra_error)?
+        .map_err(adapt_infra_error)?;
+
+    let entries: Vec<MedianEntry> = raw_entries
+        .into_iter()
+        .map(|raw_entry| MedianEntry {
+            time: raw_entry.time,
+            median_price: raw_entry.median_price,
+            num_sources: raw_entry.num_sources,
+        })
+        .collect();
+
+    Ok(entries)
+}
+
+pub async fn get_twap_prices_between(
+    pool: &deadpool_diesel::postgres::Pool,
+    pair_id: String,
+    routing_params: RoutingParams,
+    start_timestamp: u64,
+    end_timestamp: u64,
+) -> Result<Vec<MedianEntry>, InfraError> {
+    let conn = pool.get().await.map_err(adapt_infra_error)?;
+    let start_datetime = DateTime::from_timestamp(start_timestamp as i64, 0).ok_or(
+        InfraError::InvalidTimestamp(format!("Cannot convert to DateTime: {start_timestamp}")),
+    )?;
+    let end_datetime = DateTime::from_timestamp(end_timestamp as i64, 0).ok_or(
+        InfraError::InvalidTimestamp(format!("Cannot convert to DateTime: {end_timestamp}")),
+    )?;
+
+    let sql_request: String = format!(
+        r#"
+        -- query the materialized realtime view
+        SELECT
+            bucket AS time,
+            price_twap AS median_price,
+            num_sources
+        FROM
+            twap_{}_agg{}
+        WHERE
+            pair_id = $1
+            AND
+            bucket BETWEEN $2 AND $3
+            {}
+        ORDER BY
+            time DESC;
+    "#,
+        get_interval_specifier(routing_params.interval, true)?,
+        get_table_suffix(routing_params.data_type)?,
+        get_expiration_timestamp_filter(routing_params.data_type, routing_params.expiry)?,
+    );
+
+    let raw_entries = conn
+        .interact(move |conn| {
+            diesel::sql_query(&sql_request)
                 .bind::<diesel::sql_types::Text, _>(pair_id)
                 .bind::<diesel::sql_types::Timestamptz, _>(start_datetime)
                 .bind::<diesel::sql_types::Timestamptz, _>(end_datetime)

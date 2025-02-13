@@ -54,7 +54,7 @@ pub async fn get_volatility(
     }
 
     // Fetch entries between start and end timestamps
-    let entries = entry_repository::get_entries_between(
+    let entries = entry_repository::get_median_entries_1_min_between(
         &state.offchain_pool,
         pair.to_pair_id(),
         volatility_query.start,
