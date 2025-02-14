@@ -57,6 +57,7 @@ pub async fn stream_entry(
     );
 
     let generator: BoxedStreamItem = if is_routing
+        || params.get_entry_params.timestamp.is_some()
         || matches!(
             params.get_entry_params.aggregation,
             Some(AggregationMode::Twap | AggregationMode::Mean)
@@ -212,15 +213,19 @@ async fn get_latest_entry(
     is_routing: bool,
     routing_params: &RoutingParams,
 ) -> Result<GetEntryResponse, EntryError> {
+    // We have to update the timestamp to now every tick
+    let mut new_routing = routing_params.clone();
+    new_routing.timestamp = chrono::Utc::now().timestamp();
+
     let (entry, decimals) =
-        entry_repository::routing(&state.offchain_pool, is_routing, pair, routing_params)
+        entry_repository::routing(&state.offchain_pool, is_routing, pair, &new_routing)
             .await
             .map_err(|e| e.to_entry_error(&(pair.to_pair_id())))?;
 
     let last_updated_timestamp = entry_repository::get_last_updated_timestamp(
         &state.offchain_pool,
         pair.to_pair_id(),
-        routing_params.timestamp,
+        new_routing.timestamp,
     )
     .await?
     .unwrap_or(entry.time);

@@ -50,6 +50,8 @@ pub enum DataType {
 pub enum Interval {
     #[serde(rename = "1s")]
     OneSecond,
+    #[serde(rename = "5s")]
+    FiveSeconds,
     #[serde(rename = "1min")]
     #[default]
     OneMinute,
@@ -69,6 +71,7 @@ impl Interval {
     pub const fn to_minutes(&self) -> i64 {
         match self {
             Self::OneSecond => 0,
+            Self::FiveSeconds => 5,
             Self::OneMinute => 1,
             Self::FifteenMinutes => 15,
             Self::OneHour => 60,
@@ -81,6 +84,9 @@ impl Interval {
     pub const fn to_seconds(&self) -> i64 {
         if matches!(self, Self::OneSecond) {
             return 1;
+        }
+        if matches!(self, Self::FiveSeconds) {
+            return 5;
         }
         self.to_minutes() * 60
     }

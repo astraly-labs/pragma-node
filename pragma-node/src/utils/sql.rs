@@ -8,6 +8,7 @@ pub fn get_expiration_timestamp_filter(
 ) -> Result<String, InfraError> {
     match data_type {
         DataType::SpotEntry => Ok(String::default()),
+        // TODO: this is a perp?
         DataType::FutureEntry if expiry.is_empty() => {
             Ok(String::from("AND\n\t\texpiration_timestamp is null"))
         }
@@ -45,6 +46,7 @@ pub const fn get_interval_specifier(
     } else {
         match interval {
             Interval::OneSecond => Ok("1_s"),
+            Interval::FiveSeconds => Ok("5_s"),
             Interval::OneMinute => Ok("1_min"),
             Interval::FifteenMinutes => Ok("15_min"),
             Interval::OneHour => Ok("1_h"),
