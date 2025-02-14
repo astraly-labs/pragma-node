@@ -33,27 +33,25 @@ pub struct NewPublisher {
 }
 
 impl Publishers {
-    pub fn get_by_name(conn: &mut PgConnection, name: String) -> DieselResult<Publishers> {
+    pub fn get_by_name(conn: &mut PgConnection, name: String) -> DieselResult<Self> {
         publishers::table
             .filter(publishers::name.eq(name))
-            .select(Publishers::as_select())
+            .select(Self::as_select())
             .get_result(conn)
     }
 
     pub fn with_filters(
         conn: &mut PgConnection,
         filters: dto::PublishersFilter,
-    ) -> DieselResult<Vec<Publishers>> {
+    ) -> DieselResult<Vec<Self>> {
         let mut query = publishers::table.into_boxed::<diesel::pg::Pg>();
         if let Some(is_active) = filters.is_active {
             query = query.filter(publishers::active.eq(is_active));
         }
         if let Some(name_contains) = filters.name_contains {
-            query = query.filter(publishers::name.ilike(format!("%{}%", name_contains)));
+            query = query.filter(publishers::name.ilike(format!("%{name_contains}%")));
         }
-        query
-            .select(Publishers::as_select())
-            .load::<Publishers>(conn)
+        query.select(Self::as_select()).load::<Self>(conn)
     }
 
     pub fn get_account_address_by_name(

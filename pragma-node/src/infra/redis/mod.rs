@@ -26,7 +26,7 @@ pub async fn get_option_data(
         .await
         .map_err(|_| RedisError::Connection)?;
 
-    let instrument_key = format!("{}/{}/options/{}", network, block_number, instrument_name);
+    let instrument_key = format!("{network}/{block_number}/options/{instrument_name}");
 
     let result: String = conn
         .json_get(instrument_key, "$")
@@ -66,7 +66,7 @@ impl TryFrom<RawMerkleTree> for MerkleTree {
             .collect::<Result<Vec<Felt>, _>>()
             .map_err(|e| MerkleTreeError::BuildFailed(e.to_string()))?;
 
-        let merkle_tree = MerkleTree::new(leaves)?;
+        let merkle_tree = Self::new(leaves)?;
 
         let expected_hash = Felt::from_hex(&serialized_tree.root_hash)
             .map_err(|e| MerkleTreeError::BuildFailed(e.to_string()))?;
@@ -105,7 +105,7 @@ pub async fn get_merkle_tree(
         .await
         .map_err(|_| RedisError::Connection)?;
 
-    let instrument_key = format!("{}/{}/merkle_tree", network, block_number);
+    let instrument_key = format!("{network}/{block_number}/merkle_tree");
 
     let result: String = conn
         .json_get(instrument_key, "$")
@@ -134,7 +134,7 @@ pub async fn get_merkle_tree(
     Ok(merkle_tree)
 }
 
-/// Converts a BlockId to a block number.
+/// Converts a `BlockId` to a block number.
 async fn get_block_number_from_id(
     redis_client: &Arc<redis::Client>,
     network: &Network,
@@ -160,12 +160,13 @@ async fn get_block_number_for_tag(
         .await
         .map_err(|_| RedisError::Connection)?;
 
-    let key = format!("{}/latest_published_block", network);
+    let key = format!("{network}/latest_published_block");
     let latest_published_block: Option<u64> =
         conn.get(key).await.map_err(|_| RedisError::Connection)?;
 
-    match latest_published_block {
-        Some(latest) => match tag {
+    latest_published_block.map_or_else(
+        || Err(RedisError::NoBlocks(network.to_string())),
+        |latest| match tag {
             BlockTag::Pending => Ok(latest),
             BlockTag::Latest => {
                 if latest > 0 {
@@ -175,6 +176,5 @@ async fn get_block_number_for_tag(
                 }
             }
         },
-        None => Err(RedisError::NoBlocks(network.to_string())),
-    }
+    )
 }

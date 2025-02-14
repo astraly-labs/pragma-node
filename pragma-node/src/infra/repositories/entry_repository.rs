@@ -17,103 +17,17 @@ use crate::constants::starkex_ws::{
 };
 use crate::handlers::get_entry::RoutingParams;
 use crate::handlers::subscribe_to_entry::{AssetOraclePrice, SignedPublisherPrice};
+use crate::utils::sql::{
+    get_expiration_timestamp_filter, get_interval_specifier, get_table_suffix,
+};
 use crate::utils::{convert_via_quote, normalize_to_decimals};
 use pragma_common::signing::starkex::StarkexPrice;
 use pragma_common::types::{AggregationMode, DataType, Interval};
-use pragma_entities::dto;
 use pragma_entities::{
     error::{adapt_infra_error, InfraError},
     schema::currencies,
-    Currency, Entry, NewEntry,
+    Currency, Entry,
 };
-
-// SQL statement used to filter the expiration timestamp for future entries
-fn get_expiration_timestamp_filter(
-    data_type: DataType,
-    expiry: &str,
-) -> Result<String, InfraError> {
-    match data_type {
-        DataType::SpotEntry => Ok(String::default()),
-        DataType::FutureEntry if expiry.is_empty() => {
-            Ok(String::from("AND\n\t\texpiration_timestamp is null"))
-        }
-        DataType::FutureEntry if !expiry.is_empty() => {
-            Ok(format!("AND\n\texpiration_timestamp = '{}'", expiry))
-        }
-        _ => Err(InfraError::InternalServerError),
-    }
-}
-
-// Retrieve the timescale table based on the network and data type.
-fn get_table_suffix(data_type: DataType) -> Result<&'static str, InfraError> {
-    match data_type {
-        DataType::SpotEntry => Ok(""),
-        DataType::FutureEntry => Ok("_future"),
-        _ => Err(InfraError::InternalServerError),
-    }
-}
-
-// Retrieve the timeframe specifier based on the interval and aggregation mode.
-pub fn get_interval_specifier(
-    interval: Interval,
-    is_twap: bool,
-) -> Result<&'static str, InfraError> {
-    match interval {
-        Interval::OneMinute => Ok("1_min"),
-        Interval::FifteenMinutes => Ok("15_min"),
-        Interval::OneHour if is_twap => Ok("1_hour"),
-        Interval::OneHour if !is_twap => Ok("1_h"),
-        Interval::TwoHours if is_twap => Ok("2_hours"),
-        Interval::TwoHours if !is_twap => Ok("2_h"),
-        Interval::OneDay => Ok("1_day"),
-        Interval::OneWeek => Ok("1_week"),
-        _ => Err(InfraError::InternalServerError),
-    }
-}
-
-pub async fn _insert(
-    pool: &deadpool_diesel::postgres::Pool,
-    new_entry: NewEntry,
-) -> Result<dto::Entry, InfraError> {
-    let conn = pool.get().await.map_err(adapt_infra_error)?;
-    let res = conn
-        .interact(|conn| Entry::create_one(conn, new_entry))
-        .await
-        .map_err(adapt_infra_error)?
-        .map_err(adapt_infra_error)
-        .map(dto::Entry::from)?;
-    Ok(res)
-}
-
-pub async fn _get(
-    pool: &deadpool_diesel::postgres::Pool,
-    pair_id: String,
-) -> Result<dto::Entry, InfraError> {
-    let conn = pool.get().await.map_err(adapt_infra_error)?;
-    let res = conn
-        .interact(move |conn| Entry::get_by_pair_id(conn, pair_id))
-        .await
-        .map_err(adapt_infra_error)?
-        .map_err(adapt_infra_error)?;
-
-    Ok(dto::Entry::from(res))
-}
-
-pub async fn _get_all(
-    pool: &deadpool_diesel::postgres::Pool,
-    filter: dto::EntriesFilter,
-) -> Result<Vec<dto::Entry>, InfraError> {
-    let conn = pool.get().await.map_err(adapt_infra_error)?;
-    let res = conn
-        .interact(move |conn| Entry::with_filters(conn, filter))
-        .await
-        .map_err(adapt_infra_error)?
-        .map_err(adapt_infra_error)?
-        .into_iter()
-        .map(dto::Entry::from)
-        .collect();
-    Ok(res)
-}
 
 #[derive(Debug, Serialize, Queryable)]
 pub struct MedianEntry {
@@ -158,10 +72,8 @@ pub async fn routing(
         return get_price_and_decimals(pool, pair, routing_params).await;
     }
 
-    match find_alternative_pair_price(pool, pair, routing_params).await {
-        Ok(result) => Ok(result),
-        Err(_) => Err(InfraError::NotFound),
-    }
+    (find_alternative_pair_price(pool, pair, routing_params).await)
+        .map_or_else(|_| Err(InfraError::NotFound), Ok)
 }
 
 pub fn calculate_rebased_price(
@@ -420,21 +332,23 @@ pub async fn get_median_price(
     Ok(entry)
 }
 
-pub async fn get_entries_between(
+pub async fn get_median_entries_1_min_between(
     pool: &deadpool_diesel::postgres::Pool,
     pair_id: String,
     start_timestamp: u64,
     end_timestamp: u64,
 ) -> Result<Vec<MedianEntry>, InfraError> {
     let conn = pool.get().await.map_err(adapt_infra_error)?;
+    #[allow(clippy::cast_possible_wrap)]
     let start_datetime = DateTime::from_timestamp(start_timestamp as i64, 0).ok_or(
         InfraError::InvalidTimestamp(format!("Cannot convert to DateTime: {start_timestamp}")),
     )?;
+    #[allow(clippy::cast_possible_wrap)]
     let end_datetime = DateTime::from_timestamp(end_timestamp as i64, 0).ok_or(
         InfraError::InvalidTimestamp(format!("Cannot convert to DateTime: {start_timestamp}")),
     )?;
 
-    let raw_sql = r#"
+    let raw_sql = r"
         SELECT
             bucket AS time,
             median_price,
@@ -446,11 +360,137 @@ pub async fn get_entries_between(
             time BETWEEN $2 AND $3
         ORDER BY 
             time DESC;
-    "#;
+    ";
 
     let raw_entries = conn
         .interact(move |conn| {
             diesel::sql_query(raw_sql)
+                .bind::<diesel::sql_types::Text, _>(pair_id)
+                .bind::<diesel::sql_types::Timestamptz, _>(start_datetime)
+                .bind::<diesel::sql_types::Timestamptz, _>(end_datetime)
+                .load::<MedianEntryRaw>(conn)
+        })
+        .await
+        .map_err(adapt_infra_error)?
+        .map_err(adapt_infra_error)?;
+
+    let entries: Vec<MedianEntry> = raw_entries
+        .into_iter()
+        .map(|raw_entry| MedianEntry {
+            time: raw_entry.time,
+            median_price: raw_entry.median_price,
+            num_sources: raw_entry.num_sources,
+        })
+        .collect();
+
+    Ok(entries)
+}
+
+pub async fn get_median_prices_between(
+    pool: &deadpool_diesel::postgres::Pool,
+    pair_id: String,
+    routing_params: RoutingParams,
+    start_timestamp: u64,
+    end_timestamp: u64,
+) -> Result<Vec<MedianEntry>, InfraError> {
+    let conn = pool.get().await.map_err(adapt_infra_error)?;
+    #[allow(clippy::cast_possible_wrap)]
+    let start_datetime = DateTime::from_timestamp(start_timestamp as i64, 0).ok_or(
+        InfraError::InvalidTimestamp(format!("Cannot convert to DateTime: {start_timestamp}")),
+    )?;
+    #[allow(clippy::cast_possible_wrap)]
+    let end_datetime = DateTime::from_timestamp(end_timestamp as i64, 0).ok_or(
+        InfraError::InvalidTimestamp(format!("Cannot convert to DateTime: {end_timestamp}")),
+    )?;
+
+    let sql_request: String = format!(
+        r#"
+        -- query the materialized realtime view
+        SELECT
+            bucket AS time,
+            median_price,
+            num_sources
+        FROM
+            price_{}_agg{}
+        WHERE
+            pair_id = $1
+            AND
+            bucket BETWEEN $2 AND $3
+            {}
+        ORDER BY
+            time DESC;
+    "#,
+        get_interval_specifier(routing_params.interval, false)?,
+        get_table_suffix(routing_params.data_type)?,
+        get_expiration_timestamp_filter(routing_params.data_type, &routing_params.expiry)?,
+    );
+
+    let raw_entries = conn
+        .interact(move |conn| {
+            diesel::sql_query(&sql_request)
+                .bind::<diesel::sql_types::Text, _>(pair_id)
+                .bind::<diesel::sql_types::Timestamptz, _>(start_datetime)
+                .bind::<diesel::sql_types::Timestamptz, _>(end_datetime)
+                .load::<MedianEntryRaw>(conn)
+        })
+        .await
+        .map_err(adapt_infra_error)?
+        .map_err(adapt_infra_error)?;
+
+    let entries: Vec<MedianEntry> = raw_entries
+        .into_iter()
+        .map(|raw_entry| MedianEntry {
+            time: raw_entry.time,
+            median_price: raw_entry.median_price,
+            num_sources: raw_entry.num_sources,
+        })
+        .collect();
+
+    Ok(entries)
+}
+
+pub async fn get_twap_prices_between(
+    pool: &deadpool_diesel::postgres::Pool,
+    pair_id: String,
+    routing_params: RoutingParams,
+    start_timestamp: u64,
+    end_timestamp: u64,
+) -> Result<Vec<MedianEntry>, InfraError> {
+    let conn = pool.get().await.map_err(adapt_infra_error)?;
+    #[allow(clippy::cast_possible_wrap)]
+    let start_datetime = DateTime::from_timestamp(start_timestamp as i64, 0).ok_or(
+        InfraError::InvalidTimestamp(format!("Cannot convert to DateTime: {start_timestamp}")),
+    )?;
+    #[allow(clippy::cast_possible_wrap)]
+    let end_datetime = DateTime::from_timestamp(end_timestamp as i64, 0).ok_or(
+        InfraError::InvalidTimestamp(format!("Cannot convert to DateTime: {end_timestamp}")),
+    )?;
+
+    let sql_request: String = format!(
+        r#"
+        -- query the materialized realtime view
+        SELECT
+            bucket AS time,
+            price_twap AS median_price,
+            num_sources
+        FROM
+            twap_{}_agg{}
+        WHERE
+            pair_id = $1
+            AND
+            bucket BETWEEN $2 AND $3
+            {}
+        ORDER BY
+            time DESC;
+    "#,
+        get_interval_specifier(routing_params.interval, true)?,
+        get_table_suffix(routing_params.data_type)?,
+        get_expiration_timestamp_filter(routing_params.data_type, &routing_params.expiry)?,
+    );
+
+    let raw_entries = conn
+        .interact(move |conn| {
+            diesel::sql_query(&sql_request)
                 .bind::<diesel::sql_types::Text, _>(pair_id)
                 .bind::<diesel::sql_types::Timestamptz, _>(start_datetime)
                 .bind::<diesel::sql_types::Timestamptz, _>(end_datetime)
@@ -552,7 +592,7 @@ pub struct OHLCEntryRaw {
 
 impl From<OHLCEntryRaw> for OHLCEntry {
     fn from(raw: OHLCEntryRaw) -> Self {
-        OHLCEntry {
+        Self {
             time: raw.time,
             open: raw.open,
             high: raw.high,
@@ -662,7 +702,7 @@ impl TryFrom<RawMedianEntryWithComponents> for MedianEntryWithComponents {
         let median_price =
             BigDecimal::from_f64(raw.median_price).ok_or(Self::Error::BigDecimalConversion)?;
 
-        Ok(MedianEntryWithComponents {
+        Ok(Self {
             pair_id: raw.pair_id,
             median_price,
             components,
@@ -689,8 +729,8 @@ impl TryFrom<EntryComponent> for SignedPublisherPrice {
         // Scale price from 8 decimals to 18 decimals for StarkEx
         let price_with_18_decimals = component.price * BigDecimal::from(10_u64.pow(10));
 
-        Ok(SignedPublisherPrice {
-            oracle_asset_id: format!("0x{}", asset_id),
+        Ok(Self {
+            oracle_asset_id: format!("0x{asset_id}"),
             oracle_price: price_with_18_decimals.to_string(),
             timestamp: component.timestamp.to_string(),
             signing_key: component.publisher_address,
@@ -720,8 +760,8 @@ impl TryFrom<MedianEntryWithComponents> for AssetOraclePrice {
         // Scale price from 8 decimals to 18 decimals for StarkEx
         let price_with_18_decimals = median_entry.median_price * BigDecimal::from(10_u64.pow(10));
 
-        Ok(AssetOraclePrice {
-            global_asset_id: format!("0x{}", global_asset_id),
+        Ok(Self {
+            global_asset_id: format!("0x{global_asset_id}"),
             median_price: price_with_18_decimals.to_string(),
             signed_prices: signed_prices?,
             signature: Default::default(),
@@ -730,7 +770,7 @@ impl TryFrom<MedianEntryWithComponents> for AssetOraclePrice {
 }
 
 /// Convert a list of raw entries into a list of valid median entries.
-/// For each pair_id, check if it has a valid median price with enough unique publishers.
+/// For each `pair_id`, check if it has a valid median price with enough unique publishers.
 /// Returns the valid entries, filtering out any invalid ones.
 fn get_median_entries_response(
     raw_entries: Vec<RawMedianEntryWithComponents>,
@@ -778,11 +818,10 @@ fn get_median_entries_response(
 }
 
 /// Retrieves the timescale table name for the given entry type.
-fn get_table_name_from_type(entry_type: DataType) -> &'static str {
+const fn get_table_name_from_type(entry_type: DataType) -> &'static str {
     match entry_type {
         DataType::SpotEntry => "entries",
-        DataType::FutureEntry => "future_entries",
-        DataType::PerpEntry => "future_entries",
+        DataType::FutureEntry | DataType::PerpEntry => "future_entries",
     }
 }
 
@@ -792,8 +831,8 @@ fn get_table_name_from_type(entry_type: DataType) -> &'static str {
 const EXCLUDED_PUBLISHER: &str = "";
 
 /// Builds a SQL query that will fetch the recent prices between now and
-/// the given interval for each unique tuple (pair_id, publisher, source)
-/// and then calculate the median price for each pair_id.
+/// the given interval for each unique tuple (`pair_id`, publisher, source)
+/// and then calculate the median price for each `pair_id`.
 /// We also return in a JSON string the components that were used to calculate
 /// the median price.
 fn build_sql_query_for_median_with_components(
@@ -858,7 +897,7 @@ fn build_sql_query_for_median_with_components(
         table_name = get_table_name_from_type(entry_type),
         pairs_list = pair_ids
             .iter()
-            .map(|pair_id| format!("'{}'", pair_id))
+            .map(|pair_id| format!("'{pair_id}'"))
             .collect::<Vec<String>>()
             .join(", "),
         interval_in_ms = interval_in_ms,
@@ -870,8 +909,9 @@ fn build_sql_query_for_median_with_components(
     )
 }
 
-/// Compute the median price for each pair_id in the given list of pair_ids
+/// Compute the median price for each `pair_id` in the given list of `pair_ids`
 /// over an interval of time.
+///
 /// The interval is increased until we have valid entries with enough publishers.
 /// Returns any pairs that have valid data, even if some pairs are invalid.
 pub async fn get_current_median_entries_with_components(
@@ -944,12 +984,12 @@ pub async fn get_expiries_list(
 ) -> Result<Vec<NaiveDateTime>, InfraError> {
     let conn = pool.get().await.map_err(adapt_infra_error)?;
 
-    let sql_request: String = r#"
+    let sql_request: String = r"
         SELECT DISTINCT expiration_timestamp
         FROM future_entries
         WHERE pair_id = $1 AND expiration_timestamp IS NOT NULL
         ORDER BY expiration_timestamp;
-        "#
+        "
     .to_string();
 
     let raw_exp = conn

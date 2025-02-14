@@ -10,7 +10,7 @@ const STABLE_SUFFIXES: [&str; 4] = ["USDT", "USDC", "USD", "DAI"];
 /// This is a simple struct that holds the base and quote assets.
 /// It is used to represent a pair of assets in the system.
 /// Base and quote are always in UPPERCASE.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 pub struct Pair {
     pub base: String,
     pub quote: String,
@@ -20,7 +20,7 @@ impl Pair {
     /// Creates a routed pair from two pairs that share a common quote currency.
     ///
     /// e.g. "BTC/USD" and "ETH/USD" -> "BTC/ETH"
-    pub fn create_routed_pair(base_pair: &Pair, quote_pair: &Pair) -> Self {
+    pub fn create_routed_pair(base_pair: &Self, quote_pair: &Self) -> Self {
         Self {
             base: base_pair.base.clone(),
             quote: quote_pair.base.clone(),
@@ -36,7 +36,7 @@ impl Pair {
     }
 
     /// Creates a pair from a stable pair string with or without delimiters
-    /// e.g. "BTCUSDT" -> BTC/USD, "ETH-USDC" -> ETH/USD, "SOL_USDT" -> SOL/USD
+    /// e.g. "BTCUSDT" -> BTC/USD, "ETH-USDC" -> ETH/USD, "`SOL_USDT`" -> SOL/USD
     pub fn from_stable_pair(pair: &str) -> Option<Self> {
         let pair = pair.to_uppercase();
         let normalized = pair.replace(['-', '_', '/'], "");

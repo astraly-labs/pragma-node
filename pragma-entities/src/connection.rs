@@ -9,8 +9,7 @@ pub fn init_pool(app_name: &str, database_url_env: &str) -> Result<Pool, ErrorKi
     if database_url_env != ENV_OFFCHAIN_DATABASE_URL && database_url_env != ENV_ONCHAIN_DATABASE_URL
     {
         return Err(ErrorKind::GenericInitDatabase(format!(
-            "invalid database URL environment variable: {}",
-            database_url_env
+            "invalid database URL environment variable: {database_url_env}",
         )));
     }
 
@@ -21,11 +20,11 @@ pub fn init_pool(app_name: &str, database_url_env: &str) -> Result<Pool, ErrorKi
         .map_err(|_| ErrorKind::VariableDatabase(ENV_DATABASE_MAX_CONN.to_string()))?
         .parse::<u32>()
         .map_err(|_| {
-            ErrorKind::GenericInitDatabase(format!("cannot parse {}", ENV_DATABASE_MAX_CONN))
+            ErrorKind::GenericInitDatabase(format!("cannot parse {ENV_DATABASE_MAX_CONN}"))
         })? as usize;
 
     let manager = Manager::new(
-        format!("{}?application_name={}", database_url, app_name),
+        format!("{database_url}?application_name={app_name}"),
         deadpool_diesel::Runtime::Tokio1,
     );
 
@@ -36,7 +35,7 @@ pub fn init_pool(app_name: &str, database_url_env: &str) -> Result<Pool, ErrorKi
 }
 
 fn get_redis_connection_uri(host: &str, port: u16) -> String {
-    format!("redis://{}:{}/", host, port)
+    format!("redis://{host}:{port}/")
 }
 
 pub fn init_redis_client(host: &str, port: u16) -> Result<redis::Client, ErrorKind> {

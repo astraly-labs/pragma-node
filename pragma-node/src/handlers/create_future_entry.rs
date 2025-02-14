@@ -82,6 +82,7 @@ pub async fn create_future_entries(
         .entries
         .iter()
         .map(|future_entry| {
+            #[allow(clippy::cast_possible_wrap)]
             let dt = match DateTime::<Utc>::from_timestamp(future_entry.base.timestamp as i64, 0) {
                 Some(dt) => dt.naive_utc(),
                 None => {
@@ -96,6 +97,7 @@ pub async fn create_future_entries(
             let expiry_dt = if future_entry.expiration_timestamp == 0 {
                 None
             } else {
+                #[allow(clippy::cast_possible_wrap)]
                 match DateTime::<Utc>::from_timestamp_millis(
                     future_entry.expiration_timestamp as i64,
                 ) {
@@ -114,7 +116,7 @@ pub async fn create_future_entries(
                 source: future_entry.base.source.clone(),
                 timestamp: dt,
                 expiration_timestamp: expiry_dt,
-                publisher_signature: format!("0x{}", signature),
+                publisher_signature: format!("0x{signature}"),
                 price: future_entry.price.into(),
             })
         })

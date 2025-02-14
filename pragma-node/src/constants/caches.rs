@@ -1,5 +1,5 @@
 // See:
-/// https://docs.rs/moka/latest/moka/future/struct.Cache.html#example-time-based-expirations
+// <https://docs.rs/moka/latest/moka/future/struct.Cache.html#example-time-based-expirations>
 
 /// Cache the update count for our onchain publishers because the query
 /// takes a lot of time.

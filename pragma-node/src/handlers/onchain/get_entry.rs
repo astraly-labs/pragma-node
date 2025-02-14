@@ -70,11 +70,7 @@ pub async fn get_onchain_entry(
     let with_variations = params.variations.unwrap_or(true);
 
     let now = chrono::Utc::now().timestamp();
-    let timestamp = if let Some(timestamp) = params.timestamp {
-        timestamp
-    } else {
-        now
-    };
+    let timestamp = params.timestamp.map_or(now, |timestamp| timestamp);
 
     let routing_arguments = OnchainRoutingArguments {
         pair_id: pair.to_pair_id(),

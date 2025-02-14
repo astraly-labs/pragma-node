@@ -21,10 +21,10 @@ use super::get_onchain_aggregate_table_name;
 pub async fn get_historical_entries_and_decimals(
     onchain_pool: &Pool,
     offchain_pool: &Pool,
-    network: &Network,
+    network: Network,
     pair: &Pair,
     timestamp_range: &TimestampRange,
-    chunk_interval: &Interval,
+    chunk_interval: Interval,
 ) -> Result<(Vec<HistoricalEntryRaw>, u32), InfraError> {
     let raw_entries: Vec<HistoricalEntryRaw> = get_historical_aggregated_entries(
         onchain_pool,
@@ -56,13 +56,13 @@ pub struct HistoricalEntryRaw {
 }
 
 /// Returns the historical entries for a pair and the selected interval.
-/// NOTE: Only works for SpotEntry at the moment, DataType is hard coded.
+/// NOTE: Only works for `SpotEntry` at the moment, `DataType` is hard coded.
 async fn get_historical_aggregated_entries(
     pool: &Pool,
-    network: &Network,
+    network: Network,
     pair: &Pair,
     timestamp: &TimestampRange,
-    chunk_interval: &Interval,
+    chunk_interval: Interval,
 ) -> Result<Vec<HistoricalEntryRaw>, InfraError> {
     let (start_timestamp, end_timestamp) = {
         let range = timestamp.clone().0;
@@ -86,7 +86,7 @@ async fn get_historical_aggregated_entries(
             bucket ASC
         "#,
         table_name =
-            get_onchain_aggregate_table_name(network, &DataType::SpotEntry, chunk_interval)?,
+            get_onchain_aggregate_table_name(network, DataType::SpotEntry, chunk_interval)?,
     );
 
     let pair_id = pair.to_string();
@@ -109,17 +109,18 @@ async fn get_historical_aggregated_entries(
 
 /// Retry to get the onchain historical entries by finding
 /// an alternative route.
-/// TODO: This code is very similar to the one in [entry_repository] ;
+///
+/// TODO: This code is very similar to the one in [`entry_repository`] ;
 ///       once we have proper E2E tests, we should try to merge the code.
 /// NOTE: We let the possibility to try 1min intervals but they rarely works.
 /// Entries rarely align perfectly, causing insufficient data for routing.
 pub async fn retry_with_routing(
     onchain_pool: &Pool,
     offchain_pool: &Pool,
-    network: &Network,
+    network: Network,
     pair: &Pair,
     timestamp_range: &TimestampRange,
-    chunk_interval: &Interval,
+    chunk_interval: Interval,
 ) -> Result<(Vec<HistoricalEntryRaw>, u32), InfraError> {
     let offchain_conn = offchain_pool.get().await.map_err(adapt_infra_error)?;
     let alternative_currencies = offchain_conn
@@ -194,8 +195,8 @@ fn calculate_rebased_prices(
     Ok((rebased_entries, decimals))
 }
 
-/// Wrapper around the [normalize_to_decimals] function. It will be applied to all
-/// entries median_price.
+/// Wrapper around the [`normalize_to_decimals`] function. It will be applied to all
+/// entries `median_price`.
 fn normalize_entries_to_decimals(
     entries: Vec<HistoricalEntryRaw>,
     base_decimals: u32,
@@ -211,8 +212,8 @@ fn normalize_entries_to_decimals(
         .collect()
 }
 
-/// Wrapper around the [convert_via_quote] function. It will be applied to all
-/// normalized_entries median_price.
+/// Wrapper around the [`convert_via_quote`] function. It will be applied to all
+/// `normalized_entries` median price.
 fn convert_entries_via_quote(
     normalized_entries: Vec<HistoricalEntryRaw>,
     quote_entries: Vec<HistoricalEntryRaw>,
@@ -232,7 +233,7 @@ fn convert_entries_via_quote(
         .collect()
 }
 
-/// Given two entries, determine what should be the resulted pair_id, timestamp
+/// Given two entries, determine what should be the resulted `pair_id`, timestamp
 /// & sources. Returns the new entry afterwards.
 fn combine_entries(
     base_entry: &HistoricalEntryRaw,

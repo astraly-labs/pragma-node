@@ -23,6 +23,12 @@ pub struct CacheRegistry {
     publishers: Cache<String, Publisher>,
 }
 
+impl Default for CacheRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CacheRegistry {
     /// Initialize all of our caches empty.
     pub fn new() -> Self {
@@ -53,24 +59,24 @@ impl CacheRegistry {
             ))
             .build();
 
-        CacheRegistry {
+        Self {
             onchain_publishers_updates: onchain_publishers_updates_cache,
             merkle_feed_tree: merkle_feed_tree_cache,
             publishers: publishers_cache,
         }
     }
 
-    pub fn onchain_publishers_updates(
+    pub const fn onchain_publishers_updates(
         &self,
     ) -> &Cache<String, HashMap<String, RawPublisherUpdates>> {
         &self.onchain_publishers_updates
     }
 
-    pub fn merkle_feeds_tree(&self) -> &Cache<u64, MerkleTree> {
+    pub const fn merkle_feeds_tree(&self) -> &Cache<u64, MerkleTree> {
         &self.merkle_feed_tree
     }
 
-    pub fn publishers(&self) -> &Cache<String, Publisher> {
+    pub const fn publishers(&self) -> &Cache<String, Publisher> {
         &self.publishers
     }
 }

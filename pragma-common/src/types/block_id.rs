@@ -43,16 +43,19 @@ impl<'de> Deserialize<'de> for BlockId {
         D: Deserializer<'de>,
     {
         let value = String::deserialize(deserializer)?;
-        if let Ok(num) = u64::from_str(&value) {
-            Ok(BlockId::Number(num))
-        } else if let Ok(tag) = BlockTag::from_str(&value.to_lowercase()) {
-            Ok(BlockId::Tag(tag))
-        } else {
-            Err(serde::de::Error::custom(format!(
-                "Invalid BlockId: {}",
-                value
-            )))
-        }
+        u64::from_str(&value).map_or_else(
+            |_| {
+                BlockTag::from_str(&value.to_lowercase()).map_or_else(
+                    |_| {
+                        Err(serde::de::Error::custom(format!(
+                            "Invalid BlockId: {value}"
+                        )))
+                    },
+                    |tag| Ok(Self::Tag(tag)),
+                )
+            },
+            |num| Ok(Self::Number(num)),
+        )
     }
 }
 

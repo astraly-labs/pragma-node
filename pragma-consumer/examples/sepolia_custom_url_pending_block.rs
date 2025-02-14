@@ -7,7 +7,7 @@ use pragma_consumer::types::Instrument;
 async fn main() -> Result<(), ()> {
     let api_config = ApiConfig {
         base_url: PragmaBaseUrl::Custom("http://localhost:3000".into()),
-        api_key: "".into(),
+        api_key: String::new(),
     };
 
     let consumer = PragmaConsumerBuilder::new()

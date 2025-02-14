@@ -1,12 +1,12 @@
-mod caches;
-mod config;
-mod constants;
-mod errors;
-mod handlers;
-mod infra;
-mod metrics;
-mod server;
-mod utils;
+pub mod caches;
+pub mod config;
+pub mod constants;
+pub mod errors;
+pub mod handlers;
+pub mod infra;
+pub mod metrics;
+pub mod server;
+pub mod utils;
 
 use dashmap::DashMap;
 use dotenvy::dotenv;
@@ -86,19 +86,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Init the redis client - Optionnal, only for endpoints that interact with Redis,
     // i.e just the Merkle Feeds endpoint for now.
-    let redis_client = match pragma_entities::connection::init_redis_client(
-        config.redis_host(),
-        config.redis_port(),
-    ) {
-        Ok(client) => Some(Arc::new(client)),
-        Err(_) => {
-            tracing::warn!(
-                "⚠ Could not create the Redis client. Merkle feeds endpoints won't work."
+    let redis_client =
+        pragma_entities::connection::init_redis_client(config.redis_host(), config.redis_port())
+            .map_or_else(
+                |_| {
+                    tracing::warn!(
+                        "⚠ Could not create the Redis client. Merkle feeds endpoints won't work."
+                    );
+                    None
+                },
+                |client| Some(Arc::new(client)),
             );
-            None
-        }
-    };
-
     let state = AppState {
         offchain_pool,
         onchain_pool,

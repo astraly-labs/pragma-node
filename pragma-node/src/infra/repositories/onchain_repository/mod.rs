@@ -4,14 +4,15 @@ pub mod history;
 pub mod ohlc;
 pub mod publisher;
 
-use crate::{infra::repositories::entry_repository::get_interval_specifier, is_enum_variant};
+use crate::is_enum_variant;
+use crate::utils::sql::get_interval_specifier;
 use pragma_common::types::{DataType, Interval, Network};
 use pragma_entities::error::InfraError;
 
 /// Retrieve the onchain table name based on the network and data type.
-pub(crate) fn get_onchain_table_name(
-    network: &Network,
-    data_type: &DataType,
+pub(crate) const fn get_onchain_table_name(
+    network: Network,
+    data_type: DataType,
 ) -> Result<&'static str, InfraError> {
     let table = match (network, data_type) {
         (Network::Sepolia, DataType::SpotEntry) => "spot_entry",
@@ -44,9 +45,9 @@ pub(crate) fn get_onchain_ohlc_table_name(
 /// Retrieve the onchain table name for Timescale aggregates (medians) based on the network,
 /// datatype & interval.
 pub(crate) fn get_onchain_aggregate_table_name(
-    network: &Network,
-    data_type: &DataType,
-    interval: &Interval,
+    network: Network,
+    data_type: DataType,
+    interval: Interval,
 ) -> Result<String, InfraError> {
     let prefix_name = match (network, data_type) {
         (Network::Sepolia, DataType::SpotEntry) => "spot_price",
@@ -55,12 +56,14 @@ pub(crate) fn get_onchain_aggregate_table_name(
         (Network::Mainnet, DataType::FutureEntry) => "mainnet_future_price",
         _ => return Err(InfraError::InternalServerError),
     };
-    let mut interval_specifier = get_interval_specifier(*interval, true)?;
 
-    // TODO: fix the aggregate view & add the missing "s"
-    if is_enum_variant!(interval, Interval::TwoHours) {
-        interval_specifier = "2_hour";
-    }
+    // NOTE: Special case because there is a mistake and we forgot the "s" on 2_hour
+    let interval_specifier = if is_enum_variant!(interval, Interval::TwoHours) {
+        "2_hour"
+    } else {
+        get_interval_specifier(interval, true)?
+    };
+
     let table_name = format!("{prefix_name}_{interval_specifier}_agg");
     Ok(table_name)
 }

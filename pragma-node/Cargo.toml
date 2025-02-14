@@ -3,14 +3,18 @@ name = "pragma-node"
 version = "0.1.0"
 edition = "2021"
 
+[lints]
+workspace = true
 
 [dependencies]
 pragma-common = { path = "../pragma-common" }
 pragma-entities = { path = "../pragma-entities" }
 
+async-trait = { workspace = true }
 aws-config = { workspace = true, features = ["behavior-version-latest"] }
 aws-sdk-secretsmanager = { workspace = true }
 axum = { workspace = true, features = ["macros", "ws", "tokio"] }
+axum-extra = { workspace = true }
 axum-macros = { workspace = true }
 axum-tracing-opentelemetry = { workspace = true }
 bigdecimal = { workspace = true, features = ["serde"] }
@@ -26,6 +30,7 @@ diesel = { workspace = true, features = [
 ] }
 dotenvy = { workspace = true }
 envy = { workspace = true }
+futures.workspace = true
 futures-util = { workspace = true }
 governor = { workspace = true }
 indexmap = { workspace = true, features = ["serde"] }
@@ -36,6 +41,7 @@ opentelemetry = { workspace = true }
 pragma-monitoring = { workspace = true }
 rdkafka = { workspace = true }
 redis = { workspace = true, features = ["tokio-comp", "json"] }
+reqwest.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true, features = ["arbitrary_precision"] }
 starknet = { workspace = true }
@@ -43,6 +49,7 @@ starknet-crypto = { workspace = true }
 strum = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["sync", "macros", "rt-multi-thread"] }
+tokio-stream.workspace = true
 tower-http = { workspace = true, features = ["fs", "trace", "cors"] }
 tracing = { workspace = true }
 utoipa = { workspace = true }

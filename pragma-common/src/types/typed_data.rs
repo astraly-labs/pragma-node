@@ -104,8 +104,7 @@ fn get_fields(name: &str, types: &IndexMap<String, Vec<Field>>) -> Result<Vec<Fi
     }
 
     Err(SignerError::InvalidMessage(format!(
-        "Type {} not found",
-        name
+        "Type {name} not found",
     )))
 }
 
@@ -152,7 +151,7 @@ pub fn encode_type(
     rest.sort_by_key(|dep| dep.to_lowercase());
 
     for dep in dependencies {
-        type_hash += &format!("\"{}\"", dep);
+        type_hash += &format!("\"{dep}\"");
 
         type_hash += "(";
 
@@ -165,10 +164,10 @@ pub fn encode_type(
                         let inner_types = &simple_field.r#type[1..simple_field.r#type.len() - 1]
                             .split(',')
                             .map(|t| {
-                                if !t.is_empty() {
-                                    format!("\"{}\"", t)
-                                } else {
+                                if t.is_empty() {
                                     t.to_string()
+                                } else {
+                                    format!("\"{t}\"")
                                 }
                             })
                             .collect::<Vec<String>>()
@@ -220,7 +219,7 @@ pub(crate) fn get_value_type(
             return Ok(FieldInfo {
                 _name: name.to_string(),
                 r#type: key.clone(),
-                base_type: "".to_string(),
+                base_type: String::new(),
                 index: idx,
             });
         }
@@ -232,7 +231,7 @@ pub(crate) fn get_value_type(
                         return Ok(FieldInfo {
                             _name: name.to_string(),
                             r#type: simple_field.r#type.clone(),
-                            base_type: "".to_string(),
+                            base_type: String::new(),
                             index: idx,
                         });
                     }
@@ -252,20 +251,19 @@ pub(crate) fn get_value_type(
     }
 
     Err(SignerError::InvalidMessage(format!(
-        "Field {} not found in types",
-        name
+        "Field {name} not found in types",
     )))
 }
 
 fn get_hex(value: &str) -> Result<Felt, SignerError> {
-    if let Ok(felt) = Felt::from_str(value) {
-        Ok(felt)
-    } else {
-        // assume its a short string and encode
-        cairo_short_string_to_felt(value).map_err(|e| {
-            SignerError::InvalidMessage(format!("Invalid shortstring for felt: {}", e))
-        })
-    }
+    Felt::from_str(value).map_or_else(
+        |_| {
+            cairo_short_string_to_felt(value).map_err(|e| {
+                SignerError::InvalidMessage(format!("Invalid shortstring for felt: {e}"))
+            })
+        },
+        Ok,
+    )
 }
 
 impl PrimitiveType {
@@ -276,7 +274,7 @@ impl PrimitiveType {
         ctx: &mut Ctx,
     ) -> Result<Felt, SignerError> {
         match self {
-            PrimitiveType::Object(obj) => {
+            Self::Object(obj) => {
                 ctx.is_preset = types.contains_key(r#type);
 
                 let mut hashes = Vec::new();
@@ -287,8 +285,8 @@ impl PrimitiveType {
                     })?;
                     let variant_type = get_value_type(variant_name, types)?;
 
-                    let arr: &Vec<PrimitiveType> = match value {
-                        PrimitiveType::Array(arr) => arr,
+                    let arr: &Vec<Self> = match value {
+                        Self::Array(arr) => arr,
                         _ => {
                             return Err(SignerError::InvalidMessage(
                                 "Enum value must be an array".to_string(),
@@ -320,10 +318,7 @@ impl PrimitiveType {
 
                 let type_hash = encode_type(r#type, types)?;
                 hashes.push(get_selector_from_name(&type_hash).map_err(|e| {
-                    SignerError::InvalidMessage(format!(
-                        "Invalid type {} for selector: {}",
-                        r#type, e
-                    ))
+                    SignerError::InvalidMessage(format!("Invalid type {type} for selector: {e}",))
                 })?);
 
                 for (field_name, value) in obj {
@@ -340,14 +335,14 @@ impl PrimitiveType {
 
                 Ok(poseidon_hash_many(hashes.as_slice()))
             }
-            PrimitiveType::Array(array) => Ok(poseidon_hash_many(
+            Self::Array(array) => Ok(poseidon_hash_many(
                 array
                     .iter()
                     .map(|x| x.encode(r#type.trim_end_matches('*'), types, ctx))
                     .collect::<Result<Vec<_>, _>>()?
                     .as_slice(),
             )),
-            PrimitiveType::Bool(boolean) => {
+            Self::Bool(boolean) => {
                 let v = if *boolean {
                     Felt::from(1_u32)
                 } else {
@@ -355,12 +350,13 @@ impl PrimitiveType {
                 };
                 Ok(v)
             }
-            PrimitiveType::String(string) => match r#type {
-                "shortstring" => get_hex(string),
+            Self::String(string) => match r#type {
+                "felt" | "shortstring" | "ContractAddress" | "ClassHash" | "timestamp" | "u128"
+                | "i128" => get_hex(string),
                 "string" => {
                     // split the string into short strings and encode
                     let byte_array = ByteArray::from_string(string).map_err(|e| {
-                        SignerError::InvalidMessage(format!("Invalid string for bytearray: {}", e))
+                        SignerError::InvalidMessage(format!("Invalid string for bytearray: {e}"))
                     })?;
 
                     let mut hashes = vec![Felt::from(byte_array.data.len())];
@@ -375,22 +371,14 @@ impl PrimitiveType {
                     Ok(poseidon_hash_many(hashes.as_slice()))
                 }
                 "selector" => get_selector_from_name(string)
-                    .map_err(|e| SignerError::InvalidMessage(format!("Invalid selector: {}", e))),
-                "felt" => get_hex(string),
-                "ContractAddress" => get_hex(string),
-                "ClassHash" => get_hex(string),
-                "timestamp" => get_hex(string),
-                "u128" => get_hex(string),
-                "i128" => get_hex(string),
+                    .map_err(|e| SignerError::InvalidMessage(format!("Invalid selector: {e}"))),
                 _ => Err(SignerError::InvalidMessage(format!(
-                    "Invalid type {} for string",
-                    r#type
+                    "Invalid type {type} for string",
                 ))),
             },
-            PrimitiveType::Number(number) => {
-                let felt = Felt::from_str(&number.to_string()).map_err(|_| {
-                    SignerError::InvalidMessage(format!("Invalid number {}", number))
-                })?;
+            Self::Number(number) => {
+                let felt = Felt::from_str(&number.to_string())
+                    .map_err(|_| SignerError::InvalidMessage(format!("Invalid number {number}")))?;
                 Ok(felt)
             }
         }
@@ -412,7 +400,7 @@ impl Domain {
             name: name.to_string(),
             version: version.to_string(),
             chain_id: chain_id.to_string(),
-            revision: revision.map(|s| s.to_string()),
+            revision: revision.map(ToString::to_string),
         }
     }
 
@@ -481,7 +469,7 @@ impl TypedData {
         let preset_types = get_preset_types();
 
         // Combine types and preset_types
-        let mut all_types = preset_types.clone();
+        let mut all_types = preset_types;
         all_types.extend(self.types.clone());
 
         if self.domain.revision.clone().unwrap_or("1".to_string()) != "1" {
@@ -567,8 +555,7 @@ mod tests {
     #[test]
     fn test_selector_encode() {
         let selector = PrimitiveType::String("transfer".to_string());
-        let selector_hash =
-            PrimitiveType::String(starknet_keccak("transfer".as_bytes()).to_string());
+        let selector_hash = PrimitiveType::String(starknet_keccak(b"transfer").to_string());
 
         let preset_types = get_preset_types();
 
@@ -580,7 +567,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(encoded_selector, raw_encoded_selector);
-        assert_eq!(encoded_selector, starknet_keccak("transfer".as_bytes()));
+        assert_eq!(encoded_selector, starknet_keccak(b"transfer"));
     }
 
     #[test]

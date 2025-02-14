@@ -76,6 +76,7 @@ async fn create_new_subscriber(socket: WebSocket, app_state: AppState, client_ad
 
 struct WsOHLCHandler;
 
+#[async_trait::async_trait]
 impl ChannelHandler<SubscriptionState, SubscriptionRequest, InfraError> for WsOHLCHandler {
     #[tracing::instrument(
         skip(self, subscriber),

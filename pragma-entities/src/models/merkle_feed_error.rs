@@ -44,20 +44,18 @@ impl IntoResponse for MerkleFeedError {
             Self::InvalidOptionHash(hash) => (
                 StatusCode::BAD_REQUEST,
                 format!(
-                    "Option hash is not a correct 0x prefixed hexadecimal hash: {}",
-                    hash
+                    "Option hash is not a correct 0x prefixed hexadecimal hash: {hash}"
                 ),
             ),
             Self::OptionNotFound(block_number, instrument_name) => (
                 StatusCode::NOT_FOUND,
                 format!(
-                    "MerkleFeed option for instrument {} has not been found for block {}",
-                    instrument_name, block_number
+                    "MerkleFeed option for instrument {instrument_name} has not been found for block {block_number}",
                 ),
             ),
             Self::MerkleTreeNotFound(block_number) => (
                 StatusCode::NOT_FOUND,
-                format!("MerkleFeed tree not found for block {}", block_number),
+                format!("MerkleFeed tree not found for block {block_number}"),
             ),
             Self::RedisConnection => (
                 StatusCode::SERVICE_UNAVAILABLE,
@@ -69,13 +67,13 @@ impl IntoResponse for MerkleFeedError {
             ),
             Self::NoBlocks(network) => (
                 StatusCode::NOT_FOUND,
-                format!("No merkle feeds published for network {}", network),
+                format!("No merkle feeds published for network {network}"),
             ),
             Self::MerkleProof(hash) => (
                 StatusCode::NOT_FOUND,
-                format!("Could not generate a valid merkle proof for hash {}", hash),
+                format!("Could not generate a valid merkle proof for hash {hash}"),
             ),
-            _ => (
+            Self::InternalServerError => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 String::from("Internal server error"),
             ),

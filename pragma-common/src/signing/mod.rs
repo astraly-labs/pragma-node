@@ -39,12 +39,13 @@ pub trait Signable {
 pub fn sign_data(signer: &SigningKey, data: &impl Signable) -> Result<String, SignerError> {
     let hash_to_sign = data.try_get_hash()?;
     let signature = signer.sign(&hash_to_sign)?;
-    Ok(format!("0x{:}", signature))
+    Ok(format!("0x{signature:}"))
 }
 
 /// Assert that a new entries request is correctly signed
 /// by the publisher.
 /// If it is, we return the signature.
+#[allow(clippy::trait_duplication_in_bounds)]
 pub fn assert_request_signature_is_valid<R, E>(
     new_entries_request: &R,
     publisher_account: &Felt,
@@ -65,6 +66,7 @@ where
 /// Assert that a request (passed with the request for creating new
 /// entries) is correctly signed by the publisher and in a valid format.
 /// Returns the signature if it is correct.
+#[allow(clippy::trait_duplication_in_bounds)]
 fn assert_signature_is_valid<R, E>(
     new_entries_request: &R,
     account_address: &Felt,

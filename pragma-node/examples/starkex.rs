@@ -73,14 +73,11 @@ impl Environment {
             "prod" => "wss://ws.pragma.build/node/v1/data/subscribe",
             "dev" => "wss://ws.dev.pragma.build/node/v1/data/subscribe",
             "local" => "ws://0.0.0.0:3000/node/v1/data/subscribe",
-            _ => panic!(
-                "Invalid environment: {}. Use 'prod', 'dev', or 'local'",
-                env_type
-            ),
+            _ => panic!("Invalid environment: {env_type}. Use 'prod', 'dev', or 'local'",),
         }
         .to_string();
 
-        Environment { ws_url }
+        Self { ws_url }
     }
 }
 
@@ -99,8 +96,8 @@ struct App {
 }
 
 impl App {
-    fn new() -> App {
-        App {
+    fn new() -> Self {
+        Self {
             subscription_pairs: Vec::new(),
             latest_update: None,
             should_quit: false,
@@ -134,7 +131,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             // Convert mark pairs and add :MARK suffix
             let mark_pairs: Vec<String> = TEST_MARK_PAIRS
                 .iter()
-                .map(|&p| format!("{}:MARK", p))
+                .map(|&p| format!("{p}:MARK"))
                 .collect();
 
             // Combine both sets of pairs
@@ -164,12 +161,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 }
                             }
                             Err(e) => {
-                                eprintln!("WebSocket error: {}", e);
+                                eprintln!("WebSocket error: {e}");
                                 break;
                             }
                         }
                     }
-                    Ok(_) = &mut shutdown_rx => {
+                    Ok(()) = &mut shutdown_rx => {
                         // Clean shutdown
                         let _ = socket.close(None).await;
                         break;
@@ -240,13 +237,13 @@ fn parse_hex_asset_id(hex_id: &str) -> String {
         .ok()
         .and_then(|felt| parse_cairo_short_string(&felt.into()).ok())
         .unwrap_or_else(|| hex_id.to_string())
-        .replace("/", "")
+        .replace('/', "")
 }
 
 /// Extracts and formats all received pairs from oracle prices.
 ///
 /// # Arguments
-/// * `oracle_prices` - Slice of AssetOraclePrice containing the received price updates
+/// * `oracle_prices` - Slice of `AssetOraclePrice` containing the received price updates
 ///
 /// # Returns
 /// A Vec<String> containing all formatted asset pairs (e.g., "ETHUSD")
@@ -269,7 +266,7 @@ fn get_received_pairs(oracle_prices: &[AssetOraclePrice]) -> Vec<String> {
 fn get_missing_pairs(subscribed: &[String], received: &[String]) -> Vec<String> {
     subscribed
         .iter()
-        .filter(|p| !received.contains(&p.replace("/", "")))
+        .filter(|p| !received.contains(&p.replace('/', "")))
         .cloned()
         .collect()
 }
@@ -289,7 +286,7 @@ fn format_missing_pairs_text(missing_pairs: &[String]) -> String {
     }
 }
 
-fn ui(f: &mut Frame, app: &App) {
+fn ui(f: &mut Frame<'_>, app: &App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -302,7 +299,7 @@ fn ui(f: &mut Frame, app: &App) {
     // Add latency display with milliseconds
     if let Some(update) = &app.latest_update {
         let latency_ms = (app.current_time - update.timestamp) * 1000; // Convert to milliseconds
-        let latency_text = Paragraph::new(format!("⏱ Latency: {}ms", latency_ms))
+        let latency_text = Paragraph::new(format!("⏱ Latency: {latency_ms}ms"))
             .alignment(Alignment::Right)
             .block(Block::default().borders(Borders::ALL));
 
@@ -345,12 +342,13 @@ fn ui(f: &mut Frame, app: &App) {
         for price in &update.oracle_prices {
             let asset_display = if price.global_asset_id.starts_with("0x") {
                 let hex_str = &price.global_asset_id[2..];
-                if let Ok(felt) = u128::from_str_radix(hex_str, 16) {
-                    parse_cairo_short_string(&felt.into())
-                        .unwrap_or_else(|_| price.global_asset_id.clone())
-                } else {
-                    price.global_asset_id.clone()
-                }
+                u128::from_str_radix(hex_str, 16).map_or_else(
+                    |_| price.global_asset_id.clone(),
+                    |felt| {
+                        parse_cairo_short_string(&felt.into())
+                            .unwrap_or_else(|_| price.global_asset_id.clone())
+                    },
+                )
             } else {
                 price.global_asset_id.clone()
             };

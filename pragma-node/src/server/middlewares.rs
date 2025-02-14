@@ -19,6 +19,7 @@ pub async fn track_timing(req: Request<Body>, next: Next) -> Response<Body> {
 
 #[allow(dead_code)]
 pub trait TimingLayer {
+    #[must_use]
     fn with_timing(self) -> Self;
 }
 

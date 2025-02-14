@@ -1,5 +1,5 @@
-pub(crate) mod middlewares;
-pub(crate) mod routes;
+pub mod middlewares;
+pub mod routes;
 
 use axum_tracing_opentelemetry::middleware::{OtelAxumLayer, OtelInResponseLayer};
 use std::net::SocketAddr;
@@ -25,7 +25,7 @@ impl Modify for SecurityAddon {
             components.add_security_scheme(
                 "api_key",
                 SecurityScheme::ApiKey(ApiKey::Header(ApiKeyValue::new("x-api-key"))),
-            )
+            );
         }
     }
 }
@@ -75,7 +75,7 @@ pub async fn run_api_server(config: &Config, state: AppState) {
 
     let host = config.server_host();
     let port = config.server_port();
-    let address = format!("{}:{}", host, port);
+    let address = format!("{host}:{port}");
     let socket_addr: SocketAddr = address.parse().unwrap();
     let listener = tokio::net::TcpListener::bind(socket_addr)
         .await

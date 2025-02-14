@@ -8,6 +8,7 @@ pub mod merkle_feeds;
 pub mod onchain;
 pub mod optimistic_oracle;
 pub mod publish_entry_ws;
+pub mod stream_entry;
 pub mod subscribe_to_entry;
 pub mod subscribe_to_price;
 
@@ -42,9 +43,9 @@ pub enum EntryType {
 impl From<EntryType> for DataType {
     fn from(value: EntryType) -> Self {
         match value {
-            EntryType::Spot => DataType::SpotEntry,
-            EntryType::Future => DataType::FutureEntry,
-            EntryType::Perp => DataType::PerpEntry,
+            EntryType::Spot => Self::SpotEntry,
+            EntryType::Future => Self::FutureEntry,
+            EntryType::Perp => Self::PerpEntry,
         }
     }
 }

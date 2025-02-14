@@ -22,7 +22,7 @@ struct RawCheckpoint {
 }
 
 impl RawCheckpoint {
-    pub fn to_checkpoint(&self, decimals: u32) -> Checkpoint {
+    fn to_checkpoint(&self, decimals: u32) -> Checkpoint {
         Checkpoint {
             tx_hash: self.transaction_hash.clone(),
             price: format_bigdecimal_price(self.price.clone(), decimals),
@@ -32,6 +32,7 @@ impl RawCheckpoint {
     }
 }
 
+#[allow(clippy::cast_possible_wrap)]
 pub async fn get_checkpoints(
     pool: &Pool,
     network: Network,
@@ -57,7 +58,6 @@ pub async fn get_checkpoints(
         ORDER BY timestamp DESC
         LIMIT $2;
     "#,
-        table_name = table_name
     );
 
     let conn = pool.get().await.map_err(adapt_infra_error)?;

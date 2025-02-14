@@ -26,11 +26,11 @@ impl IntoResponse for AppError {
             ),
             Self::BodyParsingError(message) => (
                 StatusCode::BAD_REQUEST,
-                format!("Bad request error: {}", message),
+                format!("Bad request error: {message}"),
             ),
             Self::Entry(err) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Entry error: {}", err),
+                format!("Entry error: {err}"),
             ),
         };
         (status, Json(json!({ "message": err_msg }))).into_response()

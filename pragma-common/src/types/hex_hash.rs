@@ -12,7 +12,7 @@ impl<'de> Deserialize<'de> for HexHash {
         if !is_0x_prefixed_hex_string(&s) {
             return Err(serde::de::Error::custom("Invalid hex hash format"));
         }
-        Ok(HexHash(s))
+        Ok(Self(s))
     }
 }
 

@@ -3,19 +3,19 @@ use pragma_common::types::Network;
 use pragma_consumer::types::{BlockId, Instrument};
 use serde_json::json;
 
-pub fn mock_healthcheck(pragmapi: &MockServer) -> Mock {
+pub(crate) fn mock_healthcheck(pragmapi: &MockServer) -> Mock<'_> {
     pragmapi.mock(|when, then| {
         when.method(GET).path("/node");
         then.status(200).body("Server is running!");
     })
 }
 
-pub fn mock_option_response(
+pub(crate) fn mock_option_response(
     pragmapi: &MockServer,
     instrument: Instrument,
     network: Network,
     block_id: BlockId,
-) -> Mock {
+) -> Mock<'_> {
     let url = format!("node/v1/merkle_feeds/options/{}", instrument.name(),);
     pragmapi.mock(|when, then| {
         when.method(GET)
@@ -28,12 +28,12 @@ pub fn mock_option_response(
     })
 }
 
-pub fn mock_merkle_proof_response(
+pub(crate) fn mock_merkle_proof_response(
     pragmapi: &MockServer,
     option_hash: String,
     network: Network,
     block_id: BlockId,
-) -> Mock {
+) -> Mock<'_> {
     let url = format!("node/v1/merkle_feeds/proof/{}", &option_hash);
     pragmapi.mock(|when, then| {
         when.method(GET)
@@ -46,17 +46,17 @@ pub fn mock_merkle_proof_response(
     })
 }
 
-pub fn option_data(instrument: &Instrument) -> serde_json::Value {
+pub(crate) fn option_data(instrument: &Instrument) -> serde_json::Value {
     json!({
         "instrument_name": instrument.name(),
         "base_currency": &instrument.base_currency.to_string(),
-        "current_timestamp": 1722805873,
+        "current_timestamp": 1_722_805_873,
         "mark_price": "45431835920",
         "hash": "0x7866fd2ec3bc6bd1a2efb6e1f02337d62064a86e8d5755bdc568d92a06f320a"
     })
 }
 
-pub fn merkle_proof_data() -> serde_json::Value {
+pub(crate) fn merkle_proof_data() -> serde_json::Value {
     json!([
         "0x78626d4f8f1e24c24a41d90457688b436463d7595c4dd483671b1d5297518d2",
         "0x14eb21a8e98fbd61f20d0bbdba2b32cb2bcb61082dfcf5229370aca5b2dbd2",
@@ -72,6 +72,6 @@ pub fn merkle_proof_data() -> serde_json::Value {
     ])
 }
 
-pub fn merkle_root_data() -> String {
+pub(crate) fn merkle_root_data() -> String {
     "0x31d84dd2db2edb4b74a651b0f86351612efdedc51b51a178d5967a3cdfd319f".into()
 }

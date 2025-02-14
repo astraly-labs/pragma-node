@@ -32,8 +32,8 @@ impl WsMetricsRegistry {
             "subscribe_to_price",
             "subscribe_to_ohlc",
         ];
-        for endpoint in endpoints.iter() {
-            metrics.insert(endpoint.to_string(), WsMetrics::new(endpoint));
+        for endpoint in &endpoints {
+            metrics.insert((*endpoint).to_string(), WsMetrics::new(endpoint));
         }
 
         Arc::new(Self { metrics })
@@ -78,10 +78,9 @@ impl WsMetrics {
     fn new(endpoint_name: &str) -> Self {
         let meter = opentelemetry::global::meter("pragma-node-meter");
         let interactions = meter
-            .u64_counter(format!("{}_ws_interactions_total", endpoint_name))
+            .u64_counter(format!("{endpoint_name}_ws_interactions_total"))
             .with_description(format!(
-                "Number of WebSocket interactions for {}",
-                endpoint_name
+                "Number of WebSocket interactions for {endpoint_name}",
             ))
             .with_unit("count")
             .init();

@@ -39,21 +39,21 @@ impl IntoResponse for OptimisticOracleError {
             ),
             Self::AssertionDetailsIssue(id) => (
                 StatusCode::NOT_FOUND,
-                format!("Issue to fetch assertion details with id: {}", id),
+                format!("Issue to fetch assertion details with id: {id}"),
             ),
             Self::DisputerNotSet(id) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Disputer not set for assertion: {}", id),
+                format!("Disputer not set for assertion: {id}"),
             ),
             Self::SettlerNotSet(id) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Settler not set for assertion: {}", id),
+                format!("Settler not set for assertion: {id}"),
             ),
             Self::NoAssertionsFound => (
                 StatusCode::NOT_FOUND,
                 "No assertions found for the given criteria".to_string(),
             ),
-            _ => (
+            Self::InternalServerError => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 String::from("Internal server error"),
             ),

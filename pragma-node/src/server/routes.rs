@@ -18,6 +18,7 @@ use crate::handlers::optimistic_oracle::{
     get_disputed_assertions::get_disputed_assertions,
     get_resolved_assertions::get_resolved_assertions,
 };
+use crate::handlers::stream_entry::stream_entry;
 use crate::handlers::{
     create_entries, create_future_entries, get_entry, get_expiries, get_ohlc, get_volatility,
     publish_entry, subscribe_to_entry, subscribe_to_price,
@@ -36,10 +37,7 @@ pub fn app_router<T: OpenApiT>(state: AppState) -> Router<AppState> {
         .nest("/node/v1/aggregation", aggregation_routes(state.clone()))
         .nest("/node/v1/volatility", volatility_routes(state.clone()))
         .nest("/node/v1/merkle_feeds", merkle_feeds_routes(state.clone()))
-        .nest(
-            "/node/v1/optimistic",
-            optimistic_oracle_routes(state.clone()),
-        )
+        .nest("/node/v1/optimistic", optimistic_oracle_routes(state))
         .fallback(handler_404)
 }
 
@@ -63,6 +61,7 @@ fn data_routes(state: AppState) -> Router<AppState> {
         .route("/{base}/{quote}/future_expiries", get(get_expiries))
         .route("/subscribe", get(subscribe_to_entry))
         .route("/price/subscribe", get(subscribe_to_price))
+        .route("/{base}/{quote}/stream", get(stream_entry))
         .with_state(state)
 }
 

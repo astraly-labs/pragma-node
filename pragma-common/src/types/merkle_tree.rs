@@ -15,9 +15,9 @@ pub enum MerkleTreeError {
     FeltConversion(String),
 }
 
-/// Simple MerkleTree.
+/// Simple `MerkleTree`.
 /// Reference:
-/// https://github.com/software-mansion/starknet.py/blob/v0.23.0/starknet_py/utils/merkle_tree.py
+/// <https://github.com/software-mansion/starknet.py/blob/v0.23.0/starknet_py/utils/merkle_tree.py>
 /// NOTE: Only supports the Pedersen hash for now.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -28,21 +28,20 @@ pub struct MerkleTree {
 }
 
 /// The merkle proof that a leaf belongs to a Merkle tree.
-#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct FeltMerkleProof(pub Vec<Felt>);
 
 /// The merkle proof but with hexadecimal hashes instead of Field elements.
-#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, ToSchema)]
 pub struct MerkleProof(pub Vec<String>);
 
 impl From<FeltMerkleProof> for MerkleProof {
     fn from(proof: FeltMerkleProof) -> Self {
-        MerkleProof(
+        Self(
             proof
                 .0
-                .clone()
                 .into_iter()
-                .map(|felt| format!("{:#x}", felt))
+                .map(|felt| format!("{felt:#x}"))
                 .collect(),
         )
     }
@@ -66,7 +65,7 @@ impl MerkleTree {
             return Err(MerkleTreeError::EmptyLeaves);
         }
 
-        let mut tree = MerkleTree {
+        let mut tree = Self {
             leaves,
             root_hash: Felt::default(),
             levels: Vec::new(),
@@ -145,7 +144,7 @@ impl MerkleTree {
 
 /// All the expected values for the hash come from the python implementation of starknet.py.
 /// Reference:
-/// https://github.com/software-mansion/starknet.py/blob/v0.23.0/starknet_py/utils/merkle_tree.py
+/// <https://github.com/software-mansion/starknet.py/blob/v0.23.0/starknet_py/utils/merkle_tree.py>
 #[cfg(test)]
 mod tests {
     use rstest::rstest;
@@ -169,7 +168,7 @@ mod tests {
             merkle_tree.root_hash,
             Felt::from_hex("0x38118a340bbba28e678413cd3b07a9436a5e60fd6a7cbda7db958a6d501e274")
                 .unwrap()
-        )
+        );
     }
 
     #[rstest]
@@ -180,7 +179,7 @@ mod tests {
             Felt::from(3_u32),
             Felt::from(4_u32),
         ];
-        let merkle_tree = MerkleTree::new(leaves.clone()).unwrap();
+        let merkle_tree = MerkleTree::new(leaves).unwrap();
 
         let leaf = Felt::from(1_u32);
         let proof = merkle_tree.get_proof(&leaf).unwrap();
@@ -235,7 +234,7 @@ mod tests {
             Felt::from(3_u32),
             Felt::from(4_u32),
         ];
-        let merkle_tree = MerkleTree::new(leaves.clone()).unwrap();
+        let merkle_tree = MerkleTree::new(leaves).unwrap();
 
         let leaf = Felt::from(1_u32);
         let mut proof = merkle_tree.get_proof(&leaf).unwrap();

@@ -3,7 +3,7 @@ use serde::Deserialize;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-#[derive(Clone, Debug, PartialEq, ToSchema)]
+#[derive(Clone, Debug, PartialEq, Eq, ToSchema)]
 pub struct Entry {
     pub id: Uuid,
     pub pair_id: String,

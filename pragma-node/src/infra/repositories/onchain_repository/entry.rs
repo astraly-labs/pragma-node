@@ -50,7 +50,7 @@ struct SpotEntryWithAggregatedPrice {
 
 impl From<SpotEntryWithAggregatedPrice> for OnchainEntry {
     fn from(entry: SpotEntryWithAggregatedPrice) -> Self {
-        OnchainEntry {
+        Self {
             publisher: entry.spot_entry.publisher,
             source: entry.spot_entry.source,
             price: big_decimal_price_to_hex(&entry.spot_entry.price),
@@ -62,7 +62,7 @@ impl From<SpotEntryWithAggregatedPrice> for OnchainEntry {
 
 impl From<&SpotEntryWithAggregatedPrice> for OnchainEntry {
     fn from(entry: &SpotEntryWithAggregatedPrice) -> Self {
-        OnchainEntry {
+        Self {
             publisher: entry.spot_entry.publisher.clone(),
             source: entry.spot_entry.source.clone(),
             price: big_decimal_price_to_hex(&entry.spot_entry.price),
@@ -80,7 +80,7 @@ pub async fn routing(
     let pair_id = routing_args.pair_id;
     let is_routing = routing_args.is_routing;
 
-    let existing_pair_list = get_existing_pairs(onchain_pool, &routing_args.network).await?;
+    let existing_pair_list = get_existing_pairs(onchain_pool, routing_args.network).await?;
     let mut result: Vec<RawOnchainData> = Vec::new();
 
     if !is_routing || onchain_pair_exist(&existing_pair_list, &pair_id) {
@@ -101,7 +101,7 @@ pub async fn routing(
                     decimal,
                     sources: row.entries,
                     pair_used: vec![pair_id.clone()],
-                })
+                });
             }
             return Ok(result);
         }
@@ -122,8 +122,8 @@ pub async fn routing(
     let (base, quote) = pair_id.split_once('/').unwrap();
 
     for alt_currency in alternative_currencies {
-        let base_alt_pair = format!("{}/{}", base, alt_currency);
-        let alt_quote_pair = format!("{}/{}", quote, alt_currency);
+        let base_alt_pair = format!("{base}/{alt_currency}");
+        let alt_quote_pair = format!("{quote}/{alt_currency}");
 
         if onchain_pair_exist(&existing_pair_list, &base_alt_pair)
             && onchain_pair_exist(&existing_pair_list, &alt_quote_pair)
@@ -168,7 +168,7 @@ fn build_sql_query(
     aggregation_mode: AggregationMode,
     timestamp: u64,
 ) -> Result<String, InfraError> {
-    let table_name = get_onchain_table_name(&network, &DataType::SpotEntry)?;
+    let table_name = get_onchain_table_name(network, DataType::SpotEntry)?;
 
     let complete_sql_query = {
         let aggregation_query = get_aggregation_subquery(aggregation_mode)?;
@@ -190,7 +190,7 @@ fn build_sql_query(
                     WHERE rn = 1
                 ),
                 AggregatedPrice AS (
-                    SELECT {aggregation_subquery}
+                    SELECT {aggregation_query}
                     FROM FilteredEntries
                 )
                 SELECT DISTINCT 
@@ -202,9 +202,6 @@ fn build_sql_query(
                 ORDER BY 
                     FE.timestamp DESC;
             "#,
-            table_name = table_name,
-            aggregation_subquery = aggregation_query,
-            timestamp = timestamp
         )
     };
     Ok(complete_sql_query)
@@ -225,7 +222,7 @@ fn get_aggregation_subquery(aggregation_mode: AggregationMode) -> Result<&'stati
                 ) AS MedianPrices
             ) AS aggregated_price"
         }
-        _ => Err(InfraError::InternalServerError)?,
+        AggregationMode::Twap => Err(InfraError::InternalServerError)?,
     };
     Ok(query)
 }
@@ -287,31 +284,32 @@ pub async fn get_sources_and_aggregate(
         .map_err(adapt_infra_error)?
         .map_err(adapt_infra_error)?;
 
-    group_entries_per_aggprice(raw_entries)
+    Ok(group_entries_per_aggprice(raw_entries))
 }
 
 fn group_entries_per_aggprice(
     raw_entries: Vec<SpotEntryWithAggregatedPrice>,
-) -> Result<Vec<AggPriceAndEntries>, InfraError> {
+) -> Vec<AggPriceAndEntries> {
     let mut result: Vec<AggPriceAndEntries> = Vec::new();
     let mut curr_agg_price: BigDecimal = BigDecimal::default();
     for entry in raw_entries.iter().rev() {
-        if curr_agg_price != entry.aggregated_price {
-            result.push(AggPriceAndEntries {
-                aggregated_price: entry.aggregated_price.clone(),
-                entries: vec![OnchainEntry::from(entry)],
-            });
-            curr_agg_price = entry.aggregated_price.clone();
-        } else {
+        // TODO: Remove this unsafe unwrap, probably by checking the vec size first
+        if curr_agg_price == entry.aggregated_price {
             result
                 .last_mut()
                 .unwrap()
                 .entries
                 .push(OnchainEntry::from(entry));
+        } else {
+            result.push(AggPriceAndEntries {
+                aggregated_price: entry.aggregated_price.clone(),
+                entries: vec![OnchainEntry::from(entry)],
+            });
+            curr_agg_price = entry.aggregated_price.clone();
         }
     }
 
-    Ok(result)
+    result
 }
 
 fn compute_multiple_rebased_price(
@@ -330,10 +328,10 @@ fn compute_multiple_rebased_price(
     for (i, base) in base_alt_result.iter_mut().enumerate() {
         let quote = &quote_alt_result[i];
         let rebased_price = calculate_rebased_price(
-            (base.aggregated_price.to_owned(), base_alt_decimal),
-            (quote.aggregated_price.to_owned(), quote_alt_decimal),
+            (base.aggregated_price.clone(), base_alt_decimal),
+            (quote.aggregated_price.clone(), quote_alt_decimal),
         )?;
-        base.entries.extend(quote.entries.to_owned());
+        base.entries.extend(quote.entries.clone());
         result.push(RawOnchainData {
             price: rebased_price.0,
             decimal: rebased_price.1,
@@ -368,7 +366,7 @@ pub async fn get_last_updated_timestamp(
         ORDER BY timestamp DESC
         LIMIT 1;
     "#,
-        get_onchain_table_name(&network, &DataType::SpotEntry)?,
+        get_onchain_table_name(network, DataType::SpotEntry)?,
         pair_list,
     );
     let conn = pool.get().await.map_err(adapt_infra_error)?;
@@ -410,7 +408,7 @@ pub async fn get_variations(
                     close,
                     ROW_NUMBER() OVER (ORDER BY ohlc_bucket DESC) as rn
                 FROM
-                    {table_name}
+                    {ohlc_table_name}
                 WHERE
                     pair_id = $1
                 ORDER BY
@@ -427,7 +425,6 @@ pub async fn get_variations(
             ORDER BY
                 rn ASC;
             "#,
-            table_name = ohlc_table_name
         );
 
         let conn = pool.get().await.map_err(adapt_infra_error)?;
@@ -454,7 +451,7 @@ pub async fn get_variations(
     Ok(variations)
 }
 
-#[derive(Queryable, QueryableByName, PartialEq, Debug)]
+#[derive(Queryable, QueryableByName, PartialEq, Eq, Debug)]
 pub struct EntryPairId {
     #[diesel(sql_type = VarChar)]
     pub pair_id: String,
@@ -479,7 +476,7 @@ pub fn onchain_pair_exist(existing_pair_list: &[EntryPairId], pair_id: &str) -> 
 // TODO(0xevolve): Only works for Spot entries
 pub async fn get_existing_pairs(
     pool: &Pool,
-    network: &Network,
+    network: Network,
 ) -> Result<Vec<EntryPairId>, InfraError> {
     let raw_sql = format!(
         r#"
@@ -488,7 +485,7 @@ pub async fn get_existing_pairs(
         FROM
             {table_name};
     "#,
-        table_name = get_onchain_table_name(network, &DataType::SpotEntry)?
+        table_name = get_onchain_table_name(network, DataType::SpotEntry)?
     );
 
     let conn = pool.get().await.map_err(adapt_infra_error)?;

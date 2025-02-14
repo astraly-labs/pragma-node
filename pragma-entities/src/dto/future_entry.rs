@@ -2,7 +2,7 @@ use bigdecimal::ToPrimitive;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-#[derive(Clone, Debug, PartialEq, ToSchema)]
+#[derive(Clone, Debug, PartialEq, Eq, ToSchema)]
 pub struct FutureEntry {
     pub id: Uuid,
     pub pair_id: String,

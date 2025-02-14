@@ -41,17 +41,11 @@ pub async fn get_ohlc(
 
     let now = chrono::Utc::now().timestamp();
 
-    let timestamp = if let Some(timestamp) = params.timestamp {
-        timestamp
-    } else {
-        now
-    };
+    let timestamp = params.timestamp.map_or(now, |timestamp| timestamp);
 
-    let interval = if let Some(interval) = params.interval {
-        interval
-    } else {
-        Interval::OneMinute
-    };
+    let interval = params
+        .interval
+        .map_or(Interval::OneMinute, |interval| interval);
 
     // Validate given timestamp
     if timestamp > now {

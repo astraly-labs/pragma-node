@@ -58,7 +58,7 @@ pub async fn get_merkle_feeds_option(
 
     let option_data_hash = option_data
         .pedersen_hash_as_hex_string()
-        .map_err(|_| MerkleFeedError::InvalidOptionHash(format!("{:?}", option_data)))?;
+        .map_err(|_| MerkleFeedError::InvalidOptionHash(format!("{option_data:?}")))?;
 
     Ok(Json(GetOptionResponse {
         hash: option_data_hash,
