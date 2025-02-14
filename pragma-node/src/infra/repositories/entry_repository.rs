@@ -17,113 +17,17 @@ use crate::constants::starkex_ws::{
 };
 use crate::handlers::get_entry::RoutingParams;
 use crate::handlers::subscribe_to_entry::{AssetOraclePrice, SignedPublisherPrice};
+use crate::utils::sql::{
+    get_expiration_timestamp_filter, get_interval_specifier, get_table_suffix,
+};
 use crate::utils::{convert_via_quote, normalize_to_decimals};
 use pragma_common::signing::starkex::StarkexPrice;
 use pragma_common::types::{AggregationMode, DataType, Interval};
-use pragma_entities::dto;
 use pragma_entities::{
     error::{adapt_infra_error, InfraError},
     schema::currencies,
-    Currency, Entry, NewEntry,
+    Currency, Entry,
 };
-
-// SQL statement used to filter the expiration timestamp for future entries
-fn get_expiration_timestamp_filter(
-    data_type: DataType,
-    expiry: &str,
-) -> Result<String, InfraError> {
-    match data_type {
-        DataType::SpotEntry => Ok(String::default()),
-        DataType::FutureEntry if expiry.is_empty() => {
-            Ok(String::from("AND\n\t\texpiration_timestamp is null"))
-        }
-        DataType::FutureEntry if !expiry.is_empty() => {
-            Ok(format!("AND\n\texpiration_timestamp = '{expiry}'"))
-        }
-        _ => Err(InfraError::InternalServerError),
-    }
-}
-
-// Retrieve the timescale table based on the network and data type.
-const fn get_table_suffix(data_type: DataType) -> Result<&'static str, InfraError> {
-    match data_type {
-        DataType::SpotEntry => Ok(""),
-        DataType::FutureEntry => Ok("_future"),
-        // TODO: Why does this return an Err? Should be "_future" too?
-        DataType::PerpEntry => Err(InfraError::InternalServerError),
-    }
-}
-
-// Retrieve the timeframe specifier based on the interval and aggregation mode.
-pub const fn get_interval_specifier(
-    interval: Interval,
-    is_twap: bool,
-) -> Result<&'static str, InfraError> {
-    if is_twap {
-        match interval {
-            Interval::OneHour => Ok("1_hour"),
-            Interval::TwoHours => Ok("2_hours"),
-            _ => Err(InfraError::UnsupportedInterval(
-                interval,
-                AggregationMode::Twap,
-            )),
-        }
-    } else {
-        match interval {
-            Interval::OneSecond => Ok("1_s"),
-            Interval::OneMinute => Ok("1_min"),
-            Interval::FifteenMinutes => Ok("15_min"),
-            Interval::OneHour => Ok("1_h"),
-            Interval::TwoHours => Ok("2_h"),
-            Interval::OneDay => Ok("1_day"),
-            Interval::OneWeek => Ok("1_week"),
-        }
-    }
-}
-
-pub async fn _insert(
-    pool: &deadpool_diesel::postgres::Pool,
-    new_entry: NewEntry,
-) -> Result<dto::Entry, InfraError> {
-    let conn = pool.get().await.map_err(adapt_infra_error)?;
-    let res = conn
-        .interact(|conn| Entry::create_one(conn, new_entry))
-        .await
-        .map_err(adapt_infra_error)?
-        .map_err(adapt_infra_error)
-        .map(dto::Entry::from)?;
-    Ok(res)
-}
-
-pub async fn _get(
-    pool: &deadpool_diesel::postgres::Pool,
-    pair_id: String,
-) -> Result<dto::Entry, InfraError> {
-    let conn = pool.get().await.map_err(adapt_infra_error)?;
-    let res = conn
-        .interact(move |conn| Entry::get_by_pair_id(conn, pair_id))
-        .await
-        .map_err(adapt_infra_error)?
-        .map_err(adapt_infra_error)?;
-
-    Ok(dto::Entry::from(res))
-}
-
-pub async fn _get_all(
-    pool: &deadpool_diesel::postgres::Pool,
-    filter: dto::EntriesFilter,
-) -> Result<Vec<dto::Entry>, InfraError> {
-    let conn = pool.get().await.map_err(adapt_infra_error)?;
-    let res = conn
-        .interact(move |conn| Entry::with_filters(conn, filter))
-        .await
-        .map_err(adapt_infra_error)?
-        .map_err(adapt_infra_error)?
-        .into_iter()
-        .map(dto::Entry::from)
-        .collect();
-    Ok(res)
-}
 
 #[derive(Debug, Serialize, Queryable)]
 pub struct MedianEntry {

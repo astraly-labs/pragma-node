@@ -4,7 +4,8 @@ pub mod history;
 pub mod ohlc;
 pub mod publisher;
 
-use crate::{infra::repositories::entry_repository::get_interval_specifier, is_enum_variant};
+use crate::is_enum_variant;
+use crate::utils::sql::get_interval_specifier;
 use pragma_common::types::{DataType, Interval, Network};
 use pragma_entities::error::InfraError;
 
