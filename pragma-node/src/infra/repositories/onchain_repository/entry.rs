@@ -293,6 +293,7 @@ fn group_entries_per_aggprice(
     let mut result: Vec<AggPriceAndEntries> = Vec::new();
     let mut curr_agg_price: BigDecimal = BigDecimal::default();
     for entry in raw_entries.iter().rev() {
+        // TODO: Remove this unsafe unwrap, probably by checking the vec size first
         if curr_agg_price == entry.aggregated_price {
             result
                 .last_mut()

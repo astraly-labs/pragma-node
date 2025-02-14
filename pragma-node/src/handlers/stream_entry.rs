@@ -35,6 +35,7 @@ pub struct StreamEntryParams {
     pub historical_prices: Option<usize>,
 }
 
+#[allow(clippy::too_many_lines)]
 pub async fn stream_entry(
     State(state): State<AppState>,
     PathExtractor(pair): PathExtractor<(String, String)>,
@@ -68,7 +69,10 @@ pub async fn stream_entry(
             Box::pin(async move {
                 if first {
                     Event::default()
-                        .data("SSE streaming for entries only works with no routing & for median.")
+                        .json_data(serde_json::json!({
+                            "error": "SSE streaming for entries only works with no routing & for median."
+                        }))
+                        .unwrap_or_else(|_| Event::default().data(r#"{"error": "Error serializing error message"}"#))
                 } else {
                     Event::default()
                 }
@@ -76,13 +80,13 @@ pub async fn stream_entry(
         })
     } else {
         match RoutingParams::try_from(params.get_entry_params) {
-            Ok(routing_params) => {
+            Ok(get_entry_params) => {
                 let mut first_batch = true;
 
                 Box::new(move || {
                     let state = state.clone();
                     let pair = pair.clone();
-                    let params = routing_params.clone();
+                    let params = get_entry_params.clone();
 
                     let is_first = first_batch;
                     first_batch = false;
@@ -90,29 +94,39 @@ pub async fn stream_entry(
                     Box::pin(async move {
                         if is_first {
                             // For the first batch, get historical prices
-                            match get_historical_entries(&state, &pair, &params, historical_prices)
-                                .await
-                            {
-                                Ok(entries) => {
-                                    let json = serde_json::to_string(&entries).unwrap_or_default();
-                                    Event::default().data(json).event("historical")
-                                }
+                            match get_historical_entries(&state, &pair, &params, historical_prices).await {
+                                Ok(entries) => Event::default()
+                                    .json_data(&entries)
+                                    .unwrap_or_else(|e| Event::default().json_data(serde_json::json!({
+                                        "error": format!("Error serializing historical entries: {e}")
+                                    })).unwrap())
+                                    .event("historical"),
                                 Err(e) => Event::default()
-                                    .data(format!("Error fetching historical entries: {e}")),
+                                    .json_data(serde_json::json!({
+                                        "error": format!("Error fetching historical entries: {e}")
+                                    }))
+                                    .unwrap_or_else(|_| Event::default().data(r#"{"error": "Error serializing error message"}"#)),
                             }
                         } else {
                             // For subsequent updates, get latest price
                             match get_latest_entry(&state, &pair, is_routing, &params).await {
-                                Ok(entry_response) => {
-                                    match serde_json::to_string(&entry_response) {
-                                        Ok(json) => Event::default().data(json),
-                                        Err(e) => Event::default()
-                                            .data(format!("Serialization error: {e}")),
-                                    }
-                                }
-                                Err(e) => {
-                                    Event::default().data(format!("Error fetching entry: {e}"))
-                                }
+                                Ok(entry_response) => Event::default()
+                                    .json_data(&entry_response)
+                                    .unwrap_or_else(|e| {
+                                        Event::default()
+                                            .json_data(serde_json::json!({
+                                                "error": format!("Error serializing entry: {e}")
+                                            }))
+                                            .unwrap()
+                                    }),
+                                Err(e) => Event::default()
+                                    .json_data(serde_json::json!({
+                                        "error": format!("Error fetching entry: {e}")
+                                    }))
+                                    .unwrap_or_else(|_| {
+                                        Event::default()
+                                            .data(r#"{"error": "Error serializing error message"}"#)
+                                    }),
                             }
                         }
                     }) as BoxedFuture
@@ -122,7 +136,16 @@ pub async fn stream_entry(
                 let error_message = format!("Error: {e}");
                 Box::new(move || {
                     let msg = error_message.clone();
-                    Box::pin(async move { Event::default().data(msg) }) as BoxedFuture
+                    Box::pin(async move {
+                        Event::default()
+                            .json_data(serde_json::json!({
+                                "error": msg
+                            }))
+                            .unwrap_or_else(|_| {
+                                Event::default()
+                                    .data(r#"{"error": "Error serializing error message"}"#)
+                            })
+                    }) as BoxedFuture
                 })
             }
         }
@@ -135,7 +158,7 @@ pub async fn stream_entry(
 
     Sse::new(stream).keep_alive(
         axum::response::sse::KeepAlive::new()
-            .interval(Duration::from_secs(60))
+            .interval(Duration::from_secs(30))
             .text("keep-alive-text"),
     )
 }
