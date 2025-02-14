@@ -5,6 +5,7 @@ use axum::response::IntoResponse;
 use axum::Json;
 use pragma_common::signing::SignerError;
 use pragma_common::timestamp::TimestampRangeError;
+use pragma_common::types::{AggregationMode, Interval};
 use serde_json::json;
 use starknet::core::crypto::EcdsaVerifyError;
 use utoipa::ToSchema;
@@ -52,6 +53,8 @@ pub enum EntryError {
     SignerError(#[from] SignerError),
     #[error("invalid login message: {0}")]
     InvalidLoginMessage(String),
+    #[error("unsupported interval {0:?} for aggregation {1:?}")]
+    UnsupportedInterval(Interval, AggregationMode),
 }
 
 impl From<InfraError> for EntryError {
@@ -62,6 +65,7 @@ impl From<InfraError> for EntryError {
             InfraError::InvalidTimestamp(e) => {
                 Self::InvalidTimestamp(TimestampRangeError::Other(e))
             }
+            InfraError::UnsupportedInterval(i, a) => Self::UnsupportedInterval(i, a),
             InfraError::InternalServerError
             | InfraError::DisputerNotSet
             | InfraError::SettlerNotSet

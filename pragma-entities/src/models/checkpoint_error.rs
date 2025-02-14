@@ -20,6 +20,7 @@ impl From<InfraError> for CheckpointError {
         match error {
             InfraError::NotFound => Self::NotFound,
             InfraError::InternalServerError
+            | InfraError::UnsupportedInterval(_, _)
             | InfraError::RoutingError
             | InfraError::DisputerNotSet
             | InfraError::SettlerNotSet

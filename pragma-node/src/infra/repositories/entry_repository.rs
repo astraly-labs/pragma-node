@@ -49,6 +49,7 @@ const fn get_table_suffix(data_type: DataType) -> Result<&'static str, InfraErro
     match data_type {
         DataType::SpotEntry => Ok(""),
         DataType::FutureEntry => Ok("_future"),
+        // TODO: Why does this return an Err? Should be "_future" too?
         DataType::PerpEntry => Err(InfraError::InternalServerError),
     }
 }
@@ -58,17 +59,25 @@ pub const fn get_interval_specifier(
     interval: Interval,
     is_twap: bool,
 ) -> Result<&'static str, InfraError> {
-    match interval {
-        Interval::OneSecond => Ok("1_s"),
-        Interval::OneMinute => Ok("1_min"),
-        Interval::FifteenMinutes => Ok("15_min"),
-        Interval::OneHour if is_twap => Ok("1_hour"),
-        Interval::OneHour if !is_twap => Ok("1_h"),
-        Interval::TwoHours if is_twap => Ok("2_hours"),
-        Interval::TwoHours if !is_twap => Ok("2_h"),
-        Interval::OneDay => Ok("1_day"),
-        Interval::OneWeek => Ok("1_week"),
-        _ => Err(InfraError::InternalServerError),
+    if is_twap {
+        match interval {
+            Interval::OneHour => Ok("1_hour"),
+            Interval::TwoHours => Ok("2_hours"),
+            _ => Err(InfraError::UnsupportedInterval(
+                interval,
+                AggregationMode::Twap,
+            )),
+        }
+    } else {
+        match interval {
+            Interval::OneSecond => Ok("1_s"),
+            Interval::OneMinute => Ok("1_min"),
+            Interval::FifteenMinutes => Ok("15_min"),
+            Interval::OneHour => Ok("1_h"),
+            Interval::TwoHours => Ok("2_h"),
+            Interval::OneDay => Ok("1_day"),
+            Interval::OneWeek => Ok("1_week"),
+        }
     }
 }
 

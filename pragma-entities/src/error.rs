@@ -1,5 +1,8 @@
 use deadpool_diesel::InteractError;
-use pragma_common::timestamp::TimestampRangeError;
+use pragma_common::{
+    timestamp::TimestampRangeError,
+    types::{AggregationMode, Interval},
+};
 use std::{
     fmt::{self, Debug},
     num::TryFromIntError,
@@ -23,6 +26,7 @@ pub enum InfraError {
     #[error(transparent)]
     #[schema(value_type = String)]
     AxumError(#[from] axum::Error),
+    UnsupportedInterval(Interval, AggregationMode),
 }
 
 impl InfraError {
@@ -33,6 +37,7 @@ impl InfraError {
             Self::InvalidTimestamp(e) => {
                 EntryError::InvalidTimestamp(TimestampRangeError::Other(e.to_string()))
             }
+            Self::UnsupportedInterval(i, d) => EntryError::UnsupportedInterval(*i, *d),
             Self::InternalServerError
             | Self::DisputerNotSet
             | Self::SettlerNotSet
@@ -69,6 +74,9 @@ impl fmt::Display for InfraError {
             Self::InvalidTimestamp(e) => write!(f, "Invalid timestamp {e}"),
             Self::NonZeroU32Conversion(e) => write!(f, "Non zero u32 conversion {e}"),
             Self::AxumError(e) => write!(f, "Axum error {e}"),
+            Self::UnsupportedInterval(i, a) => {
+                write!(f, "Unsupported interval {i:?} for aggregation {a:?}")
+            }
         }
     }
 }
