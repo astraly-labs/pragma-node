@@ -13,11 +13,24 @@ use crate::{
 };
 
 #[rstest]
+#[case::one_second(Interval::OneSecond)]
+#[case::five_seconds(Interval::FiveSeconds)]
+#[case::one_minute(Interval::OneMinute)]
+#[case::fifteen_minutes(Interval::FifteenMinutes)]
+#[case::one_hour(Interval::OneHour)]
+#[case::two_hours(Interval::TwoHours)]
+#[case::one_day(Interval::OneDay)]
+#[case::one_week(Interval::OneWeek)]
 #[serial_test::serial]
 #[tokio::test]
-async fn get_entry_median_2_hours_ok(#[future] setup_containers: TestHelper) {
+async fn get_entry_median_ok(
+    #[future] setup_containers: TestHelper,
+    #[case] queried_interval: Interval,
+) {
     let hlpr = setup_containers.await;
 
+    // TODO: Insert way MORE entries, maybe we should have an utils to generate
+    // random fake data with some constraints?
     // 1. Insert one entry
     let pair_id = "ETH/USD";
     let current_timestamp: u64 = 1739688964;
@@ -45,7 +58,6 @@ async fn get_entry_median_2_hours_ok(#[future] setup_containers: TestHelper) {
     hlpr.execute_sql(&hlpr.offchain_pool, sql).await;
 
     let queried_aggregation = AggregationMode::Median;
-    let queried_interval = Interval::TwoHours;
 
     // 2. Refresh the timescale view
     hlpr.refresh_offchain_continuous_aggregate(
@@ -79,7 +91,7 @@ async fn get_entry_median_2_hours_ok(#[future] setup_containers: TestHelper) {
 
     let threshold = BigDecimal::from_f64(1.0).unwrap();
     // NOTE: approx_percentile of timescaledb returns an approximative value for the median.
-    // So we just check if the price we have is in some bonds.
+    // So we just check if the price we have is in ~1% bonds.
     assert_hex_prices_within_threshold!(&response.price, &expected_price_hex, threshold);
 }
 

@@ -35,7 +35,7 @@ pub fn is_price_within_threshold(
     difference <= *threshold_percentage
 }
 
-/// Macro to assert that two prices are within a threshold
+/// Macro to assert that two hexa prices are within a threshold
 /// Prices must be provided as hex!
 #[macro_export]
 macro_rules! assert_hex_prices_within_threshold {
@@ -48,4 +48,31 @@ macro_rules! assert_hex_prices_within_threshold {
             $price2
         );
     };
+}
+
+/// Macro to assert that prices are within a threshold
+#[macro_export]
+macro_rules! assert_prices_within_threshold {
+    ($price1:expr, $price2:expr, $threshold:expr) => {{
+        use bigdecimal::BigDecimal;
+
+        // Calculate absolute difference
+        let diff = if $price1 > $price2 {
+            &$price1 - &$price2
+        } else {
+            &$price2 - &$price1
+        };
+
+        // Calculate percentage difference relative to the first price
+        let hundred = BigDecimal::from(100);
+        let difference = (&diff * &hundred) / &$price1;
+
+        assert!(
+            difference <= $threshold,
+            "Price difference exceeds {}%. Price 1: {}, Price 2: {}",
+            $threshold,
+            $price1,
+            $price2
+        );
+    }};
 }
