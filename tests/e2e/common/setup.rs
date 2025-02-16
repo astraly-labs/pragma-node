@@ -3,6 +3,7 @@ use std::sync::Arc;
 use deadpool_diesel::{postgres::Pool, Manager};
 use diesel::RunQueryDsl;
 
+use pragma_common::types::{AggregationMode, Interval};
 use testcontainers::ContainerAsync;
 use testcontainers_modules::kafka::Kafka;
 use testcontainers_modules::zookeeper::Zookeeper;
@@ -16,6 +17,8 @@ use crate::common::containers::{
     Containers, Timescale,
 };
 use crate::common::logs::init_logging;
+
+use super::utils::{get_interval_specifier, get_window_size};
 
 /// Main structure that we carry around for our tests.
 /// Contains some usefull fields & functions attached to make testing easier.
@@ -42,6 +45,32 @@ impl TestHelper {
             .await
             .expect("Failed to execute interact closure")
             .expect("Failed to execute SQL query");
+    }
+
+    /// Refreshes a TimescaleDB continuous aggregate materialized view around a specific timestamp.
+    /// The refreshed view will be automatically found depending on the interval + aggregation mode.
+    /// NOTE: It does not work with future entries for now since we don't care for our tests yet.
+    pub async fn refresh_offchain_continuous_aggregate(
+        &self,
+        timestamp: u64,
+        interval: Interval,
+        aggregation: AggregationMode,
+    ) {
+        let is_twap = matches!(aggregation, AggregationMode::Twap);
+        let interval_spec = get_interval_specifier(interval, is_twap);
+        let window_size = get_window_size(interval);
+
+        let sql = format!(
+            r#"
+            CALL refresh_continuous_aggregate(
+                'price_{}_agg',
+                to_timestamp({} - {}),
+                to_timestamp({} + {})
+            );"#,
+            interval_spec, timestamp, window_size, timestamp, window_size
+        );
+
+        self.execute_sql(&self.offchain_pool, sql).await;
     }
 }
 

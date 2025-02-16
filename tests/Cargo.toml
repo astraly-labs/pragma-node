@@ -38,3 +38,4 @@ testcontainers-modules = { workspace = true, features = [
   "http_wait",
 ] }
 serial_test = { workspace = true }
+bigdecimal = { workspace = true }

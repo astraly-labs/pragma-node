@@ -1,27 +1,28 @@
-use std::time::Duration;
-
+use bigdecimal::{BigDecimal, FromPrimitive};
 use rstest::rstest;
 
 use pragma_common::types::{AggregationMode, Interval};
 use serde::{Deserialize, Serialize};
 
-use crate::common::{
-    constants::EMPTY_SIGNATURE,
-    setup::{setup_containers, TestHelper},
+use crate::{
+    assert_hex_prices_within_threshold,
+    common::{
+        constants::EMPTY_SIGNATURE,
+        setup::{setup_containers, TestHelper},
+    },
 };
 
 #[rstest]
 #[serial_test::serial]
 #[tokio::test]
-async fn get_entry_ok(#[future] setup_containers: TestHelper) {
+async fn get_entry_median_2_hours_ok(#[future] setup_containers: TestHelper) {
     let hlpr = setup_containers.await;
 
     // 1. Insert one entry
     let pair_id = "ETH/USD";
-    let current_timestamp = 1739688964;
-    let price: u128 = 2705530000000000000000; // 18 decimals
+    let current_timestamp: u64 = 1739688964;
+    let price: u128 = 270553000000; // 8 decimals
     let publisher = "TEST_PUBLISHER";
-
     let sql = format!(
         r#"
         INSERT INTO entries (
@@ -43,45 +44,50 @@ async fn get_entry_ok(#[future] setup_containers: TestHelper) {
     );
     hlpr.execute_sql(&hlpr.offchain_pool, sql).await;
 
-    // 2. Call the endpoint
+    let queried_aggregation = AggregationMode::Median;
+    let queried_interval = Interval::TwoHours;
+
+    // 2. Refresh the timescale view
+    hlpr.refresh_offchain_continuous_aggregate(
+        current_timestamp,
+        queried_interval,
+        queried_aggregation,
+    )
+    .await;
+
+    // 3. Call the endpoint
     let endpoint = get_entry_endpoint(
         "ETH",
         "USD",
         GetEntryRequestParams::new()
             .with_timestamp(current_timestamp)
-            .with_interval(Interval::FiveSeconds)
+            .with_interval(queried_interval)
             .with_routing(false)
-            .with_aggregation(AggregationMode::Median),
+            .with_aggregation(queried_aggregation),
     );
     tracing::info!("with endpoint: {endpoint}");
 
-    // Sleep some time so the 5s interval gets filled by timescale
-    // TODO: Can we refresh it ourselves?
-    tokio::time::sleep(Duration::from_secs(10)).await;
-
     let response = reqwest::get(hlpr.endpoint(&endpoint))
         .await
-        .unwrap()
+        .expect("Error while fetching data from pragma node")
         .json::<GetEntryResponse>()
         .await
-        .unwrap();
+        .expect("Could not retrieve a valid GetEntryResponse");
 
-    // 3. Assert
-    let expected_response = GetEntryResponse {
-        num_sources_aggregated: 1,
-        pair_id: "ETH/USD".into(),
-        price: format!("0x{price:x}"),
-        timestamp: 1739688964 * 1000, // in ms
-        decimals: 8,
-    };
-    assert_eq!(response, expected_response);
+    // 4. Assert
+    let expected_price_hex = format!("0x{price:x}");
+
+    let threshold = BigDecimal::from_f64(1.0).unwrap();
+    // NOTE: approx_percentile of timescaledb returns an approximative value for the median.
+    // So we just check if the price we have is in some bonds.
+    assert_hex_prices_within_threshold!(&response.price, &expected_price_hex, threshold);
 }
 
 // Utils to call the get entry endpoint
 
 #[derive(Default)]
 pub struct GetEntryRequestParams {
-    pub timestamp: Option<i64>,
+    pub timestamp: Option<u64>,
     pub interval: Option<Interval>,
     pub routing: Option<bool>,
     pub aggregation: Option<AggregationMode>,
@@ -92,7 +98,7 @@ impl GetEntryRequestParams {
         Self::default()
     }
 
-    pub fn with_timestamp(mut self, timestamp: i64) -> Self {
+    pub fn with_timestamp(mut self, timestamp: u64) -> Self {
         self.timestamp = Some(timestamp);
         self
     }
