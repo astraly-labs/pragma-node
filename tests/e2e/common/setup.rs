@@ -38,7 +38,6 @@ impl TestHelper {
             .await
             .expect("Failed to get connection from pool");
 
-        let sql = sql.to_owned();
         conn.interact(move |conn| diesel::sql_query(sql).execute(conn))
             .await
             .expect("Failed to execute interact closure")
