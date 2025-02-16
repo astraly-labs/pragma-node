@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::HashMap, env::current_dir, path::PathBuf};
+use std::{borrow::Cow, collections::HashMap, env::current_dir, path::PathBuf, time::Duration};
 
 use testcontainers::{
     core::{wait::HttpWaitStrategy, ContainerPort, IntoContainerPort, WaitFor},
@@ -45,6 +45,7 @@ pub async fn setup_pragma_node() -> ContainerAsync<PragmaNode> {
         .with_mapped_port(METRICS_PORT, METRICS_PORT.tcp())
         .with_network("pragma-tests-network")
         .with_container_name(PRAGMA_NODE_CONTAINER_NAME)
+        .with_startup_timeout(Duration::from_secs(600))
         .start()
         .await
         .unwrap()
