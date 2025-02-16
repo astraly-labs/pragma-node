@@ -7,7 +7,7 @@ edition = "2021"
 workspace = true
 
 [dependencies]
-pragma-common = { path = "../pragma-common" }
+pragma-common = { workspace = true }
 
 axum = { workspace = true, features = ["macros"] }
 bigdecimal = { workspace = true, features = ["serde"] }

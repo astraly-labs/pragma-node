@@ -31,27 +31,6 @@ jobs:
       security-events: write
       checks: write
       pull-requests: write
-    env:
-      HOST: 0.0.0.0
-      PORT: 3000
-      METRICS_PORT: 8080
-      POSTGRES_DATABASE_URL: postgres://postgres:postgres@localhost:5432
-
-    services:
-      postgres:
-        image: postgres:latest
-        env:
-          POSTGRES_DB: postgres
-          POSTGRES_USER: postgres
-          POSTGRES_HOST_AUTH_METHOD: trust
-        ports:
-          - 5432:5432
-        # Set health checks to wait until postgres has started
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
 
     steps:
       - name: Checkout toml files

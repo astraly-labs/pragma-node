@@ -1,6 +1,9 @@
 use std::sync::Arc;
 
 use deadpool_diesel::{postgres::Pool, Manager};
+use diesel::RunQueryDsl;
+
+use pragma_common::types::{AggregationMode, Interval};
 use testcontainers::ContainerAsync;
 use testcontainers_modules::kafka::Kafka;
 use testcontainers_modules::zookeeper::Zookeeper;
@@ -15,6 +18,8 @@ use crate::common::containers::{
 };
 use crate::common::logs::init_logging;
 
+use super::utils::{get_interval_specifier, get_window_size};
+
 /// Main structure that we carry around for our tests.
 /// Contains some usefull fields & functions attached to make testing easier.
 pub struct TestHelper {
@@ -28,8 +33,50 @@ impl TestHelper {
     pub fn endpoint(&self, path: &str) -> String {
         format!("{}/{}", self.node_base_url, path)
     }
+
+    /// Executes the provided `sql` query on the database `Pool`.
+    pub async fn execute_sql(&self, pool: &Pool, sql: String) {
+        let conn = pool
+            .get()
+            .await
+            .expect("Failed to get connection from pool");
+
+        conn.interact(move |conn| diesel::sql_query(sql).execute(conn))
+            .await
+            .expect("Failed to execute interact closure")
+            .expect("Failed to execute SQL query");
+    }
+
+    /// Refreshes a TimescaleDB continuous aggregate materialized view around a specific timestamp.
+    /// The refreshed view will be automatically found depending on the interval + aggregation mode.
+    /// NOTE: It does not work with future entries for now since we don't care for our tests yet.
+    pub async fn refresh_offchain_continuous_aggregate(
+        &self,
+        timestamp: u64,
+        interval: Interval,
+        aggregation: AggregationMode,
+    ) {
+        let is_twap = matches!(aggregation, AggregationMode::Twap);
+        let interval_spec = get_interval_specifier(interval, is_twap);
+        let window_size = get_window_size(interval);
+
+        let sql = format!(
+            r#"
+            CALL refresh_continuous_aggregate(
+                'price_{}_agg',
+                to_timestamp({} - {}),
+                to_timestamp({} + {})
+            );"#,
+            interval_spec, timestamp, window_size, timestamp, window_size
+        );
+
+        self.execute_sql(&self.offchain_pool, sql).await;
+    }
 }
 
+/// Setup all the containers needed for integration tests and return a
+/// `TestHelper` structure containing handles to interact with
+/// the containers.
 #[rstest::fixture]
 pub async fn setup_containers(
     #[from(init_logging)] _logging: (),
@@ -52,16 +99,16 @@ pub async fn setup_containers(
 
     tracing::info!("🔨 Setup zookeeper..");
     let zookeeper = setup_zookeeper.await;
-    tracing::info!("✅ ... zookeeper!\n");
+    tracing::info!("✅ ... zookeeper ready!\n");
 
     tracing::info!("🔨 Setup kafka..");
     let kafka = setup_kafka.await;
     init_kafka_topics(&kafka).await;
-    tracing::info!("✅ ... kafka!\n");
+    tracing::info!("✅ ... kafka ready!\n");
 
     tracing::info!("🔨 Setup pragma_node...");
     let pragma_node = setup_pragma_node.await;
-    tracing::info!("✅ ... pragma-node!\n");
+    tracing::info!("✅ ... pragma-node ready!\n");
 
     let containers = Containers {
         onchain_db: Arc::new(onchain_db),
