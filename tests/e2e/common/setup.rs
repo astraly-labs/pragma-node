@@ -1,6 +1,8 @@
 use std::sync::Arc;
 
 use deadpool_diesel::{postgres::Pool, Manager};
+use diesel::RunQueryDsl;
+
 use testcontainers::ContainerAsync;
 use testcontainers_modules::kafka::Kafka;
 use testcontainers_modules::zookeeper::Zookeeper;
@@ -28,8 +30,25 @@ impl TestHelper {
     pub fn endpoint(&self, path: &str) -> String {
         format!("{}/{}", self.node_base_url, path)
     }
+
+    /// Executes the provided `sql` query on the database `Pool`.
+    pub async fn execute_sql(&self, pool: &Pool, sql: String) {
+        let conn = pool
+            .get()
+            .await
+            .expect("Failed to get connection from pool");
+
+        let sql = sql.to_owned();
+        conn.interact(move |conn| diesel::sql_query(sql).execute(conn))
+            .await
+            .expect("Failed to execute interact closure")
+            .expect("Failed to execute SQL query");
+    }
 }
 
+/// Setup all the containers needed for integration tests and return a
+/// `TestHelper` structure containing handles to interact with
+/// the containers.
 #[rstest::fixture]
 pub async fn setup_containers(
     #[from(init_logging)] _logging: (),
@@ -52,16 +71,16 @@ pub async fn setup_containers(
 
     tracing::info!("🔨 Setup zookeeper..");
     let zookeeper = setup_zookeeper.await;
-    tracing::info!("✅ ... zookeeper!\n");
+    tracing::info!("✅ ... zookeeper ready!\n");
 
     tracing::info!("🔨 Setup kafka..");
     let kafka = setup_kafka.await;
     init_kafka_topics(&kafka).await;
-    tracing::info!("✅ ... kafka!\n");
+    tracing::info!("✅ ... kafka ready!\n");
 
     tracing::info!("🔨 Setup pragma_node...");
     let pragma_node = setup_pragma_node.await;
-    tracing::info!("✅ ... pragma-node!\n");
+    tracing::info!("✅ ... pragma-node ready!\n");
 
     let containers = Containers {
         onchain_db: Arc::new(onchain_db),

@@ -4,6 +4,7 @@ use rstest::rstest;
 use crate::common::setup::{setup_containers, TestHelper};
 
 #[rstest]
+#[serial_test::serial]
 #[tokio::test]
 async fn healthcheck_ok(#[future] setup_containers: TestHelper) {
     let hlpr = setup_containers.await;

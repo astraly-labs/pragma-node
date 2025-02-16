@@ -16,8 +16,13 @@ const TAG: &str = "latest";
 
 const PRAGMA_NODE_CONTAINER_NAME: &str = "pragma-node-container";
 
+// Main port of the API
 pub const SERVER_PORT: u16 = 3000;
+
+// Port where we expose pragma-node metrics
 const METRICS_PORT: u16 = 8080;
+
+// Port used by both databases in their container
 const DB_PORT: u16 = 5432;
 
 #[rstest::fixture]
