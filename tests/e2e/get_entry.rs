@@ -27,7 +27,7 @@ async fn get_entry_median_ok(
     #[future] setup_containers: TestHelper,
     #[case] queried_interval: Interval,
 ) {
-    let hlpr = setup_containers.await;
+    let mut hlpr = setup_containers.await;
 
     // TODO: Insert way MORE entries, maybe we should have an utils to generate
     // random fake data with some constraints?
@@ -85,6 +85,8 @@ async fn get_entry_median_ok(
         .json::<GetEntryResponse>()
         .await
         .expect("Could not retrieve a valid GetEntryResponse");
+
+    hlpr.shutdown_local_pragma_node().await;
 
     // 4. Assert
     let expected_price_hex = format!("0x{price:x}");

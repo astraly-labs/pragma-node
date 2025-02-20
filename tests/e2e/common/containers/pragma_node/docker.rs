@@ -6,9 +6,14 @@ use testcontainers::{
     ContainerAsync, Image, ImageExt,
 };
 
+use crate::common::containers::pragma_node::DB_PORT;
+
 use super::{
-    offchain_db::OFFCHAIN_DB_CONTAINER_NAME, onchain_db::ONCHAIN_DB_CONTAINER_NAME,
-    utils::image_builder::ImageBuilder,
+    super::{
+        offchain_db::OFFCHAIN_DB_CONTAINER_NAME, onchain_db::ONCHAIN_DB_CONTAINER_NAME,
+        utils::image_builder::ImageBuilder,
+    },
+    METRICS_PORT, SERVER_PORT,
 };
 
 const PRAGMA_NODE_BUILD_NAME: &str = "pragma-node-e2e";
@@ -16,17 +21,8 @@ const TAG: &str = "latest";
 
 const PRAGMA_NODE_CONTAINER_NAME: &str = "pragma-node-container";
 
-// Main port of the API
-pub const SERVER_PORT: u16 = 3000;
-
-// Port where we expose pragma-node metrics
-const METRICS_PORT: u16 = 8080;
-
-// Port used by both databases in their container
-const DB_PORT: u16 = 5432;
-
 #[rstest::fixture]
-pub async fn setup_pragma_node() -> ContainerAsync<PragmaNode> {
+pub async fn setup_pragma_node_with_docker() -> ContainerAsync<PragmaNode> {
     // 1. Build the pragma-node image
     ImageBuilder::default()
         .with_build_name(PRAGMA_NODE_BUILD_NAME)

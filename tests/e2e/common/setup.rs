@@ -12,13 +12,20 @@ use crate::common::containers::{
     kafka::{init_kafka_topics, setup_kafka},
     offchain_db::setup_offchain_db,
     onchain_db::{run_onchain_migrations, setup_onchain_db},
-    pragma_node::{setup_pragma_node, PragmaNode, SERVER_PORT},
+    pragma_node::{
+        docker::{setup_pragma_node_with_docker, PragmaNode},
+        local::setup_pragma_node_with_cargo,
+        SERVER_PORT,
+    },
     zookeeper::setup_zookeeper,
     Containers, Timescale,
 };
 use crate::common::logs::init_logging;
 
-use super::utils::{get_interval_specifier, get_window_size};
+use super::{
+    containers::pragma_node::PragmaNodeMode,
+    utils::{get_interval_specifier, get_window_size},
+};
 
 /// Main structure that we carry around for our tests.
 /// Contains some usefull fields & functions attached to make testing easier.
@@ -27,6 +34,8 @@ pub struct TestHelper {
     pub onchain_pool: Pool,
     pub offchain_pool: Pool,
     pub containers: Containers,
+    pub pragma_node_mode: PragmaNodeMode,
+    pub node_handle: Option<tokio::process::Child>,
 }
 
 impl TestHelper {
@@ -72,6 +81,32 @@ impl TestHelper {
 
         self.execute_sql(&self.offchain_pool, sql).await;
     }
+
+    /// Allows to shutdown a pragma-node local instance ran with cargo (not with docker).
+    pub async fn shutdown_local_pragma_node(&mut self) {
+        if matches!(self.pragma_node_mode, PragmaNodeMode::Docker) {
+            return;
+        }
+        if let Some(mut handle) = self.node_handle.take() {
+            handle
+                .kill()
+                .await
+                .expect("Failed to kill pragma-node process");
+        }
+    }
+}
+
+// TODO: Very flaky. See if we can force the kill of the handle without async.
+// TODO: At the moment, we need to call `shutdown_local_pragma_node` ourselves.
+/// Automatically kills the local `pragma-node` instance when we quit the scope of a test.
+impl Drop for TestHelper {
+    fn drop(&mut self) {
+        if let Some(handle) = &mut self.node_handle {
+            handle
+                .start_kill()
+                .expect("Failed to send kill signal to pragma-node");
+        }
+    }
 }
 
 /// Setup all the containers needed for integration tests and return a
@@ -84,7 +119,7 @@ pub async fn setup_containers(
     #[future] setup_onchain_db: ContainerAsync<Timescale>,
     #[future] setup_zookeeper: ContainerAsync<Zookeeper>,
     #[future] setup_kafka: ContainerAsync<Kafka>,
-    #[future] setup_pragma_node: ContainerAsync<PragmaNode>,
+    #[future] setup_pragma_node_with_docker: ContainerAsync<PragmaNode>,
 ) -> TestHelper {
     tracing::info!("🔨 Setup offchain db..");
     let offchain_db = setup_offchain_db.await;
@@ -106,8 +141,25 @@ pub async fn setup_containers(
     init_kafka_topics(&kafka).await;
     tracing::info!("✅ ... kafka ready!\n");
 
-    tracing::info!("🔨 Setup pragma_node...");
-    let pragma_node = setup_pragma_node.await;
+    // NOTE: See the `Default` impl. Already set depending on the `PRAGMA_NODE_MODE` env var.
+    let pragma_node_mode = PragmaNodeMode::default();
+
+    let (pragma_node, node_handle) = match pragma_node_mode {
+        PragmaNodeMode::Docker => {
+            tracing::info!("🔨 Setup pragma_node in Docker mode...");
+            let node = setup_pragma_node_with_docker.await;
+            tracing::info!("✅ ... pragma-node ready!\n");
+            (Some(Arc::new(node)), None)
+        }
+        PragmaNodeMode::Local => {
+            tracing::info!("🔨 Starting pragma_node in local mode...");
+            let offchain_db_port: u16 = offchain_db.get_host_port_ipv4(5432).await.unwrap();
+            let onchain_db_port: u16 = onchain_db.get_host_port_ipv4(5432).await.unwrap();
+            let handle = setup_pragma_node_with_cargo(offchain_db_port, onchain_db_port).await;
+            (None, Some(handle))
+        }
+    };
+
     tracing::info!("✅ ... pragma-node ready!\n");
 
     let containers = Containers {
@@ -115,7 +167,7 @@ pub async fn setup_containers(
         offchain_db: Arc::new(offchain_db),
         zookeeper: Arc::new(zookeeper),
         kafka: Arc::new(kafka),
-        pragma_node: Arc::new(pragma_node),
+        pragma_node,
     };
 
     TestHelper {
@@ -123,6 +175,8 @@ pub async fn setup_containers(
         containers,
         onchain_pool,
         offchain_pool,
+        pragma_node_mode,
+        node_handle,
     }
 }
 

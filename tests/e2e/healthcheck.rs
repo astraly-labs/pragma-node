@@ -7,7 +7,7 @@ use crate::common::setup::{setup_containers, TestHelper};
 #[serial_test::serial]
 #[tokio::test]
 async fn healthcheck_ok(#[future] setup_containers: TestHelper) {
-    let hlpr = setup_containers.await;
+    let mut hlpr = setup_containers.await;
 
     let body = reqwest::get(hlpr.endpoint("node"))
         .await
@@ -16,5 +16,6 @@ async fn healthcheck_ok(#[future] setup_containers: TestHelper) {
         .await
         .unwrap();
 
+    hlpr.shutdown_local_pragma_node().await;
     assert_eq!(body.trim(), "Server is running!");
 }
