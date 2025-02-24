@@ -47,6 +47,9 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
 ARG APP_NAME=pragma-ingestor
 ENV APP_NAME $APP_NAME
 
+# Create app directory
+RUN mkdir /app
+
 # Copy the binary, certificates, config, and OpenAPI spec
 COPY --from=builder /app/target/release/${APP_NAME} /bin/server
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
