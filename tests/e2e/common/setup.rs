@@ -75,14 +75,20 @@ impl TestHelper {
         let interval_spec = get_interval_specifier(interval, is_twap);
         let window_size = get_window_size(interval);
 
+        let table_name = if matches!(aggregation, AggregationMode::Twap) {
+            "twap"
+        } else {
+            "price"
+        };
+
         let sql = format!(
             r#"
             CALL refresh_continuous_aggregate(
-                'price_{}_agg',
+                '{}_{}_agg',
                 to_timestamp({} - {}),
                 to_timestamp({} + {})
             );"#,
-            interval_spec, timestamp, window_size, timestamp, window_size
+            table_name, interval_spec, timestamp, window_size, timestamp, window_size
         );
 
         self.execute_sql(&self.offchain_pool, sql).await;

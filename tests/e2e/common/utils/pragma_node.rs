@@ -6,7 +6,7 @@ pub const fn get_interval_specifier(interval: Interval, is_twap: bool) -> &'stat
     if is_twap {
         match interval {
             Interval::OneHour => "1_hour",
-            Interval::TwoHours => "2_hour",
+            Interval::TwoHours => "2_hours",
             _ => panic!("unsupported interval"),
         }
     } else {
