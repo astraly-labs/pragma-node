@@ -230,9 +230,10 @@ async fn get_entry_twap_routing_many_ok(
     // 1. Insert one entry
     let pair_id = "STRK/USD";
     let current_timestamp: u64 = chrono::Utc::now().timestamp() as u64;
-    let price: u128 = populate::get_pair_price(pair_id); // 8 decimals
-    let sql = populate::entry_from(pair_id, current_timestamp, price, "BINANCE");
-    hlpr.execute_sql(&hlpr.offchain_pool, sql).await;
+    let price: u128 = populate::get_pair_price(pair_id);
+    let sql_many = populate::generate_entries(1000, current_timestamp);
+
+    hlpr.execute_sql_many(&hlpr.offchain_pool, sql_many).await;
 
     let queried_aggregation = AggregationMode::Twap;
 
@@ -251,7 +252,7 @@ async fn get_entry_twap_routing_many_ok(
         GetEntryRequestParams::new()
             .with_timestamp(current_timestamp)
             .with_interval(queried_interval)
-            .with_routing(false)
+            .with_routing(true)
             .with_aggregation(queried_aggregation),
     );
     tracing::info!("with endpoint: {endpoint}");
@@ -356,7 +357,7 @@ async fn get_entry_twap_2hours_strk_eth_ok(
     hlpr.shutdown_local_pragma_node().await;
 
     // 4. Assert
-    let strk_eth_price = price / get_pair_price("ETH/USD");
+    let strk_eth_price = (price as f64 / get_pair_price("ETH/USD") as f64) as u128;
     let expected_price_hex = format!("0x{strk_eth_price:x}");
 
     let threshold = BigDecimal::from_f64(VARIATION_PERCENTAGE).unwrap();
