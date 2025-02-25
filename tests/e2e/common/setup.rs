@@ -56,6 +56,12 @@ impl TestHelper {
             .expect("Failed to execute SQL query");
     }
 
+    pub async fn execute_sql_many(&self, pool: &Pool, sql_many: Vec<String>) {
+        for sql in sql_many {
+            self.execute_sql(pool, sql).await;
+        }
+    }
+
     /// Refreshes a TimescaleDB continuous aggregate materialized view around a specific timestamp.
     /// The refreshed view will be automatically found depending on the interval + aggregation mode.
     /// NOTE: It does not work with future entries for now since we don't care for our tests yet.
