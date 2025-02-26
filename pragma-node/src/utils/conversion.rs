@@ -12,9 +12,7 @@ pub fn convert_via_quote(
     if b_price == BigDecimal::from(0) {
         return Err(InfraError::InternalServerError);
     }
-
     let power = BigDecimal::from(10_i64.pow(output_decimals));
-
     Ok(a_price * power / b_price)
 }
 

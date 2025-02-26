@@ -5,10 +5,17 @@ use chrono::{DateTime, NaiveDateTime};
 use diesel::prelude::QueryableByName;
 use diesel::sql_types::{Double, Jsonb, VarChar};
 use diesel::{Queryable, RunQueryDsl};
-use pragma_common::errors::ConversionError;
-use pragma_common::types::pair::Pair;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
+
+use pragma_common::errors::ConversionError;
+use pragma_common::signing::starkex::StarkexPrice;
+use pragma_common::types::pair::Pair;
+use pragma_common::types::{AggregationMode, DataType, Interval};
+use pragma_entities::{
+    error::{adapt_infra_error, InfraError},
+    Entry,
+};
 
 use crate::constants::currencies::ABSTRACT_CURRENCIES;
 use crate::constants::others::ROUTING_FRESHNESS_THRESHOLD;
@@ -18,15 +25,9 @@ use crate::constants::starkex_ws::{
 };
 use crate::handlers::get_entry::RoutingParams;
 use crate::handlers::subscribe_to_entry::{AssetOraclePrice, SignedPublisherPrice};
+use crate::utils::convert_via_quote;
 use crate::utils::sql::{
     get_expiration_timestamp_filter, get_interval_specifier, get_table_suffix,
-};
-use crate::utils::{convert_via_quote, normalize_to_decimals};
-use pragma_common::signing::starkex::StarkexPrice;
-use pragma_common::types::{AggregationMode, DataType, Interval};
-use pragma_entities::{
-    error::{adapt_infra_error, InfraError},
-    Entry,
 };
 
 #[derive(Debug, Serialize, Queryable)]
@@ -84,10 +85,7 @@ pub fn calculate_rebased_price(
         return Err(InfraError::InternalServerError);
     }
 
-    let rebase_price = {
-        let normalized_quote_price = normalize_to_decimals(quote_entry.median_price, 18, 18);
-        convert_via_quote(base_entry.median_price, normalized_quote_price, 18)?
-    };
+    let rebase_price = convert_via_quote(base_entry.median_price, quote_entry.median_price, 18)?;
 
     let max_timestamp = std::cmp::max(
         base_entry.time.and_utc().timestamp(),
@@ -636,12 +634,9 @@ impl TryFrom<EntryComponent> for SignedPublisherPrice {
     fn try_from(component: EntryComponent) -> Result<Self, Self::Error> {
         let asset_id = StarkexPrice::get_oracle_asset_id(&component.publisher, &component.pair_id)?;
 
-        // Scale price from 8 decimals to 18 decimals for StarkEx
-        let price_with_18_decimals = component.price * BigDecimal::from(10_u64.pow(10));
-
         Ok(Self {
             oracle_asset_id: format!("0x{asset_id}"),
-            oracle_price: price_with_18_decimals.to_string(),
+            oracle_price: component.price.to_string(),
             timestamp: component.timestamp.to_string(),
             signing_key: component.publisher_address,
         })
@@ -667,12 +662,9 @@ impl TryFrom<MedianEntryWithComponents> for AssetOraclePrice {
 
         let global_asset_id = StarkexPrice::get_global_asset_id(&median_entry.pair_id)?;
 
-        // Scale price from 8 decimals to 18 decimals for StarkEx
-        let price_with_18_decimals = median_entry.median_price * BigDecimal::from(10_u64.pow(10));
-
         Ok(Self {
             global_asset_id: format!("0x{global_asset_id}"),
-            median_price: price_with_18_decimals.to_string(),
+            median_price: median_entry.median_price.to_string(),
             signed_prices: signed_prices?,
             signature: Default::default(),
         })

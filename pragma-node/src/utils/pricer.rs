@@ -94,8 +94,6 @@ impl MarkPricer {
     /// the mark price.
     #[tracing::instrument]
     fn compute_mark_price(perp_pair_price: &BigDecimal, spot_usd_price: &BigDecimal) -> BigDecimal {
-        let scaler = BigDecimal::from(10_u32.pow(18));
-        let spot_usd_price = spot_usd_price / scaler;
         perp_pair_price / spot_usd_price
     }
 
