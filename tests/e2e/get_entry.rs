@@ -137,7 +137,6 @@ async fn get_entry_median_ok_many(
             .with_routing(false)
             .with_aggregation(queried_aggregation),
     );
-    tracing::info!("with endpoint: {endpoint}");
 
     let response = reqwest::get(hlpr.endpoint(&endpoint))
         .await
@@ -197,7 +196,6 @@ async fn get_entry_twap_many_ok(
             .with_routing(false)
             .with_aggregation(queried_aggregation),
     );
-    tracing::info!("with endpoint: {endpoint}");
 
     let response = reqwest::get(hlpr.endpoint(&endpoint))
         .await
@@ -229,8 +227,6 @@ async fn get_entry_twap_strk_eth_ok(
 ) {
     let mut hlpr = setup_containers.await;
 
-    hlpr.push_strk(&hlpr.offchain_pool).await;
-
     // 1. Insert one entry
     let pair_id = "STRK/USD";
     let current_timestamp: u64 = chrono::Utc::now().timestamp() as u64;
@@ -259,7 +255,6 @@ async fn get_entry_twap_strk_eth_ok(
             .with_routing(true)
             .with_aggregation(queried_aggregation),
     );
-    tracing::info!("with endpoint: {endpoint}");
 
     let response = reqwest::get(hlpr.endpoint(&endpoint))
         .await
