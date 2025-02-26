@@ -10,9 +10,7 @@ pub mod utils;
 
 use dashmap::DashMap;
 use dotenvy::dotenv;
-use handlers::publish_entry_ws::PublisherSession;
-use infra::rpc::{init_rpc_clients, RpcClients};
-use metrics::MetricsRegistry;
+
 use std::fmt;
 use std::sync::Arc;
 
@@ -23,6 +21,9 @@ use starknet::signers::SigningKey;
 use pragma_entities::connection::{ENV_OFFCHAIN_DATABASE_URL, ENV_ONCHAIN_DATABASE_URL};
 
 use crate::config::config;
+use crate::handlers::publish_entry_ws::PublisherSession;
+use crate::infra::rpc::{init_rpc_clients, RpcClients};
+use crate::metrics::MetricsRegistry;
 use crate::utils::PragmaSignerBuilder;
 
 #[derive(Clone)]

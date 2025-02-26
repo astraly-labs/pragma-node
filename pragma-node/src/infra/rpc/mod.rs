@@ -40,13 +40,13 @@ pub static ORACLE_ADDRESS_PER_NETWORK: LazyLock<HashMap<Network, Felt>> = LazyLo
 /// Panics if the env are not correctly set.
 pub fn init_rpc_clients() -> HashMap<Network, Arc<JsonRpcClient<HttpTransport>>> {
     let mainnet_rpc_url: Url = std::env::var(ENV_MAINNET_RPC_URL)
-        .expect("MAINNET_RPC_URL var not set")
+        .unwrap_or("https://free-rpc.nethermind.io/mainnet-juno".to_string())
         .parse()
         .expect("Invalid MAINNET_RPC_URL provided.");
     let mainnet_client = JsonRpcClient::new(HttpTransport::new(mainnet_rpc_url));
 
     let sepolia_rpc_url: Url = std::env::var(ENV_SEPOLIA_RPC_URL)
-        .expect("SEPOLIA_RPC_URL var not set")
+        .unwrap_or("https://free-rpc.nethermind.io/sepolia-juno".to_string())
         .parse()
         .expect("Invalid SEPOLIA_RPC_URL provided.");
     let sepolia_client = JsonRpcClient::new(HttpTransport::new(sepolia_rpc_url));
