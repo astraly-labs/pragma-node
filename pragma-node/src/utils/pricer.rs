@@ -90,8 +90,7 @@ impl MarkPricer {
     }
 
     /// Given the median price of a perp pair, the median price of the spot
-    /// stablecoin/USD pair and the number of decimals of the stablecoin, computes
-    /// the mark price.
+    /// stablecoin/USD pair, computes the mark price.
     #[tracing::instrument]
     fn compute_mark_price(perp_pair_price: &BigDecimal, spot_usd_price: &BigDecimal) -> BigDecimal {
         perp_pair_price / spot_usd_price

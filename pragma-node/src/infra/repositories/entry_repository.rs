@@ -23,6 +23,7 @@ use crate::constants::starkex_ws::{
     INITAL_INTERVAL_IN_MS, INTERVAL_INCREMENT_IN_MS, MAX_INTERVAL_WITHOUT_ENTRIES,
     MINIMUM_NUMBER_OF_PUBLISHERS,
 };
+use crate::constants::PRAGMA_DECIMALS;
 use crate::handlers::get_entry::RoutingParams;
 use crate::handlers::subscribe_to_entry::{AssetOraclePrice, SignedPublisherPrice};
 use crate::utils::convert_via_quote;
@@ -85,7 +86,11 @@ pub fn calculate_rebased_price(
         return Err(InfraError::InternalServerError);
     }
 
-    let rebase_price = convert_via_quote(base_entry.median_price, quote_entry.median_price, 18)?;
+    let rebase_price = convert_via_quote(
+        base_entry.median_price,
+        quote_entry.median_price,
+        PRAGMA_DECIMALS,
+    )?;
 
     let max_timestamp = std::cmp::max(
         base_entry.time.and_utc().timestamp(),

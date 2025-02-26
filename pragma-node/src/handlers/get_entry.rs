@@ -1,19 +1,21 @@
 use axum::extract::{Query, State};
 use axum::Json;
 use chrono::{DateTime, NaiveDateTime, Utc};
+use serde::{Deserialize, Serialize};
+use utoipa::{ToResponse, ToSchema};
 
 use pragma_common::timestamp::TimestampRangeError;
 use pragma_common::types::pair::Pair;
 use pragma_common::types::{AggregationMode, DataType, Interval};
 use pragma_entities::EntryError;
-use serde::{Deserialize, Serialize};
-use utoipa::{ToResponse, ToSchema};
 
-use crate::infra::repositories::entry_repository::{self, MedianEntry};
+use crate::constants::PRAGMA_DECIMALS;
+use crate::infra::repositories::entry_repository::{
+    get_last_updated_timestamp, routing, MedianEntry,
+};
+use crate::utils::big_decimal_price_to_hex;
 use crate::utils::PathExtractor;
 use crate::AppState;
-
-use crate::utils::big_decimal_price_to_hex;
 
 use super::GetEntryParams;
 
@@ -106,11 +108,11 @@ pub async fn get_entry(
 
     let pair = Pair::from(pair);
 
-    let entry = entry_repository::routing(&state.offchain_pool, is_routing, &pair, &routing_params)
+    let entry = routing(&state.offchain_pool, is_routing, &pair, &routing_params)
         .await
         .map_err(|e| e.to_entry_error(&(pair.to_pair_id())))?;
 
-    let last_updated_timestamp: NaiveDateTime = entry_repository::get_last_updated_timestamp(
+    let last_updated_timestamp: NaiveDateTime = get_last_updated_timestamp(
         &state.offchain_pool,
         pair.to_pair_id(),
         routing_params.timestamp,
@@ -135,6 +137,6 @@ pub fn adapt_entry_to_entry_response(
         timestamp: last_updated_timestamp.and_utc().timestamp_millis() as u64,
         num_sources_aggregated: entry.num_sources as usize,
         price: big_decimal_price_to_hex(&entry.median_price),
-        decimals: 18,
+        decimals: PRAGMA_DECIMALS,
     }
 }

@@ -4,6 +4,7 @@ use pragma_common::types::pair::Pair;
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToResponse, ToSchema};
 
+use crate::constants::PRAGMA_DECIMALS;
 use crate::infra::repositories::entry_repository::{self, MedianEntry};
 use crate::utils::PathExtractor;
 use crate::AppState;
@@ -78,6 +79,6 @@ fn adapt_entry_to_entry_response(
     GetVolatilityResponse {
         pair_id,
         volatility,
-        decimals: 18,
+        decimals: PRAGMA_DECIMALS,
     }
 }
