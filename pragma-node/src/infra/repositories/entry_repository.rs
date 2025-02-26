@@ -1,6 +1,6 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
-use bigdecimal::{BigDecimal, FromPrimitive, ToPrimitive};
+use bigdecimal::{BigDecimal, FromPrimitive};
 use chrono::{DateTime, NaiveDateTime};
 use diesel::prelude::QueryableByName;
 use diesel::sql_types::{Double, Jsonb, VarChar};
@@ -10,6 +10,7 @@ use pragma_common::types::pair::Pair;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+use crate::constants::currencies::ABSTRACT_CURRENCIES;
 use crate::constants::others::ROUTING_FRESHNESS_THRESHOLD;
 use crate::constants::starkex_ws::{
     INITAL_INTERVAL_IN_MS, INTERVAL_INCREMENT_IN_MS, MAX_INTERVAL_WITHOUT_ENTRIES,
@@ -56,7 +57,7 @@ pub async fn routing(
     is_routing: bool,
     pair: &Pair,
     routing_params: &RoutingParams,
-) -> Result<(MedianEntry, u32), InfraError> {
+) -> Result<MedianEntry, InfraError> {
     // If we have entries for the pair_id and the latest entry is fresh enough,
     // Or if we are not routing, we can return the price directly.
     if !is_routing
@@ -68,7 +69,7 @@ pub async fn routing(
                 .timestamp()
                 >= routing_params.timestamp - ROUTING_FRESHNESS_THRESHOLD)
     {
-        return get_price_and_decimals(pool, pair, routing_params).await;
+        return get_price(pool, pair, routing_params).await;
     }
 
     (find_alternative_pair_price(pool, pair, routing_params).await)
@@ -76,39 +77,18 @@ pub async fn routing(
 }
 
 pub fn calculate_rebased_price(
-    base_result: (MedianEntry, u32),
-    quote_result: (MedianEntry, u32),
-) -> Result<(MedianEntry, u32), InfraError> {
-    let (base_entry, base_decimals) = base_result;
-    let (quote_entry, quote_decimals) = quote_result;
-
+    base_entry: MedianEntry,
+    quote_entry: MedianEntry,
+) -> Result<MedianEntry, InfraError> {
     if quote_entry.median_price == BigDecimal::from(0) {
         return Err(InfraError::InternalServerError);
     }
 
-    let (rebase_price, decimals) = if base_decimals < quote_decimals {
-        let normalized_base_price =
-            normalize_to_decimals(base_entry.median_price, base_decimals, quote_decimals);
-        (
-            convert_via_quote(
-                normalized_base_price,
-                quote_entry.median_price,
-                quote_decimals,
-            )?,
-            quote_decimals,
-        )
-    } else {
-        let normalized_quote_price =
-            normalize_to_decimals(quote_entry.median_price, quote_decimals, base_decimals);
-        (
-            convert_via_quote(
-                base_entry.median_price,
-                normalized_quote_price,
-                base_decimals,
-            )?,
-            base_decimals,
-        )
+    let rebase_price = {
+        let normalized_quote_price = normalize_to_decimals(quote_entry.median_price, 18, 18);
+        convert_via_quote(base_entry.median_price, normalized_quote_price, 18)?
     };
+
     let max_timestamp = std::cmp::max(
         base_entry.time.and_utc().timestamp(),
         quote_entry.time.and_utc().timestamp(),
@@ -126,36 +106,23 @@ pub fn calculate_rebased_price(
         num_sources,
     };
 
-    Ok((median_entry, decimals))
+    Ok(median_entry)
 }
 
 async fn find_alternative_pair_price(
     pool: &deadpool_diesel::postgres::Pool,
     pair: &Pair,
     routing_params: &RoutingParams,
-) -> Result<(MedianEntry, u32), InfraError> {
-    let conn = pool.get().await.map_err(adapt_infra_error)?;
-
-    // TODO(decimals): How do we get abstract currencies now?
-    // Do we just create a constant with known currencies? There should not be much.
-    // Just: USD, EUR, BTC, USDPLUS.
-    let alternative_currencies = conn
-        .interact(Currency::get_abstract_all)
-        .await
-        .map_err(adapt_infra_error)?
-        .map_err(adapt_infra_error)?;
-
-    for alt_currency in alternative_currencies {
-        let base_alt_pair = Pair::from((pair.base.clone(), alt_currency.clone()));
-        let alt_quote_pair = Pair::from((pair.quote.clone(), alt_currency.clone()));
+) -> Result<MedianEntry, InfraError> {
+    for alt_currency in ABSTRACT_CURRENCIES {
+        let base_alt_pair = Pair::from((pair.base.clone(), alt_currency.to_string()));
+        let alt_quote_pair = Pair::from((pair.quote.clone(), alt_currency.to_string()));
 
         if pair_id_exist(pool, &base_alt_pair.clone()).await?
             && pair_id_exist(pool, &alt_quote_pair.clone()).await?
         {
-            let base_alt_result =
-                get_price_and_decimals(pool, &base_alt_pair, routing_params).await?;
-            let alt_quote_result =
-                get_price_and_decimals(pool, &alt_quote_pair, routing_params).await?;
+            let base_alt_result = get_price(pool, &base_alt_pair, routing_params).await?;
+            let alt_quote_result = get_price(pool, &alt_quote_pair, routing_params).await?;
 
             return calculate_rebased_price(base_alt_result, alt_quote_result);
         }
@@ -180,11 +147,11 @@ async fn pair_id_exist(
     Ok(res)
 }
 
-async fn get_price_and_decimals(
+async fn get_price(
     pool: &deadpool_diesel::postgres::Pool,
     pair: &Pair,
     routing_params: &RoutingParams,
-) -> Result<(MedianEntry, u32), InfraError> {
+) -> Result<MedianEntry, InfraError> {
     let entry = match routing_params.aggregation_mode {
         AggregationMode::Median => {
             get_median_price(pool, pair.to_pair_id(), routing_params).await?
@@ -193,28 +160,7 @@ async fn get_price_and_decimals(
         AggregationMode::Mean => Err(InfraError::InternalServerError)?,
     };
 
-    let decimals = get_decimals(pool, pair).await?;
-
-    Ok((entry, decimals))
-}
-
-// TODO(decimals): Should return 18 for all decimals
-pub async fn get_all_currencies_decimals(
-    pool: &deadpool_diesel::postgres::Pool,
-) -> Result<HashMap<String, BigDecimal>, InfraError> {
-    let conn = pool.get().await.map_err(adapt_infra_error)?;
-    let result_vec = conn
-        .interact(Currency::get_decimals_all)
-        .await
-        .map_err(adapt_infra_error)?
-        .map_err(adapt_infra_error)?;
-
-    let mut currencies_decimals_map = HashMap::new();
-    for (name, decimals) in result_vec {
-        currencies_decimals_map.insert(name, decimals);
-    }
-
-    Ok(currencies_decimals_map)
+    Ok(entry)
 }
 
 pub async fn get_twap_price(
@@ -513,48 +459,6 @@ pub async fn get_twap_prices_between(
         .collect();
 
     Ok(entries)
-}
-
-// TODO(decimals): Gonna be deleted - now we want 18 decimals for all currencies.
-// NOTE: This was also used in the ONCHAIN_REPOSITORY. For them,
-// we still need decimals. How are we gonna do that?
-pub async fn get_decimals(
-    pool: &deadpool_diesel::postgres::Pool,
-    pair: &Pair,
-) -> Result<u32, InfraError> {
-    let conn = pool.get().await.map_err(adapt_infra_error)?;
-
-    let (quote, base) = pair.as_tuple();
-
-    // Fetch currency in DB
-    let quote_decimals: BigDecimal = conn
-        .interact(move |conn| {
-            currencies::table
-                .filter(currencies::name.eq(quote))
-                .select(currencies::decimals)
-                .first::<BigDecimal>(conn)
-        })
-        .await
-        .map_err(adapt_infra_error)?
-        .map_err(adapt_infra_error)?;
-    let base_decimals: BigDecimal = conn
-        .interact(move |conn| {
-            currencies::table
-                .filter(currencies::name.eq(base))
-                .select(currencies::decimals)
-                .first::<BigDecimal>(conn)
-        })
-        .await
-        .map_err(adapt_infra_error)?
-        .map_err(adapt_infra_error)?;
-
-    // Take the minimum of the two
-    let decimals = std::cmp::min(
-        quote_decimals.to_u32().unwrap(),
-        base_decimals.to_u32().unwrap(),
-    );
-
-    Ok(decimals)
 }
 
 pub async fn get_last_updated_timestamp(

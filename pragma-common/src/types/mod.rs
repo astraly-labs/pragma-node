@@ -21,7 +21,20 @@ pub enum AggregationMode {
     Twap,
 }
 
-#[derive(Default, Debug, Serialize, Deserialize, ToSchema, Clone, Copy, Display, EnumString)]
+#[derive(
+    Default,
+    Debug,
+    Serialize,
+    Deserialize,
+    ToSchema,
+    Clone,
+    Copy,
+    Display,
+    EnumString,
+    PartialEq,
+    Eq,
+    Hash,
+)]
 #[strum(serialize_all = "lowercase")]
 pub enum Network {
     #[default]

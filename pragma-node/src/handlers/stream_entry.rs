@@ -177,31 +177,23 @@ async fn get_historical_entries(
     let start_timestamp = end_timestamp.saturating_sub(count as u64 * interval.to_seconds() as u64);
 
     // Get entries based on aggregation mode
-    let (entries, decimals) = match routing_params.aggregation_mode {
-        AggregationMode::Median => {
-            let entries = entry_repository::get_median_prices_between(
-                &state.offchain_pool,
-                pair.to_pair_id(),
-                routing_params.clone(),
-                start_timestamp,
-                end_timestamp,
-            )
-            .await
-            .map_err(|e| e.to_entry_error(&pair.to_pair_id()))?;
-
-            let decimals = entry_repository::get_decimals(&state.offchain_pool, pair)
-                .await
-                .map_err(|e| e.to_entry_error(&pair.to_pair_id()))?;
-
-            (entries, decimals)
-        }
+    let entries = match routing_params.aggregation_mode {
+        AggregationMode::Median => entry_repository::get_median_prices_between(
+            &state.offchain_pool,
+            pair.to_pair_id(),
+            routing_params.clone(),
+            start_timestamp,
+            end_timestamp,
+        )
+        .await
+        .map_err(|e| e.to_entry_error(&pair.to_pair_id()))?,
         AggregationMode::Mean | AggregationMode::Twap => unreachable!(),
     };
 
     let responses: Vec<GetEntryResponse> = entries
         .into_iter()
         .take(count)
-        .map(|entry| adapt_entry_to_entry_response(pair.to_pair_id(), &entry, decimals, entry.time))
+        .map(|entry| adapt_entry_to_entry_response(pair.to_pair_id(), &entry, entry.time))
         .collect();
 
     Ok(responses)
@@ -217,10 +209,9 @@ async fn get_latest_entry(
     let mut new_routing = routing_params.clone();
     new_routing.timestamp = chrono::Utc::now().timestamp();
 
-    let (entry, decimals) =
-        entry_repository::routing(&state.offchain_pool, is_routing, pair, &new_routing)
-            .await
-            .map_err(|e| e.to_entry_error(&(pair.to_pair_id())))?;
+    let entry = entry_repository::routing(&state.offchain_pool, is_routing, pair, &new_routing)
+        .await
+        .map_err(|e| e.to_entry_error(&(pair.to_pair_id())))?;
 
     let last_updated_timestamp = entry_repository::get_last_updated_timestamp(
         &state.offchain_pool,
@@ -233,7 +224,6 @@ async fn get_latest_entry(
     Ok(adapt_entry_to_entry_response(
         pair.to_pair_id(),
         &entry,
-        decimals,
         last_updated_timestamp,
     ))
 }

@@ -1,7 +1,10 @@
+use std::collections::HashMap;
+
 use bigdecimal::BigDecimal;
 use chrono::{DateTime, NaiveDateTime};
 use deadpool_diesel::postgres::Pool;
 use diesel::{prelude::QueryableByName, RunQueryDsl};
+use moka::future::Cache;
 use serde::Serialize;
 
 use pragma_common::types::pair::Pair;
@@ -10,21 +13,22 @@ use pragma_common::types::{DataType, Interval, Network};
 use pragma_entities::error::{adapt_infra_error, InfraError};
 
 use super::entry::{get_existing_pairs, onchain_pair_exist};
-use super::get_onchain_aggregate_table_name;
+use super::{get_onchain_aggregate_table_name, get_onchain_decimals};
+use crate::constants::currencies::ABSTRACT_CURRENCIES;
+use crate::infra::rpc::RpcClients;
 use crate::utils::{convert_via_quote, normalize_to_decimals};
-
-// TODO(decimals): This is no longer valid and we should find a new approach.
-use crate::infra::repositories::entry_repository::get_decimals;
 
 /// Query the onchain database for historical entries and if entries
 /// are found, query the offchain database to get the pair decimals.
+#[allow(clippy::implicit_hasher)]
 pub async fn get_historical_entries_and_decimals(
     onchain_pool: &Pool,
-    offchain_pool: &Pool,
     network: Network,
     pair: &Pair,
     timestamp_range: &TimestampRange,
     chunk_interval: Interval,
+    decimals_cache: &Cache<Network, HashMap<String, u32>>,
+    rpc_clients: &RpcClients,
 ) -> Result<(Vec<HistoricalEntryRaw>, u32), InfraError> {
     let raw_entries: Vec<HistoricalEntryRaw> = get_historical_aggregated_entries(
         onchain_pool,
@@ -39,7 +43,8 @@ pub async fn get_historical_entries_and_decimals(
         return Err(InfraError::NotFound);
     }
 
-    let decimals = get_decimals(offchain_pool, pair).await?;
+    let decimals = get_onchain_decimals(decimals_cache, rpc_clients, network, pair).await?;
+
     Ok((raw_entries, decimals))
 }
 
@@ -114,50 +119,46 @@ async fn get_historical_aggregated_entries(
 ///       once we have proper E2E tests, we should try to merge the code.
 /// NOTE: We let the possibility to try 1min intervals but they rarely works.
 /// Entries rarely align perfectly, causing insufficient data for routing.
+#[allow(clippy::implicit_hasher)]
 pub async fn retry_with_routing(
     onchain_pool: &Pool,
-    offchain_pool: &Pool,
     network: Network,
     pair: &Pair,
     timestamp_range: &TimestampRange,
     chunk_interval: Interval,
+    decimals_cache: &Cache<Network, HashMap<String, u32>>,
+    rpc_clients: &RpcClients,
 ) -> Result<(Vec<HistoricalEntryRaw>, u32), InfraError> {
-    let offchain_conn = offchain_pool.get().await.map_err(adapt_infra_error)?;
-
     // TODO(decimals): How do we get abstract currencies now?
     // Do we just create a constant with known currencies? There should not be much.
     // Just: USD, EUR, BTC, USDPLUS.
-    let alternative_currencies = offchain_conn
-        .interact(Currency::get_abstract_all)
-        .await
-        .map_err(adapt_infra_error)?
-        .map_err(adapt_infra_error)?;
-
     let existing_pairs = get_existing_pairs(onchain_pool, network).await?;
 
-    for alt_currency in alternative_currencies {
-        let base_alt_pair = Pair::from((pair.base.clone(), alt_currency.clone()));
-        let alt_quote_pair = Pair::from((pair.quote.clone(), alt_currency.clone()));
+    for alt_currency in ABSTRACT_CURRENCIES {
+        let base_alt_pair = Pair::from((pair.base.clone(), alt_currency.to_string()));
+        let alt_quote_pair = Pair::from((pair.quote.clone(), alt_currency.to_string()));
 
         if onchain_pair_exist(&existing_pairs, &base_alt_pair.to_string())
             && onchain_pair_exist(&existing_pairs, &alt_quote_pair.to_string())
         {
             let base_alt_result = get_historical_entries_and_decimals(
                 onchain_pool,
-                offchain_pool,
                 network,
                 &base_alt_pair,
                 timestamp_range,
                 chunk_interval,
+                decimals_cache,
+                rpc_clients,
             )
             .await?;
             let alt_quote_result = get_historical_entries_and_decimals(
                 onchain_pool,
-                offchain_pool,
                 network,
                 &alt_quote_pair,
                 timestamp_range,
                 chunk_interval,
+                decimals_cache,
+                rpc_clients,
             )
             .await?;
 

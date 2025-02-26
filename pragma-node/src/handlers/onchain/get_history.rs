@@ -64,11 +64,12 @@ pub async fn get_onchain_history(
     // We first try to get the historical entries for the selected pair
     let query_result = get_historical_entries_and_decimals(
         &state.onchain_pool,
-        &state.offchain_pool,
         network,
         &pair,
         &timestamp_range,
         chunk_interval,
+        state.caches.onchain_decimals(),
+        &state.rpc_clients,
     )
     .await;
 
@@ -80,11 +81,12 @@ pub async fn get_onchain_history(
         Err(_) if with_routing => {
             retry_with_routing(
                 &state.onchain_pool,
-                &state.offchain_pool,
                 network,
                 &pair,
                 &timestamp_range,
                 chunk_interval,
+                state.caches.onchain_decimals(),
+                &state.rpc_clients,
             )
             .await?
         }

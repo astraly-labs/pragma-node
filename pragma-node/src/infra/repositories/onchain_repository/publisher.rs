@@ -4,15 +4,18 @@ use bigdecimal::BigDecimal;
 use deadpool_diesel::postgres::Pool;
 use diesel::sql_types::{BigInt, Integer, Numeric, Timestamp, VarChar};
 use diesel::{Queryable, QueryableByName, RunQueryDsl};
-
+use futures::future::try_join_all;
 use moka::future::Cache;
+
+use pragma_common::types::pair::Pair;
 use pragma_common::types::{DataType, Network};
 use pragma_entities::error::{adapt_infra_error, InfraError};
 
 use crate::handlers::onchain::get_publishers::{Publisher, PublisherEntry};
-use crate::utils::{big_decimal_price_to_hex, get_decimals_for_pair};
+use crate::infra::rpc::RpcClients;
+use crate::utils::big_decimal_price_to_hex;
 
-use super::get_onchain_table_name;
+use super::{get_onchain_decimals, get_onchain_table_name};
 
 #[derive(Debug, Queryable, QueryableByName)]
 pub struct RawPublisher {
@@ -72,18 +75,25 @@ pub struct RawLastPublisherEntryForPair {
 }
 
 impl RawLastPublisherEntryForPair {
-    pub fn to_publisher_entry<S: ::std::hash::BuildHasher>(
+    pub async fn to_publisher_entry(
         &self,
-        currencies: &HashMap<String, BigDecimal, S>,
-    ) -> PublisherEntry {
-        PublisherEntry {
+        network: Network,
+        decimals_cache: &Cache<Network, HashMap<String, u32>>,
+        rpc_clients: &RpcClients,
+    ) -> Result<PublisherEntry, InfraError> {
+        let pair = Pair::from(self.pair_id.as_str());
+        let decimals = get_onchain_decimals(decimals_cache, rpc_clients, network, &pair).await?;
+
+        let entry = PublisherEntry {
             pair_id: self.pair_id.clone(),
             last_updated_timestamp: self.last_updated_timestamp.and_utc().timestamp() as u64,
             price: big_decimal_price_to_hex(&self.price),
             source: self.source.clone(),
-            decimals: get_decimals_for_pair(currencies, &self.pair_id),
+            decimals,
             daily_updates: self.daily_updates as u32,
-        }
+        };
+
+        Ok(entry)
     }
 }
 
@@ -103,7 +113,7 @@ async fn get_all_publishers_updates(
     pool: &Pool,
     table_name: &str,
     publishers_names: Vec<String>,
-    publishers_updates_cache: Cache<String, HashMap<String, RawPublisherUpdates>>,
+    publishers_updates_cache: &Cache<String, HashMap<String, RawPublisherUpdates>>,
 ) -> Result<HashMap<String, RawPublisherUpdates>, InfraError> {
     let publishers_list = publishers_names.join("','");
 
@@ -152,12 +162,14 @@ async fn get_all_publishers_updates(
     Ok(updates)
 }
 
-async fn get_publisher_with_components<S: ::std::hash::BuildHasher>(
+async fn get_publisher_with_components(
     pool: &Pool,
+    network: Network,
     table_name: &str,
     publisher: &RawPublisher,
     publisher_updates: &RawPublisherUpdates,
-    currencies: &HashMap<String, BigDecimal, S>,
+    decimals_cache: &Cache<Network, HashMap<String, u32>>,
+    rpc_clients: &RpcClients,
 ) -> Result<Publisher, InfraError> {
     let raw_sql_entries = format!(
         r#"
@@ -211,10 +223,15 @@ async fn get_publisher_with_components<S: ::std::hash::BuildHasher>(
         .map_err(adapt_infra_error)?
         .map_err(adapt_infra_error)?;
 
-    let components: Vec<PublisherEntry> = raw_components
-        .into_iter()
-        .map(|component| component.to_publisher_entry(currencies))
+    let component_futures: Vec<_> = raw_components
+        .iter()
+        .map(|component| component.to_publisher_entry(network, decimals_cache, rpc_clients))
         .collect();
+
+    // Execute all futures concurrently and collect results
+    let components = try_join_all(component_futures)
+        .await
+        .map_err(|_| InfraError::NotFound)?;
 
     let last_updated_timestamp = components
         .iter()
@@ -236,13 +253,14 @@ async fn get_publisher_with_components<S: ::std::hash::BuildHasher>(
 }
 
 #[allow(clippy::implicit_hasher)]
-pub async fn get_publishers_with_components<S: ::std::hash::BuildHasher>(
+pub async fn get_publishers_with_components(
     pool: &Pool,
     network: Network,
     data_type: DataType,
-    currencies: HashMap<String, BigDecimal, S>,
     publishers: Vec<RawPublisher>,
-    publishers_updates_cache: Cache<String, HashMap<String, RawPublisherUpdates>>,
+    publishers_updates_cache: &Cache<String, HashMap<String, RawPublisherUpdates>>,
+    decimals_cache: &Cache<Network, HashMap<String, u32>>,
+    rpc_clients: &RpcClients,
 ) -> Result<Vec<Publisher>, InfraError> {
     let table_name = get_onchain_table_name(network, data_type)?;
     let publisher_names = publishers.iter().map(|p| p.name.clone()).collect();
@@ -261,10 +279,12 @@ pub async fn get_publishers_with_components<S: ::std::hash::BuildHasher>(
         }
         let publisher_with_components = get_publisher_with_components(
             pool,
+            network,
             table_name,
             publisher,
             publisher_updates,
-            &currencies,
+            decimals_cache,
+            rpc_clients,
         )
         .await?;
         publishers_response.push(publisher_with_components);

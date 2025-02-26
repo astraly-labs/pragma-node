@@ -66,25 +66,18 @@ pub async fn get_volatility(
         return Err(EntryError::UnknownPairId(pair.to_pair_id()));
     }
 
-    let decimals = entry_repository::get_decimals(&state.offchain_pool, &pair).await?;
-
-    Ok(Json(adapt_entry_to_entry_response(
-        pair.into(),
-        &entries,
-        decimals,
-    )))
+    Ok(Json(adapt_entry_to_entry_response(pair.into(), &entries)))
 }
 
 fn adapt_entry_to_entry_response(
     pair_id: String,
     entries: &[MedianEntry],
-    decimals: u32,
 ) -> GetVolatilityResponse {
     let volatility = compute_volatility(entries);
 
     GetVolatilityResponse {
         pair_id,
         volatility,
-        decimals,
+        decimals: 18,
     }
 }

@@ -11,24 +11,22 @@ pub use aws::PragmaSignerBuilder;
 pub use conversion::{convert_via_quote, format_bigdecimal_price, normalize_to_decimals};
 pub use custom_extractors::path_extractor::PathExtractor;
 pub use kafka::publish_to_kafka;
-use moka::future::Cache;
-use pragma_common::types::entries::Entry;
-use pragma_common::types::pair::Pair;
-use pragma_entities::dto::Publisher;
 pub use ws::*;
-
-use std::collections::HashMap;
 
 use bigdecimal::num_bigint::ToBigInt;
 use bigdecimal::{BigDecimal, ToPrimitive};
 use chrono::NaiveDateTime;
 use deadpool_diesel::postgres::Pool;
+use moka::future::Cache;
+use starknet_crypto::{Felt, Signature};
+
+use pragma_common::types::entries::Entry;
 use pragma_common::types::Network;
+use pragma_entities::dto::Publisher;
 use pragma_entities::{
     convert_timestamp_to_datetime, Entry as EntityEntry, EntryError, FutureEntry, NewEntry,
     PublisherError,
 };
-use starknet_crypto::{Felt, Signature};
 
 use crate::infra::repositories::publisher_repository;
 use crate::infra::repositories::{
@@ -36,22 +34,6 @@ use crate::infra::repositories::{
 };
 
 const ONE_YEAR_IN_SECONDS: f64 = 3_153_600_f64;
-
-/// From a map of currencies and their decimals, returns the number of decimals for a given pair.
-/// If the currency is not found in the map, the default value is 8.
-pub(crate) fn get_decimals_for_pair<S: ::std::hash::BuildHasher>(
-    currencies: &HashMap<String, BigDecimal, S>,
-    pair_id: &str,
-) -> u32 {
-    let pair = Pair::from(pair_id);
-    let base_decimals = currencies
-        .get(&pair.base)
-        .map_or(8, |d| d.to_u32().unwrap_or(8));
-    let quote_decimals = currencies
-        .get(&pair.quote)
-        .map_or(8, |d| d.to_u32().unwrap_or(8));
-    std::cmp::min(base_decimals, quote_decimals)
-}
 
 /// Returns the mid price between two prices.
 pub fn get_mid_price(low: &BigDecimal, high: &BigDecimal) -> BigDecimal {

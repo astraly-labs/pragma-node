@@ -7,8 +7,8 @@ use pragma_entities::CheckpointError;
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToResponse, ToSchema};
 
-use crate::infra::repositories::entry_repository::get_decimals;
 use crate::infra::repositories::onchain_repository::checkpoint::get_checkpoints;
+use crate::infra::repositories::onchain_repository::get_onchain_decimals;
 use crate::utils::PathExtractor;
 use crate::AppState;
 
@@ -66,9 +66,14 @@ pub async fn get_onchain_checkpoints(
         return Err(CheckpointError::InvalidLimit(limit));
     }
 
-    let decimals = get_decimals(&state.offchain_pool, &pair)
-        .await
-        .map_err(CheckpointError::from)?;
+    let decimals = get_onchain_decimals(
+        state.caches.onchain_decimals(),
+        &state.rpc_clients,
+        params.network,
+        &pair,
+    )
+    .await
+    .map_err(CheckpointError::from)?;
 
     let checkpoints = get_checkpoints(
         &state.onchain_pool,

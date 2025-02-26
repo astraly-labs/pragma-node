@@ -11,6 +11,7 @@ pub mod utils;
 use dashmap::DashMap;
 use dotenvy::dotenv;
 use handlers::publish_entry_ws::PublisherSession;
+use infra::rpc::{init_rpc_clients, RpcClients};
 use metrics::MetricsRegistry;
 use std::fmt;
 use std::sync::Arc;
@@ -29,6 +30,8 @@ pub struct AppState {
     // Databases pools
     offchain_pool: Pool,
     onchain_pool: Pool,
+    // Starknet RPC clients for mainnet & sepolia
+    rpc_clients: RpcClients,
     // Database caches
     caches: Arc<CacheRegistry>,
     // Pragma Signer used for StarkEx signing
@@ -59,6 +62,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap_or_else(|_| "http://signoz.dev.pragma.build:4317".to_string());
     pragma_common::telemetry::init_telemetry("pragma-node".into(), otel_endpoint, None)?;
 
+    // Init config from env variables
     let config = config().await;
 
     // Init the database pools
@@ -88,6 +92,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         pragma_signer,
         metrics: MetricsRegistry::new(),
         publisher_sessions: Arc::new(DashMap::new()),
+        rpc_clients: init_rpc_clients(),
     };
 
     server::run_api_server(config, state).await;
