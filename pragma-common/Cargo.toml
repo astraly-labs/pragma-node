@@ -13,13 +13,10 @@ keywords = ["pragma", "sdk", "consumer", "data", "feeds"]
 workspace = true
 
 [dependencies]
-axum = { workspace = true }
 bigdecimal = { workspace = true, features = ["serde"] }
 cainome = { workspace = true }
 chrono = { workspace = true }
 color-eyre = { workspace = true }
-deadpool-diesel = { workspace = true }
-futures-util = { workspace = true }
 indexmap = { workspace = true }
 opentelemetry = { workspace = true }
 opentelemetry-appender-tracing = { workspace = true }
@@ -32,12 +29,10 @@ starknet = { workspace = true }
 starknet-crypto = { workspace = true }
 strum = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true }
-tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-opentelemetry = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
 utoipa = { workspace = true }
-uuid = { workspace = true }
 
 [dev-dependencies]
 rstest = { workspace = true }

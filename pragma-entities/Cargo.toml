@@ -19,7 +19,6 @@ diesel = { workspace = true, features = [
   "postgres_backend",
 ] }
 diesel_migrations = { workspace = true }
-redis = { workspace = true, features = ["tokio-comp", "json"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true, features = ["arbitrary_precision"] }
 starknet = { workspace = true }

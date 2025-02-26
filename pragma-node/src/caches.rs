@@ -2,11 +2,9 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use moka::future::Cache;
-use pragma_common::types::merkle_tree::MerkleTree;
 use pragma_entities::dto::Publisher;
 
 use crate::constants::caches::{
-    MERKLE_FEED_TREE_CACHE_TIME_TO_IDLE_IN_SECONDS, MERKLE_FEED_TREE_CACHE_TIME_TO_LIVE_IN_SECONDS,
     PUBLISHERS_CACHE_TIME_TO_IDLE_IN_SECONDS, PUBLISHERS_CACHE_TIME_TO_LIVE_IN_SECONDS,
     PUBLISHERS_UDPATES_CACHE_TIME_TO_IDLE_IN_SECONDS,
     PUBLISHERS_UDPATES_CACHE_TIME_TO_LIVE_IN_SECONDS,
@@ -19,7 +17,6 @@ use crate::infra::repositories::onchain_repository::publisher::RawPublisherUpdat
 #[derive(Clone, Debug)]
 pub struct CacheRegistry {
     onchain_publishers_updates: Cache<String, HashMap<String, RawPublisherUpdates>>,
-    merkle_feed_tree: Cache<u64, MerkleTree>,
     publishers: Cache<String, Publisher>,
 }
 
@@ -41,15 +38,6 @@ impl CacheRegistry {
             )) // 5 minutes
             .build();
 
-        let merkle_feed_tree_cache = Cache::builder()
-            .time_to_live(Duration::from_secs(
-                MERKLE_FEED_TREE_CACHE_TIME_TO_LIVE_IN_SECONDS,
-            ))
-            .time_to_idle(Duration::from_secs(
-                MERKLE_FEED_TREE_CACHE_TIME_TO_IDLE_IN_SECONDS,
-            ))
-            .build();
-
         let publishers_cache = Cache::builder()
             .time_to_live(Duration::from_secs(
                 PUBLISHERS_CACHE_TIME_TO_LIVE_IN_SECONDS,
@@ -61,7 +49,6 @@ impl CacheRegistry {
 
         Self {
             onchain_publishers_updates: onchain_publishers_updates_cache,
-            merkle_feed_tree: merkle_feed_tree_cache,
             publishers: publishers_cache,
         }
     }
@@ -70,10 +57,6 @@ impl CacheRegistry {
         &self,
     ) -> &Cache<String, HashMap<String, RawPublisherUpdates>> {
         &self.onchain_publishers_updates
-    }
-
-    pub const fn merkle_feeds_tree(&self) -> &Cache<u64, MerkleTree> {
-        &self.merkle_feed_tree
     }
 
     pub const fn publishers(&self) -> &Cache<String, Publisher> {

@@ -61,8 +61,8 @@ pub async fn run_api_server(config: &Config, state: AppState) {
 
     // Uncomment to generate openapi.json
     // TODO: move to a separate bin
-    // let json = ApiDoc::openapi().to_json().unwrap();
-    // std::fs::write("openapi.json", json).unwrap();
+    let json = ApiDoc::openapi().to_json().unwrap();
+    std::fs::write("openapi.json", json).unwrap();
 
     let app = app_router::<ApiDoc>(state.clone())
         .with_state(state)

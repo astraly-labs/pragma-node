@@ -29,8 +29,6 @@ pub struct AppState {
     // Databases pools
     offchain_pool: Pool,
     onchain_pool: Pool,
-    // Redis connection
-    redis_client: Option<Arc<redis::Client>>,
     // Database caches
     caches: Arc<CacheRegistry>,
     // Pragma Signer used for StarkEx signing
@@ -44,7 +42,6 @@ pub struct AppState {
 impl fmt::Debug for AppState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("AppState")
-            .field("redis_client", &self.redis_client)
             .field("caches", &self.caches)
             .field("pragma_signer", &self.pragma_signer)
             .field("metrics", &self.metrics)
@@ -84,23 +81,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     let pragma_signer = signer_builder.build().await;
 
-    // Init the redis client - Optionnal, only for endpoints that interact with Redis,
-    // i.e just the Merkle Feeds endpoint for now.
-    let redis_client =
-        pragma_entities::connection::init_redis_client(config.redis_host(), config.redis_port())
-            .map_or_else(
-                |_| {
-                    tracing::warn!(
-                        "⚠ Could not create the Redis client. Merkle feeds endpoints won't work."
-                    );
-                    None
-                },
-                |client| Some(Arc::new(client)),
-            );
     let state = AppState {
         offchain_pool,
         onchain_pool,
-        redis_client,
         caches: Arc::new(caches),
         pragma_signer,
         metrics: MetricsRegistry::new(),

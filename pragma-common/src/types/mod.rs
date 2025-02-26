@@ -1,9 +1,6 @@
 pub mod auth;
-pub mod block_id;
 pub mod entries;
 pub mod hex_hash;
-pub mod merkle_tree;
-pub mod options;
 pub mod pair;
 pub mod timestamp;
 pub mod typed_data;
