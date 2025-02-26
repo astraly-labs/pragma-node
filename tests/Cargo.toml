@@ -39,3 +39,5 @@ testcontainers-modules = { workspace = true, features = [
 ] }
 serial_test = { workspace = true }
 bigdecimal = { workspace = true }
+rand ={ workspace = true }
+chrono ={ workspace = true }

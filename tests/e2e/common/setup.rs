@@ -56,6 +56,25 @@ impl TestHelper {
             .expect("Failed to execute SQL query");
     }
 
+    pub async fn execute_sql_many(&self, pool: &Pool, sql_many: Vec<String>) {
+        for sql in sql_many {
+            self.execute_sql(pool, sql).await;
+        }
+    }
+
+    pub async fn push_strk(&self, pool: &Pool) {
+        self.execute_sql(
+            pool,
+            r#"
+                INSERT INTO
+                    public.currencies (name, decimals, abstract, ethereum_address)
+                VALUES
+                    ('STRK', 8, false, NULL)"#
+                .to_string(),
+        )
+        .await;
+    }
+
     /// Refreshes a TimescaleDB continuous aggregate materialized view around a specific timestamp.
     /// The refreshed view will be automatically found depending on the interval + aggregation mode.
     /// NOTE: It does not work with future entries for now since we don't care for our tests yet.
@@ -69,14 +88,20 @@ impl TestHelper {
         let interval_spec = get_interval_specifier(interval, is_twap);
         let window_size = get_window_size(interval);
 
+        let table_name = if matches!(aggregation, AggregationMode::Twap) {
+            "twap"
+        } else {
+            "price"
+        };
+
         let sql = format!(
             r#"
             CALL refresh_continuous_aggregate(
-                'price_{}_agg',
+                '{}_{}_agg',
                 to_timestamp({} - {}),
                 to_timestamp({} + {})
             );"#,
-            interval_spec, timestamp, window_size, timestamp, window_size
+            table_name, interval_spec, timestamp, window_size, timestamp, window_size
         );
 
         self.execute_sql(&self.offchain_pool, sql).await;
