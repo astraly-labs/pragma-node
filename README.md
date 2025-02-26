@@ -46,10 +46,6 @@ This library contains the models and functions common to different services.
 
 This library contains models and DTOs related to the entities used in the services and Pragma's database.
 
-### Pragma Consumer
-
-SDK allowing a user to retrieve data from our Merkle feeds. See [the repository](./pragma-consumer) for more information.
-
 # Services Structure
 
 The project follows a modular structure to keep the code organized and maintainable. Here's a brief overview of the project structure:
@@ -92,16 +88,6 @@ The project follows a modular structure to keep the code organized and maintaina
 - `src/`: Contains the main source code of the application.
   - `lib.rs`: Defines the library's entry point.
   - `tracing.rs`: Defines common tracing logic.
-
-### Pragma Consumer
-
-- `src/`: Contains the main source code of the SDK.
-  - `lib.rs`: Defines the SDK's entry point.
-  - `builder.rs`: Defines how the Pragma Consumer client is built,
-  - `constants.rs`: General constants, mainly for endpoints,
-  - `consumer.rs`: Main logic that consumes data from our API,
-  - `types.rs`: Contains the `MerkleFeedCalldata` definition.
-- `examples/`: Contains a crate example showcasing how to use the SDK.
 
 ## Development
 
@@ -163,8 +149,12 @@ PGPASSWORD=test-password pg_restore -h postgre-db -U postgres -d pragma /backup.
 
 ### 3. Export the required environment variables:
 
+Either create a `.env` variable following the `.env.example` or export the required variables:
+
 ```bash
 export MODE=dev
+export MAINNET_RPC_URL=https://free-rpc.nethermind.io/mainnet-juno
+export SEPOLIA_RPC_URL=https://free-rpc.nethermind.io/sepolia-juno
 export OFFCHAIN_DATABASE_URL="postgres://postgres:test-password@0.0.0.0:5432/pragma"
 export ONCHAIN_DATABASE_URL="postgres://postgres:test-password@0.0.0.0:5433/pragma"
 export DATABASE_MAX_CONN=5

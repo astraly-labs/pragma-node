@@ -1,9 +1,6 @@
 pub mod auth;
-pub mod block_id;
 pub mod entries;
 pub mod hex_hash;
-pub mod merkle_tree;
-pub mod options;
 pub mod pair;
 pub mod timestamp;
 pub mod typed_data;
@@ -24,7 +21,20 @@ pub enum AggregationMode {
     Twap,
 }
 
-#[derive(Default, Debug, Serialize, Deserialize, ToSchema, Clone, Copy, Display, EnumString)]
+#[derive(
+    Default,
+    Debug,
+    Serialize,
+    Deserialize,
+    ToSchema,
+    Clone,
+    Copy,
+    Display,
+    EnumString,
+    PartialEq,
+    Eq,
+    Hash,
+)]
 #[strum(serialize_all = "lowercase")]
 pub enum Network {
     #[default]

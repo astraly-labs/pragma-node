@@ -30,7 +30,7 @@ RUN cargo chef cook --profile release --recipe-path recipe.json
 
 COPY . .
 
-RUN cargo build --locked --release
+RUN cargo build --locked --release --workspace --exclude tests
 
 FROM debian:bullseye-slim AS final
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \

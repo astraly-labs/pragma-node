@@ -80,9 +80,14 @@ pub async fn get_onchain_entry(
         is_routing: params.routing.unwrap_or(false),
     };
 
-    let raw_data = routing(&state.onchain_pool, &state.offchain_pool, routing_arguments)
-        .await
-        .map_err(|db_error| db_error.to_entry_error(&pair.to_pair_id()))?;
+    let raw_data = routing(
+        &state.onchain_pool,
+        routing_arguments,
+        &state.rpc_clients,
+        state.caches.onchain_decimals(),
+    )
+    .await
+    .map_err(|db_error| db_error.to_entry_error(&pair.to_pair_id()))?;
 
     let entry = raw_data
         .first()

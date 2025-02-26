@@ -7,6 +7,9 @@ edition = "2021"
 workspace = true
 
 [dependencies]
+pragma-common = { workspace = true }
+pragma-entities = { workspace = true }
+
 deadpool-diesel = { workspace = true, features = ["postgres"] }
 dotenvy = { workspace = true }
 envy = { workspace = true }
@@ -17,6 +20,3 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 tracing = { workspace = true }
-
-pragma-common = { path = "../pragma-common", version = "0.1.0" }
-pragma-entities = { path = "../pragma-entities", version = "0.1.0" }

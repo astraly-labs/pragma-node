@@ -6,12 +6,14 @@ use axum::extract::ws::{WebSocket, WebSocketUpgrade};
 use axum::extract::{ConnectInfo, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
-use bigdecimal::BigDecimal;
 use serde::{Deserialize, Serialize};
+use utoipa::{ToResponse, ToSchema};
 
+use pragma_common::signing::sign_data;
+use pragma_common::signing::starkex::StarkexPrice;
+use pragma_common::types::timestamp::UnixTimestamp;
 use pragma_common::types::DataType;
 use pragma_entities::EntryError;
-use utoipa::{ToResponse, ToSchema};
 
 use crate::constants::starkex_ws::PRAGMA_ORACLE_NAME_FOR_STARKEX;
 use crate::infra::repositories::entry_repository::MedianEntryWithComponents;
@@ -19,9 +21,6 @@ use crate::utils::only_existing_pairs;
 use crate::utils::pricer::{IndexPricer, MarkPricer, Pricer};
 use crate::utils::{ChannelHandler, Subscriber, SubscriptionType};
 use crate::AppState;
-use pragma_common::signing::sign_data;
-use pragma_common::signing::starkex::StarkexPrice;
-use pragma_common::types::timestamp::UnixTimestamp;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
 pub struct SignedPublisherPrice {
@@ -58,9 +57,6 @@ pub async fn subscribe_to_entry(
     ws.on_upgrade(move |socket| create_new_subscriber(socket, state, client_addr))
 }
 
-/// Interval in milliseconds that the channel will update the client with the latest prices.
-const CHANNEL_UPDATE_INTERVAL_IN_MS: u64 = 500;
-
 #[tracing::instrument(
     skip(socket, app_state),
     fields(
@@ -69,6 +65,9 @@ const CHANNEL_UPDATE_INTERVAL_IN_MS: u64 = 500;
     )
 )]
 async fn create_new_subscriber(socket: WebSocket, app_state: AppState, client_addr: SocketAddr) {
+    /// Interval in milliseconds that the channel will update the client with the latest prices.
+    const CHANNEL_UPDATE_INTERVAL_IN_MS: u64 = 500;
+
     let (mut subscriber, _) = match Subscriber::<SubscriptionState>::new(
         "subscribe_to_entry".into(),
         socket,
@@ -211,16 +210,12 @@ impl WsEntriesHandler {
 
         for entry in median_entries {
             let pair_id = entry.pair_id.clone();
-            // Scale price from 8 decimals to 18 decimals for StarkEx
-            // TODO: dont hardcode the decimals, deduce it from the currency decimals
-            let price_with_18_decimals =
-                entry.median_price.clone() * BigDecimal::from(10_u64.pow(10));
 
             let starkex_price = StarkexPrice {
                 oracle_name: PRAGMA_ORACLE_NAME_FOR_STARKEX.to_string(),
                 pair_id: pair_id.clone(),
                 timestamp: now as u64,
-                price: price_with_18_decimals.clone(),
+                price: entry.median_price.clone(),
             };
             let signature =
                 sign_data(pragma_signer, &starkex_price).map_err(|_| EntryError::InvalidSigner)?;

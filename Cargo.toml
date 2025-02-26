@@ -5,7 +5,6 @@ members = [
   "pragma-ingestor",
   "pragma-entities",
   "pragma-common",
-  "pragma-consumer",
   "tests",
 ]
 
@@ -48,6 +47,10 @@ or_fun_call = "allow"
 redundant_pub_crate = "allow"
 
 [workspace.dependencies]
+pragma-common = { path = "./pragma-common" }
+pragma-entities = { path = "./pragma-entities" }
+pragma-ingestor = { path = "./pragma-ingestor" }
+pragma-node = { path = "./pragma-node" }
 color-eyre = "0.6.3"
 aws-config = { version = "1.5.1", features = ["behavior-version-latest"] }
 aws-sdk-secretsmanager = "1.32.0"
@@ -82,21 +85,15 @@ serde = { version = "1.0.204", features = ["derive"] }
 moka = { version = "0.12", features = ["future"] }
 nonzero_ext = { version = "0.3.0" }
 serde_json = { version = "1.0.122", features = ["arbitrary_precision"] }
-starknet = "0.12.0"
-starknet-crypto = "0.7.3"
-quote = "1.0.37"
-redis = { version = "0.26.1", features = ["json", "tokio-comp"] }
+starknet = "0.13.0"
+starknet-crypto = "0.7.4"
 reqwest = { version = "0.12.5", features = ["blocking"] }
 rdkafka = "0.36.2"
-time = "0.3.29"
 thiserror = "1.0.49"
 strum = { version = "0.26", features = ["derive"] }
-tracing-test = "0.2.5"
 url = "2.5.0"
-tower = { version = "0.5" }
 tower-http = { version = "0.6.2", features = ["fs", "trace", "cors"] }
 tokio = { version = "^1.43.0", features = ["full"] }
-toml = "0.8.8"
 utoipa = { version = "5.0.0", features = ["axum_extras", "chrono", "uuid"] }
 utoipauto = "0.1.14"
 utoipa-swagger-ui = { version = "8.0.3", features = ["axum"] }
@@ -127,8 +124,9 @@ pragma-monitoring = { git = "https://github.com/astraly-labs/pragma-monitoring" 
 
 # Test dependencies
 rstest = "0.18.2"
-httpmock = { version = "0.7.0" }
+serial_test = "3.2.0"
 testcontainers = { version = "0.21.1" }
+tracing-test = "0.2.5"
 testcontainers-modules = { version = "0.9.0", features = [
   "postgres",
   "kafka",
@@ -136,3 +134,4 @@ testcontainers-modules = { version = "0.9.0", features = [
   "http_wait",
 ] }
 pretty_assertions = "1.4.0"
+rand = "0.9.0"

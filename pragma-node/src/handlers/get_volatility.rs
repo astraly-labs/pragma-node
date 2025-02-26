@@ -4,6 +4,7 @@ use pragma_common::types::pair::Pair;
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToResponse, ToSchema};
 
+use crate::constants::PRAGMA_DECIMALS;
 use crate::infra::repositories::entry_repository::{self, MedianEntry};
 use crate::utils::PathExtractor;
 use crate::AppState;
@@ -66,25 +67,18 @@ pub async fn get_volatility(
         return Err(EntryError::UnknownPairId(pair.to_pair_id()));
     }
 
-    let decimals = entry_repository::get_decimals(&state.offchain_pool, &pair).await?;
-
-    Ok(Json(adapt_entry_to_entry_response(
-        pair.into(),
-        &entries,
-        decimals,
-    )))
+    Ok(Json(adapt_entry_to_entry_response(pair.into(), &entries)))
 }
 
 fn adapt_entry_to_entry_response(
     pair_id: String,
     entries: &[MedianEntry],
-    decimals: u32,
 ) -> GetVolatilityResponse {
     let volatility = compute_volatility(entries);
 
     GetVolatilityResponse {
         pair_id,
         volatility,
-        decimals,
+        decimals: PRAGMA_DECIMALS,
     }
 }

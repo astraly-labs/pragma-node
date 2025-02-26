@@ -1,9 +1,7 @@
-use std::collections::HashMap;
-
-use bigdecimal::{BigDecimal, ToPrimitive};
+use bigdecimal::BigDecimal;
 use deadpool_diesel::postgres::Pool;
 use pragma_common::types::DataType;
-use pragma_entities::{Currency, EntryError};
+use pragma_entities::EntryError;
 
 use crate::infra::repositories::entry_repository::{
     get_current_median_entries_with_components, MedianEntryWithComponents,
@@ -80,32 +78,6 @@ impl MarkPricer {
         stablecoins_index_pricer.compute(db_pool).await
     }
 
-    /// Retrieves the number of decimals for quote stablecoins.
-    /// Example: ["BTC/USDT", "ETH/USDT"] -> {"USDT": 6}
-    #[tracing::instrument(skip(db_pool))]
-    async fn get_stablecoins_decimals(
-        db_pool: &Pool,
-        stablecoin_pairs: Vec<String>,
-    ) -> Result<HashMap<String, BigDecimal>, EntryError> {
-        let conn = db_pool
-            .get()
-            .await
-            .map_err(|_| EntryError::InternalServerError)?;
-        let stablecoins_names: Vec<String> = stablecoin_pairs
-            .iter()
-            // safe unwrap since we know the pairs are formatted "XXX/YYY"
-            .map(|pair| pair.split('/').last().unwrap().to_string())
-            .collect();
-        let decimals = conn
-            .interact(move |conn| Currency::get_decimals_for(conn, stablecoins_names))
-            .await
-            .expect("Couldn't get the decimals for the stablecoins")
-            .expect("Couldn't get table result")
-            .into_iter()
-            .collect();
-        Ok(decimals)
-    }
-
     /// Computes the non USD quoted pairs median entries.
     #[tracing::instrument(skip(db_pool), fields(pairs_count = pairs.len()))]
     async fn get_pairs_entries(
@@ -118,27 +90,16 @@ impl MarkPricer {
     }
 
     /// Given the median price of a perp pair, the median price of the spot
-    /// stablecoin/USD pair and the number of decimals of the stablecoin, computes
-    /// the mark price.
+    /// stablecoin/USD pair, computes the mark price.
     #[tracing::instrument]
-    fn compute_mark_price(
-        perp_pair_price: &BigDecimal,
-        spot_usd_price: &BigDecimal,
-        decimals: &BigDecimal,
-    ) -> BigDecimal {
-        let decimals_as_u32 = decimals
-            .to_u32()
-            .ok_or(EntryError::InternalServerError)
-            .unwrap();
-        let scaler = BigDecimal::from(10_u32.pow(decimals_as_u32));
-        let spot_usd_price = spot_usd_price / scaler;
+    fn compute_mark_price(perp_pair_price: &BigDecimal, spot_usd_price: &BigDecimal) -> BigDecimal {
         perp_pair_price / spot_usd_price
     }
 
     /// Builds the complete list of entries from the median price of the spot
     /// stablecoin/USD pairs and the median price of the perp pairs.
     #[tracing::instrument(
-        skip(stablecoins_spot_entries, stablecoins_decimals, pairs_perp_entries),
+        skip(stablecoins_spot_entries, pairs_perp_entries),
         fields(
             spot_entries = stablecoins_spot_entries.len(),
             perp_entries = pairs_perp_entries.len()
@@ -146,7 +107,6 @@ impl MarkPricer {
     )]
     pub fn merge_entries_from(
         stablecoins_spot_entries: Vec<MedianEntryWithComponents>,
-        stablecoins_decimals: HashMap<String, BigDecimal>,
         pairs_perp_entries: Vec<MedianEntryWithComponents>,
     ) -> Result<Vec<MedianEntryWithComponents>, EntryError> {
         let mut merged_entries = vec![];
@@ -164,9 +124,6 @@ impl MarkPricer {
             let mark_price = Self::compute_mark_price(
                 &perp_median_entry.median_price,
                 &spot_usd_median_entry.median_price,
-                stablecoins_decimals
-                    .get(stable_coin_name)
-                    .ok_or(EntryError::InternalServerError)?,
             );
 
             let mut components = perp_median_entry.components;
@@ -202,17 +159,10 @@ impl Pricer for MarkPricer {
         if self.pairs.is_empty() {
             return Ok(vec![]);
         }
-        let (stablecoins_spot_entries, stablecoins_decimals, pairs_perp_entries) = tokio::join!(
+        let (stablecoins_spot_entries, pairs_perp_entries) = tokio::join!(
             Self::get_stablecoins_index_entries(db_pool, &self.pairs),
-            // TODO: currently, we retrieve the decimals everytime for every loop
-            // but we should not: they won't change.
-            Self::get_stablecoins_decimals(db_pool, self.pairs.clone()),
             Self::get_pairs_entries(db_pool, &self.pairs, self.pair_type)
         );
-        Self::merge_entries_from(
-            stablecoins_spot_entries?,
-            stablecoins_decimals?,
-            pairs_perp_entries?,
-        )
+        Self::merge_entries_from(stablecoins_spot_entries?, pairs_perp_entries?)
     }
 }

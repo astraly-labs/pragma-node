@@ -9,3 +9,6 @@ format:
 
 test:
 	cargo nextest run
+
+test-integration-local:
+	PRAGMA_NODE_MODE=local cargo nextest run

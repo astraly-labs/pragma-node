@@ -6,7 +6,6 @@ use pragma_entities::EntryError;
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToResponse, ToSchema};
 
-use crate::infra::repositories::entry_repository::get_all_currencies_decimals;
 use crate::infra::repositories::onchain_repository::publisher::{
     get_publishers, get_publishers_with_components,
 };
@@ -62,17 +61,14 @@ pub async fn get_onchain_publishers(
         .await
         .map_err(EntryError::from)?;
 
-    let currencies_decimals = get_all_currencies_decimals(&state.offchain_pool)
-        .await
-        .map_err(EntryError::from)?;
-
     let publishers_with_components = get_publishers_with_components(
         &state.onchain_pool,
         params.network,
         params.data_type,
-        currencies_decimals,
         publishers,
-        state.caches.onchain_publishers_updates().clone(),
+        state.caches.onchain_publishers_updates(),
+        state.caches.onchain_decimals(),
+        &state.rpc_clients,
     )
     .await
     .map_err(EntryError::from)?;

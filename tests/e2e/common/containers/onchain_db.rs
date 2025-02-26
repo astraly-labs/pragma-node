@@ -26,12 +26,7 @@ pub async fn setup_onchain_db() -> ContainerAsync<Timescale> {
 }
 
 pub async fn run_onchain_migrations(db_pool: &Pool) {
-    let migrations_folder = current_dir()
-        .unwrap()
-        .join("..")
-        .join("infra")
-        .join("pragma-node")
-        .join("postgres_migrations");
+    let migrations_folder = current_dir().unwrap().join("..").join("sql");
 
     run_migrations(db_pool, migrations_folder).await;
 }

@@ -5,9 +5,6 @@ use axum::Router;
 use utoipa::OpenApi as OpenApiT;
 // use utoipa_swagger_ui::SwaggerUi;
 
-use crate::handlers::merkle_feeds::{
-    get_merkle_proof::get_merkle_feeds_proof, get_option::get_merkle_feeds_option,
-};
 use crate::handlers::onchain::{
     get_checkpoints::get_onchain_checkpoints, get_entry::get_onchain_entry,
     get_history::get_onchain_history, get_publishers::get_onchain_publishers,
@@ -36,7 +33,6 @@ pub fn app_router<T: OpenApiT>(state: AppState) -> Router<AppState> {
         .nest("/node/v1/onchain", onchain_routes(state.clone()))
         .nest("/node/v1/aggregation", aggregation_routes(state.clone()))
         .nest("/node/v1/volatility", volatility_routes(state.clone()))
-        .nest("/node/v1/merkle_feeds", merkle_feeds_routes(state.clone()))
         .nest("/node/v1/optimistic", optimistic_oracle_routes(state))
         .fallback(handler_404)
 }
@@ -84,13 +80,6 @@ fn volatility_routes(state: AppState) -> Router<AppState> {
 fn aggregation_routes(state: AppState) -> Router<AppState> {
     Router::new()
         .route("/candlestick/{base}/{quote}", get(get_ohlc))
-        .with_state(state)
-}
-
-fn merkle_feeds_routes(state: AppState) -> Router<AppState> {
-    Router::new()
-        .route("/proof/{option_hash}", get(get_merkle_feeds_proof))
-        .route("/options/{instrument}", get(get_merkle_feeds_option))
         .with_state(state)
 }
 

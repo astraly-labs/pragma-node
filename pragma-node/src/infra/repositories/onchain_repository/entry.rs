@@ -4,21 +4,21 @@ use bigdecimal::{BigDecimal, ToPrimitive, Zero};
 use deadpool_diesel::postgres::Pool;
 use diesel::sql_types::{Numeric, Text, Timestamp, VarChar};
 use diesel::{Queryable, QueryableByName, RunQueryDsl};
+use moka::future::Cache;
 
 use pragma_common::types::pair::Pair;
 use pragma_common::types::{AggregationMode, DataType, Interval, Network};
 use pragma_entities::error::{adapt_infra_error, InfraError};
-use pragma_entities::Currency;
 use pragma_monitoring::models::SpotEntry;
 
+use crate::constants::currencies::ABSTRACT_CURRENCIES;
 use crate::handlers::onchain::get_entry::OnchainEntry;
+use crate::infra::rpc::RpcClients;
 use crate::utils::{
     big_decimal_price_to_hex, convert_via_quote, get_mid_price, normalize_to_decimals,
 };
 
-use super::{get_onchain_ohlc_table_name, get_onchain_table_name};
-
-use crate::infra::repositories::entry_repository::get_decimals;
+use super::{get_onchain_decimals, get_onchain_ohlc_table_name, get_onchain_table_name};
 
 // Means that we only consider the entries for the last hour when computing the aggregation &
 // retrieving the sources.
@@ -72,10 +72,12 @@ impl From<&SpotEntryWithAggregatedPrice> for OnchainEntry {
     }
 }
 
+#[allow(clippy::implicit_hasher)]
 pub async fn routing(
     onchain_pool: &Pool,
-    offchain_pool: &Pool,
     routing_args: OnchainRoutingArguments,
+    rpc_clients: &RpcClients,
+    decimals_cache: &Cache<Network, HashMap<String, u32>>,
 ) -> Result<Vec<RawOnchainData>, InfraError> {
     let pair_id = routing_args.pair_id;
     let is_routing = routing_args.is_routing;
@@ -94,7 +96,9 @@ pub async fn routing(
         .await?;
         if !prices_and_entries.is_empty() {
             let pair = Pair::from(pair_id.clone());
-            let decimal = get_decimals(offchain_pool, &pair).await?;
+            let decimal =
+                get_onchain_decimals(decimals_cache, rpc_clients, routing_args.network, &pair)
+                    .await?;
             for row in prices_and_entries {
                 result.push(RawOnchainData {
                     price: row.aggregated_price,
@@ -110,18 +114,10 @@ pub async fn routing(
         return Err(InfraError::NotFound);
     }
 
-    let offchain_conn = offchain_pool.get().await.map_err(adapt_infra_error)?;
-
-    let alternative_currencies = offchain_conn
-        .interact(Currency::get_abstract_all)
-        .await
-        .map_err(adapt_infra_error)?
-        .map_err(adapt_infra_error)?;
-
     // safe unwrap since we construct the pairs string in calling function
     let (base, quote) = pair_id.split_once('/').unwrap();
 
-    for alt_currency in alternative_currencies {
+    for alt_currency in ABSTRACT_CURRENCIES {
         let base_alt_pair = format!("{base}/{alt_currency}");
         let alt_quote_pair = format!("{quote}/{alt_currency}");
 
@@ -136,8 +132,13 @@ pub async fn routing(
                 routing_args.aggregation_mode,
             )
             .await?;
-            let base_alt_decimal =
-                get_decimals(offchain_pool, &Pair::from(base_alt_pair.clone())).await?;
+            let base_alt_decimal = get_onchain_decimals(
+                decimals_cache,
+                rpc_clients,
+                routing_args.network,
+                &Pair::from(base_alt_pair.clone()),
+            )
+            .await?;
             let quote_alt_result = get_sources_and_aggregate(
                 onchain_pool,
                 routing_args.network,
@@ -146,8 +147,13 @@ pub async fn routing(
                 routing_args.aggregation_mode,
             )
             .await?;
-            let quote_alt_decimal =
-                get_decimals(offchain_pool, &Pair::from(alt_quote_pair.clone())).await?;
+            let quote_alt_decimal = get_onchain_decimals(
+                decimals_cache,
+                rpc_clients,
+                routing_args.network,
+                &Pair::from(alt_quote_pair.clone()),
+            )
+            .await?;
 
             let result = compute_multiple_rebased_price(
                 &mut base_alt_result,

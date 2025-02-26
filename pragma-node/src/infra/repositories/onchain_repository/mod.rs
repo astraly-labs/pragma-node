@@ -4,10 +4,53 @@ pub mod history;
 pub mod ohlc;
 pub mod publisher;
 
-use crate::is_enum_variant;
-use crate::utils::sql::get_interval_specifier;
-use pragma_common::types::{DataType, Interval, Network};
+use std::collections::HashMap;
+
+use moka::future::Cache;
+
+use pragma_common::types::{pair::Pair, DataType, Interval, Network};
 use pragma_entities::error::InfraError;
+
+use crate::utils::sql::get_interval_specifier;
+use crate::{
+    infra::rpc::{call_get_decimals, RpcClients},
+    is_enum_variant,
+};
+
+/// Retrieves the on-chain decimals for the provided network & pair.
+pub(crate) async fn get_onchain_decimals(
+    decimals_cache: &Cache<Network, HashMap<String, u32>>,
+    rpc_clients: &RpcClients,
+    network: Network,
+    pair: &Pair,
+) -> Result<u32, InfraError> {
+    let pair_id = pair.to_pair_id();
+
+    // Try to get decimals from cache first
+    if let Some(network_decimals) = decimals_cache.get(&network).await {
+        if let Some(decimals) = network_decimals.get(&pair_id) {
+            return Ok(*decimals);
+        }
+    }
+
+    // If not found in cache, call RPC
+    let Some(rpc_client) = rpc_clients.get(&network) else {
+        return Err(InfraError::InternalServerError);
+    };
+    let decimals = call_get_decimals(rpc_client, pair, network).await?;
+
+    // Update cache with the new decimals
+    let network_decimals = decimals_cache.get(&network).await.unwrap_or_default();
+    let mut updated_network_decimals = network_decimals.clone();
+    updated_network_decimals.insert(pair_id, decimals);
+
+    // Insert updated cache
+    decimals_cache
+        .insert(network, updated_network_decimals)
+        .await;
+
+    Ok(decimals)
+}
 
 /// Retrieve the onchain table name based on the network and data type.
 pub(crate) const fn get_onchain_table_name(

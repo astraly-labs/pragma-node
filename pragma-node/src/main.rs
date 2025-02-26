@@ -11,6 +11,7 @@ pub mod utils;
 use dashmap::DashMap;
 use dotenvy::dotenv;
 use handlers::publish_entry_ws::PublisherSession;
+use infra::rpc::{init_rpc_clients, RpcClients};
 use metrics::MetricsRegistry;
 use std::fmt;
 use std::sync::Arc;
@@ -29,8 +30,8 @@ pub struct AppState {
     // Databases pools
     offchain_pool: Pool,
     onchain_pool: Pool,
-    // Redis connection
-    redis_client: Option<Arc<redis::Client>>,
+    // Starknet RPC clients for mainnet & sepolia
+    rpc_clients: RpcClients,
     // Database caches
     caches: Arc<CacheRegistry>,
     // Pragma Signer used for StarkEx signing
@@ -44,7 +45,6 @@ pub struct AppState {
 impl fmt::Debug for AppState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("AppState")
-            .field("redis_client", &self.redis_client)
             .field("caches", &self.caches)
             .field("pragma_signer", &self.pragma_signer)
             .field("metrics", &self.metrics)
@@ -62,6 +62,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap_or_else(|_| "http://signoz.dev.pragma.build:4317".to_string());
     pragma_common::telemetry::init_telemetry("pragma-node".into(), otel_endpoint, None)?;
 
+    // Init config from env variables
     let config = config().await;
 
     // Init the database pools
@@ -84,27 +85,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     let pragma_signer = signer_builder.build().await;
 
-    // Init the redis client - Optionnal, only for endpoints that interact with Redis,
-    // i.e just the Merkle Feeds endpoint for now.
-    let redis_client =
-        pragma_entities::connection::init_redis_client(config.redis_host(), config.redis_port())
-            .map_or_else(
-                |_| {
-                    tracing::warn!(
-                        "⚠ Could not create the Redis client. Merkle feeds endpoints won't work."
-                    );
-                    None
-                },
-                |client| Some(Arc::new(client)),
-            );
     let state = AppState {
         offchain_pool,
         onchain_pool,
-        redis_client,
         caches: Arc::new(caches),
         pragma_signer,
         metrics: MetricsRegistry::new(),
         publisher_sessions: Arc::new(DashMap::new()),
+        rpc_clients: init_rpc_clients(),
     };
 
     server::run_api_server(config, state).await;

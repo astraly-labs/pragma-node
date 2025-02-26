@@ -7,10 +7,13 @@
 pub const PUBLISHERS_UDPATES_CACHE_TIME_TO_LIVE_IN_SECONDS: u64 = 20 * 60; // 20 minutes
 pub const PUBLISHERS_UDPATES_CACHE_TIME_TO_IDLE_IN_SECONDS: u64 = 5 * 60; // 5 minutes
 
-/// Cache of the stored Merkle Tree for a certain block in Redis.
-/// Since this value never change we can cache it for faster iterations.
-pub const MERKLE_FEED_TREE_CACHE_TIME_TO_LIVE_IN_SECONDS: u64 = 6 * 60; // 6 minutes
-pub const MERKLE_FEED_TREE_CACHE_TIME_TO_IDLE_IN_SECONDS: u64 = 60; // 1 minutes
+/// Cache of the onchain decimals.
+///
+/// In pragma-node, every decimals are 18 but this is not the case for onchain entries.
+/// So we use this cache to fetch RPC results & store decimals for a specific `pair_id`
+/// for a given network.
+/// The values don't change often at all so we use 24 hours.
+pub const DECIMALS_TIME_TO_LIVE_IN_SECONDS: u64 = 86400; // 24 hours
 
 /// Cache of the stored publishers in memory.
 /// This cache is used to retrieve the `Publisher` object from the database
