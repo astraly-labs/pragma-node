@@ -8,7 +8,6 @@ use diesel::{Queryable, QueryableByName, RunQueryDsl};
 use pragma_common::types::pair::Pair;
 use pragma_common::types::{AggregationMode, DataType, Interval, Network};
 use pragma_entities::error::{adapt_infra_error, InfraError};
-use pragma_entities::Currency;
 use pragma_monitoring::models::SpotEntry;
 
 use crate::handlers::onchain::get_entry::OnchainEntry;
@@ -18,6 +17,7 @@ use crate::utils::{
 
 use super::{get_onchain_ohlc_table_name, get_onchain_table_name};
 
+// TODO(decimals): This is no longer valid and we should find a new approach.
 use crate::infra::repositories::entry_repository::get_decimals;
 
 // Means that we only consider the entries for the last hour when computing the aggregation &
@@ -112,6 +112,9 @@ pub async fn routing(
 
     let offchain_conn = offchain_pool.get().await.map_err(adapt_infra_error)?;
 
+    // TODO(decimals): How do we get abstract currencies now?
+    // Do we just create a constant with known currencies? There should not be much.
+    // Just: USD, EUR, BTC, USDPLUS.
     let alternative_currencies = offchain_conn
         .interact(Currency::get_abstract_all)
         .await

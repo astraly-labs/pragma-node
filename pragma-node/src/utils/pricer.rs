@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use bigdecimal::{BigDecimal, ToPrimitive};
 use deadpool_diesel::postgres::Pool;
 use pragma_common::types::DataType;
-use pragma_entities::{Currency, EntryError};
+use pragma_entities::EntryError;
 
 use crate::infra::repositories::entry_repository::{
     get_current_median_entries_with_components, MedianEntryWithComponents,
@@ -96,6 +96,8 @@ impl MarkPricer {
             // safe unwrap since we know the pairs are formatted "XXX/YYY"
             .map(|pair| pair.split('/').last().unwrap().to_string())
             .collect();
+
+        // TODO(decimals): Now it's gonna be 18 decimals for all currencies
         let decimals = conn
             .interact(move |conn| Currency::get_decimals_for(conn, stablecoins_names))
             .await

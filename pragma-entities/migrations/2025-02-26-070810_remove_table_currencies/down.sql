@@ -1,0 +1,27 @@
+-- This file should undo anything in `up.sql`
+CREATE TABLE currencies (
+    id uuid DEFAULT uuid_generate_v4(),
+    name VARCHAR NOT NULL,
+    decimals NUMERIC NOT NULL,
+    abstract BOOLEAN NOT NULL,
+    ethereum_address VARCHAR,
+    PRIMARY KEY (id)
+);
+
+-- initialize
+INSERT INTO public.currencies (name, decimals, abstract, ethereum_address) VALUES
+('BTC', 8, true, NULL),
+('ETH', 18, false, NULL),
+('USD', 8, true, NULL),
+('EUR', 8, true, NULL),
+('WBTC', 8, false, '0x2260FAC5E5542A773AA44FBCFEDF7C193BC2C599'),
+('USDC', 6, false, '0xA0B86991C6218B36C1D19D4A2E9EB0CE3606EB48'),
+('USDT', 6, false, '0xDAC17F958D2EE523A2206206994597C13D831EC7'),
+('DAI', 18, false, '0x6B175474E89094C44DA98B954EEDEAC495271D0F'),
+('LORDS', 18, false, '0x686F2404E77AB0D9070A46CDFB0B7FECDD2318B0'),
+('R', 18, false, '0x183015A9BA6FF60230FDEADC3F43B3D788B13E21'),
+('WSTETH', 18, false, '0x7F39C581F595B53C5CB19BD0B3F8DA6C935E2CA0'),
+('TON', 9, false, '0x582D872A1B094FC48F5DE31D3B73F2D9BE47DEF1'),
+('JTO', 9, false, NULL),
+('OKB', 18, false, '0x75231F58B43240C9718DD58B4967C5114342A86C'),
+('1000SATS', 8, false, NULL);

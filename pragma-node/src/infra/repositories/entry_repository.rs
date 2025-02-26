@@ -4,7 +4,7 @@ use bigdecimal::{BigDecimal, FromPrimitive, ToPrimitive};
 use chrono::{DateTime, NaiveDateTime};
 use diesel::prelude::QueryableByName;
 use diesel::sql_types::{Double, Jsonb, VarChar};
-use diesel::{ExpressionMethods, QueryDsl, Queryable, RunQueryDsl};
+use diesel::{Queryable, RunQueryDsl};
 use pragma_common::errors::ConversionError;
 use pragma_common::types::pair::Pair;
 use serde::{Deserialize, Serialize};
@@ -25,8 +25,7 @@ use pragma_common::signing::starkex::StarkexPrice;
 use pragma_common::types::{AggregationMode, DataType, Interval};
 use pragma_entities::{
     error::{adapt_infra_error, InfraError},
-    schema::currencies,
-    Currency, Entry,
+    Entry,
 };
 
 #[derive(Debug, Serialize, Queryable)]
@@ -137,6 +136,9 @@ async fn find_alternative_pair_price(
 ) -> Result<(MedianEntry, u32), InfraError> {
     let conn = pool.get().await.map_err(adapt_infra_error)?;
 
+    // TODO(decimals): How do we get abstract currencies now?
+    // Do we just create a constant with known currencies? There should not be much.
+    // Just: USD, EUR, BTC, USDPLUS.
     let alternative_currencies = conn
         .interact(Currency::get_abstract_all)
         .await
@@ -196,6 +198,7 @@ async fn get_price_and_decimals(
     Ok((entry, decimals))
 }
 
+// TODO(decimals): Should return 18 for all decimals
 pub async fn get_all_currencies_decimals(
     pool: &deadpool_diesel::postgres::Pool,
 ) -> Result<HashMap<String, BigDecimal>, InfraError> {
@@ -512,6 +515,9 @@ pub async fn get_twap_prices_between(
     Ok(entries)
 }
 
+// TODO(decimals): Gonna be deleted - now we want 18 decimals for all currencies.
+// NOTE: This was also used in the ONCHAIN_REPOSITORY. For them,
+// we still need decimals. How are we gonna do that?
 pub async fn get_decimals(
     pool: &deadpool_diesel::postgres::Pool,
     pair: &Pair,

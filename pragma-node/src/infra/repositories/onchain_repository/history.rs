@@ -2,19 +2,19 @@ use bigdecimal::BigDecimal;
 use chrono::{DateTime, NaiveDateTime};
 use deadpool_diesel::postgres::Pool;
 use diesel::{prelude::QueryableByName, RunQueryDsl};
-
-use pragma_common::types::pair::Pair;
-use pragma_common::types::{DataType, Interval, Network};
-use pragma_entities::error::{adapt_infra_error, InfraError};
-use pragma_entities::Currency;
 use serde::Serialize;
 
-use crate::infra::repositories::entry_repository::get_decimals;
-use crate::utils::{convert_via_quote, normalize_to_decimals};
+use pragma_common::types::pair::Pair;
 use pragma_common::types::timestamp::TimestampRange;
+use pragma_common::types::{DataType, Interval, Network};
+use pragma_entities::error::{adapt_infra_error, InfraError};
 
 use super::entry::{get_existing_pairs, onchain_pair_exist};
 use super::get_onchain_aggregate_table_name;
+use crate::utils::{convert_via_quote, normalize_to_decimals};
+
+// TODO(decimals): This is no longer valid and we should find a new approach.
+use crate::infra::repositories::entry_repository::get_decimals;
 
 /// Query the onchain database for historical entries and if entries
 /// are found, query the offchain database to get the pair decimals.
@@ -123,6 +123,10 @@ pub async fn retry_with_routing(
     chunk_interval: Interval,
 ) -> Result<(Vec<HistoricalEntryRaw>, u32), InfraError> {
     let offchain_conn = offchain_pool.get().await.map_err(adapt_infra_error)?;
+
+    // TODO(decimals): How do we get abstract currencies now?
+    // Do we just create a constant with known currencies? There should not be much.
+    // Just: USD, EUR, BTC, USDPLUS.
     let alternative_currencies = offchain_conn
         .interact(Currency::get_abstract_all)
         .await
