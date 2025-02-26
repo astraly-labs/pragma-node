@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::HashMap, env::current_dir, path::PathBuf};
+use std::{borrow::Cow, collections::HashMap, env::current_dir, path::PathBuf, time::Duration};
 
 use testcontainers::{
     core::{wait::HttpWaitStrategy, ContainerPort, IntoContainerPort, WaitFor},
@@ -6,9 +6,14 @@ use testcontainers::{
     ContainerAsync, Image, ImageExt,
 };
 
+use crate::common::containers::pragma_node::DB_PORT;
+
 use super::{
-    offchain_db::OFFCHAIN_DB_CONTAINER_NAME, onchain_db::ONCHAIN_DB_CONTAINER_NAME,
-    utils::image_builder::ImageBuilder,
+    super::{
+        offchain_db::OFFCHAIN_DB_CONTAINER_NAME, onchain_db::ONCHAIN_DB_CONTAINER_NAME,
+        utils::image_builder::ImageBuilder,
+    },
+    METRICS_PORT, SERVER_PORT,
 };
 
 const PRAGMA_NODE_BUILD_NAME: &str = "pragma-node-e2e";
@@ -16,12 +21,8 @@ const TAG: &str = "latest";
 
 const PRAGMA_NODE_CONTAINER_NAME: &str = "pragma-node-container";
 
-pub const SERVER_PORT: u16 = 3000;
-const METRICS_PORT: u16 = 8080;
-const DB_PORT: u16 = 5432;
-
 #[rstest::fixture]
-pub async fn setup_pragma_node() -> ContainerAsync<PragmaNode> {
+pub async fn setup_pragma_node_with_docker() -> ContainerAsync<PragmaNode> {
     // 1. Build the pragma-node image
     ImageBuilder::default()
         .with_build_name(PRAGMA_NODE_BUILD_NAME)
@@ -40,6 +41,7 @@ pub async fn setup_pragma_node() -> ContainerAsync<PragmaNode> {
         .with_mapped_port(METRICS_PORT, METRICS_PORT.tcp())
         .with_network("pragma-tests-network")
         .with_container_name(PRAGMA_NODE_CONTAINER_NAME)
+        .with_startup_timeout(Duration::from_secs(1200)) // 20 minutes
         .start()
         .await
         .unwrap()

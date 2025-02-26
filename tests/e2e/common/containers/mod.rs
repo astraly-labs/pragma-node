@@ -7,7 +7,7 @@ pub mod zookeeper;
 
 use std::sync::Arc;
 
-use pragma_node::PragmaNode;
+use pragma_node::docker::PragmaNode;
 use testcontainers::ContainerAsync;
 use testcontainers_modules::{kafka::Kafka, postgres::Postgres, zookeeper::Zookeeper};
 
@@ -22,5 +22,5 @@ pub struct Containers {
     pub onchain_db: Arc<ContainerAsync<Timescale>>,
     pub zookeeper: Arc<ContainerAsync<Zookeeper>>,
     pub kafka: Arc<ContainerAsync<Kafka>>,
-    pub pragma_node: Arc<ContainerAsync<PragmaNode>>,
+    pub pragma_node: Option<Arc<ContainerAsync<PragmaNode>>>,
 }
