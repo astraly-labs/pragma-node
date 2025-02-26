@@ -7,9 +7,9 @@ pub fn get_pair_price(pair: &str) -> u128 {
     let price = match pair {
         "BTC/USD" => 88000.0, // 88 000$
         "ETH/USD" => 2700.0, // 2700$
-        "SOL/USD" => 130.0, // 130$
+        "DAI/USD" => 130.0, // 130$
         "STRK/USD" => 0.2, // 0,2$
-        "DOGE/USD" => 0.2, // 0,2$
+        "LORDS/USD" => 0.2, // 0,2$
         _ => panic!("Pair not found, add it to the const PAIRS"),
     };
 

@@ -150,8 +150,7 @@ async fn get_entry_median_ok_many(
     let expected_price_hex = format!("0x{price:x}");
 
     let threshold = BigDecimal::from_f64(VARIATION_PERCENTAGE).unwrap();
-    // NOTE: approx_percentile of timescaledb returns an approximative value for the median.
-    // So we just check if the price we have is in ~1% bonds.
+
     assert_hex_prices_within_threshold!(&response.price, &expected_price_hex, threshold);
 }
 
@@ -167,7 +166,7 @@ async fn get_entry_twap_many_ok(
     let mut hlpr = setup_containers.await;
 
     // 1. Insert one entry
-    let pair_id = "STRK/USD";
+    let pair_id = "ETH/USD";
     let current_timestamp: u64 = chrono::Utc::now().timestamp() as u64;
     let price: u128 = populate::get_pair_price(pair_id);
     let sql_many = populate::generate_entries(1000, current_timestamp);
@@ -186,7 +185,7 @@ async fn get_entry_twap_many_ok(
 
     // 3. Call the endpoint
     let endpoint = get_entry_endpoint(
-        "STRK",
+        "ETH",
         "USD",
         GetEntryRequestParams::new()
             .with_timestamp(current_timestamp)
@@ -211,8 +210,7 @@ async fn get_entry_twap_many_ok(
     let expected_price_hex = format!("0x{price:x}");
 
     let threshold = BigDecimal::from_f64(VARIATION_PERCENTAGE).unwrap();
-    // NOTE: approx_percentile of timescaledb returns an approximative value for the median.
-    // So we just check if the price we have is in ~1% bonds.
+
     assert_hex_prices_within_threshold!(&response.price, &expected_price_hex, threshold);
 }
 
@@ -228,7 +226,7 @@ async fn get_entry_twap_routing_many_ok(
     let mut hlpr = setup_containers.await;
 
     // 1. Insert one entry
-    let pair_id = "STRK/USD";
+    let pair_id = "ETH/USD";
     let current_timestamp: u64 = chrono::Utc::now().timestamp() as u64;
     let price: u128 = populate::get_pair_price(pair_id);
     let sql_many = populate::generate_entries(1000, current_timestamp);
@@ -247,12 +245,12 @@ async fn get_entry_twap_routing_many_ok(
 
     // 3. Call the endpoint
     let endpoint = get_entry_endpoint(
-        "STRK",
+        "ETH",
         "USD",
         GetEntryRequestParams::new()
             .with_timestamp(current_timestamp)
             .with_interval(queried_interval)
-            .with_routing(true)
+            .with_routing(false)
             .with_aggregation(queried_aggregation),
     );
     tracing::info!("with endpoint: {endpoint}");
@@ -273,12 +271,11 @@ async fn get_entry_twap_routing_many_ok(
     let expected_price_hex = format!("0x{price:x}");
 
     let threshold = BigDecimal::from_f64(VARIATION_PERCENTAGE).unwrap();
-    // NOTE: approx_percentile of timescaledb returns an approximative value for the median.
-    // So we just check if the price we have is in ~1% bonds.
+
     assert_hex_prices_within_threshold!(&response.price, &expected_price_hex, threshold);
 
     let endpoint = get_entry_endpoint(
-        "STRK",
+        "ETH",
         "USD",
         GetEntryRequestParams::new()
             .with_timestamp(current_timestamp)
@@ -298,8 +295,6 @@ async fn get_entry_twap_routing_many_ok(
         .expect("Could not retrieve a valid GetEntryResponse");
 
     let threshold = BigDecimal::from_f64(VARIATION_PERCENTAGE).unwrap();
-    // NOTE: approx_percentile of timescaledb returns an approximative value for the median.
-    // So we just check if the price we have is in ~1% bonds.
     assert_hex_prices_within_threshold!(&response.price, &expected_price_hex, threshold);
 
     assert!(response.price == response_routing.price);
