@@ -1,19 +1,19 @@
-
-//use chrono;
 use rand::Rng;
 use std::ops::Range;
 
 use crate::common::constants::{EMPTY_SIGNATURE, PAIRS, SOURCES, VARIATION_PERCENTAGE};
 
 pub fn get_pair_price(pair: &str) -> u128 {
-    match pair {
-        "BTC/USD" => 88000_00000000, // 88 000$
-        "ETH/USD" => 2700_00000000, // 2700$
-        "SOL/USD" => 130_00000000, // 130$
-        "STRK/USD" => 2000000, // 0,2$
-        "DOGE/USD" => 2000000, // 0,2$
+    let price = match pair {
+        "BTC/USD" => 88000.0, // 88 000$
+        "ETH/USD" => 2700.0, // 2700$
+        "SOL/USD" => 130.0, // 130$
+        "STRK/USD" => 0.2, // 0,2$
+        "DOGE/USD" => 0.2, // 0,2$
         _ => panic!("Pair not found, add it to the const PAIRS"),
-    }
+    };
+
+    (price * 10.0_f64.powi(8)) as u128
 }
 
 pub fn generate_entries(num_entries: u32, timestamp: u64) -> Vec<String> {
@@ -54,8 +54,6 @@ pub fn generate_entry(pair: &str, source: &str, timestamp: u64) -> String {
 }
 
 pub fn entry_from(pair: &str, timestamp: u64, price: u128, source: &str) -> String {
-    tracing::info!("pair: {pair} source: {source} timestamp: {timestamp}");
-
     format!(
         r#"
         INSERT INTO entries (

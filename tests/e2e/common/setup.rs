@@ -62,6 +62,19 @@ impl TestHelper {
         }
     }
 
+    pub async fn push_strk(&self, pool: &Pool) {
+        self.execute_sql(
+            pool,
+            r#"
+                INSERT INTO
+                    public.currencies (name, decimals, abstract, ethereum_address)
+                VALUES
+                    ('STRK', 8, false, NULL)"#
+                .to_string(),
+        )
+        .await;
+    }
+
     /// Refreshes a TimescaleDB continuous aggregate materialized view around a specific timestamp.
     /// The refreshed view will be automatically found depending on the interval + aggregation mode.
     /// NOTE: It does not work with future entries for now since we don't care for our tests yet.
