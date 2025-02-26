@@ -1,33 +1,33 @@
 use rand::Rng;
 use std::ops::Range;
 
-use crate::common::constants::{EMPTY_SIGNATURE, PAIRS, SOURCES, VARIATION_PERCENTAGE};
+use crate::common::constants::{EMPTY_SIGNATURE, SOURCES, VARIATION_PERCENTAGE};
 
 pub fn get_pair_price(pair: &str) -> u128 {
     let price = match pair {
         "BTC/USD" => 88000.0, // 88 000$
         "ETH/USD" => 2700.0, // 2700$
-        "DAI/USD" => 130.0, // 130$
+        "SOL/USD" => 130.0, // 130$
         "STRK/USD" => 0.2, // 0,2$
-        "LORDS/USD" => 0.2, // 0,2$
+        "DOGE/USD" => 0.2, // 0,2$
         _ => panic!("Pair not found, add it to the const PAIRS"),
     };
 
     (price * 10.0_f64.powi(8)) as u128
 }
 
-pub fn generate_entries(num_entries: u32, timestamp: u64) -> Vec<String> {
+pub fn generate_entries(pairs: Vec<&str>, num_entries: u32, timestamp: u64) -> Vec<String> {
     let mut rng = rand::rng();
     let mut entries = Vec::with_capacity(num_entries as usize);
 
     // Generate at least one entry for each pair
-    for &pair in PAIRS {
+    for pair in &pairs {
         entries.push(generate_entry(pair, SOURCES[0], timestamp));
     }
 
     // Generate remaining random entries
-    for i in PAIRS.len()..num_entries as usize {
-        let pair = PAIRS[rng.random_range(0..PAIRS.len())];
+    for i in pairs.len()..num_entries as usize {
+        let pair = pairs[rng.random_range(0..pairs.len())];
         let source = SOURCES[i % SOURCES.len()];
         // Alterate timestamp to note have duplicate entries
         entries.push(generate_entry(pair, source, timestamp - 1 - i as u64));

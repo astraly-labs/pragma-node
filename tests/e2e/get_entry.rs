@@ -1,4 +1,4 @@
-use bigdecimal::{BigDecimal, FromPrimitive, ToPrimitive};
+use bigdecimal::{BigDecimal, FromPrimitive};
 use rstest::rstest;
 
 use pragma_common::types::{AggregationMode, Interval};
@@ -6,7 +6,11 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     assert_hex_prices_within_threshold,
-    common::{constants::VARIATION_PERCENTAGE, setup::{setup_containers, TestHelper}, utils::populate::get_pair_price},
+    common::{
+        constants::VARIATION_PERCENTAGE,
+        setup::{setup_containers, TestHelper},
+        utils::populate::get_pair_price,
+    },
 };
 
 use crate::common::utils::populate;
@@ -109,7 +113,7 @@ async fn get_entry_median_ok_many(
     let pair_id = "ETH/USD";
     let current_timestamp: u64 = chrono::Utc::now().timestamp() as u64;
     let price: u128 = populate::get_pair_price(pair_id);
-    let sql_many = populate::generate_entries(1000, current_timestamp);
+    let sql_many = populate::generate_entries(vec!["ETH/USD"], 1000, current_timestamp);
 
     hlpr.execute_sql_many(&hlpr.offchain_pool, sql_many).await;
 
@@ -169,7 +173,7 @@ async fn get_entry_twap_many_ok(
     let pair_id = "ETH/USD";
     let current_timestamp: u64 = chrono::Utc::now().timestamp() as u64;
     let price: u128 = populate::get_pair_price(pair_id);
-    let sql_many = populate::generate_entries(1000, current_timestamp);
+    let sql_many = populate::generate_entries(vec!["ETH/USD"], 1000, current_timestamp);
 
     hlpr.execute_sql_many(&hlpr.offchain_pool, sql_many).await;
 
@@ -229,7 +233,7 @@ async fn get_entry_twap_routing_many_ok(
     let pair_id = "ETH/USD";
     let current_timestamp: u64 = chrono::Utc::now().timestamp() as u64;
     let price: u128 = populate::get_pair_price(pair_id);
-    let sql_many = populate::generate_entries(1000, current_timestamp);
+    let sql_many = populate::generate_entries(vec!["ETH/USD"], 1000, current_timestamp);
 
     hlpr.execute_sql_many(&hlpr.offchain_pool, sql_many).await;
 
@@ -263,7 +267,6 @@ async fn get_entry_twap_routing_many_ok(
         .json::<GetEntryResponse>()
         .await
         .expect("Could not retrieve a valid GetEntryResponse");
-
 
     hlpr.shutdown_local_pragma_node().await;
 
@@ -316,7 +319,7 @@ async fn get_entry_twap_2hours_strk_eth_ok(
     let pair_id = "STRK/USD";
     let current_timestamp: u64 = chrono::Utc::now().timestamp() as u64;
     let price: u128 = populate::get_pair_price(pair_id);
-    let sql_many = populate::generate_entries(1000, current_timestamp);
+    let sql_many = populate::generate_entries(vec!["ETH/USD", "STRK/USD"], 1000, current_timestamp);
 
     hlpr.execute_sql_many(&hlpr.offchain_pool, sql_many).await;
 
