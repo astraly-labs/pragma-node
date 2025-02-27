@@ -14,6 +14,9 @@ The full spec is also available at [openapi.json](./openapi.json).
 
 ### Quick Setup
 
+> **Warning**
+> The script is still minimal and does not include `pulse` or other pushing services for the offchain database.
+
 Run the setup script:
 
 ```bash
@@ -31,8 +34,6 @@ git clone git@github.com:astraly-labs/indexer-service.git
 Optional environment variables:
 - `APIBARA_KEY`: will be used as your Apibara API key instead of asking for it.
 - `STARTING_BLOCK`: will be used as the indexer starting block.
-
-⚠ The script is still minimal and does not include `pulse` or other pushing services for the offchain database.
 
 ### Manual Setup
 
