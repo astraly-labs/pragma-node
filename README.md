@@ -46,7 +46,7 @@ We have `compose` file for dev purposes. It only spin ups required services for 
 docker compose -f compose.dev.yaml up -d --build
 ```
 
-#### 3. Kafka Setup
+#### 2. Kafka Setup
 
 Just make sure the topics are correctly created:
 
@@ -93,6 +93,10 @@ INSERT INTO PUBLISHERS
 ) VALUES
 (
     'YOUR_PUBLISHER_NAME', -- or any other name you want
+    
+    -- For the keys below, make sure they correspond to a correct Starknet Account.
+    -- You can generate keys using any starknet wallet.
+    -- This is needed for publishing later, since you will need your private key.
     '0x0257a51cd27e950a2ba767795446b4c6ed86116f297c820e5a7159c6b00c6ac9',
     '0x0257a51cd27e950a2ba767795446b4c6ed86116f297c820e5a7159c6b00c6ac9',
     true,
