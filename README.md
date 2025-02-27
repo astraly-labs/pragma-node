@@ -1,16 +1,18 @@
 # Pragma Node 🧩
 
-This repository contains the source code of the Pragma Node, which comprises several services and libraries:
+This repository contains the source code of the Pragma Node, a highly accurate, readily available, and fast API built on an extensive network of data providers. Pragma empowers developers to drive the evolution of next-generation applications with reliable prices and financial data at high frequency.
 
-- **Pragma Node**: Service for querying and storing data.
-- **Pragma Ingestor**: Service running to ingest data from Data Sources.
-- **Pragma Common**: Library containing common models and functions.
-- **Pragma Entities**: Library containing models/Data Transfer Objects (DTOs) and functions for entities.
-- **Pragma Offchain Service**: Offchain service aggregating and storing data from Data Providers.
+## Documentation
+
+For detailed information about API endpoints and usage, visit our documentation at [docs.pragma.build/api/overview](https://docs.pragma.build/api/overview).
+
+The Pragma Node swagger documentation is available at `http://localhost:3000/node/swagger-ui` when running locally.
+
+The full spec is also available at [openapi.json](./openapi.json).
 
 ## Getting Started
 
-Follow these steps to get started with your Rust backend project based on this template:
+Follow these steps to get started with Pragma Node:
 
 1. Clone this repository:
 
@@ -28,107 +30,53 @@ Follow these steps to get started with your Rust backend project based on this t
    cargo run
    ```
 
-# Services description
+## Development Setup
 
-### Pragma Node
+### Quick Setup
 
-The Pragma Node service allows querying and storing data within the Pragma database. It retrieves, verifies, and sends data to the Kafka service. It also provides the ability to query data stored in the database.
-
-### Pragma Ingestor
-
-This service listens on the Kafka service and stores the retrieved data in the database. It performs certain checks on the collected data.
-
-### Pragma Common
-
-This library contains the models and functions common to different services.
-
-### Pragma Entities
-
-This library contains models and DTOs related to the entities used in the services and Pragma's database.
-
-# Services Structure
-
-The project follows a modular structure to keep the code organized and maintainable. Here's a brief overview of the project structure:
-
-### Pragma Node
-
-- `src/`: Contains the main source code of the application.
-  - `handlers/`: Define your API handlers.
-  - `infra/`: Define your infrastructure logic.
-    - `kafka/`: Kafka logic.
-    - `repositories`: Repositories logic.
-  - `utils`: Defines utility functions.
-  - `config.rs`: File containing the configuration structure.
-  - `errors.rs`: Contains error kinds and error formatting logic.
-  - `main.rs`: Application's entry point.
-  - `routes.rs`: Defines application routes.
-
-### Pragma Ingestor
-
-- `src/`: Contains the main source code of the application.
-  - `main.rs`: Application's entry point.
-  - `config.rs`: File containing the configuration structure.
-  - `consumer.rs`: Defines message consumption logic.
-  - `errors.rs`: Contains error kinds and error formatting logic.
-
-### Pragma Entities
-
-- `migrations`: Contains database migrations.
-- `src/`: Contains the main source code of the application.
-  - `models/`: Defines application models.
-  - `dto/`: Defines application DTOs.
-  - `errors.rs`: Contains error kinds and error formatting logic.
-  - `schema.rs`: Defines the database schema.
-  - `connection.rs`: Defines the database connection.
-  - `db.rs`: Defines the logic for executing migrations (@TODO: To be moved).
-  - `lib.rs`: Defines the library's entry point.
-
-### Pragma Common
-
-- `src/`: Contains the main source code of the application.
-  - `lib.rs`: Defines the library's entry point.
-  - `tracing.rs`: Defines common tracing logic.
-
-## Development
-
-Simply run the setup script using:
+Run the setup script:
 
 ```bash
-# Running the script with only "sh" will fail because of syntax issues.
+# Running the script with only "sh" will fail
 bash scripts/run_dev.sh
 ```
 
 You will be prompted to either use the `indexer-service` repository or use a backup file.
-When using the `indexer` option, make sure you've clone the indexer-service repository at the same level than this repo.
+When using the `indexer` option, make sure you've cloned the indexer-service repository at the same level as this repo.
 
 ```bash
 git clone git@github.com:astraly-labs/indexer-service.git
 ```
 
-You can optionally set:
+Optional environment variables:
+- `APIBARA_KEY`: will be used as your Apibara API key instead of asking for it.
+- `STARTING_BLOCK`: will be used as the indexer starting block.
 
-- `APIBARA_KEY` : will be used as your Apibara API key instead of asking for it,
-- `STARTING_BLOCK` : will be used as the indexer starting block.
+⚠ The script is still minimal and does not include `pulse` or other pushing services for the offchain database.
 
-If you want to do the full flow manually, do the following
+### Manual Setup
 
-### 1. Start the services:
+#### 1. Start Services
+
+We have `compose` file for dev purposes. It only spin ups required services for `pragma-node` and let you run it locally using `cargo`.
 
 ```bash
 docker compose -f compose.dev.yaml up -d --build
 ```
 
-### 2. Fill the onchain database
+#### 3. Kafka Setup
 
-The database tables are created automatically using our migrations:
+Just make sure the topics are correctly created:
 
-- offchain migrations are in the `pragma-entities/migrations` folder.
-- onchain migrations are in the `infra/pragma-node/postgres_migrations` folder.
+```sh
+make init-kafka-topics
+```
 
-To fill the onchain tables with data you can either run the indexer or use a backup:
+#### 3. Database Setup
 
-#### Run the indexer:
+##### Onchain Database
 
+**Option 1: Using the indexer**
 ```bash
 git clone git@github.com:astraly-labs/indexer-service.git
 cd indexer-service
@@ -136,10 +84,9 @@ cd indexer-service
 apibara run examples/pragma/testnet/sepolia-script-spot.js -A [YOUR_APIBARA_API_KEY] --connection-string postgres://postgres:test-password@localhost:5432/pragma --table-name spot_entry --timeout-duration-seconds=240
 ```
 
-#### Use the backup (ask for a file):
-
+**Option 2: Using a backup file**
 ```bash
-# copy the backup file to the container
+# copy the backup file to the container
 docker cp /path/to/the/backup.sql pragma-node-postgre-db-1:/backup.sql
 # connect to the container
 docker exec -it pragma-node-postgre-db-1 bash
@@ -147,14 +94,47 @@ docker exec -it pragma-node-postgre-db-1 bash
 PGPASSWORD=test-password pg_restore -h postgre-db -U postgres -d pragma /backup.sql
 ```
 
-### 3. Export the required environment variables:
+##### Offchain Database
 
-Either create a `.env` variable following the `.env.example` or export the required variables:
+First, make sure that you're correctly registered as a publisher before pushing prices.
+
+You can simply execute some SQL directly into the offchain database, for example:
+
+```sql
+INSERT INTO PUBLISHERS
+(
+    name,
+    master_key,
+    active_key,
+    active,
+    account_address
+) VALUES
+(
+    'YOUR_PUBLISHER_NAME', -- or any other name you want
+    '0x0257a51cd27e950a2ba767795446b4c6ed86116f297c820e5a7159c6b00c6ac9',
+    '0x0257a51cd27e950a2ba767795446b4c6ed86116f297c820e5a7159c6b00c6ac9',
+    true,
+    '0x012322c5EA7A94cC027970694ee70e45434f1F71050e0e2D0d9DE83f1DE66945'
+);
+```
+
+Now, you can for example use `pulse`, a Pragma price-pushing service:
+
+```bash
+git clone https://github.com/astraly-labs/pulse.git
+cd pulse
+cp .env.example .env # and fill the values
+cargo run -- --config ./pulse.config.yaml
+```
+
+We also have the [python price-pusher](https://github.com/astraly-labs/pragma-sdk/tree/master/price-pusher) that should work with the API.
+
+#### 4. Environment Setup
+
+Either create a `.env` file following the `.env.example` or export the required variables:
 
 ```bash
 export MODE=dev
-export MAINNET_RPC_URL=https://free-rpc.nethermind.io/mainnet-juno
-export SEPOLIA_RPC_URL=https://free-rpc.nethermind.io/sepolia-juno
 export OFFCHAIN_DATABASE_URL="postgres://postgres:test-password@0.0.0.0:5432/pragma"
 export ONCHAIN_DATABASE_URL="postgres://postgres:test-password@0.0.0.0:5433/pragma"
 export DATABASE_MAX_CONN=5
@@ -166,10 +146,11 @@ export KAFKA_BROKERS=localhost:29092
 export OTEL_EXPORTER_OTLP_ENDPOINT=localhost:4317
 ```
 
-### 4. Start the Pragma Node service:
+
+#### 5. Start Pragma Node
+
+Now that every services are correctly running, you can run the server:
 
 ```bash
 cargo run --bin pragma-node
 ```
-
-The pragma-node swagger documentation is available at `http://localhost:3000/node/swagger-ui`.
