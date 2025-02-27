@@ -10,26 +10,6 @@ The Pragma Node swagger documentation is available at `http://localhost:3000/nod
 
 The full spec is also available at [openapi.json](./openapi.json).
 
-## Getting Started
-
-Follow these steps to get started with Pragma Node:
-
-1. Clone this repository:
-
-   ```bash
-   git clone https://github.com/astraly-labs/pragma-node.git
-   ```
-
-2. Choose a specific module/framework branch or work with the default configuration.
-
-3. Customize the project to your needs.
-
-4. Build and run your Rust backend:
-
-   ```bash
-   cargo run
-   ```
-
 ## Development Setup
 
 ### Quick Setup
