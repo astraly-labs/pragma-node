@@ -14,9 +14,6 @@ The full spec is also available at [openapi.json](./openapi.json).
 
 ### Quick Setup
 
-> **Warning**
-> 
-
 > [!NOTE]
 > The script is still minimal and does not include `pulse` or other pushing services for the offchain database.
 > But it will work fine for the onchain database.
