@@ -56,7 +56,7 @@ make init-kafka-topics
 
 #### 3. Database Setup
 
-##### Onchain Database
+#### Onchain Database
 
 **Option 1: Using the indexer**
 ```bash
@@ -76,7 +76,7 @@ docker exec -it pragma-node-postgre-db-1 bash
 PGPASSWORD=test-password pg_restore -h postgre-db -U postgres -d pragma /backup.sql
 ```
 
-##### Offchain Database
+#### Offchain Database
 
 First, make sure that you're correctly registered as a publisher before pushing prices.
 
@@ -129,6 +129,7 @@ export HOST="0.0.0.0"
 export PORT=3000
 export METRICS_PORT=8080
 export KAFKA_BROKERS=localhost:29092
+# Optional but allows you to export OTEL logs anywhere
 export OTEL_EXPORTER_OTLP_ENDPOINT=localhost:4317
 ```
 
