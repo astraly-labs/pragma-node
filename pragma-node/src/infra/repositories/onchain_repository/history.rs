@@ -3,14 +3,14 @@ use std::collections::HashMap;
 use bigdecimal::BigDecimal;
 use chrono::{DateTime, NaiveDateTime};
 use deadpool_diesel::postgres::Pool;
-use diesel::{prelude::QueryableByName, RunQueryDsl};
+use diesel::{RunQueryDsl, prelude::QueryableByName};
 use moka::future::Cache;
 use serde::Serialize;
 
 use pragma_common::types::pair::Pair;
 use pragma_common::types::timestamp::TimestampRange;
 use pragma_common::types::{DataType, Interval, Network};
-use pragma_entities::error::{adapt_infra_error, InfraError};
+use pragma_entities::error::{InfraError, adapt_infra_error};
 
 use super::entry::{get_existing_pairs, onchain_pair_exist};
 use super::{get_onchain_aggregate_table_name, get_onchain_decimals};
@@ -75,7 +75,7 @@ async fn get_historical_aggregated_entries(
     };
 
     let raw_sql = format!(
-        r#"
+        r"
         SELECT
             pair_id,
             bucket AS timestamp,
@@ -89,7 +89,7 @@ async fn get_historical_aggregated_entries(
             AND bucket <= to_timestamp($3)
         ORDER BY
             bucket ASC
-        "#,
+        ",
         table_name =
             get_onchain_aggregate_table_name(network, DataType::SpotEntry, chunk_interval)?,
     );

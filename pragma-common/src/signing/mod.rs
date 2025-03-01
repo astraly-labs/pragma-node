@@ -4,7 +4,7 @@ use crate::errors::ConversionError;
 use serde::{Deserialize, Serialize};
 use starknet::{
     core::{
-        crypto::{ecdsa_verify, EcdsaSignError, Signature},
+        crypto::{EcdsaSignError, Signature, ecdsa_verify},
         types::Felt,
     },
     signers::SigningKey,
@@ -12,7 +12,7 @@ use starknet::{
 use thiserror::Error;
 use utoipa::ToSchema;
 
-use crate::types::entries::{build_publish_message, EntryTrait};
+use crate::types::entries::{EntryTrait, build_publish_message};
 use crate::types::typed_data::TypedData;
 
 #[derive(Debug, Error, ToSchema)]

@@ -9,7 +9,7 @@ use tracing::{error, info};
 
 use pragma_entities::connection::ENV_OFFCHAIN_DATABASE_URL;
 use pragma_entities::{
-    adapt_infra_error, Entry, FutureEntry, InfraError, NewEntry, NewFutureEntry,
+    Entry, FutureEntry, InfraError, NewEntry, NewFutureEntry, adapt_infra_error,
 };
 
 #[tokio::main]

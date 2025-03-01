@@ -1,16 +1,16 @@
-use axum::extract::{Query, State};
 use axum::Json;
+use axum::extract::{Query, State};
 
-use pragma_common::types::pair::Pair;
 use pragma_common::types::Network;
+use pragma_common::types::pair::Pair;
 use pragma_entities::CheckpointError;
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToResponse, ToSchema};
 
+use crate::AppState;
 use crate::infra::repositories::onchain_repository::checkpoint::get_checkpoints;
 use crate::infra::repositories::onchain_repository::get_onchain_decimals;
 use crate::utils::PathExtractor;
-use crate::AppState;
 
 pub const DEFAULT_LIMIT: u64 = 100;
 pub const MAX_LIMIT: u64 = 1000;

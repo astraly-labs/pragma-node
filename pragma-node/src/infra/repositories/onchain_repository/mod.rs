@@ -8,12 +8,12 @@ use std::collections::HashMap;
 
 use moka::future::Cache;
 
-use pragma_common::types::{pair::Pair, DataType, Interval, Network};
+use pragma_common::types::{DataType, Interval, Network, pair::Pair};
 use pragma_entities::error::InfraError;
 
 use crate::utils::sql::get_interval_specifier;
 use crate::{
-    infra::rpc::{call_get_decimals, RpcClients},
+    infra::rpc::{RpcClients, call_get_decimals},
     is_enum_variant,
 };
 

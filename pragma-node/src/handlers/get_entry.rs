@@ -1,5 +1,5 @@
-use axum::extract::{Query, State};
 use axum::Json;
+use axum::extract::{Query, State};
 use chrono::{DateTime, NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{ToResponse, ToSchema};
@@ -9,13 +9,13 @@ use pragma_common::types::pair::Pair;
 use pragma_common::types::{AggregationMode, DataType, Interval};
 use pragma_entities::EntryError;
 
+use crate::AppState;
 use crate::constants::PRAGMA_DECIMALS;
 use crate::infra::repositories::entry_repository::{
-    get_last_updated_timestamp, routing, MedianEntry,
+    MedianEntry, get_last_updated_timestamp, routing,
 };
-use crate::utils::big_decimal_price_to_hex;
 use crate::utils::PathExtractor;
-use crate::AppState;
+use crate::utils::big_decimal_price_to_hex;
 
 use super::GetEntryParams;
 

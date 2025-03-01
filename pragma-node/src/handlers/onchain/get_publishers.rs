@@ -1,15 +1,15 @@
-use axum::extract::{Query, State};
 use axum::Json;
+use axum::extract::{Query, State};
 
 use pragma_common::types::{DataType, Network};
 use pragma_entities::EntryError;
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToResponse, ToSchema};
 
+use crate::AppState;
 use crate::infra::repositories::onchain_repository::publisher::{
     get_publishers, get_publishers_with_components,
 };
-use crate::AppState;
 
 #[derive(Debug, Default, Deserialize, IntoParams, ToSchema)]
 pub struct GetOnchainPublishersParams {

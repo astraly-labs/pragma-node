@@ -22,7 +22,7 @@ use pragma_entities::connection::{ENV_OFFCHAIN_DATABASE_URL, ENV_ONCHAIN_DATABAS
 
 use crate::config::config;
 use crate::handlers::publish_entry_ws::PublisherSession;
-use crate::infra::rpc::{init_rpc_clients, RpcClients};
+use crate::infra::rpc::{RpcClients, init_rpc_clients};
 use crate::metrics::MetricsRegistry;
 use crate::utils::PragmaSignerBuilder;
 

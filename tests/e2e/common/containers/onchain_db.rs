@@ -5,8 +5,8 @@ use testcontainers::runners::AsyncRunner;
 use testcontainers::{ContainerAsync, ImageExt};
 use testcontainers_modules::postgres::Postgres;
 
-use super::utils::migrations::run_migrations;
 use super::Timescale;
+use super::utils::migrations::run_migrations;
 
 pub const ONCHAIN_DB_CONTAINER_NAME: &str = "test-onchain-db";
 

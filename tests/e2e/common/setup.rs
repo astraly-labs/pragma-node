@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use deadpool_diesel::{postgres::Pool, Manager};
+use deadpool_diesel::{Manager, postgres::Pool};
 use diesel::RunQueryDsl;
 
 use pragma_common::types::{AggregationMode, Interval};
@@ -9,16 +9,16 @@ use testcontainers_modules::kafka::Kafka;
 use testcontainers_modules::zookeeper::Zookeeper;
 
 use crate::common::containers::{
+    Containers, Timescale,
     kafka::{init_kafka_topics, setup_kafka},
     offchain_db::setup_offchain_db,
     onchain_db::{run_onchain_migrations, setup_onchain_db},
     pragma_node::{
-        docker::{setup_pragma_node_with_docker, PragmaNode},
-        local::setup_pragma_node_with_cargo,
         SERVER_PORT,
+        docker::{PragmaNode, setup_pragma_node_with_docker},
+        local::setup_pragma_node_with_cargo,
     },
     zookeeper::setup_zookeeper,
-    Containers, Timescale,
 };
 use crate::common::logs::init_logging;
 
@@ -82,12 +82,12 @@ impl TestHelper {
         };
 
         let sql = format!(
-            r#"
+            r"
             CALL refresh_continuous_aggregate(
                 '{}_{}_agg',
                 to_timestamp({} - {}),
                 to_timestamp({} + {})
-            );"#,
+            );",
             table_name, interval_spec, timestamp, window_size, timestamp, window_size
         );
 

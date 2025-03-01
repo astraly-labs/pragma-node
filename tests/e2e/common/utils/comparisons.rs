@@ -1,4 +1,4 @@
-use bigdecimal::{num_bigint::BigInt, BigDecimal, Num};
+use bigdecimal::{BigDecimal, Num, num_bigint::BigInt};
 
 /// Calculates the percentage difference between two hex-formatted prices
 pub fn price_difference_percentage(price1: &str, price2: &str) -> BigDecimal {

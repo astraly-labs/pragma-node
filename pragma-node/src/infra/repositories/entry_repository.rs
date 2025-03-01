@@ -13,17 +13,17 @@ use pragma_common::signing::starkex::StarkexPrice;
 use pragma_common::types::pair::Pair;
 use pragma_common::types::{AggregationMode, DataType, Interval};
 use pragma_entities::{
-    error::{adapt_infra_error, InfraError},
     Entry,
+    error::{InfraError, adapt_infra_error},
 };
 
+use crate::constants::PRAGMA_DECIMALS;
 use crate::constants::currencies::ABSTRACT_CURRENCIES;
 use crate::constants::others::ROUTING_FRESHNESS_THRESHOLD;
 use crate::constants::starkex_ws::{
     INITAL_INTERVAL_IN_MS, INTERVAL_INCREMENT_IN_MS, MAX_INTERVAL_WITHOUT_ENTRIES,
     MINIMUM_NUMBER_OF_PUBLISHERS,
 };
-use crate::constants::PRAGMA_DECIMALS;
 use crate::handlers::get_entry::RoutingParams;
 use crate::handlers::subscribe_to_entry::{AssetOraclePrice, SignedPublisherPrice};
 use crate::utils::convert_via_quote;
@@ -174,7 +174,7 @@ pub async fn get_twap_price(
     let conn = pool.get().await.map_err(adapt_infra_error)?;
 
     let sql_request: String = format!(
-        r#"
+        r"
         -- query the materialized realtime view
         SELECT
             bucket AS time,
@@ -190,7 +190,7 @@ pub async fn get_twap_price(
         ORDER BY
             time DESC
         LIMIT 1;
-    "#,
+    ",
         get_interval_specifier(routing_params.interval, true)?,
         get_table_suffix(routing_params.data_type)?,
         get_expiration_timestamp_filter(routing_params.data_type, &routing_params.expiry)?,
@@ -233,7 +233,7 @@ pub async fn get_median_price(
     let conn = pool.get().await.map_err(adapt_infra_error)?;
 
     let sql_request: String = format!(
-        r#"
+        r"
         -- query the materialized realtime view
         SELECT
             bucket AS time,
@@ -249,7 +249,7 @@ pub async fn get_median_price(
         ORDER BY
             time DESC
         LIMIT 1;
-    "#,
+    ",
         get_interval_specifier(routing_params.interval, false)?,
         get_table_suffix(routing_params.data_type)?,
         get_expiration_timestamp_filter(routing_params.data_type, &routing_params.expiry)?,
@@ -356,7 +356,7 @@ pub async fn get_median_prices_between(
     )?;
 
     let sql_request: String = format!(
-        r#"
+        r"
         -- query the materialized realtime view
         SELECT
             bucket AS time,
@@ -371,7 +371,7 @@ pub async fn get_median_prices_between(
             {}
         ORDER BY
             time DESC;
-    "#,
+    ",
         get_interval_specifier(routing_params.interval, false)?,
         get_table_suffix(routing_params.data_type)?,
         get_expiration_timestamp_filter(routing_params.data_type, &routing_params.expiry)?,
@@ -419,7 +419,7 @@ pub async fn get_twap_prices_between(
     )?;
 
     let sql_request: String = format!(
-        r#"
+        r"
         -- query the materialized realtime view
         SELECT
             bucket AS time,
@@ -434,7 +434,7 @@ pub async fn get_twap_prices_between(
             {}
         ORDER BY
             time DESC;
-    "#,
+    ",
         get_interval_specifier(routing_params.interval, true)?,
         get_table_suffix(routing_params.data_type)?,
         get_expiration_timestamp_filter(routing_params.data_type, &routing_params.expiry)?,
@@ -530,7 +530,7 @@ pub async fn get_ohlc(
     let conn = pool.get().await.map_err(adapt_infra_error)?;
 
     let raw_sql = format!(
-        r#"
+        r"
         -- query the materialized realtime view
         SELECT
             ohlc_bucket AS time,
@@ -547,7 +547,7 @@ pub async fn get_ohlc(
         ORDER BY
             time DESC
         LIMIT 10000;
-    "#,
+    ",
         get_interval_specifier(interval, false)?
     );
 
@@ -748,7 +748,7 @@ fn build_sql_query_for_median_with_components(
     entry_type: DataType,
 ) -> String {
     format!(
-        r#"
+        r"
             WITH last_prices AS (
                 SELECT
                     e.pair_id,
@@ -800,7 +800,7 @@ fn build_sql_query_for_median_with_components(
                 filtered_last_prices
             GROUP BY 
                 pair_id;
-            "#,
+            ",
         table_name = get_table_name_from_type(entry_type),
         pairs_list = pair_ids
             .iter()

@@ -9,7 +9,7 @@ use moka::future::Cache;
 
 use pragma_common::types::pair::Pair;
 use pragma_common::types::{DataType, Network};
-use pragma_entities::error::{adapt_infra_error, InfraError};
+use pragma_entities::error::{InfraError, adapt_infra_error};
 
 use crate::handlers::onchain::get_publishers::{Publisher, PublisherEntry};
 use crate::infra::rpc::RpcClients;
@@ -36,7 +36,7 @@ pub async fn get_publishers(
         Network::Sepolia => "testnet_address",
     };
     let raw_sql = format!(
-        r#"
+        r"
         SELECT
             name,
             website_url,
@@ -47,7 +47,7 @@ pub async fn get_publishers(
             {address_column} IS NOT NULL
         ORDER BY
             name ASC;
-    "#,
+    ",
     );
 
     let conn = pool.get().await.map_err(adapt_infra_error)?;
@@ -127,7 +127,7 @@ async fn get_all_publishers_updates(
 
     // ... else, fetch the value from the database
     let raw_sql = format!(
-        r#"
+        r"
         SELECT 
             publisher,
             COUNT(*) FILTER (WHERE timestamp >= NOW() - INTERVAL '1 day') AS daily_updates,
@@ -139,7 +139,7 @@ async fn get_all_publishers_updates(
             publisher IN ('{publishers_list}')
         GROUP BY 
             publisher;
-        "#,
+        ",
     );
 
     let conn = pool.get().await.map_err(adapt_infra_error)?;
@@ -172,7 +172,7 @@ async fn get_publisher_with_components(
     rpc_clients: &RpcClients,
 ) -> Result<Publisher, InfraError> {
     let raw_sql_entries = format!(
-        r#"
+        r"
     WITH recent_entries AS (
         SELECT 
             pair_id,
@@ -208,7 +208,7 @@ async fn get_publisher_with_components(
         rn = 1
     ORDER BY 
         pair_id, source ASC;
-    "#,
+    ",
         table_name = table_name,
         publisher_name = publisher.name
     );

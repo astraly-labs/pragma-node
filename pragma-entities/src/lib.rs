@@ -9,7 +9,7 @@ pub mod schema;
 pub use models::entries::entry_error::EntryError;
 
 // exporting for idiomatic use
-pub use error::{adapt_infra_error, InfraError};
+pub use error::{InfraError, adapt_infra_error};
 pub use models::{
     checkpoint_error::CheckpointError,
     entry::{Entry, NewEntry},

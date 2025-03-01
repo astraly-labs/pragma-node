@@ -10,12 +10,12 @@ use starknet::{
         utils::{cairo_short_string_to_felt, get_selector_from_name},
     },
     macros::felt_hex,
-    providers::{jsonrpc::HttpTransport, JsonRpcClient},
+    providers::{JsonRpcClient, jsonrpc::HttpTransport},
 };
 use starknet_crypto::Felt;
 use url::Url;
 
-use pragma_common::types::{pair::Pair, Network};
+use pragma_common::types::{Network, pair::Pair};
 use pragma_entities::InfraError;
 
 pub const ENV_MAINNET_RPC_URL: &str = "MAINNET_RPC_URL";

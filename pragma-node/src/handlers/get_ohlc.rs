@@ -1,14 +1,14 @@
-use axum::extract::{Query, State};
 use axum::Json;
+use axum::extract::{Query, State};
 use pragma_common::timestamp::TimestampRangeError;
 use pragma_common::types::pair::Pair;
 use serde::{Deserialize, Serialize};
 use utoipa::{ToResponse, ToSchema};
 
+use crate::AppState;
 use crate::handlers::Interval;
 use crate::infra::repositories::entry_repository::{self, OHLCEntry};
 use crate::utils::PathExtractor;
-use crate::AppState;
 use pragma_entities::EntryError;
 
 use super::GetEntryParams;

@@ -1,7 +1,7 @@
 use pretty_assertions::assert_eq;
 use rstest::rstest;
 
-use crate::common::setup::{setup_containers, TestHelper};
+use crate::common::setup::{TestHelper, setup_containers};
 
 #[rstest]
 #[serial_test::serial]

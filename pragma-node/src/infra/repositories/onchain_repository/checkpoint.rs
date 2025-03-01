@@ -4,7 +4,7 @@ use diesel::sql_types::{Numeric, Timestamp, VarChar};
 use diesel::{Queryable, QueryableByName, RunQueryDsl};
 
 use pragma_common::types::Network;
-use pragma_entities::error::{adapt_infra_error, InfraError};
+use pragma_entities::error::{InfraError, adapt_infra_error};
 
 use crate::handlers::onchain::get_checkpoints::Checkpoint;
 use crate::utils::format_bigdecimal_price;
@@ -45,7 +45,7 @@ pub async fn get_checkpoints(
         Network::Sepolia => "spot_checkpoints",
     };
     let raw_sql = format!(
-        r#"
+        r"
         SELECT
             transaction_hash,
             price,
@@ -57,7 +57,7 @@ pub async fn get_checkpoints(
             pair_id = $1
         ORDER BY timestamp DESC
         LIMIT $2;
-    "#,
+    ",
     );
 
     let conn = pool.get().await.map_err(adapt_infra_error)?;

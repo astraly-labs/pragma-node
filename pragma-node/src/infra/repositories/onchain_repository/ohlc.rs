@@ -2,7 +2,7 @@ use deadpool_diesel::postgres::Pool;
 use diesel::RunQueryDsl;
 
 use pragma_common::types::{DataType, Interval, Network};
-use pragma_entities::error::{adapt_infra_error, InfraError};
+use pragma_entities::error::{InfraError, adapt_infra_error};
 
 use crate::infra::repositories::entry_repository::{OHLCEntry, OHLCEntryRaw};
 
@@ -17,7 +17,7 @@ pub async fn get_ohlc(
     data_to_retrieve: u64,
 ) -> Result<Vec<OHLCEntry>, InfraError> {
     let raw_sql = format!(
-        r#"
+        r"
         SELECT
             ohlc_bucket AS time,
             open,
@@ -31,7 +31,7 @@ pub async fn get_ohlc(
         ORDER BY
             time DESC
         LIMIT {data_to_retrieve};
-        "#,
+        ",
         table_name = get_onchain_ohlc_table_name(network, DataType::SpotEntry, interval)?,
     );
 

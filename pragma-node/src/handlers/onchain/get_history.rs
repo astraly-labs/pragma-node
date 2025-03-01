@@ -1,16 +1,16 @@
-use axum::extract::{Query, State};
 use axum::Json;
+use axum::extract::{Query, State};
 use pragma_common::types::pair::Pair;
 use pragma_common::types::{Interval, Network};
 use pragma_entities::{EntryError, InfraError};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToResponse, ToSchema};
 
-use crate::infra::repositories::onchain_repository::history::{
-    get_historical_entries_and_decimals, retry_with_routing, HistoricalEntryRaw,
-};
-use crate::utils::{big_decimal_price_to_hex, PathExtractor};
 use crate::AppState;
+use crate::infra::repositories::onchain_repository::history::{
+    HistoricalEntryRaw, get_historical_entries_and_decimals, retry_with_routing,
+};
+use crate::utils::{PathExtractor, big_decimal_price_to_hex};
 use pragma_common::types::timestamp::TimestampRange;
 
 #[derive(Debug, Deserialize, IntoParams, ToSchema)]

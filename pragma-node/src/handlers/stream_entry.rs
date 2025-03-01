@@ -4,24 +4,24 @@ use axum::{
     extract::{Query, State},
     response::sse::{Event, Sse},
 };
-use axum_extra::{headers, TypedHeader};
+use axum_extra::{TypedHeader, headers};
 use futures::{
-    stream::{self, Stream},
     Future,
+    stream::{self, Stream},
 };
 use serde::Deserialize;
 use tokio_stream::StreamExt;
 use utoipa::{IntoParams, ToSchema};
 
-use pragma_common::types::{pair::Pair, AggregationMode};
+use pragma_common::types::{AggregationMode, pair::Pair};
 use pragma_entities::EntryError;
 
 use super::{
-    get_entry::{adapt_entry_to_entry_response, GetEntryResponse, RoutingParams},
     GetEntryParams,
+    get_entry::{GetEntryResponse, RoutingParams, adapt_entry_to_entry_response},
 };
 
-use crate::{infra::repositories::entry_repository, utils::PathExtractor, AppState};
+use crate::{AppState, infra::repositories::entry_repository, utils::PathExtractor};
 
 const DEFAULT_HISTORICAL_PRICES: usize = 50;
 

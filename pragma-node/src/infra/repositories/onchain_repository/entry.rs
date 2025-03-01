@@ -8,7 +8,7 @@ use moka::future::Cache;
 
 use pragma_common::types::pair::Pair;
 use pragma_common::types::{AggregationMode, DataType, Interval, Network};
-use pragma_entities::error::{adapt_infra_error, InfraError};
+use pragma_entities::error::{InfraError, adapt_infra_error};
 use pragma_monitoring::models::SpotEntry;
 
 use crate::constants::currencies::ABSTRACT_CURRENCIES;
@@ -179,7 +179,7 @@ fn build_sql_query(
     let complete_sql_query = {
         let aggregation_query = get_aggregation_subquery(aggregation_mode)?;
         format!(
-            r#"
+            r"
                 WITH RankedEntries AS (
                     SELECT 
                         *,
@@ -207,7 +207,7 @@ fn build_sql_query(
                     AggregatedPrice AP
                 ORDER BY 
                     FE.timestamp DESC;
-            "#,
+            ",
         )
     };
     Ok(complete_sql_query)
@@ -362,7 +362,7 @@ pub async fn get_last_updated_timestamp(
 ) -> Result<u64, InfraError> {
     let pair_list = format!("('{}')", pairs.join("','"));
     let raw_sql = format!(
-        r#"
+        r"
         SELECT
             timestamp
         FROM
@@ -371,7 +371,7 @@ pub async fn get_last_updated_timestamp(
             pair_id IN {}
         ORDER BY timestamp DESC
         LIMIT 1;
-    "#,
+    ",
         get_onchain_table_name(network, DataType::SpotEntry)?,
         pair_list,
     );
@@ -406,7 +406,7 @@ pub async fn get_variations(
     for interval in intervals {
         let ohlc_table_name = get_onchain_ohlc_table_name(network, DataType::SpotEntry, interval)?;
         let raw_sql = format!(
-            r#"
+            r"
             WITH recent_entries AS (
                 SELECT
                     ohlc_bucket AS time,
@@ -430,7 +430,7 @@ pub async fn get_variations(
                 rn IN (1, 2)
             ORDER BY
                 rn ASC;
-            "#,
+            ",
         );
 
         let conn = pool.get().await.map_err(adapt_infra_error)?;
@@ -485,12 +485,12 @@ pub async fn get_existing_pairs(
     network: Network,
 ) -> Result<Vec<EntryPairId>, InfraError> {
     let raw_sql = format!(
-        r#"
+        r"
         SELECT DISTINCT
             pair_id
         FROM
             {table_name};
-    "#,
+    ",
         table_name = get_onchain_table_name(network, DataType::SpotEntry)?
     );
 

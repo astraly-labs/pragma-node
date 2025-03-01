@@ -30,11 +30,7 @@ impl From<Option<bool>> for SettlementResolution {
 }
 impl From<bool> for SettlementResolution {
     fn from(res: bool) -> Self {
-        if res {
-            Self::True
-        } else {
-            Self::False
-        }
+        if res { Self::True } else { Self::False }
     }
 }
 

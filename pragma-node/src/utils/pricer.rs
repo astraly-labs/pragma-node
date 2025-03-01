@@ -4,7 +4,7 @@ use pragma_common::types::DataType;
 use pragma_entities::EntryError;
 
 use crate::infra::repositories::entry_repository::{
-    get_current_median_entries_with_components, MedianEntryWithComponents,
+    MedianEntryWithComponents, get_current_median_entries_with_components,
 };
 
 #[async_trait::async_trait]

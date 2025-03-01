@@ -1,8 +1,8 @@
+use crate::AppState;
 use crate::handlers::optimistic_oracle::types::{GetAssertionsParams, GetAssertionsResponse};
 use crate::infra::repositories::oo_repository::assertions;
-use crate::AppState;
-use axum::extract::{Query, State};
 use axum::Json;
+use axum::extract::{Query, State};
 use pragma_entities::models::optimistic_oracle_error::OptimisticOracleError;
 
 pub const DEFAULT_LIMIT: u32 = 100;
@@ -28,9 +28,7 @@ pub async fn get_assertions(
     let page_size = params.limit.unwrap_or(DEFAULT_LIMIT);
 
     let assertions =
-        assertions::get_assertions(&state.onchain_pool, params.status, page, page_size)
-            .await
-            .map_err(OptimisticOracleError::from)?;
+        assertions::get_assertions(&state.onchain_pool, params.status, page, page_size).await?;
 
     let total_count = assertions.len();
     let total_pages = (total_count as u32).div_ceil(page_size);

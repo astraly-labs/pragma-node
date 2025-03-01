@@ -1,5 +1,5 @@
-use axum::extract::{self, State};
 use axum::Json;
+use axum::extract::{self, State};
 use chrono::{DateTime, Utc};
 use pragma_common::timestamp::TimestampRangeError;
 use pragma_entities::{EntryError, NewFutureEntry};
@@ -7,10 +7,10 @@ use serde::{Deserialize, Serialize};
 use starknet::core::types::Felt;
 use utoipa::{ToResponse, ToSchema};
 
+use crate::AppState;
 use crate::config::config;
 use crate::infra::kafka;
 use crate::utils::validate_publisher;
-use crate::AppState;
 use pragma_common::signing::assert_request_signature_is_valid;
 use pragma_common::types::entries::FutureEntry;
 use pragma_common::types::utils::felt_from_decimal;
@@ -88,7 +88,7 @@ pub async fn create_future_entries(
                 None => {
                     return Err(EntryError::InvalidTimestamp(
                         TimestampRangeError::ConversionError,
-                    ))
+                    ));
                 }
             };
 
@@ -105,7 +105,7 @@ pub async fn create_future_entries(
                     None => {
                         return Err(EntryError::InvalidTimestamp(
                             TimestampRangeError::ConversionError,
-                        ))
+                        ));
                     }
                 }
             };
@@ -141,7 +141,7 @@ pub async fn create_future_entries(
 mod tests {
     use rstest::rstest;
 
-    use pragma_common::types::entries::{build_publish_message, FutureEntry, PerpEntry};
+    use pragma_common::types::entries::{FutureEntry, PerpEntry, build_publish_message};
 
     #[rstest]
     fn test_build_publish_message_empty() {

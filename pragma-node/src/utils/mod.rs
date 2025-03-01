@@ -20,12 +20,12 @@ use deadpool_diesel::postgres::Pool;
 use moka::future::Cache;
 use starknet_crypto::{Felt, Signature};
 
-use pragma_common::types::entries::Entry;
 use pragma_common::types::Network;
+use pragma_common::types::entries::Entry;
 use pragma_entities::dto::Publisher;
 use pragma_entities::{
-    convert_timestamp_to_datetime, Entry as EntityEntry, EntryError, FutureEntry, NewEntry,
-    PublisherError,
+    Entry as EntityEntry, EntryError, FutureEntry, NewEntry, PublisherError,
+    convert_timestamp_to_datetime,
 };
 
 use crate::infra::repositories::publisher_repository;

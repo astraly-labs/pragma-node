@@ -8,7 +8,7 @@ use crate::{
     assert_hex_prices_within_threshold,
     common::{
         constants::{PRAGMA_DECIMALS, VARIATION_PERCENTAGE},
-        setup::{setup_containers, TestHelper},
+        setup::{TestHelper, setup_containers},
         utils::populate::get_pair_price,
     },
 };

@@ -1,5 +1,5 @@
-use pragma_entities::{adapt_infra_error, InfraError};
-use pragma_entities::{dto, Publishers};
+use pragma_entities::{InfraError, adapt_infra_error};
+use pragma_entities::{Publishers, dto};
 
 pub async fn get(
     pool: &deadpool_diesel::postgres::Pool,

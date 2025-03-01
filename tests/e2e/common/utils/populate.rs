@@ -55,7 +55,7 @@ pub fn generate_entry(pair: &str, source: &str, timestamp: u64) -> String {
 
 pub fn entry_from(pair: &str, timestamp: u64, price: u128, source: &str) -> String {
     format!(
-        r#"
+        r"
         INSERT INTO entries (
             pair_id,
             publisher,
@@ -71,6 +71,6 @@ pub fn entry_from(pair: &str, timestamp: u64, price: u128, source: &str) -> Stri
             '{source}',
             '{EMPTY_SIGNATURE}'
         );
-    "#
+    "
     )
 }

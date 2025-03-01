@@ -1,9 +1,9 @@
 use std::{borrow::Cow, collections::HashMap, env::current_dir, path::PathBuf, time::Duration};
 
 use testcontainers::{
-    core::{wait::HttpWaitStrategy, ContainerPort, IntoContainerPort, WaitFor},
-    runners::AsyncRunner,
     ContainerAsync, Image, ImageExt,
+    core::{ContainerPort, IntoContainerPort, WaitFor, wait::HttpWaitStrategy},
+    runners::AsyncRunner,
 };
 
 use crate::common::containers::pragma_node::DB_PORT;

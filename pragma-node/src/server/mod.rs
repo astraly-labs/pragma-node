@@ -5,17 +5,17 @@ use axum_tracing_opentelemetry::middleware::{OtelAxumLayer, OtelInResponseLayer}
 use std::net::SocketAddr;
 use tower_http::cors::CorsLayer;
 use utoipa::{
-    openapi::{
-        security::{ApiKey, ApiKeyValue, SecurityScheme},
-        ServerBuilder, ServerVariableBuilder,
-    },
     Modify, OpenApi,
+    openapi::{
+        ServerBuilder, ServerVariableBuilder,
+        security::{ApiKey, ApiKeyValue, SecurityScheme},
+    },
 };
 use utoipauto::utoipauto;
 
 use crate::errors::internal_error;
 use crate::server::middlewares::TimingLayer;
-use crate::{config::Config, server::routes::app_router, AppState};
+use crate::{AppState, config::Config, server::routes::app_router};
 
 struct SecurityAddon;
 
@@ -38,10 +38,12 @@ impl Modify for ServerAddon {
             .default_value("api.dev")
             .enum_values(Some(vec!["api.dev", "api.prod"]))
             .build();
-        openapi.servers = Some(vec![ServerBuilder::new()
-            .url("https://{environment}.pragma.build")
-            .parameter("environment", server_variable)
-            .build()]);
+        openapi.servers = Some(vec![
+            ServerBuilder::new()
+                .url("https://{environment}.pragma.build")
+                .parameter("environment", server_variable)
+                .build(),
+        ]);
     }
 }
 

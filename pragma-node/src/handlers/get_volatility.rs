@@ -1,13 +1,13 @@
-use axum::extract::{Query, State};
 use axum::Json;
+use axum::extract::{Query, State};
 use pragma_common::types::pair::Pair;
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToResponse, ToSchema};
 
+use crate::AppState;
 use crate::constants::PRAGMA_DECIMALS;
 use crate::infra::repositories::entry_repository::{self, MedianEntry};
 use crate::utils::PathExtractor;
-use crate::AppState;
 use pragma_entities::{EntryError, VolatilityError};
 
 use crate::utils::compute_volatility;

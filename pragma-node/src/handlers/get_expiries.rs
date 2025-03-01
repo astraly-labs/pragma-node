@@ -1,13 +1,13 @@
-use axum::extract::State;
 use axum::Json;
+use axum::extract::State;
 use chrono::NaiveDateTime;
 
 use pragma_common::types::pair::Pair;
 use pragma_entities::EntryError;
 
+use crate::AppState;
 use crate::infra::repositories::entry_repository;
 use crate::utils::PathExtractor;
-use crate::AppState;
 
 #[utoipa::path(
     get,

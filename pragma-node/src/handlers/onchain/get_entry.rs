@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use axum::extract::{Query, State};
 use axum::Json;
+use axum::extract::{Query, State};
 use bigdecimal::BigDecimal;
 use pragma_common::types::pair::Pair;
 use pragma_common::types::{AggregationMode, Interval, Network};
@@ -9,11 +9,11 @@ use pragma_entities::EntryError;
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToResponse, ToSchema};
 
-use crate::infra::repositories::onchain_repository::entry::{
-    get_last_updated_timestamp, get_variations, routing, OnchainRoutingArguments,
-};
-use crate::utils::{big_decimal_price_to_hex, PathExtractor};
 use crate::AppState;
+use crate::infra::repositories::onchain_repository::entry::{
+    OnchainRoutingArguments, get_last_updated_timestamp, get_variations, routing,
+};
+use crate::utils::{PathExtractor, big_decimal_price_to_hex};
 
 #[derive(Debug, Default, Deserialize, IntoParams, ToSchema)]
 pub struct GetOnchainEntryParams {

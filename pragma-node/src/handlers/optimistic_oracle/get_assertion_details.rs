@@ -1,7 +1,7 @@
-use crate::infra::repositories::oo_repository::assertions;
 use crate::AppState;
-use axum::extract::{Path, State};
+use crate::infra::repositories::oo_repository::assertions;
 use axum::Json;
+use axum::extract::{Path, State};
 use pragma_entities::models::optimistic_oracle_error::OptimisticOracleError;
 
 use crate::handlers::optimistic_oracle::types::AssertionDetails;
@@ -21,9 +21,8 @@ pub async fn get_assertion_details(
     State(state): State<AppState>,
     Path(assertion_id): Path<String>,
 ) -> Result<Json<AssertionDetails>, OptimisticOracleError> {
-    let assertion_details = assertions::get_assertion_details(&state.onchain_pool, &assertion_id)
-        .await
-        .map_err(OptimisticOracleError::from)?;
+    let assertion_details =
+        assertions::get_assertion_details(&state.onchain_pool, &assertion_id).await?;
 
     Ok(Json(assertion_details))
 }

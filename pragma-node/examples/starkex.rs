@@ -2,13 +2,13 @@ use chrono::Utc;
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use futures_util::{SinkExt as _, StreamExt as _};
 use ratatui::{
+    Terminal,
     prelude::*,
     widgets::{Block, Borders, List, ListItem, Paragraph},
-    Terminal,
 };
 use serde::{Deserialize, Serialize};
 use starknet::core::utils::parse_cairo_short_string;

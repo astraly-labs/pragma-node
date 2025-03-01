@@ -1,8 +1,8 @@
 use crate::error::InfraError;
 use crate::models::publisher_error::PublisherError;
+use axum::Json;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
-use axum::Json;
 use pragma_common::signing::SignerError;
 use pragma_common::timestamp::TimestampRangeError;
 use pragma_common::types::{AggregationMode, Interval};

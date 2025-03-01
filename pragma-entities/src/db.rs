@@ -1,7 +1,7 @@
 use deadpool_diesel::postgres::Pool;
 use diesel::prelude::*;
 use diesel::sql_query;
-use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
 
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("./migrations/");
 

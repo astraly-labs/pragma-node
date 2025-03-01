@@ -4,12 +4,12 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use utoipa::ToSchema;
 
-use crate::handlers::create_entry::CreateEntryResponse;
-use crate::utils::{convert_entry_to_db, publish_to_kafka, validate_publisher};
-use crate::utils::{ChannelHandler, Subscriber, WebSocketError};
 use crate::AppState;
+use crate::handlers::create_entry::CreateEntryResponse;
+use crate::utils::{ChannelHandler, Subscriber, WebSocketError};
+use crate::utils::{convert_entry_to_db, publish_to_kafka, validate_publisher};
 use pragma_common::signing::assert_login_is_valid;
-use pragma_common::types::auth::{build_login_message, LoginMessage};
+use pragma_common::types::auth::{LoginMessage, build_login_message};
 use pragma_common::types::entries::Entry;
 
 use pragma_entities::EntryError;

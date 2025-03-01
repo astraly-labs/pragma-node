@@ -1,10 +1,11 @@
+use axum::Router;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::routing::{get, post};
-use axum::Router;
 use utoipa::OpenApi as OpenApiT;
 // use utoipa_swagger_ui::SwaggerUi;
 
+use crate::AppState;
 use crate::handlers::onchain::{
     get_checkpoints::get_onchain_checkpoints, get_entry::get_onchain_entry,
     get_history::get_onchain_history, get_publishers::get_onchain_publishers,
@@ -20,7 +21,6 @@ use crate::handlers::{
     create_entries, create_future_entries, get_entry, get_expiries, get_ohlc, get_volatility,
     publish_entry, subscribe_to_entry, subscribe_to_price,
 };
-use crate::AppState;
 
 #[allow(clippy::extra_unused_type_parameters)]
 pub fn app_router<T: OpenApiT>(state: AppState) -> Router<AppState> {

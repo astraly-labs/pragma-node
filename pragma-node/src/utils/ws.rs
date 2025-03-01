@@ -8,14 +8,14 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc::{self, Receiver, Sender};
 
-use crate::metrics::{Interaction, Status};
 use crate::AppState;
+use crate::metrics::{Interaction, Status};
 use axum::extract::ws::{Message, WebSocket};
 use futures_util::stream::{SplitSink, SplitStream};
 use futures_util::{SinkExt, StreamExt};
 use thiserror::Error;
-use tokio::sync::{watch, Mutex};
-use tokio::time::{interval, Interval};
+use tokio::sync::{Mutex, watch};
+use tokio::time::{Interval, interval};
 use uuid::Uuid;
 
 #[derive(Default, Debug, Serialize, Deserialize)]
