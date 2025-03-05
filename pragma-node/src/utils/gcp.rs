@@ -1,5 +1,4 @@
 use google_secretmanager1::hyper_rustls::HttpsConnector;
-use google_secretmanager1::yup_oauth2::{InstalledFlowAuthenticator, InstalledFlowReturnMethod};
 use google_secretmanager1::{SecretManager, hyper_rustls, hyper_util, yup_oauth2};
 use hyper_util::client::legacy::connect::HttpConnector;
 use hyper_util::rt::TokioExecutor;
@@ -66,11 +65,29 @@ pub async fn build_pragma_signer_from_gcp() -> Option<SigningKey> {
 }
 
 async fn get_gcp_client() -> Result<GcpManager, GcpError> {
-    let secret = yup_oauth2::ApplicationSecret::default();
-    let auth = InstalledFlowAuthenticator::builder(secret, InstalledFlowReturnMethod::HTTPRedirect)
+    // Check if service account credentials are provided
+    let auth = if let Ok(service_account_json) = std::env::var("GOOGLE_APPLICATION_CREDENTIALS") {
+        // Use service account credentials from file
+        let service_account = yup_oauth2::ServiceAccountAuthenticator::builder(
+            yup_oauth2::read_service_account_key(service_account_json)
+                .await
+                .map_err(|e| GcpError::ConnectionError(format!("Failed to read service account: {}", e)))?,
+        )
         .build()
         .await
-        .map_err(|e| GcpError::ConnectionError(e.to_string()))?;
+        .map_err(|e| GcpError::ConnectionError(format!("Failed to create service account authenticator: {}", e)))?;
+
+        service_account
+    } else {
+        // Fall back to application default credentials
+        yup_oauth2::InstalledFlowAuthenticator::builder(
+            yup_oauth2::ApplicationSecret::default(),
+            yup_oauth2::InstalledFlowReturnMethod::HTTPRedirect,
+        )
+        .build()
+        .await
+        .map_err(|e| GcpError::ConnectionError(format!("Failed to create authenticator: {}", e)))?
+    };
 
     // Create a properly configured connector
     let https_connector = hyper_rustls::HttpsConnectorBuilder::new()
