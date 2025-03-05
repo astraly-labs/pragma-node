@@ -1,7 +1,7 @@
 use serde::Deserialize;
 use tokio::sync::OnceCell;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct ServerConfig {
     host: String,
     port: u16,
@@ -16,7 +16,7 @@ impl Default for ServerConfig {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct KafkaConfig {
     pub topic: String,
 }
@@ -29,7 +29,7 @@ impl Default for KafkaConfig {
     }
 }
 
-#[derive(Default, Debug, Deserialize, PartialEq, Eq)]
+#[derive(Default, Debug, Deserialize, PartialEq, Eq, Clone)]
 #[serde(rename_all = "lowercase")]
 pub enum Mode {
     Dev,
@@ -37,12 +37,21 @@ pub enum Mode {
     Production,
 }
 
-#[derive(Default, Debug, Deserialize)]
-pub struct ModeConfig {
-    mode: Mode,
+#[derive(Default, Debug, Deserialize, PartialEq, Eq, Clone)]
+#[serde(rename_all = "lowercase")]
+pub enum CloudEnv {
+    Aws,
+    #[default]
+    Gcp,
 }
 
-#[derive(Default, Debug, Deserialize)]
+#[derive(Default, Debug, Deserialize, Clone)]
+pub struct ModeConfig {
+    mode: Mode,
+    cloud_env: CloudEnv,
+}
+
+#[derive(Default, Debug, Deserialize, Clone)]
 pub struct Config {
     mode: ModeConfig,
     server: ServerConfig,
@@ -52,6 +61,10 @@ pub struct Config {
 impl Config {
     pub fn is_production_mode(&self) -> bool {
         self.mode.mode == Mode::Production
+    }
+
+    pub fn cloud_env(&self) -> CloudEnv {
+        self.mode.cloud_env.clone()
     }
 
     pub fn server_host(&self) -> &str {

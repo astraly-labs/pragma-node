@@ -1,6 +1,7 @@
 pub mod aws;
 pub mod conversion;
 pub mod custom_extractors;
+pub mod gcp;
 pub mod kafka;
 pub mod macros;
 pub mod pricer;
@@ -10,6 +11,7 @@ pub mod ws;
 pub use aws::PragmaSignerBuilder;
 pub use conversion::{convert_via_quote, format_bigdecimal_price, normalize_to_decimals};
 pub use custom_extractors::path_extractor::PathExtractor;
+pub use gcp::PragmaSignerBuilder as GcpPragmaSignerBuilder;
 pub use kafka::publish_to_kafka;
 use pragma_common::entries::EntryTrait as _;
 pub use ws::*;
