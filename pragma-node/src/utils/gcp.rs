@@ -1,6 +1,6 @@
 use google_secretmanager1::hyper_rustls::HttpsConnector;
 use google_secretmanager1::yup_oauth2::{InstalledFlowAuthenticator, InstalledFlowReturnMethod};
-use google_secretmanager1::{SecretManager, hyper, hyper_rustls, hyper_util, yup_oauth2};
+use google_secretmanager1::{SecretManager, hyper_rustls, hyper_util, yup_oauth2};
 use hyper_util::client::legacy::connect::HttpConnector;
 use hyper_util::rt::TokioExecutor;
 use starknet::{core::types::Felt, signers::SigningKey};
@@ -90,10 +90,7 @@ async fn get_gcp_client() -> Result<GcpManager, GcpError> {
 
 async fn get_gcp_secret(client: &GcpManager, secret_name: &str) -> Result<String, GcpError> {
     let project_id = std::env::var("GCP_PROJECT_ID").map_err(|_| GcpError::NoSecretFound)?;
-    let secret_path = format!(
-        "projects/{}/secrets/{}/versions/latest",
-        project_id, secret_name
-    );
+    let secret_path = format!("projects/{project_id}/secrets/{secret_name}/versions/latest");
 
     let result = client
         .projects()
