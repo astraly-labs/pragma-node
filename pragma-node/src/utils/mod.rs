@@ -89,7 +89,10 @@ pub fn convert_entry_to_db(entry: &Entry, signature: &Signature) -> Result<NewEn
     })
 }
 
-pub fn convert_market_entry_to_db(entry: &MarketEntry, signature: &Signature) -> Result<NewEntry, EntryError> {
+pub fn convert_market_entry_to_db(
+    entry: &MarketEntry,
+    signature: &Signature,
+) -> Result<NewEntry, EntryError> {
     let base = entry.base();
     let dt = convert_timestamp_to_datetime!(base.timestamp)?;
     let signature_str = format!("0x{signature}");
