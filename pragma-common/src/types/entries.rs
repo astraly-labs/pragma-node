@@ -14,6 +14,61 @@ pub struct BaseEntry {
     pub publisher: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
+#[serde(tag = "type", content = "data")]
+pub enum MarketEntry {
+    #[serde(rename = "spot")]
+    Spot(Entry),
+    #[serde(rename = "perp")]
+    Perp(PerpEntry)
+}
+
+impl EntryTrait for MarketEntry {
+    fn base(&self) -> &BaseEntry {
+        match self {
+            MarketEntry::Spot(entry) => entry.base(),
+            MarketEntry::Perp(entry) => entry.base(),
+        }
+    }
+
+    fn pair_id(&self) -> &String {
+        match self {
+            MarketEntry::Spot(entry) => entry.pair_id(),
+            MarketEntry::Perp(entry) => entry.pair_id(),
+        }
+    }
+
+    fn price(&self) -> u128 {
+        match self {
+            MarketEntry::Spot(entry) => entry.price(),
+            MarketEntry::Perp(entry) => entry.price(),
+        }
+    }
+
+    fn volume(&self) -> u128 {
+        match self {
+            MarketEntry::Spot(entry) => entry.volume(),
+            MarketEntry::Perp(entry) => entry.volume(),
+        }
+    }
+
+    fn expiration_timestamp(&self) -> Option<u64> {
+        match self {
+            MarketEntry::Spot(entry) => entry.expiration_timestamp(),
+            MarketEntry::Perp(entry) => entry.expiration_timestamp(),
+        }
+    }
+}
+
+impl fmt::Display for MarketEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            MarketEntry::Spot(entry) => write!(f, "spot: {}", entry),
+            MarketEntry::Perp(entry) => write!(f, "perp: {}", entry),
+        }
+    }
+}
+
 pub trait EntryTrait {
     fn base(&self) -> &BaseEntry;
     fn pair_id(&self) -> &String;
