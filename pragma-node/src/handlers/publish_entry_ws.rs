@@ -4,14 +4,8 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use utoipa::ToSchema;
 
-use crate::AppState;
-use crate::handlers::create_entry::CreateEntryResponse;
-use crate::utils::{ChannelHandler, Subscriber, WebSocketError};
-use crate::utils::{convert_entry_to_db, publish_to_kafka, validate_publisher};
-use pragma_common::signing::assert_login_is_valid;
 use pragma_common::types::auth::{LoginMessage, build_login_message};
-use pragma_common::types::entries::Entry;
-
+use pragma_common::types::entries::MarketEntry;
 use pragma_entities::EntryError;
 use starknet_crypto::{Felt, Signature};
 
@@ -19,6 +13,12 @@ use axum::extract::ws::{WebSocket, WebSocketUpgrade};
 use axum::extract::{ConnectInfo, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
+
+use crate::AppState;
+use crate::handlers::create_entry::CreateEntryResponse;
+use crate::utils::{ChannelHandler, Subscriber, WebSocketError, convert_market_entry_to_db};
+use crate::utils::{publish_to_kafka, validate_publisher};
+use pragma_common::signing::assert_login_is_valid;
 
 // Session expiry time in minutes
 const SESSION_EXPIRY_DURATION: Duration = Duration::from_secs(5 * 60);
@@ -55,7 +55,7 @@ impl PublisherSession {
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct PublishEntryRequest {
-    pub entries: Vec<Entry>,
+    pub entries: Vec<MarketEntry>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -361,7 +361,7 @@ async fn process_entries_without_verification(
         .entries
         .iter()
         .map(|entry| {
-            convert_entry_to_db(
+            convert_market_entry_to_db(
                 entry,
                 &Signature {
                     r: Felt::ZERO,

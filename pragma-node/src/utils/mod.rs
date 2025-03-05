@@ -11,6 +11,7 @@ pub use aws::PragmaSignerBuilder;
 pub use conversion::{convert_via_quote, format_bigdecimal_price, normalize_to_decimals};
 pub use custom_extractors::path_extractor::PathExtractor;
 pub use kafka::publish_to_kafka;
+use pragma_common::entries::EntryTrait as _;
 pub use ws::*;
 
 use bigdecimal::num_bigint::ToBigInt;
@@ -21,7 +22,7 @@ use moka::future::Cache;
 use starknet_crypto::{Felt, Signature};
 
 use pragma_common::types::Network;
-use pragma_common::types::entries::Entry;
+use pragma_common::types::entries::{Entry, MarketEntry};
 use pragma_entities::dto::Publisher;
 use pragma_entities::{
     Entry as EntityEntry, EntryError, FutureEntry, NewEntry, PublisherError,
@@ -86,6 +87,24 @@ pub fn convert_entry_to_db(entry: &Entry, signature: &Signature) -> Result<NewEn
         timestamp: dt,
         publisher_signature: format!("0x{signature}"),
         price: entry.price.into(),
+    })
+}
+
+pub fn convert_market_entry_to_db(
+    entry: &MarketEntry,
+    signature: &Signature,
+) -> Result<NewEntry, EntryError> {
+    let base = entry.base();
+    let dt = convert_timestamp_to_datetime!(base.timestamp)?;
+    let signature_str = format!("0x{signature}");
+
+    Ok(NewEntry {
+        pair_id: entry.pair_id().clone(),
+        publisher: base.publisher.clone(),
+        source: base.source.clone(),
+        timestamp: dt,
+        publisher_signature: signature_str,
+        price: entry.price().into(),
     })
 }
 
