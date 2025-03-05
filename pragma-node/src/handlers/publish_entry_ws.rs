@@ -11,7 +11,6 @@ use starknet_crypto::{Felt, Signature};
 
 use axum::extract::ws::{WebSocket, WebSocketUpgrade};
 use axum::extract::{ConnectInfo, State};
-use axum::http::StatusCode;
 use axum::response::IntoResponse;
 
 use crate::AppState;
@@ -79,10 +78,6 @@ pub async fn publish_entry(
     State(state): State<AppState>,
     ConnectInfo(client_addr): ConnectInfo<SocketAddr>,
 ) -> impl IntoResponse {
-    if state.pragma_signer.is_none() {
-        return (StatusCode::LOCKED, "Locked: Pragma signer not found").into_response();
-    }
-
     ws.on_upgrade(move |socket| create_new_subscriber(socket, state, client_addr))
 }
 

@@ -71,11 +71,18 @@ async fn get_gcp_client() -> Result<GcpManager, GcpError> {
         let service_account = yup_oauth2::ServiceAccountAuthenticator::builder(
             yup_oauth2::read_service_account_key(service_account_json)
                 .await
-                .map_err(|e| GcpError::ConnectionError(format!("Failed to read service account: {}", e)))?,
+                .map_err(|e| {
+                    GcpError::ConnectionError(format!("Failed to read service account: {}", e))
+                })?,
         )
         .build()
         .await
-        .map_err(|e| GcpError::ConnectionError(format!("Failed to create service account authenticator: {}", e)))?;
+        .map_err(|e| {
+            GcpError::ConnectionError(format!(
+                "Failed to create service account authenticator: {}",
+                e
+            ))
+        })?;
 
         service_account
     } else {
