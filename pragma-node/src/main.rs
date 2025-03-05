@@ -20,11 +20,11 @@ use starknet::signers::SigningKey;
 
 use pragma_entities::connection::{ENV_OFFCHAIN_DATABASE_URL, ENV_ONCHAIN_DATABASE_URL};
 
-use crate::config::config;
+use crate::config::{CloudEnv, config};
 use crate::handlers::publish_entry_ws::PublisherSession;
 use crate::infra::rpc::{RpcClients, init_rpc_clients};
 use crate::metrics::MetricsRegistry;
-use crate::utils::PragmaSignerBuilder;
+use crate::utils::{PragmaSignerBuilder, gcp::PragmaSignerBuilder as GcpPragmaSignerBuilder};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -78,13 +78,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Init the database caches
     let caches = CacheRegistry::new();
 
-    // Build the pragma signer
-    let signer_builder = if config.is_production_mode() {
-        PragmaSignerBuilder::new().production_mode()
+    // Build the pragma signer based on cloud environment
+    let pragma_signer = if config.is_production_mode() {
+        match config.cloud_env() {
+            CloudEnv::Aws => PragmaSignerBuilder::new().production_mode().build().await,
+            CloudEnv::Gcp => {
+                GcpPragmaSignerBuilder::new()
+                    .production_mode()
+                    .build()
+                    .await
+            }
+        }
     } else {
-        PragmaSignerBuilder::new().non_production_mode()
+        match config.cloud_env() {
+            CloudEnv::Aws => {
+                PragmaSignerBuilder::new()
+                    .non_production_mode()
+                    .build()
+                    .await
+            }
+            CloudEnv::Gcp => {
+                GcpPragmaSignerBuilder::new()
+                    .non_production_mode()
+                    .build()
+                    .await
+            }
+        }
     };
-    let pragma_signer = signer_builder.build().await;
 
     let state = AppState {
         offchain_pool,

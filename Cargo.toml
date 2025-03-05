@@ -54,6 +54,7 @@ pragma-node = { path = "./pragma-node" }
 color-eyre = "0.6.3"
 aws-config = { version = "1.5.1", features = ["behavior-version-latest"] }
 aws-sdk-secretsmanager = "1.32.0"
+google-secretmanager1 = "6.0.0"
 axum = { version = "0.8", features = ["macros", "ws", "tokio"] }
 axum-extra = { version = "0.10.0", features = ["typed-header"] }
 axum-macros = "0.5"

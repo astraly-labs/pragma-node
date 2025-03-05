@@ -13,6 +13,7 @@ pragma-entities = { path = "../pragma-entities" }
 async-trait = { workspace = true }
 aws-config = { workspace = true, features = ["behavior-version-latest"] }
 aws-sdk-secretsmanager = { workspace = true }
+google-secretmanager1 = { workspace = true }
 axum = { workspace = true, features = ["macros", "ws", "tokio"] }
 axum-extra = { workspace = true }
 axum-macros = { workspace = true }
