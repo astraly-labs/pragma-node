@@ -1,12 +1,14 @@
+use google_secretmanager1::hyper_rustls::HttpsConnector;
 use google_secretmanager1::yup_oauth2::{InstalledFlowAuthenticator, InstalledFlowReturnMethod};
 use google_secretmanager1::{SecretManager, hyper, hyper_rustls, hyper_util, yup_oauth2};
-use hyper::body::Bytes;
 use hyper_util::client::legacy::connect::HttpConnector;
 use hyper_util::rt::TokioExecutor;
 use starknet::{core::types::Felt, signers::SigningKey};
 
 const GCP_PRAGMA_PRIVATE_KEY_SECRET: &str = "pragma-secret-key";
 const GCP_JSON_STARK_PRIVATE_KEY_FIELD: &str = "STARK_PRIVATE_KEY";
+
+pub type GcpManager = SecretManager<HttpsConnector<HttpConnector>>;
 
 #[derive(Debug)]
 pub enum GcpError {
@@ -63,16 +65,7 @@ pub async fn build_pragma_signer_from_gcp() -> Option<SigningKey> {
     Some(SigningKey::from_secret_scalar(pragma_secret_key))
 }
 
-async fn get_gcp_client() -> Result<
-    SecretManager<
-        google_secretmanager1::hyper_util::client::legacy::Client<
-            hyper_rustls::HttpsConnector<HttpConnector>,
-            Bytes,
-        >,
-        Bytes,
-    >,
-    GcpError,
-> {
+async fn get_gcp_client() -> Result<GcpManager, GcpError> {
     let secret = yup_oauth2::ApplicationSecret::default();
     let auth = InstalledFlowAuthenticator::builder(secret, InstalledFlowReturnMethod::HTTPRedirect)
         .build()
@@ -95,16 +88,7 @@ async fn get_gcp_client() -> Result<
     Ok(SecretManager::new(client, auth))
 }
 
-async fn get_gcp_secret(
-    client: &SecretManager<
-        google_secretmanager1::hyper_util::client::legacy::Client<
-            hyper_rustls::HttpsConnector<HttpConnector>,
-            Bytes,
-        >,
-        Bytes,
-    >,
-    secret_name: &str,
-) -> Result<String, GcpError> {
+async fn get_gcp_secret(client: &GcpManager, secret_name: &str) -> Result<String, GcpError> {
     let project_id = std::env::var("GCP_PROJECT_ID").map_err(|_| GcpError::NoSecretFound)?;
     let secret_path = format!(
         "projects/{}/secrets/{}/versions/latest",
