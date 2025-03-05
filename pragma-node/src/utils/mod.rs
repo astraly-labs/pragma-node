@@ -11,6 +11,7 @@ pub use aws::PragmaSignerBuilder;
 pub use conversion::{convert_via_quote, format_bigdecimal_price, normalize_to_decimals};
 pub use custom_extractors::path_extractor::PathExtractor;
 pub use kafka::publish_to_kafka;
+use pragma_common::entries::EntryTrait as _;
 pub use ws::*;
 
 use bigdecimal::num_bigint::ToBigInt;

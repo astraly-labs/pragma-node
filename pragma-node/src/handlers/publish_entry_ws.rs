@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use utoipa::ToSchema;
 
-use pragma_common::types::auth::{build_login_message, LoginMessage};
+use pragma_common::types::auth::{LoginMessage, build_login_message};
 use pragma_common::types::entries::MarketEntry;
 use pragma_entities::EntryError;
 use starknet_crypto::{Felt, Signature};
@@ -13,6 +13,12 @@ use axum::extract::ws::{WebSocket, WebSocketUpgrade};
 use axum::extract::{ConnectInfo, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
+
+use crate::AppState;
+use crate::handlers::create_entry::CreateEntryResponse;
+use crate::utils::{ChannelHandler, Subscriber, WebSocketError, convert_market_entry_to_db};
+use crate::utils::{publish_to_kafka, validate_publisher};
+use pragma_common::signing::assert_login_is_valid;
 
 // Session expiry time in minutes
 const SESSION_EXPIRY_DURATION: Duration = Duration::from_secs(5 * 60);
