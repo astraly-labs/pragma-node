@@ -9,8 +9,7 @@ use utoipa::{ToResponse, ToSchema};
 
 use crate::AppState;
 use crate::config::config;
-use crate::infra::kafka;
-use crate::utils::validate_publisher;
+use crate::utils::{publish_to_kafka, validate_publisher};
 use pragma_common::signing::assert_request_signature_is_valid;
 use pragma_common::types::entries::FutureEntry;
 use pragma_common::types::utils::felt_from_decimal;
@@ -122,15 +121,12 @@ pub async fn create_future_entries(
         })
         .collect::<Result<Vec<NewFutureEntry>, EntryError>>()?;
 
-    let data =
-        serde_json::to_vec(&new_entries_db).map_err(|e| EntryError::PublishData(e.to_string()))?;
-
-    if let Err(e) = kafka::send_message(config.kafka_topic(), &data, &publisher_name).await {
-        tracing::error!("Error sending message to kafka: {:?}", e);
-        return Err(EntryError::PublishData(String::from(
-            "Error sending message to kafka",
-        )));
-    };
+    publish_to_kafka(
+        new_entries_db,
+        config.kafka_topic().to_string(),
+        &publisher_name,
+    )
+    .await?;
 
     Ok(Json(CreateFutureEntryResponse {
         number_entries_created: new_entries.entries.len(),

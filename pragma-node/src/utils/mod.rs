@@ -13,7 +13,7 @@ pub use conversion::{convert_via_quote, format_bigdecimal_price, normalize_to_de
 pub use custom_extractors::path_extractor::PathExtractor;
 pub use gcp::PragmaSignerBuilder as GcpPragmaSignerBuilder;
 pub use kafka::publish_to_kafka;
-use pragma_common::entries::EntryTrait as _;
+use pragma_common::entries::{EntryTrait as _, PerpEntry};
 pub use ws::*;
 
 use bigdecimal::num_bigint::ToBigInt;
@@ -24,10 +24,10 @@ use moka::future::Cache;
 use starknet_crypto::{Felt, Signature};
 
 use pragma_common::types::Network;
-use pragma_common::types::entries::{Entry, MarketEntry};
+use pragma_common::types::entries::Entry;
 use pragma_entities::dto::Publisher;
 use pragma_entities::{
-    Entry as EntityEntry, EntryError, FutureEntry, NewEntry, PublisherError,
+    Entry as EntityEntry, EntryError, FutureEntry, NewEntry, NewFutureEntry, PublisherError,
     convert_timestamp_to_datetime,
 };
 
@@ -92,19 +92,20 @@ pub fn convert_entry_to_db(entry: &Entry, signature: &Signature) -> Result<NewEn
     })
 }
 
-pub fn convert_market_entry_to_db(
-    entry: &MarketEntry,
+pub fn convert_perp_entry_to_db(
+    entry: &PerpEntry,
     signature: &Signature,
-) -> Result<NewEntry, EntryError> {
+) -> Result<NewFutureEntry, EntryError> {
     let base = entry.base();
     let dt = convert_timestamp_to_datetime!(base.timestamp)?;
     let signature_str = format!("0x{signature}");
 
-    Ok(NewEntry {
+    Ok(NewFutureEntry {
         pair_id: entry.pair_id().clone(),
         publisher: base.publisher.clone(),
         source: base.source.clone(),
         timestamp: dt,
+        expiration_timestamp: None,
         publisher_signature: signature_str,
         price: entry.price().into(),
     })

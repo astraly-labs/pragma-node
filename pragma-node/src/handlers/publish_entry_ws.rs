@@ -7,16 +7,18 @@ use utoipa::ToSchema;
 use pragma_common::types::auth::{LoginMessage, build_login_message};
 use pragma_common::types::entries::MarketEntry;
 use pragma_entities::EntryError;
+use pragma_entities::{NewEntry, NewFutureEntry};
 use starknet_crypto::{Felt, Signature};
 
 use axum::extract::ws::{WebSocket, WebSocketUpgrade};
 use axum::extract::{ConnectInfo, State};
-use axum::http::StatusCode;
 use axum::response::IntoResponse;
 
 use crate::AppState;
 use crate::handlers::create_entry::CreateEntryResponse;
-use crate::utils::{ChannelHandler, Subscriber, WebSocketError, convert_market_entry_to_db};
+use crate::utils::{
+    ChannelHandler, Subscriber, WebSocketError, convert_entry_to_db, convert_perp_entry_to_db,
+};
 use crate::utils::{publish_to_kafka, validate_publisher};
 use pragma_common::signing::assert_login_is_valid;
 
@@ -353,27 +355,69 @@ async fn process_entries_without_verification(
         .as_ref()
         .ok_or_else(|| EntryError::NotFound("No publisher name in session state".to_string()))?;
 
-    let new_entries_db = new_entries
+    // Split entries into spot and perp entries
+    let (spot_entries, perp_entries): (Vec<_>, Vec<_>) = new_entries
         .entries
         .iter()
-        .map(|entry| {
-            convert_market_entry_to_db(
-                entry,
-                &Signature {
-                    r: Felt::ZERO,
-                    s: Felt::ZERO,
-                },
-            )
+        .partition(|entry| matches!(entry, MarketEntry::Spot(_)));
+
+    // Convert spot entries
+    let spot_entries_db: Vec<NewEntry> = spot_entries
+        .iter()
+        .filter_map(|entry| {
+            if let MarketEntry::Spot(entry) = entry {
+                Some(convert_entry_to_db(
+                    entry,
+                    &Signature {
+                        r: Felt::ZERO,
+                        s: Felt::ZERO,
+                    },
+                ))
+            } else {
+                None
+            }
+        })
+        .collect::<Result<Vec<_>, EntryError>>()?;
+
+    // Convert perp entries
+    let perp_entries_db: Vec<NewFutureEntry> = perp_entries
+        .iter()
+        .filter_map(|entry| {
+            if let MarketEntry::Perp(entry) = entry {
+                Some(convert_perp_entry_to_db(
+                    entry,
+                    &Signature {
+                        r: Felt::ZERO,
+                        s: Felt::ZERO,
+                    },
+                ))
+            } else {
+                None
+            }
         })
         .collect::<Result<Vec<_>, EntryError>>()?;
 
     let config = crate::config::config().await;
-    publish_to_kafka(
-        new_entries_db,
-        config.kafka_topic().to_string(),
-        publisher_name,
-    )
-    .await?;
+
+    // Publish spot entries if any exist
+    if !spot_entries_db.is_empty() {
+        publish_to_kafka(
+            spot_entries_db,
+            config.kafka_topic().to_string(),
+            publisher_name,
+        )
+        .await?;
+    }
+
+    // Publish perp entries if any exist
+    if !perp_entries_db.is_empty() {
+        publish_to_kafka(
+            perp_entries_db,
+            config.kafka_topic().to_string(),
+            publisher_name,
+        )
+        .await?;
+    }
 
     Ok(CreateEntryResponse {
         number_entries_created: new_entries.entries.len(),
