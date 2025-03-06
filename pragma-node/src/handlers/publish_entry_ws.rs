@@ -79,10 +79,6 @@ pub async fn publish_entry(
     State(state): State<AppState>,
     ConnectInfo(client_addr): ConnectInfo<SocketAddr>,
 ) -> impl IntoResponse {
-    if state.pragma_signer.is_none() {
-        return (StatusCode::LOCKED, "Locked: Pragma signer not found").into_response();
-    }
-
     ws.on_upgrade(move |socket| create_new_subscriber(socket, state, client_addr))
 }
 
