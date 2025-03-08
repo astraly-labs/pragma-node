@@ -7,7 +7,7 @@ pub mod get_volatility;
 pub mod onchain;
 pub mod optimistic_oracle;
 pub mod publish_entry_ws;
-pub mod stream_entry;
+pub mod stream;
 pub mod subscribe_to_entry;
 pub mod subscribe_to_price;
 
