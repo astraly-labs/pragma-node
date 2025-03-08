@@ -88,8 +88,23 @@ pub async fn get_historical_entries_multi_pair(
     let mut all_entries = Vec::with_capacity(pairs.len());
 
     for pair in pairs {
-        let entries = get_historical_entries(state, pair, routing_params, count).await?;
-        all_entries.push(entries);
+        match get_historical_entries(state, pair, routing_params, count).await {
+            Ok(entries) => all_entries.push(entries),
+            Err(e) => {
+                tracing::warn!(
+                    "Failed to get historical entries for pair {}: {}",
+                    pair.to_pair_id(),
+                    e
+                );
+                // Skip this pair and continue with others
+                continue;
+            }
+        }
+    }
+
+    // Return error only if we couldn't get any entries
+    if all_entries.is_empty() {
+        return Err(EntryError::NotFound("No valid pairs found".to_string()));
     }
 
     Ok(all_entries)
@@ -104,8 +119,23 @@ pub async fn get_latest_entries_multi_pair(
     let mut latest_entries = Vec::with_capacity(pairs.len());
 
     for pair in pairs {
-        let entry = get_latest_entry(state, pair, is_routing, routing_params).await?;
-        latest_entries.push(entry);
+        match get_latest_entry(state, pair, is_routing, routing_params).await {
+            Ok(entry) => latest_entries.push(entry),
+            Err(e) => {
+                tracing::warn!(
+                    "Failed to get latest entry for pair {}: {}",
+                    pair.to_pair_id(),
+                    e
+                );
+                // Skip this pair and continue with others
+                continue;
+            }
+        }
+    }
+
+    // Return error only if we couldn't get any entries
+    if latest_entries.is_empty() {
+        return Err(EntryError::NotFound("No valid pairs found".to_string()));
     }
 
     Ok(latest_entries)
