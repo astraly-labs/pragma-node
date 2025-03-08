@@ -1,0 +1,112 @@
+use std::pin::Pin;
+
+use axum::response::sse::Event;
+use pragma_common::types::{AggregationMode, pair::Pair};
+use pragma_entities::EntryError;
+
+use crate::{
+    AppState,
+    handlers::get_entry::{GetEntryResponse, RoutingParams, adapt_entry_to_entry_response},
+    infra::repositories::entry_repository,
+};
+
+pub const DEFAULT_HISTORICAL_PRICES: usize = 50;
+
+pub type BoxedFuture = Pin<Box<dyn Future<Output = Event> + Send>>;
+pub type BoxedStreamItem = Box<dyn FnMut() -> BoxedFuture + Send>;
+
+pub async fn get_historical_entries(
+    state: &AppState,
+    pair: &Pair,
+    routing_params: &RoutingParams,
+    count: usize,
+) -> Result<Vec<GetEntryResponse>, EntryError> {
+    let interval = routing_params.interval;
+    // Get current timestamp
+    let end_timestamp = chrono::Utc::now().timestamp() as u64;
+    // Get timestamp from count minutes ago
+    let start_timestamp = end_timestamp.saturating_sub(count as u64 * interval.to_seconds() as u64);
+
+    // Get entries based on aggregation mode
+    let entries = match routing_params.aggregation_mode {
+        AggregationMode::Median => entry_repository::get_median_prices_between(
+            &state.offchain_pool,
+            pair.to_pair_id(),
+            routing_params.clone(),
+            start_timestamp,
+            end_timestamp,
+        )
+        .await
+        .map_err(|e| e.to_entry_error(&pair.to_pair_id()))?,
+        AggregationMode::Mean | AggregationMode::Twap => unreachable!(),
+    };
+
+    let responses: Vec<GetEntryResponse> = entries
+        .into_iter()
+        .take(count)
+        .map(|entry| adapt_entry_to_entry_response(pair.to_pair_id(), &entry, entry.time))
+        .collect();
+
+    Ok(responses)
+}
+
+pub async fn get_latest_entry(
+    state: &AppState,
+    pair: &Pair,
+    is_routing: bool,
+    routing_params: &RoutingParams,
+) -> Result<GetEntryResponse, EntryError> {
+    // We have to update the timestamp to now every tick
+    let mut new_routing = routing_params.clone();
+    new_routing.timestamp = chrono::Utc::now().timestamp();
+
+    let entry = entry_repository::routing(&state.offchain_pool, is_routing, pair, &new_routing)
+        .await
+        .map_err(|e| e.to_entry_error(&(pair.to_pair_id())))?;
+
+    let last_updated_timestamp = entry_repository::get_last_updated_timestamp(
+        &state.offchain_pool,
+        pair.to_pair_id(),
+        new_routing.timestamp,
+    )
+    .await?
+    .unwrap_or(entry.time);
+
+    Ok(adapt_entry_to_entry_response(
+        pair.to_pair_id(),
+        &entry,
+        last_updated_timestamp,
+    ))
+}
+
+pub async fn get_historical_entries_multi_pair(
+    state: &AppState,
+    pairs: &[Pair],
+    routing_params: &RoutingParams,
+    count: usize,
+) -> Result<Vec<Vec<GetEntryResponse>>, EntryError> {
+    let mut all_entries = Vec::with_capacity(pairs.len());
+
+    for pair in pairs {
+        let entries = get_historical_entries(state, pair, routing_params, count).await?;
+        all_entries.push(entries);
+    }
+
+    Ok(all_entries)
+}
+
+pub async fn get_latest_entries_multi_pair(
+    state: &AppState,
+    pairs: &[Pair],
+    is_routing: bool,
+    routing_params: &RoutingParams,
+) -> Result<Vec<GetEntryResponse>, EntryError> {
+    let mut latest_entries = Vec::with_capacity(pairs.len());
+
+    for pair in pairs {
+        let entry = get_latest_entry(state, pair, is_routing, routing_params).await?;
+        latest_entries.push(entry);
+    }
+
+    Ok(latest_entries)
+}

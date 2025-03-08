@@ -6,6 +6,8 @@ pub mod timestamp;
 pub mod typed_data;
 pub mod utils;
 
+use std::time::Duration;
+
 use serde::{Deserialize, Serialize};
 use strum::{Display, EnumString};
 use utoipa::ToSchema;
@@ -58,6 +60,8 @@ pub enum DataType {
 // Supported Aggregation Intervals
 #[derive(Default, Debug, Serialize, Deserialize, ToSchema, Clone, Copy, Eq, PartialEq, Hash)]
 pub enum Interval {
+    #[serde(rename = "100ms")]
+    OneHundredMillisecond,
     #[serde(rename = "1s")]
     OneSecond,
     #[serde(rename = "5s")]
@@ -80,6 +84,7 @@ pub enum Interval {
 impl Interval {
     pub const fn to_minutes(&self) -> i64 {
         match self {
+            Self::OneHundredMillisecond => 0,
             Self::OneSecond => 0,
             Self::FiveSeconds => 5,
             Self::OneMinute => 1,
@@ -92,6 +97,9 @@ impl Interval {
     }
 
     pub const fn to_seconds(&self) -> i64 {
+        if matches!(self, Self::OneHundredMillisecond) {
+            return 0;
+        }
         if matches!(self, Self::OneSecond) {
             return 1;
         }
@@ -99,5 +107,19 @@ impl Interval {
             return 5;
         }
         self.to_minutes() * 60
+    }
+
+    pub const fn to_millis(&self) -> u64 {
+        if matches!(self, Self::OneHundredMillisecond) {
+            return 100;
+        }
+
+        (self.to_seconds() * 1000) as u64
+    }
+}
+
+impl From<Interval> for Duration {
+    fn from(interval: Interval) -> Self {
+        Duration::from_millis(interval.to_millis())
     }
 }

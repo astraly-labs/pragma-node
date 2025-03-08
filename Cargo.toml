@@ -56,7 +56,7 @@ aws-config = { version = "1.5.1", features = ["behavior-version-latest"] }
 aws-sdk-secretsmanager = "1.32.0"
 google-secretmanager1 = "6.0.0"
 axum = { version = "0.8", features = ["macros", "ws", "tokio"] }
-axum-extra = { version = "0.10.0", features = ["typed-header"] }
+axum-extra = { version = "0.10.0", features = ["typed-header", "query"] }
 axum-macros = "0.5"
 async-trait = "0.1.86"
 cainome = { git = "https://github.com/cartridge-gg/cainome", tag = "v0.4.5", features = [

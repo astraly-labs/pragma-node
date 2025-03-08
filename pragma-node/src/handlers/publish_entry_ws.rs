@@ -337,12 +337,12 @@ impl ChannelHandler<PublishEntryState, ClientMessage, WebSocketError> for Publis
     }
 }
 
-#[tracing::instrument(skip(subscriber))]
+#[tracing::instrument(skip_all)]
 async fn process_entries_without_verification(
     subscriber: &Subscriber<PublishEntryState>,
     new_entries: PublishEntryRequest,
 ) -> Result<CreateEntryResponse, EntryError> {
-    tracing::info!("Received new entries via WebSocket: {:?}", new_entries);
+    tracing::info!("Received new entries via WebSocket..");
 
     if new_entries.entries.is_empty() {
         return Ok(CreateEntryResponse {

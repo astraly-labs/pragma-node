@@ -45,6 +45,7 @@ pub const fn get_interval_specifier(
         }
     } else {
         match interval {
+            Interval::OneHundredMillisecond => Ok("100_ms"),
             Interval::OneSecond => Ok("1_s"),
             Interval::FiveSeconds => Ok("5_s"),
             Interval::OneMinute => Ok("1_min"),
