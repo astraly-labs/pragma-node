@@ -131,31 +131,26 @@ async fn get_gcp_client() -> Result<GcpManager, GcpError> {
                     "Service account file should contain: type, project_id, private_key_id, private_key, client_email, client_id, auth_uri, token_uri, auth_provider_x509_cert_url, client_x509_cert_url"
                 );
                 return Err(GcpError::ConnectionError(format!(
-                    "Failed to read service account: {}",
-                    e
+                    "Failed to read service account: {e}"
                 )));
             }
         };
 
-        let service_account =
-            match yup_oauth2::ServiceAccountAuthenticator::builder(service_account_key)
-                .build()
-                .await
-            {
-                Ok(authenticator) => {
-                    debug!("Successfully created service account authenticator");
-                    authenticator
-                }
-                Err(e) => {
-                    error!("Failed to create service account authenticator: {}", e);
-                    return Err(GcpError::ConnectionError(format!(
-                        "Failed to create service account authenticator: {}",
-                        e
-                    )));
-                }
-            };
-
-        service_account
+        match yup_oauth2::ServiceAccountAuthenticator::builder(service_account_key)
+            .build()
+            .await
+        {
+            Ok(authenticator) => {
+                debug!("Successfully created service account authenticator");
+                authenticator
+            }
+            Err(e) => {
+                error!("Failed to create service account authenticator: {e}");
+                return Err(GcpError::ConnectionError(format!(
+                    "Failed to create service account authenticator: {e}"
+                )));
+            }
+        }
     } else {
         debug!("No GOOGLE_APPLICATION_CREDENTIALS found, using application default credentials");
         // Fall back to application default credentials
@@ -166,8 +161,8 @@ async fn get_gcp_client() -> Result<GcpManager, GcpError> {
         .build()
         .await
         .map_err(|e| {
-            error!("Failed to create authenticator: {}", e);
-            GcpError::ConnectionError(format!("Failed to create authenticator: {}", e))
+            error!("Failed to create authenticator: {e}");
+            GcpError::ConnectionError(format!("Failed to create authenticator: {e}"))
         })?
     };
 

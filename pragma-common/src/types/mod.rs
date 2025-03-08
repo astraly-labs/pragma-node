@@ -84,8 +84,7 @@ pub enum Interval {
 impl Interval {
     pub const fn to_minutes(&self) -> i64 {
         match self {
-            Self::OneHundredMillisecond => 0,
-            Self::OneSecond => 0,
+            Self::OneHundredMillisecond | Self::OneSecond => 0,
             Self::FiveSeconds => 5,
             Self::OneMinute => 1,
             Self::FifteenMinutes => 15,
@@ -120,6 +119,6 @@ impl Interval {
 
 impl From<Interval> for Duration {
     fn from(interval: Interval) -> Self {
-        Duration::from_millis(interval.to_millis())
+        Self::from_millis(interval.to_millis())
     }
 }

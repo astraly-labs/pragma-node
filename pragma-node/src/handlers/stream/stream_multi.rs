@@ -60,7 +60,7 @@ pub async fn stream_entry_multi_pair(
         user_agent.as_str(),
         pairs
             .iter()
-            .map(|pair| pair.to_pair_id())
+            .map(Pair::to_pair_id)
             .collect::<Vec<_>>()
             .join(", "),
         historical_prices
