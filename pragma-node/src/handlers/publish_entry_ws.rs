@@ -1,3 +1,4 @@
+use pragma_entities::error::WebSocketError;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -16,9 +17,7 @@ use axum::response::IntoResponse;
 
 use crate::AppState;
 use crate::handlers::create_entry::CreateEntryResponse;
-use crate::utils::{
-    ChannelHandler, Subscriber, WebSocketError, convert_entry_to_db, convert_perp_entry_to_db,
-};
+use crate::utils::{ChannelHandler, Subscriber, convert_entry_to_db, convert_perp_entry_to_db};
 use crate::utils::{publish_to_kafka, validate_publisher};
 use pragma_common::signing::assert_login_is_valid;
 

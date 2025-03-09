@@ -10,6 +10,16 @@ use std::{
 use thiserror::Error;
 use utoipa::ToSchema;
 
+#[derive(Debug, Error, ToSchema)]
+pub enum WebSocketError {
+    #[error("could not create a channel with the client")]
+    ChannelInit,
+    #[error("could not decode client message: {0}")]
+    MessageDecode(String),
+    #[error("could not close the channel")]
+    ChannelClose,
+}
+
 #[derive(Debug, Error)]
 pub enum PragmaNodeError {
     #[error("cannot init database pool : {0}")]
@@ -65,6 +75,7 @@ pub enum InfraError {
     NoRpcAvailable(Network),
     // Unknown internal Server Error - should never be shown to the user
     InternalServerError,
+    WebSocketError(#[from] WebSocketError),
 }
 
 impl fmt::Display for InfraError {
@@ -92,6 +103,7 @@ impl fmt::Display for InfraError {
             // Unclassified
             Self::DisputerNotSet => write!(f, "Unable to fetch disputer address"),
             Self::SettlerNotSet => write!(f, "Unable to fetch settler address"),
+            Self::WebSocketError(e) => write!(f, "WebSocket error {e}"),
         }
     }
 }
