@@ -1,5 +1,6 @@
 use governor::{DefaultKeyedRateLimiter, Quota, RateLimiter};
 use nonzero_ext::nonzero;
+use pragma_entities::error::WebSocketError;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::fmt::Debug;
@@ -13,7 +14,6 @@ use crate::metrics::{Interaction, Status};
 use axum::extract::ws::{Message, WebSocket};
 use futures_util::stream::{SplitSink, SplitStream};
 use futures_util::{SinkExt, StreamExt};
-use thiserror::Error;
 use tokio::sync::{Mutex, watch};
 use tokio::time::{Interval, interval};
 use uuid::Uuid;
@@ -25,16 +25,6 @@ pub enum SubscriptionType {
     Subscribe,
     #[serde(rename = "unsubscribe")]
     Unsubscribe,
-}
-
-#[derive(Debug, Error)]
-pub enum WebSocketError {
-    #[error("could not create a channel with the client")]
-    ChannelInit,
-    #[error("could not decode client message: {0}")]
-    MessageDecode(String),
-    #[error("could not close the channel")]
-    ChannelClose,
 }
 
 /// Subscriber is an actor that handles a single websocket connection.
@@ -53,11 +43,16 @@ pub struct Subscriber<ChannelState> {
     pub notify_receiver: Receiver<Message>,
     pub rate_limiter: DefaultKeyedRateLimiter<IpAddr>,
     pub exit: (watch::Sender<bool>, watch::Receiver<bool>),
+    pub last_activity: std::time::Instant,
+    pub inactivity_timeout: Duration,
 }
 
 /// The maximum number of bytes that can be sent per second per IP address.
 /// If the limit is exceeded, the connection is closed.
 const BYTES_LIMIT_PER_IP_PER_SECOND: u32 = 256 * 1024; // 256 KiB
+
+/// The timeout for inactivity of a connection.
+const INACTIVITY_TIMEOUT: Duration = Duration::from_secs(60); // 1 minute timeout
 
 #[async_trait::async_trait]
 pub trait ChannelHandler<ChannelState, CM, Err> {
@@ -108,6 +103,8 @@ where
                 BYTES_LIMIT_PER_IP_PER_SECOND
             ))),
             exit: watch::channel(false),
+            last_activity: std::time::Instant::now(),
+            inactivity_timeout: INACTIVITY_TIMEOUT,
         };
         subscriber.assert_is_healthy().await?;
         // Retain the recent rate limit data for the IP addresses to
@@ -133,6 +130,7 @@ where
     where
         H: ChannelHandler<ChannelState, CM, Err>,
         CM: for<'a> Deserialize<'a>,
+        Err: From<WebSocketError>,
     {
         loop {
             tokio::select! {
@@ -150,6 +148,20 @@ where
                 },
                 // Periodic updates
                 _ = self.update_interval.tick() => {
+                    // Check for inactivity timeout
+                    if self.is_inactive() {
+                        tracing::warn!(
+                            subscriber_id = %self.id,
+                            ip = %self.ip_address,
+                            "Connection timeout due to inactivity"
+                        );
+                        self.send_err("Connection timeout due to inactivity").await;
+                        self.sender.close().await.map_err(|_| WebSocketError::ChannelClose)?;
+                        self.closed = true;
+                        self.record_metric(Interaction::CloseConnection, Status::Success);
+                        return Ok(());
+                    }
+
                     let status = handler.periodic_interval(self).await;
                     match status {
                         Ok(()) => {
@@ -238,6 +250,7 @@ where
             Message::Text(text) => {
                 let maybe_msg = serde_json::from_str::<T>(&text);
                 if let Ok(msg) = maybe_msg {
+                    self.last_activity = std::time::Instant::now();
                     return Ok(Some(msg));
                 }
                 tracing::error!("Failed to decode text message: {:?}", maybe_msg.err());
@@ -250,6 +263,7 @@ where
             Message::Binary(payload) => {
                 let maybe_msg = serde_json::from_slice::<T>(&payload);
                 if let Ok(msg) = maybe_msg {
+                    self.last_activity = std::time::Instant::now();
                     return Ok(Some(msg));
                 }
                 self.send_err(
@@ -258,8 +272,9 @@ where
                 .await;
                 return Err(WebSocketError::MessageDecode(format!("{payload:?}")));
             }
-            // Ignore pings and pongs messages
-            _ => {}
+            Message::Ping(_) | Message::Pong(_) => {
+                self.last_activity = std::time::Instant::now();
+            }
         }
         Ok(None)
     }
@@ -285,5 +300,10 @@ where
             interaction,
             status,
         );
+    }
+
+    /// Add method to check for timeout
+    fn is_inactive(&self) -> bool {
+        self.last_activity.elapsed() > self.inactivity_timeout
     }
 }

@@ -9,7 +9,7 @@ use pragma_common::timestamp::TimestampError;
 use pragma_common::types::{AggregationMode, Interval};
 
 use crate::PublisherError;
-use crate::error::InfraError;
+use crate::error::{InfraError, WebSocketError};
 
 #[derive(Debug, thiserror::Error, ToSchema)]
 pub enum EntryError {
@@ -56,6 +56,9 @@ pub enum EntryError {
     // 500 Error - Internal server error
     #[error("internal server error: {0}")]
     InternalServerError(String),
+
+    #[error("websocket error: {0}")]
+    WebSocketError(#[from] WebSocketError),
 }
 
 impl From<InfraError> for EntryError {
@@ -129,6 +132,10 @@ impl IntoResponse for EntryError {
             Self::InternalServerError(reason) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 format!("Interval server error: {reason}"),
+            ),
+            Self::WebSocketError(err) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("WebSocket error: {err}"),
             ),
         };
 
