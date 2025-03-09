@@ -106,7 +106,7 @@ pub async fn get_entry(
     PathExtractor(pair): PathExtractor<(String, String)>,
     Query(params): Query<GetEntryParams>,
 ) -> Result<Json<GetEntryResponse>, EntryError> {
-    let is_routing = params.routing.unwrap_or(false);
+    let is_routing = params.routing.unwrap_or(true);
 
     let entry_params = EntryParams::try_from(params)?;
 
