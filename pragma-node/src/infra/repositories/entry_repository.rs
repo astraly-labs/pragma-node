@@ -15,7 +15,7 @@ use pragma_common::types::pair::Pair;
 use pragma_common::types::{AggregationMode, DataType, Interval};
 use pragma_entities::{Entry, error::InfraError};
 
-use crate::constants::PRAGMA_DECIMALS;
+use crate::constants::EIGHTEEN_DECIMALS;
 use crate::constants::currencies::ABSTRACT_CURRENCIES;
 use crate::constants::others::ROUTING_FRESHNESS_THRESHOLD;
 use crate::constants::starkex_ws::{
@@ -87,7 +87,7 @@ pub fn calculate_rebased_price(
     let rebase_price = convert_via_quote(
         base_entry.median_price,
         quote_entry.median_price,
-        PRAGMA_DECIMALS,
+        EIGHTEEN_DECIMALS,
     )?;
 
     let max_timestamp = std::cmp::max(

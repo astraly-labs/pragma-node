@@ -10,7 +10,7 @@ use pragma_common::types::{AggregationMode, DataType, Interval};
 use pragma_entities::EntryError;
 
 use crate::AppState;
-use crate::constants::PRAGMA_DECIMALS;
+use crate::constants::EIGHTEEN_DECIMALS;
 use crate::infra::repositories::entry_repository::{
     MedianEntry, get_last_updated_timestamp, routing,
 };
@@ -48,8 +48,7 @@ impl TryFrom<GetEntryParams> for EntryParams {
         let interval = params.interval.unwrap_or_default();
         let aggregation_mode = params.aggregation.unwrap_or_default();
 
-        // Validate TWAP aggregation constraints
-        // NOTE: Fixed logic error in the original condition
+        // TWAP is only supported for One & Two hours
         if matches!(aggregation_mode, AggregationMode::Twap)
             && interval != Interval::OneHour
             && interval != Interval::TwoHours
@@ -142,6 +141,6 @@ pub fn adapt_entry_to_entry_response(
         timestamp: last_updated_timestamp.and_utc().timestamp_millis() as u64,
         num_sources_aggregated: entry.num_sources as usize,
         price: big_decimal_price_to_hex(&entry.median_price),
-        decimals: PRAGMA_DECIMALS,
+        decimals: EIGHTEEN_DECIMALS,
     }
 }

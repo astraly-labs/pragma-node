@@ -53,9 +53,9 @@ pub enum EntryError {
     #[error("could not sign price")]
     InvalidSigner,
 
-    // 500 Error - Internal server error - USER MUST NEVER SEE THAT!
-    #[error("internal server error")]
-    InternalServerError,
+    // 500 Error - Internal server error
+    #[error("internal server error: {0}")]
+    InternalServerError(String),
 }
 
 impl From<InfraError> for EntryError {
@@ -69,7 +69,7 @@ impl From<InfraError> for EntryError {
             InfraError::EntryNotFound(entry_id) => Self::EntryNotFound(entry_id),
             InfraError::PairNotFound(pair_id) => Self::PairNotFound(pair_id),
             // Those errors should never proc for Entry
-            _ => Self::InternalServerError,
+            e => Self::InternalServerError(e.to_string()),
         }
     }
 }
@@ -126,9 +126,9 @@ impl IntoResponse for EntryError {
                 format!("Can't build publish message: {err}"),
             ),
             Self::InvalidSigner => (StatusCode::BAD_REQUEST, "Could not sign price".to_string()),
-            Self::InternalServerError => (
+            Self::InternalServerError(reason) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                "Internal server error".to_string(),
+                format!("Interval server error: {reason}"),
             ),
         };
 

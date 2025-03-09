@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     assert_hex_prices_within_threshold,
     common::{
-        constants::{PRAGMA_DECIMALS, VARIATION_PERCENTAGE},
+        constants::{EIGHTEEN_DECIMALS, VARIATION_PERCENTAGE},
         setup::{TestHelper, setup_containers},
         utils::populate::get_pair_price,
     },
@@ -269,7 +269,7 @@ async fn get_entry_twap_strk_eth_ok(
 
     // 4. Assert
     let strk_eth_price = price as f64 / get_pair_price("ETH/USD") as f64;
-    let strk_eth_price = strk_eth_price * 10.0_f64.powi(PRAGMA_DECIMALS);
+    let strk_eth_price = strk_eth_price * 10.0_f64.powi(EIGHTEEN_DECIMALS);
     let expected_price_hex = format!("0x{:x}", strk_eth_price as u128);
 
     let threshold = BigDecimal::from_f64(VARIATION_PERCENTAGE).unwrap();

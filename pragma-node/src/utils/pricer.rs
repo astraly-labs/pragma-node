@@ -119,7 +119,9 @@ impl MarkPricer {
             let spot_usd_median_entry = stablecoins_spot_entries
                 .iter()
                 .find(|spot_median_entry| spot_median_entry.pair_id == related_usd_spot)
-                .ok_or(EntryError::InternalServerError)?;
+                .ok_or(EntryError::InternalServerError(format!(
+                    "No entry found for {related_usd_spot}"
+                )))?;
 
             let mark_price = Self::compute_mark_price(
                 &perp_median_entry.median_price,

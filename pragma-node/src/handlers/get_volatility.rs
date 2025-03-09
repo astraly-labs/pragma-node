@@ -8,7 +8,7 @@ use pragma_common::types::pair::Pair;
 use pragma_entities::VolatilityError;
 
 use crate::AppState;
-use crate::constants::PRAGMA_DECIMALS;
+use crate::constants::EIGHTEEN_DECIMALS;
 use crate::infra::repositories::entry_repository::{self, MedianEntry};
 use crate::utils::PathExtractor;
 use crate::utils::compute_volatility;
@@ -80,6 +80,6 @@ fn adapt_entry_to_entry_response(
     GetVolatilityResponse {
         pair_id,
         volatility,
-        decimals: PRAGMA_DECIMALS,
+        decimals: EIGHTEEN_DECIMALS,
     }
 }

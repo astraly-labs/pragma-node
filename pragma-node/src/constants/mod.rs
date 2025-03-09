@@ -7,4 +7,4 @@ pub mod starkex_ws;
 ///
 /// This is not the case for on-chain entries! They still have indiviual decimals.
 /// We use the `get_onchain_decimals` function to query the RPC and know how many.
-pub const PRAGMA_DECIMALS: u32 = 18;
+pub const EIGHTEEN_DECIMALS: u32 = 18;

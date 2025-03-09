@@ -206,7 +206,9 @@ impl WsEntriesHandler {
             .pragma_signer
             .as_ref()
             // Should not happen, as the endpoint is disabled if the signer is not found.
-            .ok_or(EntryError::InternalServerError)?;
+            .ok_or(EntryError::InternalServerError(
+                "No Signer for Pragma".into(),
+            ))?;
 
         for entry in median_entries {
             let pair_id = entry.pair_id.clone();
@@ -221,9 +223,9 @@ impl WsEntriesHandler {
                 sign_data(pragma_signer, &starkex_price).map_err(|_| EntryError::InvalidSigner)?;
 
             // Create AssetOraclePrice with the original entry (it will be scaled in the TryFrom implementation)
-            let mut oracle_price: AssetOraclePrice = entry
-                .try_into()
-                .map_err(|_| EntryError::InternalServerError)?;
+            let mut oracle_price: AssetOraclePrice = entry.try_into().map_err(|_| {
+                EntryError::InternalServerError("Could not create Oracle price".into())
+            })?;
             oracle_price.signature = signature;
             response.oracle_prices.push(oracle_price);
         }
