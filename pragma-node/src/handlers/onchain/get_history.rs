@@ -1,5 +1,6 @@
 use axum::Json;
 use axum::extract::{Query, State};
+use pragma_common::timestamp::TimestampError;
 use pragma_common::types::pair::Pair;
 use pragma_common::types::{Interval, Network};
 use pragma_entities::{EntryError, InfraError};
@@ -57,7 +58,8 @@ pub async fn get_onchain_history(
     let timestamp_range = params
         .timestamp
         .assert_time_is_valid()
-        .map_err(EntryError::InvalidTimestamp)?;
+        .map_err(|e| EntryError::InvalidTimestamp(TimestampError::RangeError(e)))?;
+
     let chunk_interval = params.chunk_interval.unwrap_or_default();
     let with_routing = params.routing.unwrap_or(false);
 
@@ -92,10 +94,10 @@ pub async fn get_onchain_history(
         }
         Err(e) => {
             // We early returns an empty array if no history is found
-            if matches!(e, InfraError::NotFound) {
+            if matches!(e, InfraError::RoutingError(_)) {
                 return Ok(Json(GetOnchainHistoryResponse(vec![])));
             }
-            return Err(e.to_entry_error(&pair.to_pair_id()));
+            return Err(e.into());
         }
     };
 

@@ -1,15 +1,16 @@
 use axum::Json;
 use axum::extract::{Query, State};
-use pragma_common::types::pair::Pair;
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToResponse, ToSchema};
+
+use pragma_common::timestamp::{TimestampError, TimestampRangeError};
+use pragma_common::types::pair::Pair;
+use pragma_entities::VolatilityError;
 
 use crate::AppState;
 use crate::constants::PRAGMA_DECIMALS;
 use crate::infra::repositories::entry_repository::{self, MedianEntry};
 use crate::utils::PathExtractor;
-use pragma_entities::{EntryError, VolatilityError};
-
 use crate::utils::compute_volatility;
 
 /// Volatility query
@@ -45,12 +46,12 @@ pub async fn get_volatility(
     State(state): State<AppState>,
     PathExtractor(pair): PathExtractor<(String, String)>,
     Query(volatility_query): Query<VolatilityQuery>,
-) -> Result<Json<GetVolatilityResponse>, EntryError> {
+) -> Result<Json<GetVolatilityResponse>, VolatilityError> {
     let pair = Pair::from(pair);
 
     if volatility_query.start > volatility_query.end {
-        return Err(EntryError::VolatilityError(
-            VolatilityError::InvalidTimestampsRange(volatility_query.start, volatility_query.end),
+        return Err(VolatilityError::InvalidTimestamp(
+            TimestampError::RangeError(TimestampRangeError::StartAfterEnd),
         ));
     }
 
@@ -64,7 +65,7 @@ pub async fn get_volatility(
     .await?;
 
     if entries.is_empty() {
-        return Err(EntryError::UnknownPairId(pair.to_pair_id()));
+        return Err(VolatilityError::EntryNotFound(pair.to_pair_id()));
     }
 
     Ok(Json(adapt_entry_to_entry_response(pair.into(), &entries)))

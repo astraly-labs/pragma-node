@@ -8,39 +8,40 @@ use tracing::{debug, error, info};
 const GCP_PRAGMA_PRIVATE_KEY_SECRET: &str = "pragma-secret-key";
 const GCP_JSON_STARK_PRIVATE_KEY_FIELD: &str = "STARK_PRIVATE_KEY";
 
-pub type GcpManager = SecretManager<HttpsConnector<HttpConnector>>;
+type GcpManager = SecretManager<HttpsConnector<HttpConnector>>;
 
 #[derive(Debug)]
-pub enum GcpError {
+enum GcpError {
     NoSecretFound,
     DeserializationError,
+    #[allow(unused)]
     ConnectionError(String),
 }
 
-pub struct PragmaSignerBuilder {
+pub(super) struct PragmaSignerBuilder {
     is_production: bool,
 }
 
 impl PragmaSignerBuilder {
-    pub const fn new() -> Self {
+    pub(super) const fn new() -> Self {
         Self {
             is_production: false,
         }
     }
 
     #[must_use]
-    pub const fn production_mode(mut self) -> Self {
+    pub(super) const fn production_mode(mut self) -> Self {
         self.is_production = true;
         self
     }
 
     #[must_use]
-    pub const fn non_production_mode(mut self) -> Self {
+    pub(super) const fn non_production_mode(mut self) -> Self {
         self.is_production = false;
         self
     }
 
-    pub async fn build(self) -> Option<SigningKey> {
+    pub(super) async fn build(self) -> Option<SigningKey> {
         if self.is_production {
             build_pragma_signer_from_gcp().await
         } else {
@@ -55,7 +56,8 @@ impl Default for PragmaSignerBuilder {
     }
 }
 
-pub async fn build_pragma_signer_from_gcp() -> Option<SigningKey> {
+#[allow(clippy::cognitive_complexity)]
+async fn build_pragma_signer_from_gcp() -> Option<SigningKey> {
     debug!("Starting to build pragma signer from GCP");
     let gcp_client = match get_gcp_client().await {
         Ok(client) => {
@@ -106,6 +108,7 @@ pub async fn build_pragma_signer_from_gcp() -> Option<SigningKey> {
     Some(SigningKey::from_secret_scalar(pragma_secret_key))
 }
 
+#[allow(clippy::cognitive_complexity)]
 async fn get_gcp_client() -> Result<GcpManager, GcpError> {
     debug!("Attempting to create GCP client");
     // Check if service account credentials are provided

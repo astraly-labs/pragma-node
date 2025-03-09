@@ -78,7 +78,7 @@ pub async fn get_onchain_checkpoints(
     let checkpoints = get_checkpoints(
         &state.onchain_pool,
         params.network,
-        pair.into(),
+        pair.clone().into(),
         decimals,
         limit,
     )
@@ -86,7 +86,7 @@ pub async fn get_onchain_checkpoints(
     .map_err(CheckpointError::from)?;
 
     if checkpoints.is_empty() {
-        return Err(CheckpointError::NotFound);
+        return Err(CheckpointError::CheckpointNotFound(pair.to_pair_id()));
     }
     Ok(Json(GetOnchainCheckpointsResponse(checkpoints)))
 }

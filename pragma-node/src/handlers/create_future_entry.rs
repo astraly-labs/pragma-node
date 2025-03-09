@@ -1,7 +1,7 @@
 use axum::Json;
 use axum::extract::{self, State};
 use chrono::{DateTime, Utc};
-use pragma_common::timestamp::TimestampRangeError;
+use pragma_common::timestamp::TimestampError;
 use pragma_entities::{EntryError, NewFutureEntry};
 use serde::{Deserialize, Serialize};
 use starknet::core::types::Felt;
@@ -86,7 +86,7 @@ pub async fn create_future_entries(
                 Some(dt) => dt.naive_utc(),
                 None => {
                     return Err(EntryError::InvalidTimestamp(
-                        TimestampRangeError::ConversionError,
+                        TimestampError::ToDatetimeErrorU64(future_entry.base.timestamp),
                     ));
                 }
             };
@@ -103,7 +103,7 @@ pub async fn create_future_entries(
                     Some(dt) => Some(dt.naive_utc()),
                     None => {
                         return Err(EntryError::InvalidTimestamp(
-                            TimestampRangeError::ConversionError,
+                            TimestampError::ToDatetimeErrorU64(future_entry.expiration_timestamp),
                         ));
                     }
                 }

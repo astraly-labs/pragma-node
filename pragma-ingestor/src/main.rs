@@ -8,9 +8,7 @@ use tokio::sync::mpsc;
 use tracing::{error, info};
 
 use pragma_entities::connection::ENV_OFFCHAIN_DATABASE_URL;
-use pragma_entities::{
-    Entry, FutureEntry, InfraError, NewEntry, NewFutureEntry, adapt_infra_error,
-};
+use pragma_entities::{Entry, FutureEntry, InfraError, NewEntry, NewFutureEntry};
 
 #[tokio::main]
 #[tracing::instrument]
@@ -80,12 +78,12 @@ pub async fn insert_spot_entries(
     pool: &Pool,
     new_entries: Vec<NewEntry>,
 ) -> Result<(), InfraError> {
-    let conn = pool.get().await.map_err(adapt_infra_error)?;
+    let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
     let entries = conn
         .interact(move |conn| Entry::create_many(conn, new_entries))
         .await
-        .map_err(adapt_infra_error)?
-        .map_err(adapt_infra_error)?;
+        .map_err(InfraError::DbInteractionError)?
+        .map_err(InfraError::DbResultError)?;
 
     for entry in &entries {
         info!(
@@ -102,7 +100,7 @@ pub async fn insert_future_entries(
     pool: &Pool,
     new_entries: Vec<NewFutureEntry>,
 ) -> Result<(), InfraError> {
-    let conn = pool.get().await.map_err(adapt_infra_error)?;
+    let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
 
     // Double check that we don't have expiration_timestamp set to 0,
     // if we do, we set them to NULL to be extra clear in the database
@@ -133,8 +131,8 @@ pub async fn insert_future_entries(
     let entries = conn
         .interact(move |conn| FutureEntry::create_many(conn, new_entries))
         .await
-        .map_err(adapt_infra_error)?
-        .map_err(adapt_infra_error)?;
+        .map_err(InfraError::DbInteractionError)?
+        .map_err(InfraError::DbResultError)?;
     for entry in &entries {
         info!(
             "new future entry created {} - {}({}) - {}",

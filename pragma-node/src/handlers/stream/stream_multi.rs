@@ -17,7 +17,7 @@ use crate::{
     AppState,
     handlers::{
         GetEntryParams,
-        get_entry::RoutingParams,
+        get_entry::EntryParams,
         stream::{
             BoxedFuture, BoxedStreamItem, DEFAULT_HISTORICAL_PRICES,
             get_historical_entries_multi_pair, get_latest_entries_multi_pair,
@@ -90,7 +90,7 @@ pub async fn stream_entry_multi_pair(
             })
         })
     } else {
-        match RoutingParams::try_from(params.get_entry_params) {
+        match EntryParams::try_from(params.get_entry_params) {
             Ok(get_entry_params) => {
                 let mut first_batch = true;
 

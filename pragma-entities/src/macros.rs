@@ -11,7 +11,7 @@ macro_rules! convert_timestamp_to_datetime {
     ($timestamp:expr) => {{
         if $timestamp > (i64::MAX as u64).try_into().unwrap() {
             Err(EntryError::InvalidTimestamp(
-                pragma_common::timestamp::TimestampRangeError::Other(format!(
+                pragma_common::timestamp::TimestampError::Other(format!(
                     "Timestamp {} is too large",
                     $timestamp
                 )),
@@ -21,24 +21,18 @@ macro_rules! convert_timestamp_to_datetime {
             chrono::DateTime::<chrono::Utc>::from_timestamp_millis($timestamp as i64)
                 .map(|dt| dt.naive_utc())
                 .ok_or_else(|| {
-                    EntryError::InvalidTimestamp(
-                        pragma_common::timestamp::TimestampRangeError::Other(format!(
-                            "Could not convert {} to DateTime (millis)",
-                            $timestamp
-                        )),
-                    )
+                    EntryError::InvalidTimestamp(pragma_common::timestamp::TimestampError::Other(
+                        format!("Could not convert {} to DateTime (millis)", $timestamp),
+                    ))
                 })
         } else {
             #[allow(clippy::cast_possible_wrap)]
             chrono::DateTime::<chrono::Utc>::from_timestamp($timestamp as i64, 0)
                 .map(|dt| dt.naive_utc())
                 .ok_or_else(|| {
-                    EntryError::InvalidTimestamp(
-                        pragma_common::timestamp::TimestampRangeError::Other(format!(
-                            "Could not convert {} to DateTime (seconds)",
-                            $timestamp
-                        )),
-                    )
+                    EntryError::InvalidTimestamp(pragma_common::timestamp::TimestampError::Other(
+                        format!("Could not convert {} to DateTime (seconds)", $timestamp),
+                    ))
                 })
         }
     }};

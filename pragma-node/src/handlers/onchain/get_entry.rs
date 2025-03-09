@@ -87,22 +87,22 @@ pub async fn get_onchain_entry(
         state.caches.onchain_decimals(),
     )
     .await
-    .map_err(|db_error| db_error.to_entry_error(&pair.to_pair_id()))?;
+    .map_err(EntryError::from)?;
 
     let entry = raw_data
         .first()
-        .ok_or_else(|| EntryError::NotFound(pair.to_pair_id()))?;
+        .ok_or_else(|| EntryError::EntryNotFound(pair.to_pair_id()))?;
 
     let last_updated_timestamp =
         get_last_updated_timestamp(&state.onchain_pool, params.network, entry.pair_used.clone())
             .await
-            .map_err(|db_error| db_error.to_entry_error(&pair.to_pair_id()))?;
+            .map_err(EntryError::from)?;
 
     let variations = if with_variations {
         Some(
             get_variations(&state.onchain_pool, params.network, pair.to_pair_id())
                 .await
-                .map_err(|db_error| db_error.to_entry_error(&pair.to_pair_id()))?,
+                .map_err(EntryError::from)?,
         )
     } else {
         None

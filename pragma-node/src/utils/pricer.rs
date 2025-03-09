@@ -38,7 +38,7 @@ impl Pricer for IndexPricer {
         }
         get_current_median_entries_with_components(db_pool, &self.pairs, self.pair_type)
             .await
-            .map_err(|e| e.to_entry_error(&self.pairs.join(",")))
+            .map_err(EntryError::from)
     }
 }
 

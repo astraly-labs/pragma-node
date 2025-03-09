@@ -8,13 +8,13 @@ pub mod schema;
 
 pub use models::entries::entry_error::EntryError;
 
-// exporting for idiomatic use
-pub use error::{InfraError, adapt_infra_error};
+pub use error::InfraError;
+
 pub use models::{
     checkpoint_error::CheckpointError,
     entry::{Entry, NewEntry},
-    entry_error::VolatilityError,
     future_entry::{FutureEntry, NewFutureEntry},
     publisher::{NewPublisher, Publishers},
     publisher_error::PublisherError,
+    volatility_error::VolatilityError,
 };

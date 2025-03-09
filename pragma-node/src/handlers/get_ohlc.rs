@@ -1,6 +1,6 @@
 use axum::Json;
 use axum::extract::{Query, State};
-use pragma_common::timestamp::TimestampRangeError;
+use pragma_common::timestamp::{TimestampError, TimestampRangeError};
 use pragma_common::types::pair::Pair;
 use serde::{Deserialize, Serialize};
 use utoipa::{ToResponse, ToSchema};
@@ -49,15 +49,15 @@ pub async fn get_ohlc(
 
     // Validate given timestamp
     if timestamp > now {
-        return Err(EntryError::InvalidTimestamp(
+        return Err(EntryError::InvalidTimestamp(TimestampError::RangeError(
             TimestampRangeError::EndInFuture,
-        ));
+        )));
     }
 
     let entries =
         entry_repository::get_ohlc(&state.offchain_pool, pair.to_pair_id(), interval, timestamp)
             .await
-            .map_err(|db_error| db_error.to_entry_error(&pair.to_pair_id()))?;
+            .map_err(EntryError::from)?;
 
     Ok(Json(adapt_entry_to_entry_response(pair.into(), &entries)))
 }

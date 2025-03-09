@@ -8,7 +8,7 @@ use moka::future::Cache;
 
 use pragma_common::types::pair::Pair;
 use pragma_common::types::{AggregationMode, DataType, Interval, Network};
-use pragma_entities::error::{InfraError, adapt_infra_error};
+use pragma_entities::error::InfraError;
 use pragma_monitoring::models::SpotEntry;
 
 use crate::constants::currencies::ABSTRACT_CURRENCIES;
@@ -111,7 +111,7 @@ pub async fn routing(
         }
     }
     if !is_routing {
-        return Err(InfraError::NotFound);
+        return Err(InfraError::EntryNotFound(pair_id));
     }
 
     // safe unwrap since we construct the pairs string in calling function
@@ -155,6 +155,10 @@ pub async fn routing(
             )
             .await?;
 
+            if quote_alt_result.len() != base_alt_result.len() {
+                return Err(InfraError::RoutingError(pair_id));
+            }
+
             let result = compute_multiple_rebased_price(
                 &mut base_alt_result,
                 &quote_alt_result,
@@ -166,7 +170,7 @@ pub async fn routing(
             return result;
         }
     }
-    Err(InfraError::NotFound)
+    Err(InfraError::RoutingError(pair_id))
 }
 
 fn build_sql_query(
@@ -279,7 +283,7 @@ pub async fn get_sources_and_aggregate(
 ) -> Result<Vec<AggPriceAndEntries>, InfraError> {
     let raw_sql = build_sql_query(network, aggregation_mode, timestamp)?;
 
-    let conn = pool.get().await.map_err(adapt_infra_error)?;
+    let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
     let raw_entries = conn
         .interact(move |conn| {
             diesel::sql_query(raw_sql)
@@ -287,8 +291,8 @@ pub async fn get_sources_and_aggregate(
                 .load::<SpotEntryWithAggregatedPrice>(conn)
         })
         .await
-        .map_err(adapt_infra_error)?
-        .map_err(adapt_infra_error)?;
+        .map_err(InfraError::DbInteractionError)?
+        .map_err(InfraError::DbResultError)?;
 
     Ok(group_entries_per_aggprice(raw_entries))
 }
@@ -325,10 +329,6 @@ fn compute_multiple_rebased_price(
     base_alt_decimal: u32,
     quote_alt_decimal: u32,
 ) -> Result<Vec<RawOnchainData>, InfraError> {
-    if quote_alt_result.len() != base_alt_result.len() {
-        return Err(InfraError::RoutingError);
-    }
-
     let mut result: Vec<RawOnchainData> = Vec::new();
 
     for (i, base) in base_alt_result.iter_mut().enumerate() {
@@ -375,14 +375,17 @@ pub async fn get_last_updated_timestamp(
         get_onchain_table_name(network, DataType::SpotEntry)?,
         pair_list,
     );
-    let conn = pool.get().await.map_err(adapt_infra_error)?;
+    let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
     let raw_entry = conn
         .interact(move |conn| diesel::sql_query(raw_sql).load::<EntryTimestamp>(conn))
         .await
-        .map_err(adapt_infra_error)?
-        .map_err(adapt_infra_error)?;
+        .map_err(InfraError::DbInteractionError)?
+        .map_err(InfraError::DbResultError)?;
 
-    let most_recent_entry = raw_entry.first().ok_or(InfraError::NotFound)?;
+    let most_recent_entry = raw_entry
+        .first()
+        .ok_or(InfraError::EntryNotFound(pair_list))?;
+
     Ok(most_recent_entry.timestamp.and_utc().timestamp() as u64)
 }
 
@@ -433,13 +436,13 @@ pub async fn get_variations(
             ",
         );
 
-        let conn = pool.get().await.map_err(adapt_infra_error)?;
+        let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
         let p = pair_id.clone();
         let raw_entries: Vec<VariationEntry> = conn
             .interact(move |conn| diesel::sql_query(raw_sql).bind::<Text, _>(p).load(conn))
             .await
-            .map_err(adapt_infra_error)?
-            .map_err(adapt_infra_error)?;
+            .map_err(InfraError::DbInteractionError)?
+            .map_err(InfraError::DbResultError)?;
 
         if raw_entries.len() == 2 {
             let current_open = get_mid_price(&raw_entries[0].open, &raw_entries[0].close);
@@ -494,12 +497,12 @@ pub async fn get_existing_pairs(
         table_name = get_onchain_table_name(network, DataType::SpotEntry)?
     );
 
-    let conn = pool.get().await.map_err(adapt_infra_error)?;
+    let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
     let raw_entries = conn
         .interact(move |conn| diesel::sql_query(raw_sql).load::<EntryPairId>(conn))
         .await
-        .map_err(adapt_infra_error)?
-        .map_err(adapt_infra_error)?;
+        .map_err(InfraError::DbInteractionError)?
+        .map_err(InfraError::DbResultError)?;
 
     Ok(raw_entries)
 }

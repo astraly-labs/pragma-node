@@ -3,6 +3,7 @@ pub mod entries;
 pub mod optimistic_oracle_error;
 pub mod publisher;
 pub mod publisher_error;
+pub mod volatility_error;
 
 pub use entries::{entry, entry_error, future_entry};
 

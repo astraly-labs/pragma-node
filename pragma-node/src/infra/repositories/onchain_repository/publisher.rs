@@ -9,7 +9,7 @@ use moka::future::Cache;
 
 use pragma_common::types::pair::Pair;
 use pragma_common::types::{DataType, Network};
-use pragma_entities::error::{InfraError, adapt_infra_error};
+use pragma_entities::error::InfraError;
 
 use crate::handlers::onchain::get_publishers::{Publisher, PublisherEntry};
 use crate::infra::rpc::RpcClients;
@@ -50,12 +50,12 @@ pub async fn get_publishers(
     ",
     );
 
-    let conn = pool.get().await.map_err(adapt_infra_error)?;
+    let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
     let raw_publishers = conn
         .interact(move |conn| diesel::sql_query(raw_sql).load::<RawPublisher>(conn))
         .await
-        .map_err(adapt_infra_error)?
-        .map_err(adapt_infra_error)?;
+        .map_err(InfraError::DbInteractionError)?
+        .map_err(InfraError::DbResultError)?;
 
     Ok(raw_publishers)
 }
@@ -142,12 +142,12 @@ async fn get_all_publishers_updates(
         ",
     );
 
-    let conn = pool.get().await.map_err(adapt_infra_error)?;
+    let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
     let updates = conn
         .interact(move |conn| diesel::sql_query(raw_sql).load::<RawPublisherUpdates>(conn))
         .await
-        .map_err(adapt_infra_error)?
-        .map_err(adapt_infra_error)?;
+        .map_err(InfraError::DbInteractionError)?
+        .map_err(InfraError::DbResultError)?;
 
     let updates: HashMap<String, RawPublisherUpdates> = updates
         .into_iter()
@@ -213,15 +213,15 @@ async fn get_publisher_with_components(
         publisher_name = publisher.name
     );
 
-    let conn = pool.get().await.map_err(adapt_infra_error)?;
+    let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
 
     let raw_components = conn
         .interact(move |conn| {
             diesel::sql_query(raw_sql_entries).load::<RawLastPublisherEntryForPair>(conn)
         })
         .await
-        .map_err(adapt_infra_error)?
-        .map_err(adapt_infra_error)?;
+        .map_err(InfraError::DbInteractionError)?
+        .map_err(InfraError::DbResultError)?;
 
     let component_futures: Vec<_> = raw_components
         .iter()
@@ -231,13 +231,13 @@ async fn get_publisher_with_components(
     // Execute all futures concurrently and collect results
     let components = try_join_all(component_futures)
         .await
-        .map_err(|_| InfraError::NotFound)?;
+        .map_err(|_| InfraError::PublishersNotFound)?;
 
     let last_updated_timestamp = components
         .iter()
         .map(|component| component.last_updated_timestamp)
         .max()
-        .ok_or(InfraError::NotFound)?;
+        .ok_or(InfraError::PublishersNotFound)?;
 
     let publisher = Publisher {
         publisher: publisher.name.clone(),

@@ -5,6 +5,7 @@ use chrono::{DateTime, NaiveDateTime};
 use diesel::prelude::QueryableByName;
 use diesel::sql_types::{Double, Jsonb, VarChar};
 use diesel::{Queryable, RunQueryDsl};
+use pragma_common::timestamp::TimestampError;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -12,10 +13,7 @@ use pragma_common::errors::ConversionError;
 use pragma_common::signing::starkex::StarkexPrice;
 use pragma_common::types::pair::Pair;
 use pragma_common::types::{AggregationMode, DataType, Interval};
-use pragma_entities::{
-    Entry,
-    error::{InfraError, adapt_infra_error},
-};
+use pragma_entities::{Entry, error::InfraError};
 
 use crate::constants::PRAGMA_DECIMALS;
 use crate::constants::currencies::ABSTRACT_CURRENCIES;
@@ -24,7 +22,7 @@ use crate::constants::starkex_ws::{
     INITAL_INTERVAL_IN_MS, INTERVAL_INCREMENT_IN_MS, MAX_INTERVAL_WITHOUT_ENTRIES,
     MINIMUM_NUMBER_OF_PUBLISHERS,
 };
-use crate::handlers::get_entry::RoutingParams;
+use crate::handlers::get_entry::EntryParams;
 use crate::handlers::subscribe_to_entry::{AssetOraclePrice, SignedPublisherPrice};
 use crate::utils::convert_via_quote;
 use crate::utils::sql::{
@@ -58,24 +56,24 @@ pub async fn routing(
     pool: &deadpool_diesel::postgres::Pool,
     is_routing: bool,
     pair: &Pair,
-    routing_params: &RoutingParams,
+    entry_params: &EntryParams,
 ) -> Result<MedianEntry, InfraError> {
     // If we have entries for the pair_id and the latest entry is fresh enough,
     // Or if we are not routing, we can return the price directly.
     if !is_routing
         || (pair_id_exist(pool, pair).await?
-            && get_last_updated_timestamp(pool, pair.to_pair_id(), routing_params.timestamp)
+            && get_last_updated_timestamp(pool, pair.to_pair_id(), entry_params.timestamp)
                 .await?
                 .unwrap_or(NaiveDateTime::default())
                 .and_utc()
                 .timestamp()
-                >= routing_params.timestamp - ROUTING_FRESHNESS_THRESHOLD)
+                >= entry_params.timestamp - ROUTING_FRESHNESS_THRESHOLD)
     {
-        return get_price(pool, pair, routing_params).await;
+        return get_price(pool, pair, entry_params).await;
     }
 
-    (find_alternative_pair_price(pool, pair, routing_params).await)
-        .map_or_else(|_| Err(InfraError::NotFound), Ok)
+    (find_alternative_pair_price(pool, pair, entry_params).await)
+        .map_or_else(|_| Err(InfraError::RoutingError(pair.to_pair_id())), Ok)
 }
 
 pub fn calculate_rebased_price(
@@ -98,9 +96,9 @@ pub fn calculate_rebased_price(
     );
     let num_sources = std::cmp::max(base_entry.num_sources, quote_entry.num_sources);
     let new_timestamp = DateTime::from_timestamp(max_timestamp, 0)
-        .ok_or(InfraError::InvalidTimestamp(format!(
-            "Cannot convert to DateTime: {max_timestamp}"
-        )))?
+        .ok_or(InfraError::InvalidTimestamp(
+            TimestampError::ToDatetimeErrorI64(max_timestamp),
+        ))?
         .naive_utc();
 
     let median_entry = MedianEntry {
@@ -115,7 +113,7 @@ pub fn calculate_rebased_price(
 async fn find_alternative_pair_price(
     pool: &deadpool_diesel::postgres::Pool,
     pair: &Pair,
-    routing_params: &RoutingParams,
+    entry_params: &EntryParams,
 ) -> Result<MedianEntry, InfraError> {
     for alt_currency in ABSTRACT_CURRENCIES {
         let base_alt_pair = Pair::from((pair.base.clone(), alt_currency.to_string()));
@@ -124,28 +122,28 @@ async fn find_alternative_pair_price(
         if pair_id_exist(pool, &base_alt_pair.clone()).await?
             && pair_id_exist(pool, &alt_quote_pair.clone()).await?
         {
-            let base_alt_result = get_price(pool, &base_alt_pair, routing_params).await?;
-            let alt_quote_result = get_price(pool, &alt_quote_pair, routing_params).await?;
+            let base_alt_result = get_price(pool, &base_alt_pair, entry_params).await?;
+            let alt_quote_result = get_price(pool, &alt_quote_pair, entry_params).await?;
 
             return calculate_rebased_price(base_alt_result, alt_quote_result);
         }
     }
 
-    Err(InfraError::NotFound)
+    Err(InfraError::RoutingError(pair.to_pair_id()))
 }
 
 async fn pair_id_exist(
     pool: &deadpool_diesel::postgres::Pool,
     pair: &Pair,
 ) -> Result<bool, InfraError> {
-    let conn = pool.get().await.map_err(adapt_infra_error)?;
+    let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
 
     let pair_str = pair.to_string();
     let res = conn
         .interact(move |conn| Entry::exists(conn, pair_str))
         .await
-        .map_err(adapt_infra_error)?
-        .map_err(adapt_infra_error)?;
+        .map_err(InfraError::DbInteractionError)?
+        .map_err(InfraError::DbResultError)?;
 
     Ok(res)
 }
@@ -153,13 +151,11 @@ async fn pair_id_exist(
 async fn get_price(
     pool: &deadpool_diesel::postgres::Pool,
     pair: &Pair,
-    routing_params: &RoutingParams,
+    entry_params: &EntryParams,
 ) -> Result<MedianEntry, InfraError> {
-    let entry = match routing_params.aggregation_mode {
-        AggregationMode::Median => {
-            get_median_price(pool, pair.to_pair_id(), routing_params).await?
-        }
-        AggregationMode::Twap => get_twap_price(pool, pair.to_pair_id(), routing_params).await?,
+    let entry = match entry_params.aggregation_mode {
+        AggregationMode::Median => get_median_price(pool, pair.to_pair_id(), entry_params).await?,
+        AggregationMode::Twap => get_twap_price(pool, pair.to_pair_id(), entry_params).await?,
         AggregationMode::Mean => Err(InfraError::InternalServerError)?,
     };
 
@@ -169,9 +165,9 @@ async fn get_price(
 pub async fn get_twap_price(
     pool: &deadpool_diesel::postgres::Pool,
     pair_id: String,
-    routing_params: &RoutingParams,
+    entry_params: &EntryParams,
 ) -> Result<MedianEntry, InfraError> {
-    let conn = pool.get().await.map_err(adapt_infra_error)?;
+    let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
 
     let sql_request: String = format!(
         r"
@@ -191,30 +187,30 @@ pub async fn get_twap_price(
             time DESC
         LIMIT 1;
     ",
-        get_interval_specifier(routing_params.interval, true)?,
-        get_table_suffix(routing_params.data_type)?,
-        get_expiration_timestamp_filter(routing_params.data_type, &routing_params.expiry)?,
+        get_interval_specifier(entry_params.interval, true)?,
+        get_table_suffix(entry_params.data_type)?,
+        get_expiration_timestamp_filter(entry_params.data_type, &entry_params.expiry)?,
     );
 
-    let date_time = DateTime::from_timestamp(routing_params.timestamp, 0).ok_or(
-        InfraError::InvalidTimestamp(format!(
-            "Cannot convert to DateTime: {}",
-            routing_params.timestamp
-        )),
+    let date_time = DateTime::from_timestamp(entry_params.timestamp, 0).ok_or(
+        InfraError::InvalidTimestamp(TimestampError::ToDatetimeErrorI64(entry_params.timestamp)),
     )?;
 
+    let p = pair_id.clone();
     let raw_entry = conn
         .interact(move |conn| {
             diesel::sql_query(&sql_request)
-                .bind::<diesel::sql_types::Text, _>(pair_id)
+                .bind::<diesel::sql_types::Text, _>(p)
                 .bind::<diesel::sql_types::Timestamptz, _>(date_time)
                 .load::<MedianEntryRaw>(conn)
         })
         .await
-        .map_err(adapt_infra_error)?
-        .map_err(adapt_infra_error)?;
+        .map_err(InfraError::DbInteractionError)?
+        .map_err(InfraError::DbResultError)?;
 
-    let raw_entry = raw_entry.first().ok_or(InfraError::NotFound)?;
+    let raw_entry = raw_entry
+        .first()
+        .ok_or(InfraError::EntryNotFound(pair_id))?;
 
     let entry: MedianEntry = MedianEntry {
         time: raw_entry.time,
@@ -228,9 +224,9 @@ pub async fn get_twap_price(
 pub async fn get_median_price(
     pool: &deadpool_diesel::postgres::Pool,
     pair_id: String,
-    routing_params: &RoutingParams,
+    entry_params: &EntryParams,
 ) -> Result<MedianEntry, InfraError> {
-    let conn = pool.get().await.map_err(adapt_infra_error)?;
+    let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
 
     let sql_request: String = format!(
         r"
@@ -250,30 +246,30 @@ pub async fn get_median_price(
             time DESC
         LIMIT 1;
     ",
-        get_interval_specifier(routing_params.interval, false)?,
-        get_table_suffix(routing_params.data_type)?,
-        get_expiration_timestamp_filter(routing_params.data_type, &routing_params.expiry)?,
+        get_interval_specifier(entry_params.interval, false)?,
+        get_table_suffix(entry_params.data_type)?,
+        get_expiration_timestamp_filter(entry_params.data_type, &entry_params.expiry)?,
     );
 
-    let date_time = DateTime::from_timestamp(routing_params.timestamp, 0).ok_or(
-        InfraError::InvalidTimestamp(format!(
-            "Cannot convert to DateTime: {}",
-            routing_params.timestamp
-        )),
+    let date_time = DateTime::from_timestamp(entry_params.timestamp, 0).ok_or(
+        InfraError::InvalidTimestamp(TimestampError::ToDatetimeErrorI64(entry_params.timestamp)),
     )?;
 
+    let p = pair_id.clone();
     let raw_entry = conn
         .interact(move |conn| {
             diesel::sql_query(&sql_request)
-                .bind::<diesel::sql_types::Text, _>(pair_id)
+                .bind::<diesel::sql_types::Text, _>(p)
                 .bind::<diesel::sql_types::Timestamptz, _>(date_time)
                 .load::<MedianEntryRaw>(conn)
         })
         .await
-        .map_err(adapt_infra_error)?
-        .map_err(adapt_infra_error)?;
+        .map_err(InfraError::DbInteractionError)?
+        .map_err(InfraError::DbResultError)?;
 
-    let raw_entry = raw_entry.first().ok_or(InfraError::NotFound)?;
+    let raw_entry = raw_entry
+        .first()
+        .ok_or(InfraError::EntryNotFound(pair_id))?;
 
     let entry: MedianEntry = MedianEntry {
         time: raw_entry.time,
@@ -290,14 +286,14 @@ pub async fn get_median_entries_1_min_between(
     start_timestamp: u64,
     end_timestamp: u64,
 ) -> Result<Vec<MedianEntry>, InfraError> {
-    let conn = pool.get().await.map_err(adapt_infra_error)?;
+    let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
     #[allow(clippy::cast_possible_wrap)]
     let start_datetime = DateTime::from_timestamp(start_timestamp as i64, 0).ok_or(
-        InfraError::InvalidTimestamp(format!("Cannot convert to DateTime: {start_timestamp}")),
+        InfraError::InvalidTimestamp(TimestampError::ToDatetimeErrorU64(start_timestamp)),
     )?;
     #[allow(clippy::cast_possible_wrap)]
     let end_datetime = DateTime::from_timestamp(end_timestamp as i64, 0).ok_or(
-        InfraError::InvalidTimestamp(format!("Cannot convert to DateTime: {start_timestamp}")),
+        InfraError::InvalidTimestamp(TimestampError::ToDatetimeErrorU64(start_timestamp)),
     )?;
 
     let raw_sql = r"
@@ -323,8 +319,8 @@ pub async fn get_median_entries_1_min_between(
                 .load::<MedianEntryRaw>(conn)
         })
         .await
-        .map_err(adapt_infra_error)?
-        .map_err(adapt_infra_error)?;
+        .map_err(InfraError::DbInteractionError)?
+        .map_err(InfraError::DbResultError)?;
 
     let entries: Vec<MedianEntry> = raw_entries
         .into_iter()
@@ -341,18 +337,18 @@ pub async fn get_median_entries_1_min_between(
 pub async fn get_median_prices_between(
     pool: &deadpool_diesel::postgres::Pool,
     pair_id: String,
-    routing_params: RoutingParams,
+    entry_params: EntryParams,
     start_timestamp: u64,
     end_timestamp: u64,
 ) -> Result<Vec<MedianEntry>, InfraError> {
-    let conn = pool.get().await.map_err(adapt_infra_error)?;
+    let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
     #[allow(clippy::cast_possible_wrap)]
     let start_datetime = DateTime::from_timestamp(start_timestamp as i64, 0).ok_or(
-        InfraError::InvalidTimestamp(format!("Cannot convert to DateTime: {start_timestamp}")),
+        InfraError::InvalidTimestamp(TimestampError::ToDatetimeErrorU64(start_timestamp)),
     )?;
     #[allow(clippy::cast_possible_wrap)]
     let end_datetime = DateTime::from_timestamp(end_timestamp as i64, 0).ok_or(
-        InfraError::InvalidTimestamp(format!("Cannot convert to DateTime: {end_timestamp}")),
+        InfraError::InvalidTimestamp(TimestampError::ToDatetimeErrorU64(end_timestamp)),
     )?;
 
     let sql_request: String = format!(
@@ -372,9 +368,9 @@ pub async fn get_median_prices_between(
         ORDER BY
             time DESC;
     ",
-        get_interval_specifier(routing_params.interval, false)?,
-        get_table_suffix(routing_params.data_type)?,
-        get_expiration_timestamp_filter(routing_params.data_type, &routing_params.expiry)?,
+        get_interval_specifier(entry_params.interval, false)?,
+        get_table_suffix(entry_params.data_type)?,
+        get_expiration_timestamp_filter(entry_params.data_type, &entry_params.expiry)?,
     );
 
     let raw_entries = conn
@@ -386,8 +382,8 @@ pub async fn get_median_prices_between(
                 .load::<MedianEntryRaw>(conn)
         })
         .await
-        .map_err(adapt_infra_error)?
-        .map_err(adapt_infra_error)?;
+        .map_err(InfraError::DbInteractionError)?
+        .map_err(InfraError::DbResultError)?;
 
     let entries: Vec<MedianEntry> = raw_entries
         .into_iter()
@@ -404,18 +400,18 @@ pub async fn get_median_prices_between(
 pub async fn get_twap_prices_between(
     pool: &deadpool_diesel::postgres::Pool,
     pair_id: String,
-    routing_params: RoutingParams,
+    entry_params: EntryParams,
     start_timestamp: u64,
     end_timestamp: u64,
 ) -> Result<Vec<MedianEntry>, InfraError> {
-    let conn = pool.get().await.map_err(adapt_infra_error)?;
+    let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
     #[allow(clippy::cast_possible_wrap)]
     let start_datetime = DateTime::from_timestamp(start_timestamp as i64, 0).ok_or(
-        InfraError::InvalidTimestamp(format!("Cannot convert to DateTime: {start_timestamp}")),
+        InfraError::InvalidTimestamp(TimestampError::ToDatetimeErrorU64(start_timestamp)),
     )?;
     #[allow(clippy::cast_possible_wrap)]
     let end_datetime = DateTime::from_timestamp(end_timestamp as i64, 0).ok_or(
-        InfraError::InvalidTimestamp(format!("Cannot convert to DateTime: {end_timestamp}")),
+        InfraError::InvalidTimestamp(TimestampError::ToDatetimeErrorU64(end_timestamp)),
     )?;
 
     let sql_request: String = format!(
@@ -435,9 +431,9 @@ pub async fn get_twap_prices_between(
         ORDER BY
             time DESC;
     ",
-        get_interval_specifier(routing_params.interval, true)?,
-        get_table_suffix(routing_params.data_type)?,
-        get_expiration_timestamp_filter(routing_params.data_type, &routing_params.expiry)?,
+        get_interval_specifier(entry_params.interval, true)?,
+        get_table_suffix(entry_params.data_type)?,
+        get_expiration_timestamp_filter(entry_params.data_type, &entry_params.expiry)?,
     );
 
     let raw_entries = conn
@@ -449,8 +445,8 @@ pub async fn get_twap_prices_between(
                 .load::<MedianEntryRaw>(conn)
         })
         .await
-        .map_err(adapt_infra_error)?
-        .map_err(adapt_infra_error)?;
+        .map_err(InfraError::DbInteractionError)?
+        .map_err(InfraError::DbResultError)?;
 
     let entries: Vec<MedianEntry> = raw_entries
         .into_iter()
@@ -469,11 +465,11 @@ pub async fn get_last_updated_timestamp(
     pair_id: String,
     max_timestamp: i64,
 ) -> Result<Option<NaiveDateTime>, InfraError> {
-    let conn = pool.get().await.map_err(adapt_infra_error)?;
+    let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
     conn.interact(move |conn| Entry::get_last_updated_timestamp(conn, pair_id, max_timestamp))
         .await
-        .map_err(adapt_infra_error)?
-        .map_err(adapt_infra_error)
+        .map_err(InfraError::DbInteractionError)?
+        .map_err(InfraError::DbResultError)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Queryable, ToSchema)]
@@ -527,7 +523,7 @@ pub async fn get_ohlc(
     interval: Interval,
     time: i64,
 ) -> Result<Vec<OHLCEntry>, InfraError> {
-    let conn = pool.get().await.map_err(adapt_infra_error)?;
+    let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
 
     let raw_sql = format!(
         r"
@@ -552,7 +548,7 @@ pub async fn get_ohlc(
     );
 
     let date_time = DateTime::from_timestamp(time, 0).ok_or(InfraError::InvalidTimestamp(
-        format!("Cannot convert to DateTime: {time}"),
+        TimestampError::ToDatetimeErrorI64(time),
     ))?;
 
     let raw_entries = conn
@@ -563,8 +559,8 @@ pub async fn get_ohlc(
                 .load::<OHLCEntryRaw>(conn)
         })
         .await
-        .map_err(adapt_infra_error)?
-        .map_err(adapt_infra_error)?;
+        .map_err(InfraError::DbInteractionError)?
+        .map_err(InfraError::DbResultError)?;
 
     let entries: Vec<OHLCEntry> = raw_entries
         .into_iter()
@@ -826,7 +822,7 @@ pub async fn get_current_median_entries_with_components(
     pair_ids: &[String],
     entry_type: DataType,
 ) -> Result<Vec<MedianEntryWithComponents>, InfraError> {
-    let conn = pool.get().await.map_err(adapt_infra_error)?;
+    let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
     let mut interval_in_ms = INITAL_INTERVAL_IN_MS;
     let mut last_valid_entries = Vec::new();
 
@@ -839,8 +835,8 @@ pub async fn get_current_median_entries_with_components(
                 diesel::sql_query(raw_sql).load::<RawMedianEntryWithComponents>(conn)
             })
             .await
-            .map_err(adapt_infra_error)?
-            .map_err(adapt_infra_error)?;
+            .map_err(InfraError::DbInteractionError)?
+            .map_err(InfraError::DbResultError)?;
 
         if let Some(valid_entries) = get_median_entries_response(raw_median_entries) {
             // Keep track of the valid entries we've found
@@ -889,7 +885,7 @@ pub async fn get_expiries_list(
     pool: &deadpool_diesel::postgres::Pool,
     pair_id: String,
 ) -> Result<Vec<NaiveDateTime>, InfraError> {
-    let conn = pool.get().await.map_err(adapt_infra_error)?;
+    let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
 
     let sql_request: String = r"
         SELECT DISTINCT expiration_timestamp
@@ -906,8 +902,8 @@ pub async fn get_expiries_list(
                 .load::<ExpiriesListRaw>(conn)
         })
         .await
-        .map_err(adapt_infra_error)?
-        .map_err(adapt_infra_error)?;
+        .map_err(InfraError::DbInteractionError)?
+        .map_err(InfraError::DbResultError)?;
 
     let expiries: Vec<NaiveDateTime> = raw_exp
         .into_iter()

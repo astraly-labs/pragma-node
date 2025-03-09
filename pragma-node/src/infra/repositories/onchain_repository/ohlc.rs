@@ -2,7 +2,7 @@ use deadpool_diesel::postgres::Pool;
 use diesel::RunQueryDsl;
 
 use pragma_common::types::{DataType, Interval, Network};
-use pragma_entities::error::{InfraError, adapt_infra_error};
+use pragma_entities::error::InfraError;
 
 use crate::infra::repositories::entry_repository::{OHLCEntry, OHLCEntryRaw};
 
@@ -35,7 +35,7 @@ pub async fn get_ohlc(
         table_name = get_onchain_ohlc_table_name(network, DataType::SpotEntry, interval)?,
     );
 
-    let conn = pool.get().await.map_err(adapt_infra_error)?;
+    let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
     let raw_entries = conn
         .interact(move |conn| {
             diesel::sql_query(raw_sql)
@@ -43,8 +43,8 @@ pub async fn get_ohlc(
                 .load::<OHLCEntryRaw>(conn)
         })
         .await
-        .map_err(adapt_infra_error)?
-        .map_err(adapt_infra_error)?;
+        .map_err(InfraError::DbInteractionError)?
+        .map_err(InfraError::DbResultError)?;
 
     let entries: Vec<OHLCEntry> = raw_entries
         .into_iter()

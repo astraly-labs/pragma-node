@@ -5,35 +5,35 @@ const AWS_PRAGMA_PRIVATE_KEY_SECRET: &str = "pragma-secret-key";
 const AWS_JSON_STARK_PRIVATE_KEY_FIELD: &str = "STARK_PRIVATE_KEY";
 
 #[derive(Debug)]
-pub enum AwsError {
+enum AwsError {
     NoSecretFound,
     DeserializationError,
 }
 
-pub struct PragmaSignerBuilder {
+pub(super) struct PragmaSignerBuilder {
     is_production: bool,
 }
 
 impl PragmaSignerBuilder {
-    pub const fn new() -> Self {
+    pub(super) const fn new() -> Self {
         Self {
             is_production: false,
         }
     }
 
     #[must_use]
-    pub const fn production_mode(mut self) -> Self {
+    pub(super) const fn production_mode(mut self) -> Self {
         self.is_production = true;
         self
     }
 
     #[must_use]
-    pub const fn non_production_mode(mut self) -> Self {
+    pub(super) const fn non_production_mode(mut self) -> Self {
         self.is_production = false;
         self
     }
 
-    pub async fn build(self) -> Option<SigningKey> {
+    pub(super) async fn build(self) -> Option<SigningKey> {
         if self.is_production {
             build_pragma_signer_from_aws().await
         } else {
@@ -48,7 +48,7 @@ impl Default for PragmaSignerBuilder {
     }
 }
 
-pub async fn build_pragma_signer_from_aws() -> Option<SigningKey> {
+async fn build_pragma_signer_from_aws() -> Option<SigningKey> {
     let aws_client = get_aws_client().await;
     let secret_json_response = get_aws_secret(&aws_client, AWS_PRAGMA_PRIVATE_KEY_SECRET)
         .await

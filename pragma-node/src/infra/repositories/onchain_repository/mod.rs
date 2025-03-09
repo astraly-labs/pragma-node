@@ -35,7 +35,7 @@ pub(crate) async fn get_onchain_decimals(
 
     // If not found in cache, call RPC
     let Some(rpc_client) = rpc_clients.get(&network) else {
-        return Err(InfraError::InternalServerError);
+        return Err(InfraError::NoRpcAvailable(network));
     };
     let decimals = call_get_decimals(rpc_client, pair, network).await?;
 

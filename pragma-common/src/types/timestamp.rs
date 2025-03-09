@@ -28,6 +28,18 @@ pub enum TimestampRangeError {
     Other(String),
 }
 
+#[derive(Debug, thiserror::Error, ToSchema)]
+pub enum TimestampError {
+    #[error("Timestamp range error: {0}")]
+    RangeError(#[from] TimestampRangeError),
+    #[error("Could not convert unsigned timestamp to datetime: {0}")]
+    ToDatetimeErrorU64(u64),
+    #[error("Could not convert signed timestamp to datetime: {0}")]
+    ToDatetimeErrorI64(i64),
+    #[error("Timestamp error: {0}")]
+    Other(String),
+}
+
 impl TimestampRange {
     pub fn assert_time_is_valid(self) -> Result<Self, TimestampRangeError> {
         let now = chrono::Utc::now().timestamp();

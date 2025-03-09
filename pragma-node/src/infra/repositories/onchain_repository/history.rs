@@ -5,12 +5,13 @@ use chrono::{DateTime, NaiveDateTime};
 use deadpool_diesel::postgres::Pool;
 use diesel::{RunQueryDsl, prelude::QueryableByName};
 use moka::future::Cache;
+use pragma_common::timestamp::TimestampError;
 use serde::Serialize;
 
 use pragma_common::types::pair::Pair;
 use pragma_common::types::timestamp::TimestampRange;
 use pragma_common::types::{DataType, Interval, Network};
-use pragma_entities::error::{InfraError, adapt_infra_error};
+use pragma_entities::error::InfraError;
 
 use super::entry::{get_existing_pairs, onchain_pair_exist};
 use super::{get_onchain_aggregate_table_name, get_onchain_decimals};
@@ -40,7 +41,7 @@ pub async fn get_historical_entries_and_decimals(
     .await?;
 
     if raw_entries.is_empty() {
-        return Err(InfraError::NotFound);
+        return Err(InfraError::EntryNotFound(pair.to_pair_id()));
     }
 
     let decimals = get_onchain_decimals(decimals_cache, rpc_clients, network, pair).await?;
@@ -96,7 +97,7 @@ async fn get_historical_aggregated_entries(
 
     let pair_id = pair.to_string();
 
-    let conn = pool.get().await.map_err(adapt_infra_error)?;
+    let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
     let raw_entries = conn
         .interact(move |conn| {
             diesel::sql_query(raw_sql)
@@ -106,8 +107,8 @@ async fn get_historical_aggregated_entries(
                 .load::<HistoricalEntryRaw>(conn)
         })
         .await
-        .map_err(adapt_infra_error)?
-        .map_err(adapt_infra_error)?;
+        .map_err(InfraError::DbInteractionError)?
+        .map_err(InfraError::DbResultError)?;
 
     Ok(raw_entries)
 }
@@ -170,7 +171,7 @@ pub async fn retry_with_routing(
         }
     }
 
-    Err(InfraError::RoutingError)
+    Err(InfraError::RoutingError(pair.to_pair_id()))
 }
 
 /// Given two vector of entries, compute a new vector containing the routed prices.
@@ -254,9 +255,9 @@ fn combine_entries(
         quote_entry.nb_sources_aggregated,
     );
     let new_timestamp = DateTime::from_timestamp(max_timestamp, 0)
-        .ok_or(InfraError::InvalidTimestamp(format!(
-            "Cannot convert to DateTime: {max_timestamp}"
-        )))?
+        .ok_or(InfraError::InvalidTimestamp(
+            TimestampError::ToDatetimeErrorI64(max_timestamp),
+        ))?
         .naive_utc();
 
     let base_pair = Pair::from(base_entry.pair_id.clone());

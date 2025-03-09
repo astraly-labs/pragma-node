@@ -351,9 +351,9 @@ async fn process_entries_without_verification(
     }
 
     let publisher_name = &subscriber.state.lock().await.publisher_name;
-    let publisher_name = publisher_name
-        .as_ref()
-        .ok_or_else(|| EntryError::NotFound("No publisher name in session state".to_string()))?;
+    let publisher_name = publisher_name.as_ref().ok_or_else(|| {
+        EntryError::PublisherNotFound("No publisher name in session state".to_string())
+    })?;
 
     // Split entries into spot and perp entries
     let (spot_entries, perp_entries): (Vec<_>, Vec<_>) = new_entries
@@ -452,6 +452,7 @@ async fn process_login(
         validate_publisher(&state.offchain_pool, &publisher_name, publishers_cache).await?;
 
     assert_login_is_valid(message, signature, &account_address, &public_key)
-        .map_err(EntryError::SignerError)?;
+        .map_err(|_| EntryError::InvalidSigner)?;
+
     Ok(())
 }
