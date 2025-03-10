@@ -30,7 +30,7 @@ use super::GetEntryParams;
 pub struct GetOHLCResponse {
     /// Trading pair identifier (e.g., "BTC/USD")
     pub pair_id: String,
-    
+
     /// Array of OHLC entries ordered by timestamp
     pub data: Vec<OHLCEntry>,
 }
@@ -40,7 +40,7 @@ pub struct GetOHLCResponse {
     path = "/node/v1/aggregation/candlestick/{base}/{quote}",
     tag = "Market Data",
     responses(
-        (status = 200, 
+        (status = 200,
          description = "Successfully retrieved OHLC data", 
          body = GetOHLCResponse,
          example = json!({
@@ -56,7 +56,7 @@ pub struct GetOHLCResponse {
              ]
          })
         ),
-        (status = 400, 
+        (status = 400,
          description = "Invalid parameters", 
          body = EntryError,
          example = json!({
@@ -65,7 +65,7 @@ pub struct GetOHLCResponse {
              "resource": "EntryModel"
          })
         ),
-        (status = 404, 
+        (status = 404,
          description = "No data found", 
          body = EntryError,
          example = json!({
@@ -74,7 +74,7 @@ pub struct GetOHLCResponse {
              "resource": "EntryModel"
          })
         ),
-        (status = 500, 
+        (status = 500,
          description = "Internal server error", 
          body = EntryError,
          example = json!({

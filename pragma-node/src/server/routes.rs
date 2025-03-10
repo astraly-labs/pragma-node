@@ -3,7 +3,7 @@ use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::routing::{get, post};
 use utoipa::OpenApi as OpenApiT;
-// use utoipa_swagger_ui::SwaggerUi;
+use utoipa_swagger_ui::SwaggerUi;
 
 use crate::AppState;
 use crate::handlers::onchain::{
@@ -25,10 +25,9 @@ use crate::handlers::{
 
 #[allow(clippy::extra_unused_type_parameters)]
 pub fn app_router<T: OpenApiT>(state: AppState) -> Router<AppState> {
-    // let open_api = T::openapi();
-    // TODO: Add swagger ui
+    let open_api = T::openapi();
     Router::new()
-        // .merge(SwaggerUi::new("/node/swagger-ui").url("/node/api-docs/openapi.json", open_api))
+        .merge(SwaggerUi::new("/node/v1/docs").url("/node/v1/docs/openapi.json", open_api))
         .route("/node", get(root))
         .nest("/node/v1/data", data_routes(state.clone()))
         .nest("/node/v1/onchain", onchain_routes(state.clone()))
