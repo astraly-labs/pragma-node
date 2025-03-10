@@ -272,9 +272,10 @@ where
                 .await;
                 return Err(WebSocketError::MessageDecode(format!("{payload:?}")));
             }
-            Message::Ping(_) | Message::Pong(_) => {
+            Message::Ping(_) => {
                 self.last_activity = std::time::Instant::now();
             }
+            Message::Pong(_) => {}
         }
         Ok(None)
     }
