@@ -95,9 +95,9 @@ strum = { version = "0.26", features = ["derive"] }
 url = "2.5.0"
 tower-http = { version = "0.6.2", features = ["fs", "trace", "cors"] }
 tokio = { version = "^1.43.0", features = ["full"] }
-utoipa = { version = "5.0.0", features = ["axum_extras", "chrono", "uuid"] }
+utoipa = { version = "5", features = ["axum_extras", "chrono", "uuid"] }
 utoipauto = "0.1.14"
-utoipa-swagger-ui = { version = "8.0.3", features = ["axum"] }
+utoipa-swagger-ui = { version = "9", features = ["axum"] }
 uuid = { version = "1.4", features = ["fast-rng", "v4", "serde"] }
 
 # David Bernard (sacre jojo)

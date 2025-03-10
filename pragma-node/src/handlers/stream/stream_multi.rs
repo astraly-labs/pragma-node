@@ -27,13 +27,29 @@ use crate::{
 
 #[derive(Debug, Deserialize, IntoParams, ToSchema)]
 pub struct StreamEntryMultipairParams {
+    /// Base parameters for entry requests including interval, aggregation mode, and routing options
     #[serde(flatten)]
     pub get_entry_params: GetEntryParams,
+    /// List of trading pairs to stream prices for (e.g. ["ETH/USD", "BTC/USD"])
     #[serde(rename = "pairs[]")]
+    #[param(example = json!(["ETH/USD", "BTC/USD"]))]
     pub pairs: Vec<String>,
+    /// Number of historical price entries to fetch on initial connection (default: 100)
+    #[param(example = 100)]
     pub historical_prices: Option<usize>,
 }
 
+#[utoipa::path(
+    get,
+    path = "/node/v1/multi/stream",
+    params(
+        StreamEntryMultipairParams
+    ),
+    responses(
+        (status = 200, description = "Server-sent events stream of price entries for multiple pairs", content_type = "text/event-stream")
+    ),
+    tag = "Stream"
+)]
 #[allow(clippy::too_many_lines)]
 pub async fn stream_entry_multi_pair(
     State(state): State<AppState>,

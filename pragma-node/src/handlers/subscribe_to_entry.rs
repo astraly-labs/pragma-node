@@ -22,29 +22,87 @@ use crate::utils::only_existing_pairs;
 use crate::utils::pricer::{IndexPricer, MarkPricer, Pricer};
 use crate::utils::{ChannelHandler, Subscriber, SubscriptionType};
 
+/// Response format for StarkEx price subscriptions
 #[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
 pub struct SignedPublisherPrice {
+    /// StarkEx-specific asset identifier in hex format
+    /// Format: <ASSET><CURRENCY>00..00PRAGMA00
+    #[schema(example = "0x534f4c55534400000000000000000000505241474d4100")]
     pub oracle_asset_id: String,
+
+    /// Price in StarkEx decimal format (not hex)
+    /// The price is scaled by 10^18
+    #[schema(example = "128065038090000000000")]
     pub oracle_price: String,
+
+    /// Public key of the price signer (Pragma's StarkEx key)
+    #[schema(example = "0x624EBFB99865079BD58CFCFB925B6F5CE940D6F6E41E118B8A72B7163FB435C")]
     pub signing_key: String,
+
+    /// Unix timestamp as string
+    #[schema(example = "1741594457")]
     pub timestamp: String,
 }
 
+/// Price data structure for StarkEx oracle integration
 #[derive(Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct AssetOraclePrice {
+    /// Global asset identifier in StarkEx hex format
+    /// Format: <ASSET>-<CURRENCY>-<DECIMALS>00..00
+    #[schema(example = "0x534f4c2d5553442d38000000000000")]
     pub global_asset_id: String,
+
+    /// Median price in StarkEx decimal format
+    /// The price is scaled by 10^18
+    #[schema(example = "128065038090000007168")]
     pub median_price: String,
+
+    /// Pragma's signature of the price data in StarkEx format
+    #[schema(
+        example = "0x02ba39e956bb5b29a0fab31d61c7678228f79dddee2998b4ff3de5c7a6ae1e770636712af81b0506749555e1439004b4ce905419d2ba946b9bd06eb87de7a167"
+    )]
     pub signature: String,
+
+    /// Individual signed prices from publishers
     pub signed_prices: Vec<SignedPublisherPrice>,
 }
 
+/// WebSocket response message for StarkEx price updates
 #[derive(Debug, Default, Serialize, Deserialize, ToResponse, ToSchema)]
+#[schema(example = json!({
+    "oracle_prices": [{
+        "global_asset_id": "0x534f4c2d5553442d38000000000000",
+        "median_price": "128065038090000007168",
+        "signature": "0x02ba39e956bb5b29a0fab31d61c7678228f79dddee2998b4ff3de5c7a6ae1e770636712af81b0506749555e1439004b4ce905419d2ba946b9bd06eb87de7a167",
+        "signed_prices": [{
+            "oracle_asset_id": "0x534f4c55534400000000000000000000505241474d4100",
+            "oracle_price": "128065038090000000000",
+            "signing_key": "0x624EBFB99865079BD58CFCFB925B6F5CE940D6F6E41E118B8A72B7163FB435C",
+            "timestamp": "1741594457"
+        }]
+    }],
+    "timestamp": 1741594458
+}))]
 pub struct SubscribeToEntryResponse {
+    /// Array of price data for subscribed assets
     pub oracle_prices: Vec<AssetOraclePrice>,
-    #[schema(value_type = i64)]
+
+    /// Unix timestamp of the update
+    #[schema(value_type = i64, example = 1741594458)]
     pub timestamp: UnixTimestamp,
 }
 
+#[utoipa::path(
+    get,
+    path = "/node/v1/data/subscribe",
+    tag = "StarkEx Oracle",
+    responses(
+        (status = 101, description = "WebSocket connection upgraded successfully"),
+        (status = 403, description = "Forbidden - Rate limit exceeded", body = EntryError),
+        (status = 500, description = "Internal server error", body = EntryError,
+         example = json!({"error": "Locked: Pragma signer not found"}))
+    ),
+)]
 #[tracing::instrument(skip(state, ws), fields(endpoint_name = "subscribe_to_entry"))]
 pub async fn subscribe_to_entry(
     ws: WebSocketUpgrade,

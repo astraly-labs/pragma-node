@@ -88,17 +88,33 @@ pub struct GetEntryResponse {
     decimals: u32,
 }
 
+/// Get the latest price entry for a trading pair
 #[utoipa::path(
     get,
     path = "/node/v1/data/{base}/{quote}",
+    tag = "Price Data",
     responses(
-        (status = 200, description = "Get median entry successfuly", body = [GetEntryResponse])
+        (status = 200, description = "Successfully retrieved price entry", body = GetEntryResponse,
+         example = json!({
+            "num_sources_aggregated": 5,
+            "pair_id": "BTC/USD",
+            "price": "0x1234567890abcdef",
+            "timestamp": 1647820800,
+            "decimals": 18
+         })
+        ),
+        (status = 400, description = "Invalid request parameters", body = EntryError),
+        (status = 404, description = "Price entry not found", body = EntryError),
+        (status = 500, description = "Internal server error", body = EntryError)
     ),
     params(
-        ("base" = String, Path, description = "Base Asset"),
-        ("quote" = String, Path, description = "Quote Asset"),
-        GetEntryParams,
+        ("base" = String, Path, description = "Base asset symbol (e.g. BTC)"),
+        ("quote" = String, Path, description = "Quote asset symbol (e.g. USD)"),
+        GetEntryParams
     ),
+    security(
+        ("api_key" = [])
+    )
 )]
 #[tracing::instrument(skip(state))]
 pub async fn get_entry(
