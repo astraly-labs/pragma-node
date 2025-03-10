@@ -12,14 +12,23 @@ use crate::PublisherError;
 use crate::error::{InfraError, WebSocketError};
 
 #[derive(Debug, thiserror::Error, ToSchema)]
+#[schema(example = json!({
+    "code": "UNAUTHORIZED",
+    "message": "Unauthorized request: Invalid API key",
+    "timestamp": "2024-03-20T10:30:00Z"
+}))]
 pub enum EntryError {
     // 400 Error - Bad Requests
+    #[schema(example = "invalid signature")]
     #[error("invalid signature: {0}")]
     InvalidSignature(#[from] SignerError),
+    #[schema(example = "invalid timestamp")]
     #[error("invalid timestamp: {0}")]
     InvalidTimestamp(#[from] TimestampError),
+    #[schema(example = "invalid expiry")]
     #[error("invalid expiry")]
     InvalidExpiry,
+    #[schema(example = "unsupported interval 1s for aggregation median")]
     #[error("unsupported interval {0:?} for aggregation {1:?}")]
     InvalidInterval(Interval, AggregationMode),
     #[error("invalid login message: {0}")]
