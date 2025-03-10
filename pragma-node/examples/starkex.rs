@@ -18,9 +18,9 @@ use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
 use url::Url;
 
 const TEST_PAIRS: &[&str] = &[
-    "EUR/USD",
+    // "EUR/USD",
     // "ETH/USD",
-    // "SOL/USD",
+    "SOL/USD",
     // "AVAX/USD",
     // "MATIC/USD",
     // "ARB/USD",
@@ -28,23 +28,28 @@ const TEST_PAIRS: &[&str] = &[
 
 const TEST_MARK_PAIRS: &[&str] = &["BTC/USD"];
 
+#[derive(Debug)]
+enum WebSocketMessage {
+    Ack(SubscriptionAck),
+    Update(SubscribeToEntryResponse),
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 struct SubscribeMessage {
     msg_type: String,
     pairs: Vec<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[allow(unused)]
 struct SignedPublisherPrice {
     oracle_asset_id: String,
     oracle_price: String,
     signing_key: String,
-    signature: String,
     timestamp: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[allow(unused)]
 struct AssetOraclePrice {
     global_asset_id: String,
@@ -53,7 +58,7 @@ struct AssetOraclePrice {
     signed_prices: Vec<SignedPublisherPrice>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct SubscribeToEntryResponse {
     oracle_prices: Vec<AssetOraclePrice>,
     timestamp: i64,
@@ -71,7 +76,7 @@ impl Environment {
 
         let ws_url = match env_type.as_str() {
             "prod" => "wss://ws.pragma.build/node/v1/data/subscribe",
-            "dev" => "wss://ws.dev.pragma.build/node/v1/data/subscribe",
+            "dev" => "wss://ws.devnet.pragma.build/node/v1/data/subscribe",
             "local" => "ws://0.0.0.0:3000/node/v1/data/subscribe",
             _ => panic!("Invalid environment: {env_type}. Use 'prod', 'dev', or 'local'",),
         }
@@ -155,8 +160,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         match message {
                             Ok(msg) => {
                                 if let Message::Text(text) = msg {
-                                    if tx.send(text).is_err() {
-                                        break;
+                                    if let Ok(ack) = serde_json::from_str::<SubscriptionAck>(&text) {
+                                        if tx.send(Ok(WebSocketMessage::Ack(ack))).is_err() {
+                                            break;
+                                        }
+                                    } else if let Ok(response) = serde_json::from_str::<SubscribeToEntryResponse>(&text) {
+                                        if tx.send(Ok(WebSocketMessage::Update(response))).is_err() {
+                                            break;
+                                        }
+                                    } else {
+                                        if tx.send(Err("Failed to parse message".to_string())).is_err() {
+                                            break;
+                                        }
                                     }
                                 }
                             }
@@ -191,11 +206,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         // Check for WebSocket messages
-        if let Ok(text) = rx.try_recv() {
-            if let Ok(ack) = serde_json::from_str::<SubscriptionAck>(&text) {
-                app.subscription_pairs = ack.pairs;
-            } else if let Ok(response) = serde_json::from_str::<SubscribeToEntryResponse>(&text) {
-                app.latest_update = Some(response);
+        if let Ok(msg) = rx.try_recv() {
+            match msg {
+                Ok(WebSocketMessage::Ack(ack)) => {
+                    app.subscription_pairs = ack.pairs;
+                }
+                Ok(WebSocketMessage::Update(response)) => {
+                    app.latest_update = Some(response);
+                }
+                Err(e) => eprintln!("Error: {}", e),
             }
         }
 
@@ -232,21 +251,30 @@ fn parse_hex_asset_id(hex_id: &str) -> String {
         return hex_id.to_string();
     }
 
-    let hex_str = &hex_id[2..];
-    u128::from_str_radix(hex_str, 16)
-        .ok()
-        .and_then(|felt| parse_cairo_short_string(&felt.into()).ok())
-        .unwrap_or_else(|| hex_id.to_string())
-        .replace('/', "")
+    // Remove "0x" prefix and any trailing zeros
+    let hex_str = hex_id[2..].trim_end_matches('0');
+
+    // Convert hex to felt and then to string
+    if let Ok(felt) = u128::from_str_radix(hex_str, 16) {
+        if let Ok(s) = parse_cairo_short_string(&felt.into()) {
+            // The format is always ASSET-USD-8, so we can safely remove the -8 suffix
+            if s.ends_with("-8") {
+                return s[..s.len() - 2].to_string();
+            }
+            return s;
+        }
+    }
+    hex_id.to_string()
 }
 
 /// Extracts and formats all received pairs from oracle prices.
+/// Converts from the StarkEx encoded format back to human-readable pairs.
 ///
 /// # Arguments
 /// * `oracle_prices` - Slice of `AssetOraclePrice` containing the received price updates
 ///
 /// # Returns
-/// A Vec<String> containing all formatted asset pairs (e.g., "ETHUSD")
+/// A Vec<String> containing all formatted asset pairs (e.g., "BTC-USD")
 fn get_received_pairs(oracle_prices: &[AssetOraclePrice]) -> Vec<String> {
     oracle_prices
         .iter()
@@ -255,18 +283,24 @@ fn get_received_pairs(oracle_prices: &[AssetOraclePrice]) -> Vec<String> {
 }
 
 /// Identifies which subscribed pairs are missing from the received pairs.
-/// Handles the format difference between subscribed pairs (ETH/USD) and received pairs (ETHUSD).
+/// Handles the format difference between subscribed pairs and received pairs.
 ///
 /// # Arguments
-/// * `subscribed` - Slice of subscribed pair strings (format: "ETH/USD")
-/// * `received` - Slice of received pair strings (format: "ETHUSD")
+/// * `subscribed` - Slice of subscribed pair strings (format: "BTC/USD")
+/// * `received` - Slice of received pair strings (format: "BTC-USD")
 ///
 /// # Returns
 /// A Vec<String> containing all subscribed pairs that weren't received
 fn get_missing_pairs(subscribed: &[String], received: &[String]) -> Vec<String> {
     subscribed
         .iter()
-        .filter(|p| !received.contains(&p.replace('/', "")))
+        .filter(|p| {
+            let normalized_sub = p.replace('/', "-");
+            !received.iter().any(|r| {
+                let normalized_rec = r.replace('/', "-");
+                normalized_sub == normalized_rec
+            })
+        })
         .cloned()
         .collect()
 }
@@ -340,18 +374,7 @@ fn ui(f: &mut Frame<'_>, app: &App) {
         // Price updates list
         let mut items = vec![];
         for price in &update.oracle_prices {
-            let asset_display = if price.global_asset_id.starts_with("0x") {
-                let hex_str = &price.global_asset_id[2..];
-                u128::from_str_radix(hex_str, 16).map_or_else(
-                    |_| price.global_asset_id.clone(),
-                    |felt| {
-                        parse_cairo_short_string(&felt.into())
-                            .unwrap_or_else(|_| price.global_asset_id.clone())
-                    },
-                )
-            } else {
-                price.global_asset_id.clone()
-            };
+            let asset_display = parse_hex_asset_id(&price.global_asset_id);
 
             items.push(ListItem::new(vec![
                 Line::from(format!(
@@ -384,5 +407,80 @@ fn ui(f: &mut Frame<'_>, app: &App) {
                 .title(format!("Price Updates (Timestamp: {})", update.timestamp)),
         );
         f.render_widget(prices_list, chunks[2]);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_received_pairs() {
+        let oracle_prices = vec![
+            AssetOraclePrice {
+                global_asset_id: "0x534f4c2d5553442d38000000000000".to_string(), // SOL-USD-8
+                median_price: "100".to_string(),
+                signature: "sig".to_string(),
+                signed_prices: vec![],
+            },
+            AssetOraclePrice {
+                global_asset_id: "0x4254432d5553442d38000000000000".to_string(), // BTC-USD-8
+                median_price: "100".to_string(),
+                signature: "sig".to_string(),
+                signed_prices: vec![],
+            },
+        ];
+
+        let received = get_received_pairs(&oracle_prices);
+        assert_eq!(received, vec!["SOL-USD", "BTC-USD"]);
+    }
+
+    #[test]
+    fn test_get_missing_pairs() {
+        let subscribed = vec![
+            "SOL/USD".to_string(),
+            "BTC/USD".to_string(),
+            "ETH/USD".to_string(),
+        ];
+        let received = vec!["SOL-USD".to_string(), "BTC-USD".to_string()];
+
+        let missing = get_missing_pairs(&subscribed, &received);
+        assert_eq!(missing, vec!["ETH/USD"]);
+    }
+
+    #[test]
+    fn test_get_missing_pairs_with_mixed_separators() {
+        let subscribed = vec![
+            "SOL/USD".to_string(),
+            "BTC-USD".to_string(),
+            "ETH/USD".to_string(),
+        ];
+        let received = vec!["SOL-USD".to_string(), "BTC/USD".to_string()];
+
+        let missing = get_missing_pairs(&subscribed, &received);
+        assert_eq!(missing, vec!["ETH/USD"]);
+    }
+
+    #[test]
+    fn test_get_missing_pairs_all_present() {
+        let subscribed = vec!["SOL/USD".to_string(), "BTC/USD".to_string()];
+        let received = vec!["SOL-USD".to_string(), "BTC-USD".to_string()];
+
+        let missing = get_missing_pairs(&subscribed, &received);
+        assert!(missing.is_empty(), "Expected no missing pairs");
+    }
+
+    #[test]
+    fn test_parse_hex_asset_id() {
+        let test_cases = vec![
+            ("0x534f4c2d5553442d38000000000000", "SOL-USD"),
+            ("0x4254432d5553442d38000000000000", "BTC-USD"),
+            ("0x4554482d5553442d38000000000000", "ETH-USD"),
+        ];
+
+        for (input, expected) in test_cases {
+            let result = parse_hex_asset_id(input);
+            assert_eq!(result, expected, "Failed to parse {}", input);
+        }
     }
 }
