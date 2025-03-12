@@ -36,7 +36,14 @@ pub(crate) async fn get_onchain_decimals(
     let Some(rpc_client) = rpc_clients.get(&network) else {
         return Err(InfraError::NoRpcAvailable(network));
     };
-    let decimals = call_get_decimals(rpc_client, pair, network).await?;
+
+    let decimals = match call_get_decimals(rpc_client, pair, network).await {
+        Ok(decimals) => decimals,
+        Err(_) => {
+            tracing::error!("No decimals found for published pair {pair}");
+            0
+        }
+    };
 
     // Update cache with the new decimals
     let network_decimals = decimals_cache.get(&network).await.unwrap_or_default();
