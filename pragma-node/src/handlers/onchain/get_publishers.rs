@@ -31,7 +31,7 @@ pub struct PublisherEntry {
 pub struct Publisher {
     pub publisher: String,
     pub website_url: String,
-    pub last_updated_timestamp: u64,
+    pub last_updated_timestamp: Option<u64>,
     pub r#type: u32,
     pub nb_feeds: u32,
     pub daily_updates: u32,

@@ -229,15 +229,12 @@ async fn get_publisher_with_components(
         .collect();
 
     // Execute all futures concurrently and collect results
-    let components = try_join_all(component_futures)
-        .await
-        .map_err(|_| InfraError::PublishersNotFound)?;
+    let components = try_join_all(component_futures).await?;
 
     let last_updated_timestamp = components
         .iter()
         .map(|component| component.last_updated_timestamp)
-        .max()
-        .ok_or(InfraError::PublishersNotFound)?;
+        .max();
 
     let publisher = Publisher {
         publisher: publisher.name.clone(),
