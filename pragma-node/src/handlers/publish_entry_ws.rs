@@ -341,7 +341,7 @@ async fn process_entries_without_verification(
     subscriber: &Subscriber<PublishEntryState>,
     new_entries: PublishEntryRequest,
 ) -> Result<CreateEntryResponse, EntryError> {
-    tracing::info!("Received new entries via WebSocket..");
+    tracing::debug!("Received new entries via WebSocket..");
 
     if new_entries.entries.is_empty() {
         return Ok(CreateEntryResponse {
