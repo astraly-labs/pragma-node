@@ -11,7 +11,6 @@ use moka::future::Cache;
 use pragma_common::types::{DataType, Interval, Network, pair::Pair};
 use pragma_entities::error::InfraError;
 
-use crate::utils::sql::get_interval_specifier;
 use crate::{
     infra::rpc::{RpcClients, call_get_decimals},
     is_enum_variant,
@@ -88,7 +87,7 @@ pub(crate) fn get_onchain_ohlc_table_name(
             ));
         }
     };
-    let interval_specifier = get_interval_specifier(interval, true)?;
+    let interval_specifier = get_onchain_interval_specifier(interval)?;
     let table_name = format!("{prefix_name}_{interval_specifier}_candle");
     Ok(table_name)
 }
