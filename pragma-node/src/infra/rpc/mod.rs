@@ -66,6 +66,7 @@ pub async fn call_get_decimals(
 ) -> Result<u32, InfraError> {
     let pair_id = cairo_short_string_to_felt(&pair.to_pair_id())
         .map_err(|_| InfraError::PairNotFound(pair.to_pair_id()))?;
+
     let Some(pragma_oracle_address) = ORACLE_ADDRESS_PER_NETWORK.get(&network) else {
         unreachable!()
     };
@@ -73,14 +74,14 @@ pub async fn call_get_decimals(
     let request = FunctionCall {
         contract_address: *pragma_oracle_address,
         entry_point_selector: get_selector_from_name("get_decimals")
-            .map_err(|e| InfraError::RpcError(e.to_string()))?,
+            .map_err(|e| InfraError::RpcError(format!("{e:?}")))?,
         calldata: vec![Felt::ZERO, pair_id],
     };
 
     let call_result = rpc_client
         .call(request, BlockId::Tag(BlockTag::Pending))
         .await
-        .map_err(|e| InfraError::RpcError(e.to_string()))?;
+        .map_err(|e| InfraError::RpcError(format!("{e:?}")))?;
 
     let Some(felt_decimals) = call_result.first() else {
         return Err(InfraError::PairNotFound(pair.to_pair_id()));
