@@ -274,6 +274,7 @@ where
             }
             Message::Ping(_) => {
                 self.last_activity = std::time::Instant::now();
+                let _ = self.sender.send(Message::Pong(Default::default())).await;
             }
             Message::Pong(_) => {}
         }
