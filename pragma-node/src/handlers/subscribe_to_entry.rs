@@ -22,7 +22,7 @@ use crate::utils::only_existing_pairs;
 use crate::utils::pricer::{IndexPricer, MarkPricer, Pricer};
 use crate::utils::{ChannelHandler, Subscriber, SubscriptionType};
 
-/// Response format for StarkEx price subscriptions
+/// Response format for `StarkEx` price subscriptions
 #[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
 pub struct SignedPublisherPrice {
     /// StarkEx-specific asset identifier in hex format
@@ -35,7 +35,7 @@ pub struct SignedPublisherPrice {
     #[schema(example = "128065038090000000000")]
     pub oracle_price: String,
 
-    /// Public key of the price signer (Pragma's StarkEx key)
+    /// Public key of the price signer (Pragma's `StarkEx` key)
     #[schema(example = "0x624EBFB99865079BD58CFCFB925B6F5CE940D6F6E41E118B8A72B7163FB435C")]
     pub signing_key: String,
 
@@ -44,20 +44,20 @@ pub struct SignedPublisherPrice {
     pub timestamp: String,
 }
 
-/// Price data structure for StarkEx oracle integration
+/// Price data structure for `StarkEx` oracle integration
 #[derive(Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct AssetOraclePrice {
-    /// Global asset identifier in StarkEx hex format
+    /// Global asset identifier in `StarkEx` hex format
     /// Format: <ASSET>-<CURRENCY>-<DECIMALS>00..00
     #[schema(example = "0x534f4c2d5553442d38000000000000")]
     pub global_asset_id: String,
 
-    /// Median price in StarkEx decimal format
+    /// Median price in `StarkEx` decimal format
     /// The price is scaled by 10^18
     #[schema(example = "128065038090000007168")]
     pub median_price: String,
 
-    /// Pragma's signature of the price data in StarkEx format
+    /// Pragma's signature of the price data in `StarkEx` format
     #[schema(
         example = "0x02ba39e956bb5b29a0fab31d61c7678228f79dddee2998b4ff3de5c7a6ae1e770636712af81b0506749555e1439004b4ce905419d2ba946b9bd06eb87de7a167"
     )]
@@ -81,14 +81,14 @@ pub struct AssetOraclePrice {
             "timestamp": "1741594457"
         }]
     }],
-    "timestamp": 1741594458
+    "timestamp": 1_741_594_458
 }))]
 pub struct SubscribeToEntryResponse {
     /// Array of price data for subscribed assets
     pub oracle_prices: Vec<AssetOraclePrice>,
 
     /// Unix timestamp of the update
-    #[schema(value_type = i64, example = 1741594458)]
+    #[schema(value_type = i64, example = 1_741_594_458)]
     pub timestamp: UnixTimestamp,
 }
 

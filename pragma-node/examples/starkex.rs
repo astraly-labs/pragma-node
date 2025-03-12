@@ -168,10 +168,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                         if tx.send(Ok(WebSocketMessage::Update(response))).is_err() {
                                             break;
                                         }
-                                    } else {
-                                        if tx.send(Err("Failed to parse message".to_string())).is_err() {
-                                            break;
-                                        }
+                                    } else if tx.send(Err("Failed to parse message".to_string())).is_err() {
+                                        break;
                                     }
                                 }
                             }
@@ -214,7 +212,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Ok(WebSocketMessage::Update(response)) => {
                     app.latest_update = Some(response);
                 }
-                Err(e) => eprintln!("Error: {}", e),
+                Err(e) => eprintln!("Error: {e}"),
             }
         }
 
@@ -268,7 +266,7 @@ fn parse_hex_asset_id(hex_id: &str) -> String {
 }
 
 /// Extracts and formats all received pairs from oracle prices.
-/// Converts from the StarkEx encoded format back to human-readable pairs.
+/// Converts from the `StarkEx` encoded format back to human-readable pairs.
 ///
 /// # Arguments
 /// * `oracle_prices` - Slice of `AssetOraclePrice` containing the received price updates

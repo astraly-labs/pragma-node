@@ -99,7 +99,7 @@ pub struct GetEntryResponse {
             "num_sources_aggregated": 5,
             "pair_id": "BTC/USD",
             "price": "0x1234567890abcdef",
-            "timestamp": 1647820800,
+            "timestamp": 1_647_820_800,
             "decimals": 18
          })
         ),

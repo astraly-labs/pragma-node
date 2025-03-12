@@ -25,7 +25,7 @@ use super::{get_onchain_decimals, get_onchain_ohlc_table_name, get_onchain_table
 pub const ENTRIES_BACKWARD_INTERVAL: &str = "1 hour";
 
 #[derive(Debug)]
-pub struct OnchainRoutingArguments {
+pub struct OnchainEntryArguments {
     pub pair_id: String,
     pub network: Network,
     pub timestamp: u64,
@@ -75,7 +75,7 @@ impl From<&SpotEntryWithAggregatedPrice> for OnchainEntry {
 #[allow(clippy::implicit_hasher)]
 pub async fn routing(
     onchain_pool: &Pool,
-    routing_args: OnchainRoutingArguments,
+    routing_args: OnchainEntryArguments,
     rpc_clients: &RpcClients,
     decimals_cache: &Cache<Network, HashMap<String, u32>>,
 ) -> Result<Vec<RawOnchainData>, InfraError> {

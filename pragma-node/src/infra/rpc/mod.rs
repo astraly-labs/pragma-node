@@ -65,7 +65,7 @@ pub async fn call_get_decimals(
     network: Network,
 ) -> Result<u32, InfraError> {
     let pair_id = cairo_short_string_to_felt(&pair.to_pair_id())
-        .map_err(|_| InfraError::InternalServerError)?;
+        .map_err(|_| InfraError::PairNotFound(pair.to_pair_id()))?;
     let Some(pragma_oracle_address) = ORACLE_ADDRESS_PER_NETWORK.get(&network) else {
         unreachable!()
     };
@@ -73,23 +73,23 @@ pub async fn call_get_decimals(
     let request = FunctionCall {
         contract_address: *pragma_oracle_address,
         entry_point_selector: get_selector_from_name("get_decimals")
-            .map_err(|_| InfraError::InternalServerError)?,
+            .map_err(|e| InfraError::RpcError(e.to_string()))?,
         calldata: vec![Felt::ZERO, pair_id],
     };
 
     let call_result = rpc_client
         .call(request, BlockId::Tag(BlockTag::Pending))
         .await
-        .map_err(|_| InfraError::InternalServerError)?;
+        .map_err(|e| InfraError::RpcError(e.to_string()))?;
 
     let Some(felt_decimals) = call_result.first() else {
-        return Err(InfraError::InternalServerError);
+        return Err(InfraError::PairNotFound(pair.to_pair_id()));
     };
 
     let decimals: u32 = felt_decimals
         .to_biguint()
         .try_into()
-        .map_err(|_| InfraError::InternalServerError)?;
+        .map_err(|_| InfraError::RpcError(format!("Converting {felt_decimals} to Biguint")))?;
 
     Ok(decimals)
 }

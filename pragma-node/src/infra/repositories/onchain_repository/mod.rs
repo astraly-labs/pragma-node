@@ -62,7 +62,11 @@ pub(crate) const fn get_onchain_table_name(
         (Network::Mainnet, DataType::SpotEntry) => "mainnet_spot_entry",
         (Network::Sepolia, DataType::FutureEntry) => "future_entry",
         (Network::Mainnet, DataType::FutureEntry) => "mainnet_future_entry",
-        _ => return Err(InfraError::InternalServerError),
+        _ => {
+            return Err(InfraError::UnsupportedDataTypeForNetwork(
+                network, data_type,
+            ));
+        }
     };
     Ok(table)
 }
@@ -78,7 +82,11 @@ pub(crate) fn get_onchain_ohlc_table_name(
         (Network::Mainnet, DataType::SpotEntry) => "mainnet_spot",
         (Network::Sepolia, DataType::FutureEntry) => "future",
         (Network::Mainnet, DataType::FutureEntry) => "mainnet_future",
-        _ => return Err(InfraError::InternalServerError),
+        _ => {
+            return Err(InfraError::UnsupportedDataTypeForNetwork(
+                network, data_type,
+            ));
+        }
     };
     let interval_specifier = get_interval_specifier(interval, true)?;
     let table_name = format!("{prefix_name}_{interval_specifier}_candle");
@@ -97,16 +105,32 @@ pub(crate) fn get_onchain_aggregate_table_name(
         (Network::Mainnet, DataType::SpotEntry) => "mainnet_spot_price",
         (Network::Sepolia, DataType::FutureEntry) => "future_price",
         (Network::Mainnet, DataType::FutureEntry) => "mainnet_future_price",
-        _ => return Err(InfraError::InternalServerError),
+        _ => {
+            return Err(InfraError::UnsupportedDataTypeForNetwork(
+                network, data_type,
+            ));
+        }
     };
 
     // NOTE: Special case because there is a mistake and we forgot the "s" on 2_hour
     let interval_specifier = if is_enum_variant!(interval, Interval::TwoHours) {
         "2_hour"
     } else {
-        get_interval_specifier(interval, true)?
+        get_onchain_interval_specifier(interval)?
     };
 
     let table_name = format!("{prefix_name}_{interval_specifier}_agg");
     Ok(table_name)
+}
+
+pub const fn get_onchain_interval_specifier(
+    interval: Interval,
+) -> Result<&'static str, InfraError> {
+    match interval {
+        Interval::OneMinute => Ok("1_min"),
+        Interval::FifteenMinutes => Ok("15_min"),
+        Interval::OneHour => Ok("1_hour"),
+        Interval::TwoHours => Ok("2_hour"),
+        _ => return Err(InfraError::UnsupportedOnchainInterval(interval)),
+    }
 }

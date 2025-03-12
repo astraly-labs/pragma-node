@@ -11,7 +11,7 @@ use utoipa::{IntoParams, ToResponse, ToSchema};
 
 use crate::AppState;
 use crate::infra::repositories::onchain_repository::entry::{
-    OnchainRoutingArguments, get_last_updated_timestamp, get_variations, routing,
+    OnchainEntryArguments, get_last_updated_timestamp, get_variations, routing,
 };
 use crate::utils::{PathExtractor, big_decimal_price_to_hex};
 
@@ -72,7 +72,7 @@ pub async fn get_onchain_entry(
     let now = chrono::Utc::now().timestamp();
     let timestamp = params.timestamp.map_or(now, |timestamp| timestamp);
 
-    let routing_arguments = OnchainRoutingArguments {
+    let routing_arguments = OnchainEntryArguments {
         pair_id: pair.to_pair_id(),
         network: params.network,
         timestamp: (timestamp as u64),

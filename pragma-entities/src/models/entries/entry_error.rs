@@ -6,7 +6,7 @@ use serde_json::json;
 use utoipa::ToSchema;
 
 use pragma_common::timestamp::TimestampError;
-use pragma_common::types::{AggregationMode, Interval};
+use pragma_common::types::{AggregationMode, DataType, Interval, Network};
 
 use crate::PublisherError;
 use crate::error::{InfraError, WebSocketError};
@@ -31,8 +31,13 @@ pub enum EntryError {
     #[schema(example = "unsupported interval 1s for aggregation median")]
     #[error("unsupported interval {0:?} for aggregation {1:?}")]
     InvalidInterval(Interval, AggregationMode),
+    #[schema(example = "unsupported interval 1s for onchain data")]
+    #[error("unsupported interval {0:?} for onchain data")]
+    InvalidOnchainInterval(Interval),
     #[error("invalid login message: {0}")]
     InvalidLoginMessage(String),
+    #[error("unsupported data_type {1:?} for network {0:?}")]
+    InvalidDataTypeForNetwork(Network, DataType),
 
     // 401 Error - Unauthorized
     #[error("unauthorized request: {0}")]
@@ -77,6 +82,12 @@ impl From<InfraError> for EntryError {
             InfraError::UnsupportedInterval(interval, mode) => {
                 Self::InvalidInterval(interval, mode)
             }
+            InfraError::UnsupportedOnchainInterval(interval) => {
+                Self::InvalidOnchainInterval(interval)
+            }
+            InfraError::UnsupportedDataTypeForNetwork(network, data_type) => {
+                Self::InvalidDataTypeForNetwork(network, data_type)
+            }
             InfraError::RoutingError(pair_id) => Self::RouteNotFound(pair_id),
             InfraError::EntryNotFound(entry_id) => Self::EntryNotFound(entry_id),
             InfraError::PairNotFound(pair_id) => Self::PairNotFound(pair_id),
@@ -100,6 +111,14 @@ impl IntoResponse for EntryError {
             Self::InvalidInterval(interval, mode) => (
                 StatusCode::BAD_REQUEST,
                 format!("Unsupported interval {interval:?} for aggregation {mode:?}"),
+            ),
+            Self::InvalidOnchainInterval(interval) => (
+                StatusCode::BAD_REQUEST,
+                format!("Unsupported interval {interval:?} for onchain data"),
+            ),
+            Self::InvalidDataTypeForNetwork(network, data_type) => (
+                StatusCode::BAD_REQUEST,
+                format!("Unsupported data type {data_type:?} for aggregation {network:?}"),
             ),
             Self::InvalidLoginMessage(msg) => (
                 StatusCode::BAD_REQUEST,

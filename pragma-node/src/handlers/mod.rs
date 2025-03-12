@@ -58,9 +58,9 @@ pub struct GetEntryParams {
     /// If not provided, returns the latest available price.
     ///
     /// # Examples
-    /// - `1647820800`: Returns price data from March 21, 2022 00:00:00 UTC
+    /// - `1_647_820_800`: Returns price data from March 21, 2022 00:00:00 UTC
     /// - `null`: Returns the most recent price update
-    #[schema(value_type = i64, example = 1647820800)]
+    #[schema(value_type = i64, example = 1_647_820_800)]
     pub timestamp: Option<UnixTimestamp>,
 
     /// Time interval for aggregated price data. Different intervals affect how price data is

@@ -1,7 +1,7 @@
 use deadpool_diesel::{InteractError, PoolError};
 use pragma_common::{
     timestamp::TimestampError,
-    types::{AggregationMode, Interval, Network},
+    types::{AggregationMode, DataType, Interval, Network},
 };
 use std::{
     fmt::{self, Debug},
@@ -55,6 +55,8 @@ pub enum InfraError {
     // Bad request (400)
     InvalidTimestamp(TimestampError),
     UnsupportedInterval(Interval, AggregationMode),
+    UnsupportedOnchainInterval(Interval),
+    UnsupportedDataTypeForNetwork(Network, DataType),
     // Not Found error (404)
     RoutingError(String),
     EntryNotFound(String),
@@ -69,6 +71,7 @@ pub enum InfraError {
     NonZeroU32Conversion(#[from] TryFromIntError),
     #[error(transparent)]
     AxumError(#[from] axum::Error),
+    RpcError(String),
     DbPoolError(#[from] PoolError),
     DbInteractionError(#[from] InteractError),
     DbResultError(#[from] diesel::result::Error),
@@ -86,6 +89,12 @@ impl fmt::Display for InfraError {
             Self::UnsupportedInterval(i, a) => {
                 write!(f, "Unsupported interval {i:?} for aggregation {a:?}")
             }
+            Self::UnsupportedOnchainInterval(i) => {
+                write!(f, "Unsupported interval {i:?} for onchain data")
+            }
+            Self::UnsupportedDataTypeForNetwork(n, d) => {
+                write!(f, "Unsupported data type {d:?} for network {n:?}")
+            }
             // 404
             Self::EntryNotFound(pair_id) => write!(f, "Entry not found for pair {pair_id}"),
             Self::PairNotFound(pair_id) => write!(f, "Pair {pair_id} not found"),
@@ -100,6 +109,7 @@ impl fmt::Display for InfraError {
             Self::NoRpcAvailable(network) => write!(f, "No RPC available for network {network}"),
             Self::NonZeroU32Conversion(e) => write!(f, "Non zero u32 conversion {e}"),
             Self::InternalServerError => write!(f, "Internal server error"),
+            Self::RpcError(e) => write!(f, "RPC error: {e}"),
             // Unclassified
             Self::DisputerNotSet => write!(f, "Unable to fetch disputer address"),
             Self::SettlerNotSet => write!(f, "Unable to fetch settler address"),
