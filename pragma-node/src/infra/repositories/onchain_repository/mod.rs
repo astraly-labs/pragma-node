@@ -46,14 +46,14 @@ pub(crate) async fn get_onchain_decimals(
     };
 
     // Update cache with the new decimals
-    let network_decimals = decimals_cache.get(&network).await.unwrap_or_default();
-    let mut updated_network_decimals = network_decimals.clone();
-    updated_network_decimals.insert(pair_id, decimals);
-
-    // Insert updated cache
-    decimals_cache
-        .insert(network, updated_network_decimals)
-        .await;
+    if decimals != 0 {
+        let network_decimals = decimals_cache.get(&network).await.unwrap_or_default();
+        let mut updated_network_decimals = network_decimals.clone();
+        updated_network_decimals.insert(pair_id, decimals);
+        decimals_cache
+            .insert(network, updated_network_decimals)
+            .await;
+    }
 
     Ok(decimals)
 }
