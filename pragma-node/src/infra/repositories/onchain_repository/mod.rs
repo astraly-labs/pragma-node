@@ -39,8 +39,8 @@ pub(crate) async fn get_onchain_decimals(
 
     let decimals = match call_get_decimals(rpc_client, pair, network).await {
         Ok(decimals) => decimals,
-        Err(_) => {
-            tracing::error!("No decimals found for published pair {pair}");
+        Err(e) => {
+            tracing::error!("Could not get on-chain decimals for {pair}: {e}");
             0
         }
     };
