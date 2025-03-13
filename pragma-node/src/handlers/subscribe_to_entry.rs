@@ -30,8 +30,7 @@ pub struct SignedPublisherPrice {
     #[schema(example = "0x534f4c55534400000000000000000000505241474d4100")]
     pub oracle_asset_id: String,
 
-    /// Price in StarkEx decimal format (not hex)
-    /// The price is scaled by 10^18
+    /// Price in `StarkEx` 18 decimals
     #[schema(example = "128065038090000000000")]
     pub oracle_price: String,
 
@@ -52,8 +51,7 @@ pub struct AssetOraclePrice {
     #[schema(example = "0x534f4c2d5553442d38000000000000")]
     pub global_asset_id: String,
 
-    /// Median price in `StarkEx` decimal format
-    /// The price is scaled by 10^18
+    /// Median price in `StarkEx` 18 decimals format
     #[schema(example = "128065038090000007168")]
     pub median_price: String,
 
@@ -67,7 +65,7 @@ pub struct AssetOraclePrice {
     pub signed_prices: Vec<SignedPublisherPrice>,
 }
 
-/// WebSocket response message for StarkEx price updates
+/// WebSocket response message for `StarkEx` price updates
 #[derive(Debug, Default, Serialize, Deserialize, ToResponse, ToSchema)]
 #[schema(example = json!({
     "oracle_prices": [{

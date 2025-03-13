@@ -111,7 +111,7 @@ pub struct GetEntryParams {
     pub entry_type: Option<EntryType>,
 
     /// Expiry date for future contracts in ISO 8601 format.
-    /// Only applicable when entry_type is "future".
+    /// Only applicable when `entry_type` is "future".
     ///
     /// # Example
     /// - `"2024-12-31"`: December 31, 2024 expiry

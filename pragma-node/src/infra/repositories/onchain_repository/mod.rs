@@ -139,6 +139,6 @@ pub const fn get_onchain_interval_specifier(
         Interval::TwoHours => Ok("2_hour"),
         Interval::OneDay => Ok("1_day"),
         Interval::OneWeek => Ok("1_week"),
-        _ => return Err(InfraError::UnsupportedOnchainInterval(interval)),
+        _ => Err(InfraError::UnsupportedOnchainInterval(interval)),
     }
 }

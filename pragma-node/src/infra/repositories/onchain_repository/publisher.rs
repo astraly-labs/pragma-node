@@ -265,27 +265,36 @@ pub async fn get_publishers_with_components(
     let updates =
         get_all_publishers_updates(pool, table_name, publisher_names, publishers_updates_cache)
             .await?;
-    let mut publishers_response = Vec::with_capacity(publishers.len());
 
-    for publisher in &publishers {
-        let Some(publisher_updates) = updates.get(&publisher.name) else {
-            continue;
-        };
-        if publisher_updates.daily_updates == 0 {
-            continue;
-        }
-        let publisher_with_components = get_publisher_with_components(
-            pool,
-            network,
-            table_name,
-            publisher,
-            publisher_updates,
-            decimals_cache,
-            rpc_clients,
-        )
-        .await?;
-        publishers_response.push(publisher_with_components);
-    }
+    // Create a vector of futures for each publisher that needs processing
+    let publisher_futures: Vec<_> = publishers
+        .iter()
+        .filter_map(|publisher| {
+            // Only process publishers with updates
+            let publisher_updates = updates.get(&publisher.name)?;
+            if publisher_updates.daily_updates == 0 {
+                return None;
+            }
+
+            let table_name = table_name.to_string();
+            let publisher_updates = publisher_updates.clone();
+            Some(async move {
+                get_publisher_with_components(
+                    pool,
+                    network,
+                    &table_name,
+                    publisher,
+                    &publisher_updates,
+                    decimals_cache,
+                    rpc_clients,
+                )
+                .await
+            })
+        })
+        .collect();
+
+    // Execute all publisher futures concurrently
+    let publishers_response = try_join_all(publisher_futures).await?;
 
     Ok(publishers_response)
 }

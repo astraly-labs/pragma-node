@@ -30,7 +30,7 @@ pub struct StreamEntryMultipairParams {
     /// Base parameters for entry requests including interval, aggregation mode, and routing options
     #[serde(flatten)]
     pub get_entry_params: GetEntryParams,
-    /// List of trading pairs to stream prices for (e.g. ["ETH/USD", "BTC/USD"])
+    /// List of trading pairs to stream prices for (e.g. `["ETH/USD", "BTC/USD"]`)
     #[serde(rename = "pairs[]")]
     #[param(example = json!(["ETH/USD", "BTC/USD"]))]
     pub pairs: Vec<String>,
