@@ -12,10 +12,10 @@ keywords = ["pragma", "sdk", "consumer", "data", "feeds"]
 workspace = true
 
 [dependencies]
+anyhow = { workspace = true }
 bigdecimal = { workspace = true, features = ["serde"] }
 cainome = { workspace = true }
 chrono = { workspace = true }
-anyhow = { workspace = true }
 indexmap = { workspace = true }
 opentelemetry = { workspace = true }
 opentelemetry-appender-tracing = { workspace = true }
