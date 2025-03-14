@@ -29,9 +29,9 @@ pub fn init_telemetry(
         .with(
             tracing_subscriber::fmt::layer()
                 .with_target(false)
-                .with_file(false)
-                .with_line_number(false)
-                .pretty(),
+                .with_file(true)
+                .with_line_number(true)
+                .compact(),
         );
 
     if let Some(endpoint) = collection_endpoint {
@@ -51,9 +51,9 @@ pub fn init_telemetry(
             .with(
                 tracing_subscriber::fmt::layer()
                     .with_target(false)
-                    .with_file(false)
-                    .with_line_number(false)
-                    .pretty()
+                    .with_file(true)
+                    .with_line_number(true)
+                    .compact()
                     .with_span_events(FmtSpan::NONE),
             )
             .try_init()?;
