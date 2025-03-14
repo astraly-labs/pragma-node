@@ -8,7 +8,7 @@ CREATE TABLE entries (
   timestamp TIMESTAMPTZ NOT NULL,
   price NUMERIC NOT NULL,
   PRIMARY KEY (id, timestamp)
-)
+);
 
 CREATE INDEX entries_pair_id_timestamp_idx ON entries (pair_id, timestamp DESC);
 CREATE INDEX future_entries_pair_id_timestamp_idx ON future_entries (pair_id, timestamp DESC);
