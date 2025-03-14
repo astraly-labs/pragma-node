@@ -34,9 +34,10 @@ struct ServerAddon;
 
 impl Modify for ServerAddon {
     fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
+        // TODO: Add back enum_values with api.mainnet when we have production environment
         let server_variable = ServerVariableBuilder::new()
-            .default_value("api.dev")
-            .enum_values(Some(vec!["api.dev", "api.prod"]))
+            .default_value("api.devnet")
+            // .enum_values(Some(vec!["api.devnet", "api.mainnet"]))
             .build();
         openapi.servers = Some(vec![
             ServerBuilder::new()
