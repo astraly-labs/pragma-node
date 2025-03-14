@@ -15,12 +15,13 @@ use opentelemetry_semantic_conventions::resource::SERVICE_NAME;
 use tracing::Level;
 use tracing::level_filters::LevelFilter;
 use tracing_opentelemetry::OpenTelemetryLayer;
+use tracing_subscriber::fmt::format::FmtSpan;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
 pub fn init_telemetry(
     app_name: String,
-    collection_endpoint: String,
+    collection_endpoint: Option<String>,
     log_level: Option<Level>,
 ) -> Result<()> {
     let tracing_subscriber = tracing_subscriber::registry()
@@ -33,20 +34,34 @@ pub fn init_telemetry(
                 .pretty(),
         );
 
-    let tracer_provider = init_tracer_provider(&app_name, &collection_endpoint);
+    if let Some(endpoint) = collection_endpoint {
+        let tracer_provider = init_tracer_provider(&app_name, &endpoint);
+        let logger_provider = init_logs_provider(&app_name, &endpoint)?;
+        init_meter_provider(&app_name, &endpoint)?;
 
-    let logger_provider = init_logs_provider(&app_name, &collection_endpoint)?;
-    init_meter_provider(&app_name, &collection_endpoint)?;
-
-    tracing_subscriber
-        .with(OpenTelemetryLayer::new(tracer_provider))
-        .with(OpenTelemetryTracingBridge::new(&logger_provider))
-        .try_init()?;
+        tracing_subscriber
+            .with(OpenTelemetryLayer::new(tracer_provider))
+            .with(OpenTelemetryTracingBridge::new(&logger_provider))
+            .try_init()?;
+    } else {
+        // Ignore spans when collection_endpoint is None
+        let filter = tracing_subscriber::filter::FilterFn::new(|metadata| !metadata.is_span());
+        tracing_subscriber
+            .with(filter)
+            .with(
+                tracing_subscriber::fmt::layer()
+                    .with_target(false)
+                    .with_file(false)
+                    .with_line_number(false)
+                    .pretty()
+                    .with_span_events(FmtSpan::NONE),
+            )
+            .try_init()?;
+    }
 
     Ok(())
 }
 
-#[allow(dead_code)]
 fn init_tracer_provider(app_name: &str, collection_endpoint: &str) -> Tracer {
     let provider = opentelemetry_otlp::new_pipeline()
         .tracing()
@@ -105,7 +120,6 @@ pub fn init_meter_provider(app_name: &str, collection_endpoint: &str) -> Result<
         )]))
         .build();
 
-    // Set the global meter provider
     global::set_meter_provider(metrics_provider);
 
     Ok(())

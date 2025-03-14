@@ -15,6 +15,7 @@ CREATE TABLE future_entries (
 );
 
 CREATE UNIQUE INDEX idx_future_entries_unique ON future_entries(pair_id, source, timestamp, expiration_timestamp);
+CREATE INDEX idx_future_entries_pair_id_timestamp ON future_entries (pair_id, timestamp DESC);
 
 SELECT
   create_hypertable('future_entries', 'timestamp');

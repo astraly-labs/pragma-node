@@ -15,8 +15,7 @@ use pragma_entities::{Entry, FutureEntry, InfraError, NewEntry, NewFutureEntry};
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let _ = dotenv(); // .env file is not present in prod
 
-    let otel_endpoint = std::env::var("OTEL_EXPORTER_OTLP_ENDPOINT")
-        .unwrap_or_else(|_| "http://signoz.dev.pragma.build:4317".to_string());
+    let otel_endpoint = std::env::var("OTEL_EXPORTER_OTLP_ENDPOINT").ok();
     pragma_common::telemetry::init_telemetry("pragma-ingestor".into(), otel_endpoint, None)?;
 
     info!(

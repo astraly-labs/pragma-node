@@ -58,8 +58,7 @@ impl fmt::Debug for AppState {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv().ok();
 
-    let otel_endpoint = std::env::var("OTEL_EXPORTER_OTLP_ENDPOINT")
-        .unwrap_or_else(|_| "http://localhost:4317".to_string());
+    let otel_endpoint = std::env::var("OTEL_EXPORTER_OTLP_ENDPOINT").ok();
     pragma_common::telemetry::init_telemetry("pragma-node".into(), otel_endpoint, None)
         .expect("Failed to initialize telemetry");
 
