@@ -51,7 +51,7 @@ pragma-common = { path = "./pragma-common" }
 pragma-entities = { path = "./pragma-entities" }
 pragma-ingestor = { path = "./pragma-ingestor" }
 pragma-node = { path = "./pragma-node" }
-color-eyre = "0.6.3"
+anyhow = "1.0.97"
 aws-config = { version = "1.5.1", features = ["behavior-version-latest"] }
 aws-sdk-secretsmanager = "1.32.0"
 google-secretmanager1 = "6.0.0"

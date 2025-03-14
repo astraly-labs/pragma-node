@@ -1,4 +1,4 @@
-use color_eyre::eyre::Result;
+use anyhow::Result;
 use opentelemetry::trace::TracerProvider;
 use opentelemetry::{KeyValue, global};
 use opentelemetry_appender_tracing::layer::OpenTelemetryTracingBridge;
@@ -12,27 +12,19 @@ use opentelemetry_sdk::{
 };
 use opentelemetry_sdk::{runtime, trace::BatchConfigBuilder};
 use opentelemetry_semantic_conventions::resource::SERVICE_NAME;
-use tracing::Level;
 use tracing::level_filters::LevelFilter;
 use tracing_opentelemetry::OpenTelemetryLayer;
+use tracing_subscriber::EnvFilter;
 use tracing_subscriber::fmt::format::FmtSpan;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
-pub fn init_telemetry(
-    app_name: String,
-    collection_endpoint: Option<String>,
-    log_level: Option<Level>,
-) -> Result<()> {
-    let tracing_subscriber = tracing_subscriber::registry()
-        .with(LevelFilter::from_level(log_level.unwrap_or(Level::INFO)))
-        .with(
-            tracing_subscriber::fmt::layer()
-                .with_target(false)
-                .with_file(true)
-                .with_line_number(true)
-                .compact(),
-        );
+pub fn init_telemetry(app_name: String, collection_endpoint: Option<String>) -> Result<()> {
+    let tracing_subscriber = tracing_subscriber::registry().with(
+        EnvFilter::builder()
+            .with_default_directive(LevelFilter::INFO.into())
+            .from_env_lossy(),
+    );
 
     if let Some(endpoint) = collection_endpoint {
         let tracer_provider = init_tracer_provider(&app_name, &endpoint);
@@ -40,6 +32,7 @@ pub fn init_telemetry(
         init_meter_provider(&app_name, &endpoint)?;
 
         tracing_subscriber
+            .with(tracing_subscriber::fmt::layer())
             .with(OpenTelemetryLayer::new(tracer_provider))
             .with(OpenTelemetryTracingBridge::new(&logger_provider))
             .try_init()?;
