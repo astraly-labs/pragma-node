@@ -7,11 +7,11 @@ CREATE OR REPLACE FUNCTION create_twap_aggregate(
 RETURNS void AS $$
 BEGIN
     EXECUTE format('
-        CREATE MATERIALIZED VIEW %s
+        CREATE MATERIALIZED VIEW %I
         WITH (timescaledb.continuous, timescaledb.materialized_only = false)
         AS SELECT 
             pair_id,
-            time_bucket($1::interval, timestamp) as bucket,
+            time_bucket(%L, timestamp) as bucket,
             average(time_weight(''Linear'', timestamp, price))::numeric as price_twap,
             COUNT(DISTINCT source) as num_sources
         FROM %I
@@ -19,10 +19,10 @@ BEGIN
         WITH NO DATA;', p_name, p_interval, p_table_name);
 
     EXECUTE format('
-        SELECT add_continuous_aggregate_policy(''%s'',
-            start_offset => $1,
-            end_offset => $2,
-            schedule_interval => $3);', p_name, p_start_offset, p_interval, p_interval);
+        SELECT add_continuous_aggregate_policy(%L,
+            start_offset => %L,
+            end_offset => %L,
+            schedule_interval => %L);', p_name, p_start_offset, '0'::interval, p_interval);
 END;
 $$ LANGUAGE plpgsql;
 

@@ -9,7 +9,7 @@ CREATE TABLE entries (
   price NUMERIC NOT NULL,
   timestamp TIMESTAMPTZ NOT NULL,
   publisher TEXT NOT NULL,
-  publisher_signature TEXT NOT NULL,
+  publisher_signature TEXT NULLABLE,
   source VARCHAR NOT NULL,
   PRIMARY KEY (id, timestamp)
 );
@@ -28,9 +28,9 @@ CREATE TABLE future_entries (
   pair_id VARCHAR NOT NULL,
   price NUMERIC NOT NULL,
   timestamp TIMESTAMPTZ NOT NULL,
-  expiration_timestamp TIMESTAMPTZ, -- can be NULL for perp contracts
+  expiration_timestamp TIMESTAMPTZ NULLABLE, -- can be NULL for perp contracts
   publisher TEXT NOT NULL,
-  publisher_signature TEXT NOT NULL,
+  publisher_signature TEXT NULLABLE,
   source VARCHAR NOT NULL,
   PRIMARY KEY (id, timestamp)
 );

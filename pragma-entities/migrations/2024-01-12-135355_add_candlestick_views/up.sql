@@ -7,24 +7,24 @@ CREATE OR REPLACE FUNCTION create_candlestick_view(
 RETURNS void AS $$
 BEGIN
     EXECUTE format('
-        CREATE MATERIALIZED VIEW %s
+        CREATE MATERIALIZED VIEW %I
         WITH (timescaledb.continuous, timescaledb.materialized_only = false) AS
         SELECT
-            time_bucket($1::interval, timestamp) AS bucket,
+            time_bucket(%L, bucket) AS ohlc_bucket,
             pair_id,
-            FIRST(price, timestamp)::numeric AS "open",
-            MAX(price)::numeric AS high,
-            MIN(price)::numeric AS low,
-            LAST(price, timestamp)::numeric AS "close"
+            FIRST(median_price, bucket)::numeric AS "open",
+            MAX(median_price)::numeric AS high,
+            MIN(median_price)::numeric AS low,
+            LAST(median_price, bucket)::numeric AS "close"
         FROM %I
-        GROUP BY bucket, pair_id
+        GROUP BY ohlc_bucket, pair_id
         WITH NO DATA;', p_name, p_interval, p_table_name);
 
     EXECUTE format('
-        SELECT add_continuous_aggregate_policy(''%s'',
-            start_offset => $1,
-            end_offset => $2,
-            schedule_interval => $3);', p_name, p_start_offset, p_interval, p_interval);
+        SELECT add_continuous_aggregate_policy(%L,
+            start_offset => %L,
+            end_offset => %L,
+            schedule_interval => %L);', p_name, p_start_offset, '0'::interval, p_interval);
 END;
 $$ LANGUAGE plpgsql;
 

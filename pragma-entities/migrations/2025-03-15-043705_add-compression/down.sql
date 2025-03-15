@@ -37,8 +37,14 @@ BEGIN
             'price_1_week_agg', 'price_1_week_agg_future'
         ]))
     LOOP
-        -- Remove compression policy
-        CALL remove_compression_policy(view_name, if_exists => true);
+        BEGIN
+            -- Remove compression policy if it exists
+            CALL remove_columnstore_policy(view_name);
+        EXCEPTION WHEN OTHERS THEN
+            -- Skip if policy doesn't exist
+            RAISE NOTICE 'No compression policy found for %', view_name;
+        END;
+        
         -- Disable columnstore
         EXECUTE format('ALTER MATERIALIZED VIEW %I SET (timescaledb.enable_columnstore = false)', view_name);
     END LOOP;
@@ -51,6 +57,9 @@ SELECT remove_compression_from_continuous_aggregates();
 -- Drop the functions
 DROP FUNCTION IF EXISTS add_compression_to_continuous_aggregates;
 DROP FUNCTION IF EXISTS remove_compression_from_continuous_aggregates;
+
+CALL remove_columnstore_policy('entries');
+CALL remove_columnstore_policy('future_entries');
 
 -- Remove compression from base tables
 ALTER TABLE entries SET (timescaledb.enable_columnstore = false);
