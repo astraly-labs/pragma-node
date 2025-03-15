@@ -1,95 +1,43 @@
--- 1 day candle
-CREATE MATERIALIZED VIEW one_day_candle
-WITH (timescaledb.continuous) AS
-    SELECT
-        time_bucket('1 day', timestamp) AS bucket,
-        pair_id,
-        FIRST(price, timestamp) AS "open",
-        MAX(price) AS high,
-        MIN(price) AS low,
-        LAST(price, timestamp) AS "close"
-    FROM entries
-    GROUP BY bucket, pair_id
-    WITH NO DATA;
+CREATE OR REPLACE FUNCTION create_candlestick_view(
+    p_name text,
+    p_interval interval,
+    p_start_offset interval,
+    p_table_name text
+)
+RETURNS void AS $$
+BEGIN
+    EXECUTE format('
+        CREATE MATERIALIZED VIEW %s
+        WITH (timescaledb.continuous, timescaledb.materialized_only = false) AS
+        SELECT
+            time_bucket($1::interval, timestamp) AS bucket,
+            pair_id,
+            FIRST(price, timestamp)::numeric AS "open",
+            MAX(price)::numeric AS high,
+            MIN(price)::numeric AS low,
+            LAST(price, timestamp)::numeric AS "close"
+        FROM %I
+        GROUP BY bucket, pair_id
+        WITH NO DATA;', p_name, p_interval, p_table_name);
 
+    EXECUTE format('
+        SELECT add_continuous_aggregate_policy(''%s'',
+            start_offset => $1,
+            end_offset => $2,
+            schedule_interval => $3);', p_name, p_start_offset, p_interval, p_interval);
+END;
+$$ LANGUAGE plpgsql;
 
-SELECT add_continuous_aggregate_policy('one_day_candle',
-    start_offset => INTERVAL '3 days',
-    end_offset => INTERVAL '1 day',
-    schedule_interval => INTERVAL '1 day');
+-- Spot entries candlesticks
+SELECT create_candlestick_view('candle_1_min', '1 minute'::interval, '3 minutes'::interval, 'price_1_s_agg');
+SELECT create_candlestick_view('candle_5_min', '5 minutes'::interval, '15 minutes'::interval, 'price_10_s_agg');
+SELECT create_candlestick_view('candle_15_min', '15 minutes'::interval, '45 minutes'::interval, 'price_10_s_agg');
+SELECT create_candlestick_view('candle_1_h', '1 hour'::interval, '3 hours'::interval, 'price_10_s_agg');
+SELECT create_candlestick_view('candle_1_day', '1 day'::interval, '3 days'::interval, 'price_10_s_agg');
 
--- 1 hour candle
-CREATE MATERIALIZED VIEW one_hour_candle
-WITH (timescaledb.continuous) AS
-    SELECT
-        time_bucket('1 hour', timestamp) AS bucket,
-        pair_id,
-        FIRST(price, timestamp) AS "open",
-        MAX(price) AS high,
-        MIN(price) AS low,
-        LAST(price, timestamp) AS "close"
-    FROM entries
-    GROUP BY bucket, pair_id
-    WITH NO DATA;
-
-SELECT add_continuous_aggregate_policy('one_hour_candle',
-    start_offset => INTERVAL '3 hours',
-    end_offset => INTERVAL '1 hour',
-    schedule_interval => INTERVAL '1 hour');
-
--- 15 minute candle
-CREATE MATERIALIZED VIEW fifteen_minute_candle
-WITH (timescaledb.continuous) AS
-    SELECT
-        time_bucket('15 minutes', timestamp) AS bucket,
-        pair_id,
-        FIRST(price, timestamp)::numeric AS "open",
-        MAX(price)::numeric AS high,
-        MIN(price)::numeric AS low,
-        LAST(price, timestamp)::numeric AS "close"
-    FROM entries
-    GROUP BY bucket, pair_id
-    WITH NO DATA;
-
-SELECT add_continuous_aggregate_policy('fifteen_minute_candle',
-    start_offset => INTERVAL '45 minutes',
-    end_offset => INTERVAL '15 minutes',
-    schedule_interval => INTERVAL '15 minutes');
-
--- 5 minute candle
-CREATE MATERIALIZED VIEW five_minute_candle
-WITH (timescaledb.continuous) AS
-    SELECT
-        time_bucket('5 minutes', timestamp) AS bucket,
-        pair_id,
-        FIRST(price, timestamp) AS "open",
-        MAX(price) AS high,
-        MIN(price) AS low,
-        LAST(price, timestamp) AS "close"
-    FROM entries
-    GROUP BY bucket, pair_id
-    WITH NO DATA;
-
-SELECT add_continuous_aggregate_policy('five_minute_candle',
-    start_offset => INTERVAL '15 minutes',
-    end_offset => INTERVAL '5 minutes',
-    schedule_interval => INTERVAL '5 minutes');
-
--- 1 minute candle
-CREATE MATERIALIZED VIEW one_minute_candle
-WITH (timescaledb.continuous) AS
-    SELECT
-        time_bucket('1 minute', timestamp) AS bucket,
-        pair_id,
-        FIRST(price, timestamp) AS "open",
-        MAX(price) AS high,
-        MIN(price) AS low,
-        LAST(price, timestamp) AS "close"
-    FROM entries
-    GROUP BY bucket, pair_id
-    WITH NO DATA;
-
-SELECT add_continuous_aggregate_policy('one_minute_candle',
-    start_offset => INTERVAL '3 minutes',
-    end_offset => INTERVAL '1 minute',
-    schedule_interval => INTERVAL '1 minute');
+-- Future entries candlesticks
+SELECT create_candlestick_view('candle_1_min_future', '1 minute'::interval, '3 minutes'::interval, 'price_1_s_agg_future');
+SELECT create_candlestick_view('candle_5_min_future', '5 minutes'::interval, '15 minutes'::interval, 'price_10_s_agg_future');
+SELECT create_candlestick_view('candle_15_min_future', '15 minutes'::interval, '45 minutes'::interval, 'price_10_s_agg_future');
+SELECT create_candlestick_view('candle_1_h_future', '1 hour'::interval, '3 hours'::interval, 'price_10_s_agg_future');
+SELECT create_candlestick_view('candle_1_day_future', '1 day'::interval, '3 days'::interval, 'price_10_s_agg_future');

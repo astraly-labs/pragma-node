@@ -8,8 +8,7 @@ pub fn get_expiration_timestamp_filter(
 ) -> Result<String, InfraError> {
     match data_type {
         DataType::SpotEntry => Ok(String::default()),
-        // TODO: this is a perp?
-        DataType::FutureEntry if expiry.is_empty() => {
+        DataType::PerpEntry => {
             Ok(String::from("AND\n\t\texpiration_timestamp is null"))
         }
         DataType::FutureEntry if !expiry.is_empty() => {
@@ -24,8 +23,7 @@ pub const fn get_table_suffix(data_type: DataType) -> Result<&'static str, Infra
     match data_type {
         DataType::SpotEntry => Ok(""),
         DataType::FutureEntry => Ok("_future"),
-        // TODO: Why does this return an Err? Should be "_future" too?
-        DataType::PerpEntry => Err(InfraError::InternalServerError),
+        DataType::PerpEntry => Ok("_future"),
     }
 }
 

@@ -4,6 +4,7 @@ CREATE TABLE publishers (
     name VARCHAR NOT NULL,
     master_key VARCHAR NOT NULL,
     active_key VARCHAR NOT NULL,
-    active BOOLEAN NOT NULL,
+    account_address VARCHAR NOT NULL DEFAULT '',
+    active BOOLEAN NOT NULL DEFAULT true,
     PRIMARY KEY (id)
 );

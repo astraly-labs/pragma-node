@@ -535,7 +535,7 @@ pub async fn get_ohlc(
             low,
             close
         FROM
-            new_{}_candle
+            candle_{}
         WHERE
             pair_id = $1
             AND

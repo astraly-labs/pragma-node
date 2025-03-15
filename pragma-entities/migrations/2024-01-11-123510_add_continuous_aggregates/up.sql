@@ -1,49 +1,50 @@
--- Your SQL goes here
-CREATE MATERIALIZED VIEW price_1_min_agg
-WITH (timescaledb.continuous, timescaledb.materialized_only = true)
-AS SELECT 
-    pair_id,
-    time_bucket('1 min'::interval, timestamp) as bucket,
-    approx_percentile(0.5, percentile_agg(price))::numeric AS median_price,
-    COUNT(DISTINCT source) as num_sources
-FROM entries
-GROUP BY bucket, pair_id
-WITH NO DATA;
+CREATE OR REPLACE FUNCTION create_continuous_aggregate(
+    p_name text,
+    p_interval interval,
+    p_start_offset interval,
+    p_table_name text
+)
+RETURNS void AS $$
+BEGIN
+    EXECUTE format('
+        CREATE MATERIALIZED VIEW %s
+        WITH (timescaledb.continuous, timescaledb.materialized_only = false)
+        AS SELECT 
+            pair_id,
+            time_bucket($1::interval, timestamp) as bucket,
+            (percentile_cont(0.5) WITHIN GROUP (ORDER BY price))::numeric(1000,0) AS median_price,
+            COUNT(DISTINCT source) as num_sources
+        FROM %I
+        GROUP BY bucket, pair_id
+        WITH NO DATA;', p_name, p_interval, p_table_name);
 
-SELECT add_continuous_aggregate_policy('price_1_min_agg',
-  start_offset => NULL,
-  end_offset => INTERVAL '1 min',
-  schedule_interval => INTERVAL '1 min');
+    EXECUTE format('
+        SELECT add_continuous_aggregate_policy(''%s'',
+            start_offset => $1,
+            end_offset => $2,
+            schedule_interval => $3);', p_name, p_start_offset, p_interval, p_interval);
+END;
+$$ LANGUAGE plpgsql;
 
-CREATE MATERIALIZED VIEW price_15_min_agg
-WITH (timescaledb.continuous, timescaledb.materialized_only = true)
-AS SELECT 
-    pair_id,
-    time_bucket('15 min'::interval, timestamp) as bucket,
-    approx_percentile(0.5, percentile_agg(price))::numeric AS median_price,
-    COUNT(DISTINCT source) as num_sources
-FROM entries
-GROUP BY bucket, pair_id
-WITH NO DATA;
+-- Spot entries aggregates
+SELECT create_continuous_aggregate('price_100_ms_agg', '100 milliseconds'::interval, '300 milliseconds'::interval, 'entries');
+SELECT create_continuous_aggregate('price_1_s_agg', '1 second'::interval, '3 seconds'::interval, 'entries');
+SELECT create_continuous_aggregate('price_5_s_agg', '5 seconds'::interval, '15 seconds'::interval, 'entries');
+SELECT create_continuous_aggregate('price_1_min_agg', '1 minute'::interval, '3 minutes'::interval, 'entries');
+SELECT create_continuous_aggregate('price_15_min_agg', '15 minutes'::interval, '45 minutes'::interval, 'entries');
+SELECT create_continuous_aggregate('price_1_h_agg', '1 hour'::interval, '3 hours'::interval, 'entries');
+SELECT create_continuous_aggregate('price_2_h_agg', '2 hours'::interval, '6 hours'::interval, 'entries');
+SELECT create_continuous_aggregate('price_1_day_agg', '1 day'::interval, '3 days'::interval, 'entries');
+SELECT create_continuous_aggregate('price_1_week_agg', '1 week'::interval, '3 weeks'::interval, 'entries');
 
-SELECT add_continuous_aggregate_policy('price_15_min_agg',
-  start_offset => NULL,
-  end_offset => INTERVAL '15 min',
-  schedule_interval => INTERVAL '15 min');
-
-CREATE MATERIALIZED VIEW price_1_h_agg
-WITH (timescaledb.continuous, timescaledb.materialized_only = true)
-AS SELECT 
-    pair_id,
-    time_bucket('1 hour'::interval, timestamp) as bucket,
-    approx_percentile(0.5, percentile_agg(price))::numeric AS median_price,
-    COUNT(DISTINCT source) as num_sources
-FROM entries
-GROUP BY bucket, pair_id
-WITH NO DATA;
-
-SELECT add_continuous_aggregate_policy('price_1_h_agg',
-  start_offset => NULL,
-  end_offset => INTERVAL '1 hour',
-  schedule_interval => INTERVAL '1 hour');
+-- Future entries aggregates
+SELECT create_continuous_aggregate('price_100_ms_agg_future', '100 milliseconds'::interval, '300 milliseconds'::interval, 'future_entries');
+SELECT create_continuous_aggregate('price_1_s_agg_future', '1 second'::interval, '3 seconds'::interval, 'future_entries');
+SELECT create_continuous_aggregate('price_5_s_agg_future', '5 seconds'::interval, '15 seconds'::interval, 'future_entries');
+SELECT create_continuous_aggregate('price_1_min_agg_future', '1 minute'::interval, '3 minutes'::interval, 'future_entries');
+SELECT create_continuous_aggregate('price_15_min_agg_future', '15 minutes'::interval, '45 minutes'::interval, 'future_entries');
+SELECT create_continuous_aggregate('price_1_h_agg_future', '1 hour'::interval, '3 hours'::interval, 'future_entries');
+SELECT create_continuous_aggregate('price_2_h_agg_future', '2 hours'::interval, '6 hours'::interval, 'future_entries');
+SELECT create_continuous_aggregate('price_1_day_agg_future', '1 day'::interval, '3 days'::interval, 'future_entries');
+SELECT create_continuous_aggregate('price_1_week_agg_future', '1 week'::interval, '3 weeks'::interval, 'future_entries');
 

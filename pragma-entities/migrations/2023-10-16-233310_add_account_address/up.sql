@@ -1,7 +1,4 @@
 -- Your SQL goes here
-ALTER TABLE publishers
-ADD COLUMN account_address VARCHAR NOT NULL DEFAULT '';
-
 INSERT INTO publishers (name, master_key, active_key, active, account_address) 
 VALUES (
     'PRAGMA',
