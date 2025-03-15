@@ -57,7 +57,7 @@ BEGIN
         EXECUTE format('ALTER MATERIALIZED VIEW %I SET (timescaledb.enable_columnstore = true, timescaledb.segmentby = ''pair_id'')', view_name);
 
         -- Add compression policy
-        EXECUTE format('CALL add_columnstore_policy(%I, compress_after => $1)', view_name) USING compress_after;
+        EXECUTE format('CALL add_columnstore_policy(%L, after => $1)', view_name) USING compress_after;
 
     END LOOP;
 END;
