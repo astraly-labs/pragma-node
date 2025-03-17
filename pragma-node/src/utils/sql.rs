@@ -20,8 +20,8 @@ pub const fn get_interval_specifier(
             Interval::OneMinute => Ok("1_min"),
             Interval::FiveMinutes => Ok("5_min"),
             Interval::FifteenMinutes => Ok("15_min"),
-            Interval::OneHour => Ok("1_hour"),
-            Interval::TwoHours => Ok("2_hours"),
+            Interval::OneHour => Ok("1_h"),
+            Interval::TwoHours => Ok("2_h"),
             Interval::OneDay => Ok("1_day"),
             _ => Err(InfraError::UnsupportedInterval(
                 interval,
