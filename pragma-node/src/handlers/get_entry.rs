@@ -47,15 +47,7 @@ impl TryFrom<GetEntryParams> for EntryParams {
         // Unwrap parameters with their defaults
         let interval = params.interval.unwrap_or_default();
         let aggregation_mode = params.aggregation.unwrap_or_default();
-
-        // TWAP is only supported for One & Two hours
-        if matches!(aggregation_mode, AggregationMode::Twap)
-            && interval != Interval::OneHour
-            && interval != Interval::TwoHours
-        {
-            return Err(EntryError::InvalidInterval(interval, aggregation_mode));
-        }
-
+        
         // Convert entry_type to DataType
         let data_type = params
             .entry_type
