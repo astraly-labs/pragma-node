@@ -16,8 +16,6 @@ use utoipa::ToSchema;
 pub enum AggregationMode {
     #[serde(rename = "median")]
     Median,
-    #[serde(rename = "mean")]
-    Mean,
     #[serde(rename = "twap")]
     #[default]
     Twap,
@@ -66,8 +64,12 @@ pub enum Interval {
     OneSecond,
     #[serde(rename = "5s")]
     FiveSeconds,
+    #[serde(rename = "10s")]
+    TenSeconds,
     #[serde(rename = "1min")]
     OneMinute,
+    #[serde(rename = "5min")]
+    FiveMinutes,
     #[serde(rename = "15min")]
     FifteenMinutes,
     #[serde(rename = "1h")]
@@ -84,9 +86,12 @@ pub enum Interval {
 impl Interval {
     pub const fn to_minutes(&self) -> i64 {
         match self {
-            Self::OneHundredMillisecond | Self::OneSecond => 0,
-            Self::FiveSeconds => 5,
+            Self::OneHundredMillisecond
+            | Self::OneSecond
+            | Self::FiveSeconds
+            | Self::TenSeconds => 0,
             Self::OneMinute => 1,
+            Self::FiveMinutes => 5,
             Self::FifteenMinutes => 15,
             Self::OneHour => 60,
             Self::TwoHours => 120,
@@ -104,6 +109,9 @@ impl Interval {
         }
         if matches!(self, Self::FiveSeconds) {
             return 5;
+        }
+        if matches!(self, Self::TenSeconds) {
+            return 10;
         }
         self.to_minutes() * 60
     }

@@ -219,7 +219,6 @@ fn build_sql_query(
 
 fn get_aggregation_subquery(aggregation_mode: AggregationMode) -> Result<&'static str, InfraError> {
     let query = match aggregation_mode {
-        AggregationMode::Mean => "AVG(price) AS aggregated_price",
         AggregationMode::Median => {
             "(
                 SELECT AVG(price)

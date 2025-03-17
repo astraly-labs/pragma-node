@@ -38,7 +38,7 @@ pub async fn get_historical_entries(
         )
         .await
         .map_err(EntryError::from)?,
-        AggregationMode::Mean | AggregationMode::Twap => unreachable!(),
+        AggregationMode::Twap => unreachable!(),
     };
 
     let responses: Vec<GetEntryResponse> = entries

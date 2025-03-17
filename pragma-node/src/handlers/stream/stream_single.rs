@@ -60,7 +60,7 @@ pub async fn stream_entry(
         || params.get_entry_params.timestamp.is_some()
         || matches!(
             params.get_entry_params.aggregation,
-            Some(AggregationMode::Twap | AggregationMode::Mean)
+            Some(AggregationMode::Twap)
         ) {
         let mut sent_error = false;
         Box::new(move || {
