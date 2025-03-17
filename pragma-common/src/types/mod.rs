@@ -16,8 +16,6 @@ use utoipa::ToSchema;
 pub enum AggregationMode {
     #[serde(rename = "median")]
     Median,
-    #[serde(rename = "mean")]
-    Mean,
     #[serde(rename = "twap")]
     #[default]
     Twap,
@@ -68,6 +66,8 @@ pub enum Interval {
     FiveSeconds,
     #[serde(rename = "1min")]
     OneMinute,
+    #[serde(rename = "5min")]
+    FiveMinutes,
     #[serde(rename = "15min")]
     FifteenMinutes,
     #[serde(rename = "1h")]
@@ -87,6 +87,7 @@ impl Interval {
             Self::OneHundredMillisecond | Self::OneSecond => 0,
             Self::FiveSeconds => 5,
             Self::OneMinute => 1,
+            Self::FiveMinutes => 5,
             Self::FifteenMinutes => 15,
             Self::OneHour => 60,
             Self::TwoHours => 120,

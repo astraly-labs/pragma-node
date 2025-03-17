@@ -156,7 +156,6 @@ async fn get_price(
     let entry = match entry_params.aggregation_mode {
         AggregationMode::Median => get_median_price(pool, pair.to_pair_id(), entry_params).await?,
         AggregationMode::Twap => get_twap_price(pool, pair.to_pair_id(), entry_params).await?,
-        AggregationMode::Mean => Err(InfraError::InternalServerError)?,
     };
 
     Ok(entry)

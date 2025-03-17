@@ -34,8 +34,12 @@ pub const fn get_interval_specifier(
 ) -> Result<&'static str, InfraError> {
     if is_twap {
         match interval {
+            Interval::OneMinute => Ok("1_min"),
+            Interval::FiveMinutes => Ok("5_min"),
+            Interval::FifteenMinutes => Ok("15_min"),
             Interval::OneHour => Ok("1_hour"),
             Interval::TwoHours => Ok("2_hours"),
+            Interval::OneDay => Ok("1_day"),
             _ => Err(InfraError::UnsupportedInterval(
                 interval,
                 AggregationMode::Twap,
@@ -52,6 +56,10 @@ pub const fn get_interval_specifier(
             Interval::TwoHours => Ok("2_h"),
             Interval::OneDay => Ok("1_day"),
             Interval::OneWeek => Ok("1_week"),
+            _ => Err(InfraError::UnsupportedInterval(
+                interval,
+                AggregationMode::Median,
+            )),
         }
     }
 }
