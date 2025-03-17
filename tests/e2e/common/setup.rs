@@ -71,8 +71,7 @@ impl TestHelper {
         interval: Interval,
         aggregation: AggregationMode,
     ) {
-        let is_twap = matches!(aggregation, AggregationMode::Twap);
-        let interval_spec = get_interval_specifier(interval, is_twap);
+        let interval_spec = get_interval_specifier(interval);
         let window_size = get_window_size(interval);
 
         let table_name = if matches!(aggregation, AggregationMode::Twap) {

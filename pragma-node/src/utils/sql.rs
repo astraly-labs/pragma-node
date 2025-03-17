@@ -5,8 +5,7 @@ use pragma_entities::InfraError;
 pub const fn get_table_suffix(data_type: DataType) -> Result<&'static str, InfraError> {
     match data_type {
         DataType::SpotEntry => Ok(""),
-        DataType::FutureEntry => Ok("_future"),
-        DataType::PerpEntry => Ok("_future"),
+        DataType::FutureEntry | DataType::PerpEntry => Ok("_future"),
     }
 }
 
