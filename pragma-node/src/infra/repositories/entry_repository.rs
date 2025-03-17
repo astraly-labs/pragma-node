@@ -25,9 +25,7 @@ use crate::constants::starkex_ws::{
 use crate::handlers::get_entry::EntryParams;
 use crate::handlers::subscribe_to_entry::{AssetOraclePrice, SignedPublisherPrice};
 use crate::utils::convert_via_quote;
-use crate::utils::sql::{
-    get_expiration_timestamp_filter, get_interval_specifier, get_table_suffix,
-};
+use crate::utils::sql::{get_interval_specifier, get_table_suffix};
 
 #[derive(Debug, Serialize, Queryable)]
 pub struct MedianEntry {
@@ -181,14 +179,12 @@ pub async fn get_twap_price(
             pair_id = $1
             AND
             bucket <= $2
-            {}
         ORDER BY
             time DESC
         LIMIT 1;
     ",
         get_interval_specifier(entry_params.interval, true)?,
         get_table_suffix(entry_params.data_type)?,
-        get_expiration_timestamp_filter(entry_params.data_type, &entry_params.expiry)?,
     );
 
     let date_time = DateTime::from_timestamp(entry_params.timestamp, 0).ok_or(
@@ -240,14 +236,12 @@ pub async fn get_median_price(
             pair_id = $1
             AND
             bucket <= $2
-            {}
         ORDER BY
             time DESC
         LIMIT 1;
     ",
         get_interval_specifier(entry_params.interval, false)?,
         get_table_suffix(entry_params.data_type)?,
-        get_expiration_timestamp_filter(entry_params.data_type, &entry_params.expiry)?,
     );
 
     let date_time = DateTime::from_timestamp(entry_params.timestamp, 0).ok_or(
@@ -363,13 +357,11 @@ pub async fn get_median_prices_between(
             pair_id = $1
             AND
             bucket BETWEEN $2 AND $3
-            {}
         ORDER BY
             time DESC;
     ",
         get_interval_specifier(entry_params.interval, false)?,
         get_table_suffix(entry_params.data_type)?,
-        get_expiration_timestamp_filter(entry_params.data_type, &entry_params.expiry)?,
     );
 
     let raw_entries = conn
@@ -426,13 +418,11 @@ pub async fn get_twap_prices_between(
             pair_id = $1
             AND
             bucket BETWEEN $2 AND $3
-            {}
         ORDER BY
             time DESC;
     ",
         get_interval_specifier(entry_params.interval, true)?,
         get_table_suffix(entry_params.data_type)?,
-        get_expiration_timestamp_filter(entry_params.data_type, &entry_params.expiry)?,
     );
 
     let raw_entries = conn

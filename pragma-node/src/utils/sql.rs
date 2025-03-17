@@ -1,23 +1,6 @@
 use pragma_common::types::{AggregationMode, DataType, Interval};
 use pragma_entities::InfraError;
 
-// SQL statement used to filter the expiration timestamp for future entries
-pub fn get_expiration_timestamp_filter(
-    data_type: DataType,
-    expiry: &str,
-) -> Result<String, InfraError> {
-    match data_type {
-        DataType::SpotEntry => Ok(String::default()),
-        DataType::PerpEntry => {
-            Ok(String::from("AND\n\t\texpiration_timestamp is null"))
-        }
-        DataType::FutureEntry if !expiry.is_empty() => {
-            Ok(format!("AND\n\texpiration_timestamp = '{expiry}'"))
-        }
-        _ => Err(InfraError::InternalServerError),
-    }
-}
-
 // Retrieve the timescale table based on the network and data type.
 pub const fn get_table_suffix(data_type: DataType) -> Result<&'static str, InfraError> {
     match data_type {

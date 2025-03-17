@@ -47,7 +47,7 @@ impl TryFrom<GetEntryParams> for EntryParams {
         // Unwrap parameters with their defaults
         let interval = params.interval.unwrap_or_default();
         let aggregation_mode = params.aggregation.unwrap_or_default();
-        
+
         // Convert entry_type to DataType
         let data_type = params
             .entry_type
