@@ -19,7 +19,7 @@ CREATE UNIQUE INDEX idx_entries_unique
 CREATE INDEX entries_pair_id_timestamp_idx ON entries (pair_id, timestamp DESC);
 
 SELECT
-  create_hypertable('entries', 'timestamp');
+  create_hypertable('entries', by_range('timestamp', INTERVAL '1 day'));
 
 -- FUTURE (PERP) entries
 
@@ -40,4 +40,4 @@ CREATE INDEX idx_future_entries_pair_id_timestamp ON future_entries (pair_id, ti
 CREATE INDEX idx_future_entries_pair_id_timestamp_expiration_timestamp ON future_entries (pair_id, expiration_timestamp, timestamp DESC);
 
 SELECT
-  create_hypertable('future_entries', 'timestamp');
+  create_hypertable('future_entries', by_range('timestamp', INTERVAL '1 day'));
