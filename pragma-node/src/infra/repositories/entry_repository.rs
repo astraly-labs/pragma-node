@@ -565,7 +565,8 @@ pub async fn get_median_prices_between(
             bucket AS time,
             median_price,
             num_sources, 
-            NULL as components
+            COALESCE(components, ARRAY[]::record(text,text,numeric,timestamptz)[]) as components,
+            (components IS NOT NULL AND array_length(components, 1) > 0) as has_components
         FROM
             price_{}_agg{}
         WHERE
@@ -593,11 +594,31 @@ pub async fn get_median_prices_between(
 
     let entries: Vec<MedianEntry> = raw_entries
         .into_iter()
-        .map(|raw_entry| MedianEntry {
-            time: raw_entry.time,
-            median_price: raw_entry.median_price,
-            num_sources: raw_entry.num_sources,
-            components: Option::None,
+        .map(|raw_entry| {
+            // Process components only if they exist
+            let components = if raw_entry.has_components {
+                Some(
+                    raw_entry
+                        .components
+                        .iter()
+                        .map(|(source, publisher, price, timestamp)| Component {
+                            source: source.clone(),
+                            publisher: publisher.clone(),
+                            price: price.clone(),
+                            timestamp: *timestamp,
+                        })
+                        .collect(),
+                )
+            } else {
+                None
+            };
+
+            MedianEntry {
+                time: raw_entry.time,
+                median_price: raw_entry.median_price,
+                num_sources: raw_entry.num_sources,
+                components,
+            }
         })
         .collect();
 
