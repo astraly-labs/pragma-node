@@ -1,4 +1,4 @@
-use std::pin::Pin;
+use std::{pin::Pin, sync::Arc};
 
 use axum::response::sse::Event;
 use pragma_common::types::{AggregationMode, pair::Pair};
@@ -7,7 +7,7 @@ use pragma_entities::EntryError;
 use crate::{
     AppState,
     handlers::get_entry::{EntryParams, GetEntryResponse, adapt_entry_to_entry_response},
-    infra::repositories::entry_repository,
+    infra::repositories::entry_repository::{self, DetailedMedianEntry},
 };
 
 pub const DEFAULT_HISTORICAL_PRICES: usize = 50;
@@ -44,7 +44,16 @@ pub async fn get_historical_entries(
     let responses: Vec<GetEntryResponse> = entries
         .into_iter()
         .take(count)
-        .map(|entry| adapt_entry_to_entry_response(pair.to_pair_id(), &entry, entry.time))
+        .map(|entry| {
+            // Convert MedianEntry to DetailedMedianEntry with empty individual_prices
+            let detailed_entry = entry_repository::DetailedMedianEntry {
+                time: entry.time,
+                median_price: entry.median_price,
+                num_sources: entry.num_sources,
+                individual_prices: Vec::new(), // TODO: Fetch actual individual prices when needed
+            };
+            adapt_entry_to_entry_response(pair.to_pair_id(), &detailed_entry, entry.time)
+        })
         .collect();
 
     Ok(responses)

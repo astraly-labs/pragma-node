@@ -12,7 +12,7 @@ use pragma_entities::EntryError;
 use crate::AppState;
 use crate::constants::EIGHTEEN_DECIMALS;
 use crate::infra::repositories::entry_repository::{
-    MedianEntry, get_last_updated_timestamp, routing,
+    DetailedMedianEntry, MedianEntry, get_last_updated_timestamp, routing,
 };
 use crate::utils::PathExtractor;
 use crate::utils::big_decimal_price_to_hex;
@@ -71,13 +71,23 @@ impl TryFrom<GetEntryParams> for EntryParams {
         })
     }
 }
+
+#[derive(Serialize, Deserialize, Default, ToSchema, Clone, ToResponse, Debug)]
+pub struct EntryComponent {
+    pub publisher: String,
+    pub source: String,
+    pub price: String,
+    pub timestamp: u64,
+}
+
 #[derive(Debug, Serialize, Deserialize, ToSchema, ToResponse)]
 pub struct GetEntryResponse {
-    num_sources_aggregated: usize,
-    pair_id: String,
-    price: String,
-    timestamp: u64,
-    decimals: u32,
+    pub num_sources_aggregated: usize,
+    pub pair_id: String,
+    pub price: String,
+    pub timestamp: u64,
+    pub decimals: u32,
+    pub components: Vec<EntryComponent>,
 }
 
 /// Get the latest price entry for a trading pair
@@ -141,7 +151,7 @@ pub async fn get_entry(
 
 pub fn adapt_entry_to_entry_response(
     pair_id: String,
-    entry: &MedianEntry,
+    entry: &DetailedMedianEntry,
     last_updated_timestamp: NaiveDateTime,
 ) -> GetEntryResponse {
     GetEntryResponse {
@@ -150,5 +160,11 @@ pub fn adapt_entry_to_entry_response(
         num_sources_aggregated: entry.num_sources as usize,
         price: big_decimal_price_to_hex(&entry.median_price),
         decimals: EIGHTEEN_DECIMALS,
+        components: entry
+            .individual_prices
+            .iter()
+            .cloned()
+            .map(Into::into)
+            .collect(),
     }
 }
