@@ -44,9 +44,7 @@ pub async fn get_historical_entries(
     let responses: Vec<GetEntryResponse> = entries
         .into_iter()
         .take(count)
-        .map(|entry| 
-            adapt_entry_to_entry_response(pair.to_pair_id(), &entry, entry.time)
-        )
+        .map(|entry| adapt_entry_to_entry_response(pair.to_pair_id(), &entry, entry.time))
         .collect();
 
     Ok(responses)
@@ -57,15 +55,21 @@ pub async fn get_latest_entry(
     pair: &Pair,
     is_routing: bool,
     entry_params: &EntryParams,
-    with_components: bool
+    with_components: bool,
 ) -> Result<GetEntryResponse, EntryError> {
     // We have to update the timestamp to now every tick
     let mut new_routing = entry_params.clone();
     new_routing.timestamp = chrono::Utc::now().timestamp();
 
-    let entry = entry_repository::routing(&state.offchain_pool, is_routing, pair, &new_routing, with_components)
-        .await
-        .map_err(EntryError::from)?;
+    let entry = entry_repository::routing(
+        &state.offchain_pool,
+        is_routing,
+        pair,
+        &new_routing,
+        with_components,
+    )
+    .await
+    .map_err(EntryError::from)?;
 
     let last_updated_timestamp = entry_repository::get_last_updated_timestamp(
         &state.offchain_pool,
@@ -118,7 +122,7 @@ pub async fn get_latest_entries_multi_pair(
     pairs: &[Pair],
     is_routing: bool,
     entry_params: &EntryParams,
-    with_components: bool
+    with_components: bool,
 ) -> Result<Vec<GetEntryResponse>, EntryError> {
     let mut latest_entries = Vec::with_capacity(pairs.len());
 

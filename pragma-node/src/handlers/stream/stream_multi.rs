@@ -136,8 +136,10 @@ pub async fn stream_entry_multi_pair(
                             }
                         } else {
                             // For subsequent updates, get latest prices for all pairs
-                            match get_latest_entries_multi_pair(&state, &pairs, is_routing, &params, true)
-                                .await
+                            match get_latest_entries_multi_pair(
+                                &state, &pairs, is_routing, &params, true,
+                            )
+                            .await
                             {
                                 Ok(entry_responses) => Event::default()
                                     .json_data(&entry_responses)

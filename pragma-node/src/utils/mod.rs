@@ -251,7 +251,7 @@ mod tests {
                 .naive_utc(),
             median_price: median_price.into(),
             num_sources: 5,
-            components: Option::None
+            components: Option::None,
         }
     }
 

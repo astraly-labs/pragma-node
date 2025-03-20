@@ -130,9 +130,15 @@ pub async fn get_entry(
 
     let pair = Pair::from(pair);
 
-    let entry = routing(&state.offchain_pool, is_routing, &pair, &entry_params, false)
-        .await
-        .map_err(EntryError::from)?;
+    let entry = routing(
+        &state.offchain_pool,
+        is_routing,
+        &pair,
+        &entry_params,
+        false,
+    )
+    .await
+    .map_err(EntryError::from)?;
 
     let last_updated_timestamp: NaiveDateTime = get_last_updated_timestamp(
         &state.offchain_pool,
@@ -149,7 +155,6 @@ pub async fn get_entry(
     )))
 }
 
-
 pub fn adapt_entry_to_entry_response(
     pair_id: String,
     entry: &MedianEntry,
@@ -161,8 +166,9 @@ pub fn adapt_entry_to_entry_response(
         num_sources_aggregated: entry.num_sources as usize,
         price: big_decimal_price_to_hex(&entry.median_price),
         decimals: EIGHTEEN_DECIMALS,
-        components: entry.components.as_ref().map(|prices| {
-            prices.iter().cloned().map(Into::into).collect()
-        }),
+        components: entry
+            .components
+            .as_ref()
+            .map(|prices| prices.iter().cloned().map(Into::into).collect()),
     }
 }
