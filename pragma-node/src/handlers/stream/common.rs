@@ -1,4 +1,4 @@
-use std::{pin::Pin, sync::Arc};
+use std::pin::Pin;
 
 use axum::response::sse::Event;
 use pragma_common::types::{AggregationMode, pair::Pair};
@@ -7,7 +7,7 @@ use pragma_entities::EntryError;
 use crate::{
     AppState,
     handlers::get_entry::{EntryParams, GetEntryResponse, adapt_entry_to_entry_response},
-    infra::repositories::entry_repository::{self, DetailedMedianEntry},
+    infra::repositories::entry_repository::{self},
 };
 
 pub const DEFAULT_HISTORICAL_PRICES: usize = 50;
@@ -44,16 +44,9 @@ pub async fn get_historical_entries(
     let responses: Vec<GetEntryResponse> = entries
         .into_iter()
         .take(count)
-        .map(|entry| {
-            // Convert MedianEntry to DetailedMedianEntry with empty individual_prices
-            let detailed_entry = entry_repository::DetailedMedianEntry {
-                time: entry.time,
-                median_price: entry.median_price,
-                num_sources: entry.num_sources,
-                individual_prices: Vec::new(), // TODO: Fetch actual individual prices when needed
-            };
-            adapt_entry_to_entry_response(pair.to_pair_id(), &detailed_entry, entry.time)
-        })
+        .map(|entry| 
+            adapt_entry_to_entry_response(pair.to_pair_id(), &entry, entry.time)
+        )
         .collect();
 
     Ok(responses)
@@ -64,12 +57,13 @@ pub async fn get_latest_entry(
     pair: &Pair,
     is_routing: bool,
     entry_params: &EntryParams,
+    with_components: bool
 ) -> Result<GetEntryResponse, EntryError> {
     // We have to update the timestamp to now every tick
     let mut new_routing = entry_params.clone();
     new_routing.timestamp = chrono::Utc::now().timestamp();
 
-    let entry = entry_repository::routing(&state.offchain_pool, is_routing, pair, &new_routing)
+    let entry = entry_repository::routing(&state.offchain_pool, is_routing, pair, &new_routing, with_components)
         .await
         .map_err(EntryError::from)?;
 
@@ -124,11 +118,12 @@ pub async fn get_latest_entries_multi_pair(
     pairs: &[Pair],
     is_routing: bool,
     entry_params: &EntryParams,
+    with_components: bool
 ) -> Result<Vec<GetEntryResponse>, EntryError> {
     let mut latest_entries = Vec::with_capacity(pairs.len());
 
     for pair in pairs {
-        match get_latest_entry(state, pair, is_routing, entry_params).await {
+        match get_latest_entry(state, pair, is_routing, entry_params, with_components).await {
             Ok(entry) => latest_entries.push(entry),
             Err(e) => {
                 tracing::warn!(
