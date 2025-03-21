@@ -98,7 +98,7 @@ impl fmt::Display for InfraError {
             // 404
             Self::EntryNotFound(pair_id) => write!(f, "Entry not found for pair {pair_id}"),
             Self::PairNotFound(pair_id) => write!(f, "Pair {pair_id} not found"),
-            Self::RoutingError(pair_id) => write!(f, "No route found for {pair_id}"),
+            Self::RoutingError(details) => write!(f, "Routing error: {details}"),
             Self::CheckpointNotFound(pair_id) => write!(f, "No checkpoint found for {pair_id}"),
             Self::PublishersNotFound => write!(f, "No publishers found"),
             // 500

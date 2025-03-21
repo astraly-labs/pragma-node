@@ -88,7 +88,7 @@ impl From<InfraError> for EntryError {
             InfraError::UnsupportedDataTypeForNetwork(network, data_type) => {
                 Self::InvalidDataTypeForNetwork(network, data_type)
             }
-            InfraError::RoutingError(pair_id) => Self::RouteNotFound(pair_id),
+            InfraError::RoutingError(err_msg) => Self::RouteNotFound(err_msg),
             InfraError::EntryNotFound(entry_id) => Self::EntryNotFound(entry_id),
             InfraError::PairNotFound(pair_id) => Self::PairNotFound(pair_id),
             // Those errors should never proc for Entry

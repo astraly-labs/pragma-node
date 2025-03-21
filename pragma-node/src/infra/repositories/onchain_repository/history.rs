@@ -130,48 +130,88 @@ pub async fn retry_with_routing(
     decimals_cache: &Cache<Network, HashMap<String, u32>>,
     rpc_clients: &RpcClients,
 ) -> Result<(Vec<HistoricalEntryRaw>, u32), InfraError> {
-    // TODO(decimals): How do we get abstract currencies now?
-    // Do we just create a constant with known currencies? There should not be much.
-    // Just: USD, EUR, BTC, USDPLUS.
     let existing_pairs = get_existing_pairs(onchain_pool, network).await?;
+    let mut routing_attempts = Vec::new();
 
     for alt_currency in ABSTRACT_CURRENCIES {
         let base_alt_pair = Pair::from((pair.base.clone(), alt_currency.to_string()));
         let alt_quote_pair = Pair::from((pair.quote.clone(), alt_currency.to_string()));
+        let base_alt_pair_str = base_alt_pair.to_string();
+        let alt_quote_pair_str = alt_quote_pair.to_string();
 
-        if onchain_pair_exist(&existing_pairs, &base_alt_pair.to_string())
-            && onchain_pair_exist(&existing_pairs, &alt_quote_pair.to_string())
-        {
-            let base_alt_result = get_historical_entries_and_decimals(
-                onchain_pool,
-                network,
-                &base_alt_pair,
-                timestamp_range,
-                chunk_interval,
-                decimals_cache,
-                rpc_clients,
-            )
-            .await?;
-            let alt_quote_result = get_historical_entries_and_decimals(
-                onchain_pool,
-                network,
-                &alt_quote_pair,
-                timestamp_range,
-                chunk_interval,
-                decimals_cache,
-                rpc_clients,
-            )
-            .await?;
+        // Check if both required pairs exist
+        let base_alt_exists = onchain_pair_exist(&existing_pairs, &base_alt_pair_str);
+        let alt_quote_exists = onchain_pair_exist(&existing_pairs, &alt_quote_pair_str);
 
-            if base_alt_result.0.len() != alt_quote_result.0.len() {
-                continue;
-            }
-
-            return calculate_rebased_prices(base_alt_result, alt_quote_result);
+        if !base_alt_exists || !alt_quote_exists {
+            routing_attempts.push(format!(
+                "Route via {}: base pair '{}' exists: {}, quote pair '{}' exists: {}",
+                alt_currency, base_alt_pair_str, base_alt_exists, alt_quote_pair_str, alt_quote_exists
+            ));
+            continue;
         }
+
+        // Both pairs exist, try to get their historical entries
+        let base_alt_result = get_historical_entries_and_decimals(
+            onchain_pool,
+            network,
+            &base_alt_pair,
+            timestamp_range,
+            chunk_interval,
+            decimals_cache,
+            rpc_clients,
+        )
+        .await;
+
+        if let Err(e) = &base_alt_result {
+            routing_attempts.push(format!(
+                "Route via {}: failed to get history for '{}': {}",
+                alt_currency, base_alt_pair_str, e
+            ));
+            continue;
+        }
+
+        let alt_quote_result = get_historical_entries_and_decimals(
+            onchain_pool,
+            network,
+            &alt_quote_pair,
+            timestamp_range,
+            chunk_interval,
+            decimals_cache,
+            rpc_clients,
+        )
+        .await;
+
+        if let Err(e) = &alt_quote_result {
+            routing_attempts.push(format!(
+                "Route via {}: failed to get history for '{}': {}",
+                alt_currency, alt_quote_pair_str, e
+            ));
+            continue;
+        }
+
+        let base_alt_result = base_alt_result.unwrap();
+        let alt_quote_result = alt_quote_result.unwrap();
+
+        if base_alt_result.0.len() != alt_quote_result.0.len() {
+            routing_attempts.push(format!(
+                "Route via {}: mismatched entries count: {} vs {}",
+                alt_currency, base_alt_result.0.len(), alt_quote_result.0.len()
+            ));
+            continue;
+        }
+
+        return calculate_rebased_prices(base_alt_result, alt_quote_result);
     }
 
-    Err(InfraError::RoutingError(pair.to_pair_id()))
+    // Construct detailed error message
+    let attempts_info = if routing_attempts.is_empty() {
+        "No routing pairs found".to_string()
+    } else {
+        format!("Attempted routes:\n- {}", routing_attempts.join("\n- "))
+    };
+
+    Err(InfraError::RoutingError(format!("{}; {}", pair.to_pair_id(), attempts_info)))
 }
 
 /// Given two vector of entries, compute a new vector containing the routed prices.
