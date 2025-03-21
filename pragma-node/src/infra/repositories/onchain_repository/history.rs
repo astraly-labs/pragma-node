@@ -146,7 +146,11 @@ pub async fn retry_with_routing(
         if !base_alt_exists || !alt_quote_exists {
             routing_attempts.push(format!(
                 "Route via {}: base pair '{}' exists: {}, quote pair '{}' exists: {}",
-                alt_currency, base_alt_pair_str, base_alt_exists, alt_quote_pair_str, alt_quote_exists
+                alt_currency,
+                base_alt_pair_str,
+                base_alt_exists,
+                alt_quote_pair_str,
+                alt_quote_exists
             ));
             continue;
         }
@@ -196,7 +200,9 @@ pub async fn retry_with_routing(
         if base_alt_result.0.len() != alt_quote_result.0.len() {
             routing_attempts.push(format!(
                 "Route via {}: mismatched entries count: {} vs {}",
-                alt_currency, base_alt_result.0.len(), alt_quote_result.0.len()
+                alt_currency,
+                base_alt_result.0.len(),
+                alt_quote_result.0.len()
             ));
             continue;
         }
@@ -211,7 +217,11 @@ pub async fn retry_with_routing(
         format!("Attempted routes:\n- {}", routing_attempts.join("\n- "))
     };
 
-    Err(InfraError::RoutingError(format!("{}; {}", pair.to_pair_id(), attempts_info)))
+    Err(InfraError::RoutingError(format!(
+        "{}; {}",
+        pair.to_pair_id(),
+        attempts_info
+    )))
 }
 
 /// Given two vector of entries, compute a new vector containing the routed prices.

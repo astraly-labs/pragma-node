@@ -13,7 +13,7 @@ use pragma_entities::error::InfraError;
 
 use crate::{
     infra::rpc::{RpcClients, call_get_decimals},
-    is_enum_variant,
+    utils::sql::get_interval_specifier,
 };
 
 /// Retrieves the on-chain decimals for the provided network & pair.
@@ -119,11 +119,7 @@ pub(crate) fn get_onchain_aggregate_table_name(
     };
 
     // NOTE: Special case because there is a mistake and we forgot the "s" on 2_hour
-    let interval_specifier = if is_enum_variant!(interval, Interval::TwoHours) {
-        "2_hour"
-    } else {
-        get_onchain_interval_specifier(interval)?
-    };
+    let interval_specifier = get_interval_specifier(interval, false)?;
 
     let table_name = format!("{prefix_name}_{interval_specifier}_agg");
     Ok(table_name)
