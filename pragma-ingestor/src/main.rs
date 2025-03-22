@@ -5,7 +5,7 @@ mod error;
 use deadpool_diesel::postgres::Pool;
 use dotenvy::dotenv;
 use tokio::sync::mpsc;
-use tracing::{error, info};
+use tracing::{debug, error, info};
 
 use pragma_entities::connection::ENV_OFFCHAIN_DATABASE_URL;
 use pragma_entities::{Entry, FutureEntry, InfraError, NewEntry, NewFutureEntry};
@@ -59,7 +59,7 @@ async fn process_payload(pool: &Pool, payload: Vec<u8>) -> Result<(), Box<dyn st
     } else {
         match serde_json::from_slice::<Vec<NewEntry>>(&payload) {
             Ok(entries) => {
-                info!("[SPOT] total of '{}' new entries available.", entries.len());
+                debug!("[SPOT] total of '{}' new entries available.", entries.len());
                 if let Err(e) = insert_spot_entries(pool, entries).await {
                     error!("error while inserting entries : {:?}", e);
                 }
@@ -85,7 +85,7 @@ pub async fn insert_spot_entries(
         .map_err(InfraError::DbResultError)?;
 
     for entry in &entries {
-        info!(
+        debug!(
             "new entry created {} - {}({}) - {}",
             entry.publisher, entry.pair_id, entry.price, entry.source
         );
@@ -121,8 +121,8 @@ pub async fn insert_future_entries(
         .filter(|entry| entry.expiration_timestamp.is_none())
         .count();
 
-    info!("[PERP] {} new entries available", len_perp_entries);
-    info!(
+    debug!("[PERP] {} new entries available", len_perp_entries);
+    debug!(
         "[FUTURE] {} new entries available",
         new_entries.len() - len_perp_entries
     );
@@ -133,7 +133,7 @@ pub async fn insert_future_entries(
         .map_err(InfraError::DbInteractionError)?
         .map_err(InfraError::DbResultError)?;
     for entry in &entries {
-        info!(
+        debug!(
             "new future entry created {} - {}({}) - {}",
             entry.publisher, entry.pair_id, entry.price, entry.source
         );
