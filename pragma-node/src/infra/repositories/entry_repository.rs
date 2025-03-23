@@ -127,7 +127,7 @@ pub fn calculate_rebased_price(
         time: new_timestamp,
         median_price: rebase_price,
         num_sources,
-        components: Option::None, // No components for routing
+        components: Option::None,
     };
 
     Ok(median_entry)
@@ -261,7 +261,7 @@ pub async fn get_twap_price_without_components(
     })
 }
 
-// Function to get TWAP price with components - optimized to avoid extra check
+// Function to get TWAP price with components
 pub async fn get_twap_price_with_components(
     pool: &deadpool_diesel::postgres::Pool,
     pair_id: String,
@@ -269,7 +269,6 @@ pub async fn get_twap_price_with_components(
 ) -> Result<MedianEntry, InfraError> {
     let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
 
-    // Get components and check existence in a single query
     let sql_request: String = format!(
         r"
         SELECT
@@ -394,7 +393,7 @@ pub async fn get_median_price_without_components(
     })
 }
 
-// Function to get median price with components - optimized to avoid extra check
+// Function to get median price with components
 pub async fn get_median_price_with_components(
     pool: &deadpool_diesel::postgres::Pool,
     pair_id: String,
@@ -1139,7 +1138,7 @@ pub async fn get_expiries_list(
     Ok(expiries)
 }
 
-// Add a new struct to hold the individual price data
+// struct to hold the individual price data
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Component {
     pub source: String,
@@ -1148,7 +1147,6 @@ pub struct Component {
     pub timestamp: NaiveDateTime,
 }
 
-// Add implementation of From for converting between Component and EntryComponent
 impl From<Component> for crate::handlers::get_entry::EntryComponent {
     fn from(individual: Component) -> Self {
         Self {
@@ -1160,7 +1158,7 @@ impl From<Component> for crate::handlers::get_entry::EntryComponent {
     }
 }
 
-// Add reverse conversion
+// Reverse conversion
 impl TryFrom<crate::handlers::get_entry::EntryComponent> for Component {
     type Error = InfraError;
 
