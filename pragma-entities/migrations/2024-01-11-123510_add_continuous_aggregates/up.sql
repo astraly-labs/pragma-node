@@ -1,3 +1,11 @@
+CREATE TYPE price_component AS (
+    source text,
+    publisher text,
+    price numeric(1000,0),
+    timestamp timestamptz
+);
+
+
 CREATE OR REPLACE FUNCTION create_continuous_aggregate(
     p_name text,
     p_interval interval,
@@ -14,7 +22,7 @@ BEGIN
             time_bucket(%L, timestamp) as bucket,
             (percentile_cont(0.5) WITHIN GROUP (ORDER BY price))::numeric(1000,0) AS median_price,
             COUNT(DISTINCT source) as num_sources,
-            array_agg(ROW(source, publisher, price, timestamp) ORDER BY timestamp) AS components
+            array_agg(ROW(source, publisher, price, timestamp)::price_component) AS components
         FROM %I
         GROUP BY bucket, pair_id
         WITH NO DATA;', p_name, p_interval, p_table_name);

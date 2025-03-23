@@ -24,3 +24,6 @@ DROP MATERIALIZED VIEW IF EXISTS price_1_week_agg_future;
 
 -- Drop the function
 DROP FUNCTION IF EXISTS create_continuous_aggregate;
+
+-- Drop the type
+DROP TYPE IF EXISTS price_component;

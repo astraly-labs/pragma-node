@@ -276,7 +276,7 @@ pub async fn get_twap_price_with_components(
             bucket AS time,
             price_twap AS median_price,
             num_sources,
-            COALESCE(components, ARRAY[]::record(text,text,numeric,timestamptz)[]) as components,
+            components,
             (components IS NOT NULL AND array_length(components, 1) > 0) as has_components
         FROM
             twap_{}_agg{}
@@ -401,15 +401,13 @@ pub async fn get_median_price_with_components(
     entry_params: &EntryParams,
 ) -> Result<MedianEntry, InfraError> {
     let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
-
-    // Get components and check existence in a single query
     let sql_request: String = format!(
         r"
         SELECT
             bucket AS time,
             median_price,
             num_sources,
-            COALESCE(components, ARRAY[]::record(text,text,numeric,timestamptz)[]) as components,
+            components,
             (components IS NOT NULL AND array_length(components, 1) > 0) as has_components
         FROM
             price_{}_agg{}
