@@ -563,7 +563,7 @@ pub async fn get_median_prices_between(
             bucket AS time,
             median_price,
             num_sources, 
-            COALESCE(components, ARRAY[]::record(text,text,numeric,timestamptz)[]) as components,
+            components,
             (components IS NOT NULL AND array_length(components, 1) > 0) as has_components
         FROM
             price_{}_agg{}
