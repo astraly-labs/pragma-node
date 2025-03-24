@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 
+use bigdecimal::num_bigint::ToBigInt;
 use bigdecimal::{BigDecimal, FromPrimitive};
 use chrono::{DateTime, NaiveDateTime};
 use diesel::prelude::QueryableByName;
@@ -320,7 +321,7 @@ pub async fn get_twap_price_with_components(
                 .map(|(source, publisher, price, timestamp)| Component {
                     source: source.clone(),
                     publisher: publisher.clone(),
-                    price: price.clone(),
+                    price: price.to_hex_string(),
                     timestamp: *timestamp,
                 })
                 .collect(),
@@ -451,7 +452,7 @@ pub async fn get_median_price_with_components(
                 .map(|(source, publisher, price, timestamp)| Component {
                     source: source.clone(),
                     publisher: publisher.clone(),
-                    price: price.clone(),
+                    price: price.to_hex_string(),
                     timestamp: *timestamp,
                 })
                 .collect(),
@@ -601,7 +602,7 @@ pub async fn get_median_prices_between(
                         .map(|(source, publisher, price, timestamp)| Component {
                             source: source.clone(),
                             publisher: publisher.clone(),
-                            price: price.clone(),
+                            price: price.to_hex_string(),
                             timestamp: *timestamp,
                         })
                         .collect(),
@@ -1143,7 +1144,7 @@ pub async fn get_expiries_list(
 pub struct Component {
     pub source: String,
     pub publisher: String,
-    pub price: BigDecimal,
+    pub price: String,
     pub timestamp: NaiveDateTime,
 }
 
@@ -1152,7 +1153,7 @@ impl From<Component> for crate::handlers::get_entry::EntryComponent {
         Self {
             source: individual.source,
             publisher: individual.publisher,
-            price: individual.price.to_string(),
+            price: individual.price,
             timestamp: individual.timestamp.and_utc().timestamp_millis() as u64,
         }
     }
@@ -1179,8 +1180,20 @@ impl TryFrom<crate::handlers::get_entry::EntryComponent> for Component {
         Ok(Self {
             source: component.source,
             publisher: component.publisher,
-            price,
+            price: price.to_hex_string(),
             timestamp,
         })
+    }
+}
+
+trait HexFormat {
+    fn to_hex_string(&self) -> String;
+}
+
+impl HexFormat for BigDecimal {
+    fn to_hex_string(&self) -> String {
+        let bigint = self.to_bigint().unwrap_or_default();
+
+        format!("0x{:x}", bigint)
     }
 }
