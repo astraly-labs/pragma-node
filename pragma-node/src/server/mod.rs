@@ -15,7 +15,7 @@ use utoipauto::utoipauto;
 
 use crate::errors::internal_error;
 use crate::server::middlewares::TimingLayer;
-use crate::{AppState, config::Config, server::routes::app_router};
+use crate::{config::Config, server::routes::app_router, state::AppState};
 
 struct SecurityAddon;
 

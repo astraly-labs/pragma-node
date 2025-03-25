@@ -2,22 +2,6 @@
 //! Since we can't import them here, we recreated them here.
 use pragma_common::types::Interval;
 
-pub const fn get_interval_specifier(interval: Interval) -> &'static str {
-    match interval {
-        Interval::OneHundredMillisecond => "100_ms",
-        Interval::OneSecond => "1_s",
-        Interval::FiveSeconds => "5_s",
-        Interval::TenSeconds => "10_s",
-        Interval::OneMinute => "1_min",
-        Interval::FiveMinutes => "5_min",
-        Interval::FifteenMinutes => "15_min",
-        Interval::OneHour => "1_h",
-        Interval::TwoHours => "2_h",
-        Interval::OneDay => "1_day",
-        Interval::OneWeek => "1_week",
-    }
-}
-
 pub const fn get_window_size(interval: Interval) -> i64 {
     match interval {
         Interval::OneHundredMillisecond => 1, // 1 second window

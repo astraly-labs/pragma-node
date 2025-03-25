@@ -7,10 +7,10 @@ use pragma_entities::{EntryError, InfraError};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToResponse, ToSchema};
 
-use crate::AppState;
 use crate::infra::repositories::onchain_repository::history::{
     HistoricalEntryRaw, get_historical_entries_and_decimals, retry_with_routing,
 };
+use crate::state::AppState;
 use crate::utils::{PathExtractor, big_decimal_price_to_hex};
 use pragma_common::types::timestamp::TimestampRange;
 

@@ -5,8 +5,8 @@ use chrono::NaiveDateTime;
 use pragma_common::types::pair::Pair;
 use pragma_entities::EntryError;
 
-use crate::AppState;
 use crate::infra::repositories::entry_repository;
+use crate::state::AppState;
 use crate::utils::PathExtractor;
 
 #[utoipa::path(

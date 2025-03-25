@@ -21,7 +21,7 @@ CREATE INDEX entries_pair_id_timestamp_idx ON entries (pair_id, timestamp DESC);
 SELECT
   create_hypertable('entries', by_range('timestamp', INTERVAL '1 day'));
 
--- FUTURE (PERP) entries
+-- FUTURE (contains perp) entries
 
 CREATE TABLE future_entries (
   id uuid DEFAULT uuid_generate_v4(),

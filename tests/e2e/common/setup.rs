@@ -3,7 +3,8 @@ use std::sync::Arc;
 use deadpool_diesel::{Manager, postgres::Pool};
 use diesel::RunQueryDsl;
 
-use pragma_common::types::{AggregationMode, Interval};
+use pragma_common::types::{AggregationMode, DataType, Interval};
+use pragma_node::utils::sql::{get_interval_specifier, get_table_suffix};
 use testcontainers::ContainerAsync;
 use testcontainers_modules::kafka::Kafka;
 use testcontainers_modules::zookeeper::Zookeeper;
@@ -22,10 +23,7 @@ use crate::common::containers::{
 };
 use crate::common::logs::init_logging;
 
-use super::{
-    containers::pragma_node::PragmaNodeMode,
-    utils::{get_interval_specifier, get_window_size},
-};
+use super::{containers::pragma_node::PragmaNodeMode, utils::get_window_size};
 
 /// Main structure that we carry around for our tests.
 /// Contains some usefull fields & functions attached to make testing easier.
@@ -71,23 +69,25 @@ impl TestHelper {
         interval: Interval,
         aggregation: AggregationMode,
     ) {
-        let interval_spec = get_interval_specifier(interval);
+        let interval_spec =
+            get_interval_specifier(interval, matches!(aggregation, AggregationMode::Twap)).unwrap();
         let window_size = get_window_size(interval);
+        let suffix = get_table_suffix(DataType::SpotEntry).unwrap();
 
         let table_name = if matches!(aggregation, AggregationMode::Twap) {
             "twap"
         } else {
-            "price"
+            "median"
         };
 
         let sql = format!(
             r"
             CALL refresh_continuous_aggregate(
-                '{}_{}_agg',
+                '{}_{}_{}',
                 to_timestamp({} - {}),
                 to_timestamp({} + {})
             );",
-            table_name, interval_spec, timestamp, window_size, timestamp, window_size
+            table_name, interval_spec, suffix, timestamp, window_size, timestamp, window_size
         );
 
         self.execute_sql(&self.offchain_pool, sql).await;
@@ -159,7 +159,6 @@ pub async fn setup_containers(
         PragmaNodeMode::Docker => {
             tracing::info!("🔨 Setup pragma_node in Docker mode...");
             let node = setup_pragma_node_with_docker.await;
-            tracing::info!("✅ ... pragma-node ready!\n");
             (Some(Arc::new(node)), None)
         }
         PragmaNodeMode::Local => {

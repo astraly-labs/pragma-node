@@ -6,6 +6,7 @@ CREATE OR REPLACE FUNCTION create_candlestick_view(
 )
 RETURNS void AS $$
 BEGIN
+    -- Create the materialized view with continuous aggregate
     EXECUTE format('
         CREATE MATERIALIZED VIEW %I
         WITH (timescaledb.continuous, timescaledb.materialized_only = false) AS
@@ -20,6 +21,10 @@ BEGIN
         GROUP BY ohlc_bucket, pair_id
         WITH NO DATA;', p_name, p_interval, p_table_name);
 
+    -- Set the chunk time interval to 7 days
+    EXECUTE format('SELECT set_chunk_time_interval(%L, INTERVAL ''7 days'');', p_name);
+
+    -- Add the continuous aggregate refresh policy
     EXECUTE format('
         SELECT add_continuous_aggregate_policy(%L,
             start_offset => %L,
@@ -29,17 +34,17 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Spot entries candlesticks
-SELECT create_candlestick_view('candle_10_s', '10 seconds'::interval, '30 seconds'::interval, 'price_1_s_agg');
-SELECT create_candlestick_view('candle_1_min', '1 minute'::interval, '3 minutes'::interval, 'price_1_s_agg');
-SELECT create_candlestick_view('candle_5_min', '5 minutes'::interval, '15 minutes'::interval, 'price_10_s_agg');
-SELECT create_candlestick_view('candle_15_min', '15 minutes'::interval, '45 minutes'::interval, 'price_10_s_agg');
-SELECT create_candlestick_view('candle_1_h', '1 hour'::interval, '3 hours'::interval, 'price_10_s_agg');
-SELECT create_candlestick_view('candle_1_day', '1 day'::interval, '3 days'::interval, 'price_10_s_agg');
+SELECT create_candlestick_view('candle_10_s_spot', '10 seconds'::interval, '30 seconds'::interval, 'median_1_s_spot');
+SELECT create_candlestick_view('candle_1_min_spot', '1 minute'::interval, '3 minutes'::interval, 'median_1_s_spot');
+SELECT create_candlestick_view('candle_5_min_spot', '5 minutes'::interval, '15 minutes'::interval, 'median_10_s_spot');
+SELECT create_candlestick_view('candle_15_min_spot', '15 minutes'::interval, '45 minutes'::interval, 'median_10_s_spot');
+SELECT create_candlestick_view('candle_1_h_spot', '1 hour'::interval, '3 hours'::interval, 'median_10_s_spot');
+SELECT create_candlestick_view('candle_1_day_spot', '1 day'::interval, '3 days'::interval, 'median_10_s_spot');
 
--- Future entries candlesticks
-SELECT create_candlestick_view('candle_10_s_future', '10 seconds'::interval, '30 seconds'::interval, 'price_1_s_agg_future');
-SELECT create_candlestick_view('candle_1_min_future', '1 minute'::interval, '3 minutes'::interval, 'price_1_s_agg_future');
-SELECT create_candlestick_view('candle_5_min_future', '5 minutes'::interval, '15 minutes'::interval, 'price_10_s_agg_future');
-SELECT create_candlestick_view('candle_15_min_future', '15 minutes'::interval, '45 minutes'::interval, 'price_10_s_agg_future');
-SELECT create_candlestick_view('candle_1_h_future', '1 hour'::interval, '3 hours'::interval, 'price_10_s_agg_future');
-SELECT create_candlestick_view('candle_1_day_future', '1 day'::interval, '3 days'::interval, 'price_10_s_agg_future');
+-- Perp entries candlesticks
+SELECT create_candlestick_view('candle_10_s_perp', '10 seconds'::interval, '30 seconds'::interval, 'median_1_s_perp');
+SELECT create_candlestick_view('candle_1_min_perp', '1 minute'::interval, '3 minutes'::interval, 'median_1_s_perp');
+SELECT create_candlestick_view('candle_5_min_perp', '5 minutes'::interval, '15 minutes'::interval, 'median_10_s_perp');
+SELECT create_candlestick_view('candle_15_min_perp', '15 minutes'::interval, '45 minutes'::interval, 'median_10_s_perp');
+SELECT create_candlestick_view('candle_1_h_perp', '1 hour'::interval, '3 hours'::interval, 'median_10_s_perp');
+SELECT create_candlestick_view('candle_1_day_perp', '1 day'::interval, '3 days'::interval, 'median_10_s_perp');

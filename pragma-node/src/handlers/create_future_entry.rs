@@ -7,8 +7,8 @@ use serde::{Deserialize, Serialize};
 use starknet::core::types::Felt;
 use utoipa::{ToResponse, ToSchema};
 
-use crate::AppState;
 use crate::config::config;
+use crate::state::AppState;
 use crate::utils::{publish_to_kafka, validate_publisher};
 use pragma_common::signing::assert_request_signature_is_valid;
 use pragma_common::types::entries::FutureEntry;

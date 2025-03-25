@@ -1,11 +1,11 @@
 use axum::Json;
 use axum::extract::{Query, State};
 
-use crate::AppState;
 use crate::handlers::optimistic_oracle::types::{
     GetResolvedAssertionsParams, GetResolvedAssertionsResponse,
 };
 use crate::infra::repositories::oo_repository::assertions;
+use crate::state::AppState;
 use pragma_entities::models::optimistic_oracle_error::OptimisticOracleError;
 
 pub const DEFAULT_LIMIT: u32 = 100;

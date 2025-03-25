@@ -1,57 +1,16 @@
-pub mod caches;
-pub mod config;
-pub mod constants;
-pub mod errors;
-pub mod handlers;
-pub mod infra;
-pub mod metrics;
-pub mod server;
-pub mod utils;
+use std::sync::Arc;
 
 use dashmap::DashMap;
 use dotenvy::dotenv;
-use infra::cloud::build_signer;
-
-use std::fmt;
-use std::sync::Arc;
-
-use caches::CacheRegistry;
-use deadpool_diesel::postgres::Pool;
-use starknet::signers::SigningKey;
 
 use pragma_entities::connection::{ENV_OFFCHAIN_DATABASE_URL, ENV_ONCHAIN_DATABASE_URL};
 
-use crate::config::config;
-use crate::handlers::publish_entry_ws::PublisherSession;
-use crate::infra::rpc::{RpcClients, init_rpc_clients};
-use crate::metrics::MetricsRegistry;
-
-#[derive(Clone)]
-pub struct AppState {
-    // Databases pools
-    offchain_pool: Pool,
-    onchain_pool: Pool,
-    // Starknet RPC clients for mainnet & sepolia
-    rpc_clients: RpcClients,
-    // Database caches
-    caches: Arc<CacheRegistry>,
-    // Pragma Signer used for StarkEx signing
-    pragma_signer: Option<SigningKey>,
-    // Metrics
-    metrics: Arc<MetricsRegistry>,
-    // Publisher sessions
-    publisher_sessions: Arc<DashMap<String, PublisherSession>>,
-}
-
-impl fmt::Debug for AppState {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("AppState")
-            .field("caches", &self.caches)
-            .field("pragma_signer", &self.pragma_signer)
-            .field("metrics", &self.metrics)
-            .finish_non_exhaustive()
-    }
-}
+use pragma_node::caches::CacheRegistry;
+use pragma_node::config::config;
+use pragma_node::infra::cloud::build_signer;
+use pragma_node::infra::rpc::init_rpc_clients;
+use pragma_node::metrics::MetricsRegistry;
+use pragma_node::state::AppState;
 
 #[tokio::main]
 #[tracing::instrument]
@@ -90,7 +49,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         rpc_clients: init_rpc_clients(),
     };
 
-    server::run_api_server(config, state).await;
+    pragma_node::server::run_api_server(config, state).await;
 
     // Ensure that the tracing provider is shutdown correctly
     opentelemetry::global::shutdown_tracer_provider();

@@ -7,9 +7,9 @@ use pragma_common::timestamp::{TimestampError, TimestampRangeError};
 use pragma_common::types::pair::Pair;
 use pragma_entities::VolatilityError;
 
-use crate::AppState;
 use crate::constants::EIGHTEEN_DECIMALS;
 use crate::infra::repositories::entry_repository::{self, MedianEntry};
+use crate::state::AppState;
 use crate::utils::PathExtractor;
 use crate::utils::compute_volatility;
 
@@ -56,7 +56,7 @@ pub async fn get_volatility(
     }
 
     // Fetch entries between start and end timestamps
-    let entries = entry_repository::get_median_entries_1_min_between(
+    let entries = entry_repository::get_spot_median_entries_1_min_between(
         &state.offchain_pool,
         pair.to_pair_id(),
         volatility_query.start,

@@ -4,8 +4,9 @@ use pragma_entities::InfraError;
 // Retrieve the timescale table based on the network and data type.
 pub const fn get_table_suffix(data_type: DataType) -> Result<&'static str, InfraError> {
     match data_type {
-        DataType::SpotEntry => Ok(""),
-        DataType::FutureEntry | DataType::PerpEntry => Ok("_future"),
+        DataType::SpotEntry => Ok("spot"),
+        DataType::PerpEntry => Ok("perp"),
+        DataType::FutureEntry => Ok("future"),
     }
 }
 
@@ -32,13 +33,14 @@ pub const fn get_interval_specifier(
             Interval::OneHundredMillisecond => Ok("100_ms"),
             Interval::OneSecond => Ok("1_s"),
             Interval::FiveSeconds => Ok("5_s"),
+            Interval::TenSeconds => Ok("10_s"),
             Interval::OneMinute => Ok("1_min"),
             Interval::FifteenMinutes => Ok("15_min"),
             Interval::OneHour => Ok("1_h"),
             Interval::TwoHours => Ok("2_h"),
             Interval::OneDay => Ok("1_day"),
             Interval::OneWeek => Ok("1_week"),
-            _ => Err(InfraError::UnsupportedInterval(
+            Interval::FiveMinutes => Err(InfraError::UnsupportedInterval(
                 interval,
                 AggregationMode::Median,
             )),

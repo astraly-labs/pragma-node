@@ -5,9 +5,9 @@ use pragma_common::types::pair::Pair;
 use serde::{Deserialize, Serialize};
 use utoipa::{ToResponse, ToSchema};
 
-use crate::AppState;
 use crate::handlers::Interval;
 use crate::infra::repositories::entry_repository::{self, OHLCEntry};
+use crate::state::AppState;
 use crate::utils::PathExtractor;
 use pragma_entities::EntryError;
 
@@ -116,10 +116,14 @@ pub async fn get_ohlc(
         )));
     }
 
-    let entries =
-        entry_repository::get_ohlc(&state.offchain_pool, pair.to_pair_id(), interval, timestamp)
-            .await
-            .map_err(EntryError::from)?;
+    let entries = entry_repository::get_spot_ohlc(
+        &state.offchain_pool,
+        pair.to_pair_id(),
+        interval,
+        timestamp,
+    )
+    .await
+    .map_err(EntryError::from)?;
 
     Ok(Json(adapt_entry_to_entry_response(pair.into(), &entries)))
 }

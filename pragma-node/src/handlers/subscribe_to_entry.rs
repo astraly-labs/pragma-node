@@ -15,9 +15,9 @@ use pragma_common::types::DataType;
 use pragma_common::types::timestamp::UnixTimestamp;
 use pragma_entities::EntryError;
 
-use crate::AppState;
 use crate::constants::starkex_ws::PRAGMA_ORACLE_NAME_FOR_STARKEX;
 use crate::infra::repositories::entry_repository::MedianEntryWithComponents;
+use crate::state::AppState;
 use crate::utils::only_existing_pairs;
 use crate::utils::pricer::{IndexPricer, MarkPricer, Pricer};
 use crate::utils::{ChannelHandler, Subscriber, SubscriptionType};
