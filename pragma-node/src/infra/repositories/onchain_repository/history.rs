@@ -145,12 +145,7 @@ pub async fn retry_with_routing(
 
         if !base_alt_exists || !alt_quote_exists {
             routing_attempts.push(format!(
-                "Route via {}: base pair '{}' exists: {}, quote pair '{}' exists: {}",
-                alt_currency,
-                base_alt_pair_str,
-                base_alt_exists,
-                alt_quote_pair_str,
-                alt_quote_exists
+                "Route via {alt_currency}: base pair '{base_alt_pair_str}' exists: {base_alt_exists}, quote pair '{alt_quote_pair_str}' exists: {alt_quote_exists}",                
             ));
             continue;
         }
@@ -169,8 +164,7 @@ pub async fn retry_with_routing(
 
         if let Err(e) = &base_alt_result {
             routing_attempts.push(format!(
-                "Route via {}: failed to get history for '{}': {}",
-                alt_currency, base_alt_pair_str, e
+                "Route via {alt_currency}: failed to get history for '{base_alt_pair_str}': {e}",
             ));
             continue;
         }
@@ -188,8 +182,7 @@ pub async fn retry_with_routing(
 
         if let Err(e) = &alt_quote_result {
             routing_attempts.push(format!(
-                "Route via {}: failed to get history for '{}': {}",
-                alt_currency, alt_quote_pair_str, e
+                "Route via {alt_currency}: failed to get history for '{alt_quote_pair_str}': {e}",
             ));
             continue;
         }
@@ -199,8 +192,7 @@ pub async fn retry_with_routing(
 
         if base_alt_result.0.len() != alt_quote_result.0.len() {
             routing_attempts.push(format!(
-                "Route via {}: mismatched entries count: {} vs {}",
-                alt_currency,
+                "Route via {alt_currency}: mismatched entries count: {} vs {}",
                 base_alt_result.0.len(),
                 alt_quote_result.0.len()
             ));
@@ -218,9 +210,8 @@ pub async fn retry_with_routing(
     };
 
     Err(InfraError::RoutingError(format!(
-        "{}; {}",
+        "{}; {attempts_info}",
         pair.to_pair_id(),
-        attempts_info
     )))
 }
 
