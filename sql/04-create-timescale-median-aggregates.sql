@@ -41,8 +41,7 @@ BEGIN
             pair_id,
             time_bucket(%L, subbucket) AS bucket,
             percentile_cont(0.5) WITHIN GROUP (ORDER BY source_median_price)::numeric(1000,0) AS median_price,
-            COUNT(DISTINCT source) AS num_sources,
-            array_agg(ROW(source, source_median_price, subbucket)::price_component) AS components
+            COUNT(DISTINCT source) AS num_sources
         FROM %I
         GROUP BY pair_id, bucket
         WITH NO DATA;',

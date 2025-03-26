@@ -41,8 +41,7 @@ BEGIN
             pair_id,
             time_bucket(%L, subbucket) AS bucket,
             avg(source_twap_price)::numeric(1000,0) AS twap_price,
-            COUNT(DISTINCT source) AS num_sources,
-            array_agg(ROW(source, source_twap_price, subbucket)::price_component) AS components
+            COUNT(DISTINCT source) AS num_sources
         FROM %I
         GROUP BY pair_id, bucket
         WITH NO DATA;',
