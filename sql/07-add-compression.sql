@@ -72,8 +72,6 @@ BEGIN
             UNION
             SELECT unnest(twap_views)
             UNION
-            SELECT unnest(twap_views) || '_per_source'
-            UNION
             SELECT unnest(candle_views)
         ) AS all_views
     LOOP
@@ -86,6 +84,7 @@ BEGIN
                 WHEN view_to_compress LIKE '%week%' THEN INTERVAL '30 days'
             END;
 
+        -- Perform operations sequentially within a transaction
         EXECUTE format('ALTER MATERIALIZED VIEW %I SET (timescaledb.enable_columnstore = true, timescaledb.segmentby = ''pair_id'')', view_to_compress);
         EXECUTE format('CALL add_columnstore_policy(%L, after => $1)', view_to_compress) USING compress_after;
     END LOOP;

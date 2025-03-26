@@ -1,5 +1,6 @@
 use std::fs;
 use std::path::PathBuf;
+use std::time::Duration;
 
 use deadpool_diesel::postgres::Pool;
 use diesel::connection::SimpleConnection;
@@ -37,6 +38,14 @@ async fn execute_migration(pool: &Pool, file_path: PathBuf) {
     let sql = fs::read_to_string(&file_path).unwrap();
     let conn = pool.get().await.unwrap();
 
+    if file_path
+        .to_str()
+        .is_some_and(|e| e.contains("sql/07-add-compression.sql"))
+    {
+        tokio::time::sleep(Duration::from_secs(2)).await;
+    }
+
+    tracing::info!("Executing migration for {:?}", file_path);
     conn.interact(move |conn| conn.batch_execute(&sql))
         .await
         .unwrap()

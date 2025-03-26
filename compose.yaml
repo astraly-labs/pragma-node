@@ -64,12 +64,12 @@ services:
     volumes:
       - ./sql/01-init.sql:/docker-entrypoint-initdb.d/01-init.sql
       - ./sql/02-create-publishers.sql:/docker-entrypoint-initdb.d/02-add-publishers.sql
-      - ./sql/03-create-timescale-hypertables.sql:/docker-entrypoint-initdb.d/04-create-timescale-hypertables.sql
-      - ./sql/04-create-timescale-median-aggregates.sql:/docker-entrypoint-initdb.d/05-create-timescale-median-aggregates.sql
-      - ./sql/05-create-timescale-ohlc-aggregates.sql:/docker-entrypoint-initdb.d/06-create-timescale-ohlc-aggregates.sql
-      - ./sql/06-create-timescale-twap-aggregates.sql:/docker-entrypoint-initdb.d/07-create-timescale-twap-aggregates.sql
-      - ./sql/07-create-indexes.sql:/docker-entrypoint-initdb.d/08-create-indexes.sql
-      - ./sql/08-add-compression.sql:/docker-entrypoint-initdb.d/09-add-compression.sql
+      - ./sql/03-create-timescale-hypertables.sql:/docker-entrypoint-initdb.d/03-create-timescale-hypertables.sql
+      - ./sql/04-create-timescale-median-aggregates.sql:/docker-entrypoint-initdb.d/04-create-timescale-median-aggregates.sql
+      - ./sql/05-create-timescale-ohlc-aggregates.sql:/docker-entrypoint-initdb.d/05-create-timescale-ohlc-aggregates.sql
+      - ./sql/06-create-timescale-twap-aggregates.sql:/docker-entrypoint-initdb.d/06-create-timescale-twap-aggregates.sql
+      - ./sql/07-add-compression.sql:/docker-entrypoint-initdb.d/07-add-compression.sql
+      - ./sql/08-create-indexes.sql:/docker-entrypoint-initdb.d/08-create-indexes.sql
       - onchain-db-data:/var/lib/postgresql/data
     environment:
       - POSTGRES_DB=pragma

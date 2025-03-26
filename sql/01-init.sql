@@ -9,7 +9,7 @@ CREATE TABLE mainnet_spot_entry (
     block_timestamp timestamp without time zone,
     transaction_hash character varying(255),
     price numeric,
-    timestamp timestamp without time zone,
+    timestamp TIMESTAMPTZ,
     publisher character varying(255),
     source character varying(255),
     volume numeric,
@@ -25,7 +25,7 @@ CREATE TABLE spot_entry (
     block_timestamp timestamp without time zone,
     transaction_hash character varying(255),
     price numeric,
-    timestamp timestamp without time zone,
+    timestamp TIMESTAMPTZ,
     publisher character varying(255),
     source character varying(255),
     volume numeric,
@@ -41,12 +41,12 @@ CREATE TABLE mainnet_future_entry (
     block_timestamp timestamp without time zone,
     transaction_hash character varying(255),
     price numeric,
-    timestamp timestamp without time zone,
+    timestamp TIMESTAMPTZ,
     publisher character varying(255),
     source character varying(255),
     volume numeric,
     _cursor bigint,
-    expiration_timestamp timestamp without time zone
+    expiration_timestamp TIMESTAMPTZ
 );
 
 CREATE TABLE future_entry (
@@ -58,12 +58,12 @@ CREATE TABLE future_entry (
     block_timestamp timestamp without time zone,
     transaction_hash character varying(255),
     price numeric,
-    timestamp timestamp without time zone,
+    timestamp TIMESTAMPTZ,
     publisher character varying(255),
     source character varying(255),
     volume numeric,
     _cursor bigint,
-    expiration_timestamp timestamp without time zone
+    expiration_timestamp TIMESTAMPTZ
 );
 
 CREATE TABLE mainnet_spot_checkpoints (
@@ -78,7 +78,7 @@ CREATE TABLE mainnet_spot_checkpoints (
     sender_address character varying(255),
     aggregation_mode numeric,
     _cursor bigint,
-    timestamp timestamp without time zone,
+    timestamp TIMESTAMPTZ,
     nb_sources_aggregated numeric
 );
 
@@ -94,7 +94,7 @@ CREATE TABLE spot_checkpoints (
     sender_address character varying(255),
     aggregation_mode numeric,
     _cursor bigint,
-    timestamp timestamp without time zone,
+    timestamp TIMESTAMPTZ,
     nb_sources_aggregated numeric
 );
 
@@ -109,5 +109,5 @@ CREATE TABLE publishers (
 CREATE TYPE price_component AS (
     source text,
     price numeric(1000,0),
-    "timestamp" timestamptz
+    "timestamp" TIMESTAMPTZ
 );
