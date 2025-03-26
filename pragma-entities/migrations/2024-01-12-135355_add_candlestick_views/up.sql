@@ -11,13 +11,13 @@ BEGIN
         CREATE MATERIALIZED VIEW %I
         WITH (timescaledb.continuous, timescaledb.materialized_only = false) AS
         SELECT
-            time_bucket(%L, bucket) AS ohlc_bucket,
+            time_bucket(%L, subbucket) AS ohlc_bucket,
             pair_id,
-            FIRST(median_price, bucket)::numeric AS "open",
-            MAX(median_price)::numeric AS high,
-            MIN(median_price)::numeric AS low,
-            LAST(median_price, bucket)::numeric AS "close"
-        FROM %I
+            FIRST(source_median_price, subbucket)::numeric AS "open",
+            MAX(source_median_price)::numeric AS high,
+            MIN(source_median_price)::numeric AS low,
+            LAST(source_median_price, subbucket)::numeric AS "close"
+        FROM %I_per_source
         GROUP BY ohlc_bucket, pair_id
         WITH NO DATA;', p_name, p_interval, p_table_name);
 
