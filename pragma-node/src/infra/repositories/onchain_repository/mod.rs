@@ -84,18 +84,27 @@ pub(crate) fn get_onchain_ohlc_table_name(
     interval: Interval,
 ) -> Result<String, InfraError> {
     let prefix_name = match (network, data_type) {
-        (Network::Sepolia, DataType::SpotEntry) => "spot",
-        (Network::Mainnet, DataType::SpotEntry) => "mainnet_spot",
-        (Network::Sepolia, DataType::FutureEntry) => "future",
-        (Network::Mainnet, DataType::FutureEntry) => "mainnet_future",
+        (Network::Sepolia, DataType::SpotEntry) => "spot_candle",
+        (Network::Mainnet, DataType::SpotEntry) => "mainnet_spot_candle",
+        (Network::Sepolia, DataType::FutureEntry) => "perp_candle",
+        (Network::Mainnet, DataType::FutureEntry) => "mainnet_perp_candle",
         _ => {
             return Err(InfraError::UnsupportedDataTypeForNetwork(
                 network, data_type,
             ));
         }
     };
-    let interval_specifier = get_onchain_interval_specifier(interval)?;
-    let table_name = format!("{prefix_name}_{interval_specifier}_candle");
+    let interval_specifier = match interval {
+        Interval::TenSeconds => Ok("10_s"),
+        Interval::OneMinute => Ok("1_min"),
+        Interval::FiveMinutes => Ok("5_min"),
+        Interval::FifteenMinutes => Ok("15_min"),
+        Interval::OneHour => Ok("1_hour"),
+        Interval::OneDay => Ok("1_day"),
+        // We support less intervals for candles
+        _ => Err(InfraError::UnsupportedOnchainInterval(interval)),
+    }?;
+    let table_name = format!("{prefix_name}_{interval_specifier}");
     Ok(table_name)
 }
 
@@ -107,10 +116,10 @@ pub(crate) fn get_onchain_aggregate_table_name(
     interval: Interval,
 ) -> Result<String, InfraError> {
     let prefix_name = match (network, data_type) {
-        (Network::Sepolia, DataType::SpotEntry) => "spot_price",
-        (Network::Mainnet, DataType::SpotEntry) => "mainnet_spot_price",
-        (Network::Sepolia, DataType::FutureEntry) => "future_price",
-        (Network::Mainnet, DataType::FutureEntry) => "mainnet_future_price",
+        (Network::Sepolia, DataType::SpotEntry) => "spot_median",
+        (Network::Mainnet, DataType::SpotEntry) => "mainnet_spot_median",
+        (Network::Sepolia, DataType::FutureEntry) => "perp_median",
+        (Network::Mainnet, DataType::FutureEntry) => "mainnet_perp_median",
         _ => {
             return Err(InfraError::UnsupportedDataTypeForNetwork(
                 network, data_type,
@@ -118,23 +127,8 @@ pub(crate) fn get_onchain_aggregate_table_name(
         }
     };
 
-    // NOTE: Special case because there is a mistake and we forgot the "s" on 2_hour
     let interval_specifier = get_interval_specifier(interval, false)?;
+    let table_name = format!("{prefix_name}_{interval_specifier}");
 
-    let table_name = format!("{prefix_name}_{interval_specifier}_agg");
     Ok(table_name)
-}
-
-pub const fn get_onchain_interval_specifier(
-    interval: Interval,
-) -> Result<&'static str, InfraError> {
-    match interval {
-        Interval::OneMinute => Ok("1_min"),
-        Interval::FifteenMinutes => Ok("15_min"),
-        Interval::OneHour => Ok("1_hour"),
-        Interval::TwoHours => Ok("2_hour"),
-        Interval::OneDay => Ok("1_day"),
-        Interval::OneWeek => Ok("1_week"),
-        _ => Err(InfraError::UnsupportedOnchainInterval(interval)),
-    }
 }
