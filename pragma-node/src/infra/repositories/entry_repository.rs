@@ -171,7 +171,7 @@ pub async fn get_twap_price(
         -- query the materialized realtime view
         SELECT
             bucket AS time,
-            price_twap AS median_price,
+            twap_price AS median_price,
             num_sources
         FROM
             twap_{}_{}
