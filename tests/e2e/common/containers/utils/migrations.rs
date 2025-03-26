@@ -37,7 +37,6 @@ async fn execute_migration(pool: &Pool, file_path: PathBuf) {
     let sql = fs::read_to_string(&file_path).unwrap();
     let conn = pool.get().await.unwrap();
 
-    tracing::info!("Executing migration for {:?}", file_path);
     conn.interact(move |conn| conn.batch_execute(&sql))
         .await
         .unwrap()
