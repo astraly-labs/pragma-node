@@ -146,3 +146,9 @@ CREATE TABLE oo_requests (
     updated_at timestamp without time zone,
     updated_at_tx character varying(255)
 );
+
+CREATE TYPE price_component AS (
+    source text,
+    price numeric(1000,0),
+    "timestamp" timestamptz
+);
