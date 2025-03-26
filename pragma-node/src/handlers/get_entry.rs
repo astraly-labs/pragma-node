@@ -73,13 +73,13 @@ impl TryFrom<GetEntryParams> for EntryParams {
 }
 #[derive(Debug, Serialize, Deserialize, ToSchema, ToResponse)]
 pub struct GetEntryResponse {
-    num_sources_aggregated: usize,
-    pair_id: String,
-    price: String,
-    timestamp: u64,
-    decimals: u32,
+    pub num_sources_aggregated: usize,
+    pub pair_id: String,
+    pub price: String,
+    pub timestamp: u64,
+    pub decimals: u32,
+    pub components: Option<Vec<EntryComponent>>,
 }
-
 /// Get the latest price entry for a trading pair
 #[utoipa::path(
     get,
@@ -120,9 +120,15 @@ pub async fn get_entry(
 
     let pair = Pair::from(pair);
 
-    let entry = routing(&state.offchain_pool, is_routing, &pair, &entry_params)
-        .await
-        .map_err(EntryError::from)?;
+    let entry = routing(
+        &state.offchain_pool,
+        is_routing,
+        &pair,
+        &entry_params,
+        false,
+    )
+    .await
+    .map_err(EntryError::from)?;
 
     let last_updated_timestamp: NaiveDateTime = get_last_updated_timestamp(
         &state.offchain_pool,
@@ -150,5 +156,16 @@ pub fn adapt_entry_to_entry_response(
         num_sources_aggregated: entry.num_sources as usize,
         price: big_decimal_price_to_hex(&entry.median_price),
         decimals: EIGHTEEN_DECIMALS,
+        components: entry
+            .components
+            .as_ref()
+            .map(|prices| prices.iter().cloned().map(Into::into).collect()),
     }
+}
+
+#[derive(Serialize, Deserialize, Default, ToSchema, Clone, ToResponse, Debug)]
+pub struct EntryComponent {
+    pub source: String,
+    pub price: String,
+    pub timestamp: u64,
 }
