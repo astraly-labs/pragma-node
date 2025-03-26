@@ -5615,6 +5615,7 @@ dependencies = [
  "diesel-async",
  "futures-util",
  "pragma-common",
+ "pragma-node",
  "pretty_assertions",
  "rand 0.9.0",
  "reqwest 0.12.12",

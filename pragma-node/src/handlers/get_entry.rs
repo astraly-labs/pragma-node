@@ -9,11 +9,11 @@ use pragma_common::types::pair::Pair;
 use pragma_common::types::{AggregationMode, DataType, Interval};
 use pragma_entities::EntryError;
 
-use crate::AppState;
 use crate::constants::EIGHTEEN_DECIMALS;
 use crate::infra::repositories::entry_repository::{
     MedianEntry, get_last_updated_timestamp, routing,
 };
+use crate::state::AppState;
 use crate::utils::PathExtractor;
 use crate::utils::big_decimal_price_to_hex;
 

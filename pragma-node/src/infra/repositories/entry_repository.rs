@@ -171,10 +171,10 @@ pub async fn get_twap_price(
         -- query the materialized realtime view
         SELECT
             bucket AS time,
-            price_twap AS median_price,
+            twap_price AS median_price,
             num_sources
         FROM
-            twap_{}_agg{}
+            twap_{}_{}
         WHERE
             pair_id = $1
             AND
@@ -231,7 +231,7 @@ pub async fn get_median_price(
             median_price,
             num_sources
         FROM
-            price_{}_agg{}
+            median_{}_{}
         WHERE
             pair_id = $1
             AND
@@ -273,7 +273,7 @@ pub async fn get_median_price(
     Ok(entry)
 }
 
-pub async fn get_median_entries_1_min_between(
+pub async fn get_spot_median_entries_1_min_between(
     pool: &deadpool_diesel::postgres::Pool,
     pair_id: String,
     start_timestamp: u64,
@@ -294,7 +294,7 @@ pub async fn get_median_entries_1_min_between(
             bucket AS time,
             median_price,
             num_sources
-        FROM price_1_min_agg
+        FROM median_1_min_spot
         WHERE 
             pair_id = $1
         AND 
@@ -352,7 +352,7 @@ pub async fn get_median_prices_between(
             median_price,
             num_sources
         FROM
-            price_{}_agg{}
+            median_{}_{}
         WHERE
             pair_id = $1
             AND
@@ -413,7 +413,7 @@ pub async fn get_twap_prices_between(
             price_twap AS median_price,
             num_sources
         FROM
-            twap_{}_agg{}
+            twap_{}_{}
         WHERE
             pair_id = $1
             AND
@@ -506,7 +506,7 @@ impl FromIterator<OHLCEntryRaw> for Vec<OHLCEntry> {
     }
 }
 
-pub async fn get_ohlc(
+pub async fn get_spot_ohlc(
     pool: &deadpool_diesel::postgres::Pool,
     pair_id: String,
     interval: Interval,
@@ -524,7 +524,7 @@ pub async fn get_ohlc(
             low,
             close
         FROM
-            candle_{}
+            candle_{}_spot
         WHERE
             pair_id = $1
             AND

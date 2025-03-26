@@ -1,8 +1,8 @@
-use crate::AppState;
 use crate::handlers::optimistic_oracle::types::{
     GetDisputedAssertionsParams, GetDisputedAssertionsResponse,
 };
 use crate::infra::repositories::oo_repository::assertions;
+use crate::state::AppState;
 use axum::Json;
 use axum::extract::{Query, State};
 use pragma_entities::models::optimistic_oracle_error::OptimisticOracleError;

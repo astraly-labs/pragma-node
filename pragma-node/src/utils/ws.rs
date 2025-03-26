@@ -9,8 +9,8 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc::{self, Receiver, Sender};
 
-use crate::AppState;
 use crate::metrics::{Interaction, Status};
+use crate::state::AppState;
 use axum::extract::ws::{Message, WebSocket};
 use futures_util::stream::{SplitSink, SplitStream};
 use futures_util::{SinkExt, StreamExt};

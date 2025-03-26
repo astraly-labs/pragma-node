@@ -9,32 +9,32 @@ BEGIN
     FOR view_name IN 
         SELECT format('%s', unnest(ARRAY[
             -- Sub-minute aggregates
-            'price_100_ms_agg', 'price_1_s_agg', 'price_5_s_agg',
-            'price_100_ms_agg_future', 'price_1_s_agg_future', 'price_5_s_agg_future',
-            'candle_10_s', 'candle_10_s_future',
+            'median_100_ms_spot', 'median_1_s_spot', 'median_5_s_spot',
+            'median_100_ms_perp', 'median_1_s_perp', 'median_5_s_perp',
+            'candle_10_s_spot', 'candle_10_s_perp',
 
             -- 1-15min aggregates
-            'price_1_min_agg', 'price_15_min_agg',
-            'price_1_min_agg_future', 'price_15_min_agg_future',
-            'candle_1_min', 'candle_5_min', 'candle_15_min',
-            'candle_1_min_future', 'candle_5_min_future', 'candle_15_min_future',
-            'twap_1_min_agg', 'twap_5_min_agg', 'twap_15_min_agg',
-            'twap_1_min_agg_future', 'twap_5_min_agg_future', 'twap_15_min_agg_future',
+            'median_1_min_spot', 'median_15_min_spot',
+            'median_1_min_perp', 'median_15_min_perp',
+            'candle_1_min_spot', 'candle_5_min_spot', 'candle_15_min_spot',
+            'candle_1_min_perp', 'candle_5_min_perp', 'candle_15_min_perp',
+            'twap_1_min_spot', 'twap_5_min_spot', 'twap_15_min_spot',
+            'twap_1_min_perp', 'twap_5_min_perp', 'twap_15_min_perp',
 
             -- 1-2h aggregates
-            'price_1_h_agg', 'price_2_h_agg',
-            'price_1_h_agg_future', 'price_2_h_agg_future',
-            'candle_1_h', 'candle_1_h_future',
-            'twap_1_h_agg', 'twap_2_h_agg',
-            'twap_1_h_agg_future', 'twap_2_h_agg_future',
+            'median_1_h_spot', 'median_2_h_spot',
+            'median_1_h_perp', 'median_2_h_perp',
+            'candle_1_h_spot', 'candle_1_h_perp',
+            'twap_1_h_spot', 'twap_2_h_spot',
+            'twap_1_h_perp', 'twap_2_h_perp',
 
             -- Daily aggregates
-            'price_1_day_agg', 'price_1_day_agg_future',
-            'candle_1_day', 'candle_1_day_future',
-            'twap_1_day_agg', 'twap_1_day_agg_future',
+            'median_1_day_spot', 'median_1_day_perp',
+            'candle_1_day_spot', 'candle_1_day_perp',
+            'twap_1_day_spot', 'twap_1_day_perp',
 
             -- Weekly aggregates
-            'price_1_week_agg', 'price_1_week_agg_future'
+            'median_1_week_spot', 'median_1_week_perp'
         ]))
     LOOP
         BEGIN

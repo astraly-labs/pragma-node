@@ -15,8 +15,8 @@ use axum::extract::ws::{WebSocket, WebSocketUpgrade};
 use axum::extract::{ConnectInfo, State};
 use axum::response::IntoResponse;
 
-use crate::AppState;
 use crate::handlers::create_entry::CreateEntryResponse;
+use crate::state::AppState;
 use crate::utils::{ChannelHandler, Subscriber, convert_entry_to_db, convert_perp_entry_to_db};
 use crate::utils::{publish_to_kafka, validate_publisher};
 use pragma_common::signing::assert_login_is_valid;

@@ -5,9 +5,9 @@ use pragma_common::types::{AggregationMode, pair::Pair};
 use pragma_entities::EntryError;
 
 use crate::{
-    AppState,
     handlers::get_entry::{EntryParams, GetEntryResponse, adapt_entry_to_entry_response},
     infra::repositories::entry_repository,
+    state::AppState,
 };
 
 pub const DEFAULT_HISTORICAL_PRICES: usize = 50;

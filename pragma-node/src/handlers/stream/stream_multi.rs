@@ -14,7 +14,6 @@ use utoipa::{IntoParams, ToSchema};
 use pragma_common::types::{AggregationMode, Interval, pair::Pair};
 
 use crate::{
-    AppState,
     handlers::{
         GetEntryParams,
         get_entry::EntryParams,
@@ -23,6 +22,7 @@ use crate::{
             get_historical_entries_multi_pair, get_latest_entries_multi_pair,
         },
     },
+    state::AppState,
 };
 
 #[derive(Debug, Deserialize, IntoParams, ToSchema)]
