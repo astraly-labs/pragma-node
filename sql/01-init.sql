@@ -1,5 +1,3 @@
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
 CREATE TABLE mainnet_spot_entry (
     network character varying(255),
     pair_id character varying(255),

@@ -1,18 +1,3 @@
--- Enable compression on base tables
-ALTER TABLE entries SET (
-    timescaledb.enable_columnstore = true, 
-    timescaledb.segmentby = 'pair_id'
-);
-
-ALTER TABLE future_entries SET (
-    timescaledb.enable_columnstore = true,
-    timescaledb.segmentby = 'pair_id'
-);
-
--- Add compression policies to base tables
-CALL add_columnstore_policy('entries', after => INTERVAL '1d');
-CALL add_columnstore_policy('future_entries', after => INTERVAL '1d');
-
 -- Add compression to all continuous aggregates, including _per_source sub-tables
 CREATE OR REPLACE FUNCTION add_compression_to_continuous_aggregates()
 RETURNS void AS $$

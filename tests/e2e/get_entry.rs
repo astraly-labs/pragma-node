@@ -93,14 +93,16 @@ pub struct GetEntryResponse {
 }
 
 #[rstest]
-#[case::one_second(Interval::OneSecond)]
-#[case::five_seconds(Interval::FiveSeconds)]
-#[case::one_minute(Interval::OneMinute)]
-#[case::fifteen_minutes(Interval::FifteenMinutes)]
-#[case::one_hour(Interval::OneHour)]
-#[case::two_hours(Interval::TwoHours)]
-#[case::one_day(Interval::OneDay)]
-#[case::one_week(Interval::OneWeek)]
+#[case(Interval::OneHundredMillisecond)]
+#[case(Interval::OneSecond)]
+#[case(Interval::FiveSeconds)]
+#[case(Interval::TenSeconds)]
+#[case(Interval::OneMinute)]
+#[case(Interval::FifteenMinutes)]
+#[case(Interval::OneHour)]
+#[case(Interval::TwoHours)]
+#[case(Interval::OneDay)]
+#[case(Interval::OneWeek)]
 #[serial_test::serial]
 #[tokio::test]
 async fn get_entry_median_ok_many(
@@ -113,7 +115,7 @@ async fn get_entry_median_ok_many(
     let pair_id = "ETH/USD";
     let current_timestamp: u64 = chrono::Utc::now().timestamp() as u64;
     let price: u128 = populate::get_pair_price(pair_id);
-    let sql_many = populate::generate_entries(vec!["ETH/USD"], 1000, current_timestamp);
+    let sql_many = populate::generate_entries(vec!["ETH/USD"], 100, current_timestamp);
 
     hlpr.execute_sql_many(&hlpr.offchain_pool, sql_many).await;
 
@@ -172,7 +174,7 @@ async fn get_entry_twap_many_ok(
     let pair_id = "ETH/USD";
     let current_timestamp: u64 = chrono::Utc::now().timestamp() as u64;
     let price: u128 = populate::get_pair_price(pair_id);
-    let sql_many = populate::generate_entries(vec!["ETH/USD"], 1000, current_timestamp);
+    let sql_many = populate::generate_entries(vec!["ETH/USD"], 100, current_timestamp);
 
     hlpr.execute_sql_many(&hlpr.offchain_pool, sql_many).await;
 
@@ -231,7 +233,7 @@ async fn get_entry_twap_strk_eth_ok(
     let pair_id = "STRK/USD";
     let current_timestamp: u64 = chrono::Utc::now().timestamp() as u64;
     let price: u128 = populate::get_pair_price(pair_id);
-    let sql_many = populate::generate_entries(vec!["ETH/USD", "STRK/USD"], 1000, current_timestamp);
+    let sql_many = populate::generate_entries(vec!["ETH/USD", "STRK/USD"], 100, current_timestamp);
 
     hlpr.execute_sql_many(&hlpr.offchain_pool, sql_many).await;
 
