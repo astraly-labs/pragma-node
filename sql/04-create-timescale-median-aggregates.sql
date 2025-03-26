@@ -20,7 +20,7 @@ BEGIN
 
     -- Create the per-source materialized view
     EXECUTE format('
-        CREATE MATERIALIZED VIEW %I_per_source
+        CREATE MATERIALIZED VIEW %s_per_source
         WITH (timescaledb.continuous, timescaledb.materialized_only = false)
         AS SELECT
             pair_id,
@@ -31,7 +31,7 @@ BEGIN
         WHERE %s
         GROUP BY pair_id, source, subbucket
         WITH NO DATA;',
-        p_name, p_interval, p_table_name, where_condition);
+    p_name, p_interval, p_table_name, where_condition);
 
     -- Create the main materialized view with median across sources
     EXECUTE format('
@@ -43,10 +43,10 @@ BEGIN
             percentile_cont(0.5) WITHIN GROUP (ORDER BY source_median_price)::numeric(1000,0) AS median_price,
             COUNT(DISTINCT source) AS num_sources,
             array_agg(ROW(source, source_median_price, subbucket)::price_component) AS components
-        FROM %I_per_source
+        FROM %I
         GROUP BY pair_id, bucket
         WITH NO DATA;',
-        p_name, p_interval, p_name);
+    p_name, p_interval, p_name || '_per_source');
 
     -- Set chunk time interval to 7 days
     EXECUTE format('SELECT set_chunk_time_interval(%L, INTERVAL ''7 days'');', p_name || '_per_source');
@@ -56,15 +56,15 @@ BEGIN
     EXECUTE format('
         SELECT add_continuous_aggregate_policy(%L,
             start_offset => %L,
-            end_offset => ''0''::interval,
+            end_offset => %L,
             schedule_interval => %L);',
-        p_name || '_per_source', p_start_offset, p_interval);
+    p_name || '_per_source', p_start_offset, '0'::interval, p_interval);
     EXECUTE format('
         SELECT add_continuous_aggregate_policy(%L,
             start_offset => %L,
-            end_offset => ''0''::interval,
+            end_offset => %L,
             schedule_interval => %L);',
-        p_name, p_start_offset, p_interval);
+    p_name, p_start_offset, '0'::interval, p_interval);
 END;
 $$ LANGUAGE plpgsql;
 

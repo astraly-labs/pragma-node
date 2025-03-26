@@ -32,3 +32,5 @@ CREATE INDEX spot_entry_idx_cursor ON spot_entry (_cursor);
 CREATE INDEX mainnet_spot_entry_idx_cursor ON mainnet_spot_entry (_cursor);
 CREATE INDEX future_entry_idx_cursor ON future_entry (_cursor);
 CREATE INDEX mainnet_future_entry_idx_cursor ON mainnet_future_entry (_cursor);
+
+CREATE INDEX idx_publisher_name ON publishers (name);

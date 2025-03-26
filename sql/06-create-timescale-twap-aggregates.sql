@@ -20,7 +20,7 @@ BEGIN
 
     -- Create the per-source TWAP materialized view
     EXECUTE format('
-        CREATE MATERIALIZED VIEW %I_per_source
+        CREATE MATERIALIZED VIEW %s_per_source
         WITH (timescaledb.continuous, timescaledb.materialized_only = false)
         AS SELECT
             pair_id,
@@ -43,28 +43,28 @@ BEGIN
             avg(source_twap_price)::numeric(1000,0) AS twap_price,
             COUNT(DISTINCT source) AS num_sources,
             array_agg(ROW(source, source_twap_price, subbucket)::price_component) AS components
-        FROM %I_per_source
+        FROM %I
         GROUP BY pair_id, bucket
         WITH NO DATA;',
-        p_name, p_interval, p_name);
+        p_name, p_interval, p_name || '_per_source');
 
-    -- Set chunk time interval to 7 days
+    -- Set chunk time interval to 7 days for both views
     EXECUTE format('SELECT set_chunk_time_interval(%L, INTERVAL ''7 days'');', p_name || '_per_source');
     EXECUTE format('SELECT set_chunk_time_interval(%L, INTERVAL ''7 days'');', p_name);
 
-    -- Add continuous aggregate refresh policies
+    -- Add continuous aggregate policies
     EXECUTE format('
         SELECT add_continuous_aggregate_policy(%L,
             start_offset => %L,
-            end_offset => ''0''::interval,
+            end_offset => %L,
             schedule_interval => %L);',
-        p_name || '_per_source', p_start_offset, p_interval);
+        p_name || '_per_source', p_start_offset, '0'::interval, p_interval);
     EXECUTE format('
         SELECT add_continuous_aggregate_policy(%L,
             start_offset => %L,
-            end_offset => ''0''::interval,
+            end_offset => %L,
             schedule_interval => %L);',
-        p_name, p_start_offset, p_interval);
+        p_name, p_start_offset, '0'::interval, p_interval);
 END;
 $$ LANGUAGE plpgsql;
 

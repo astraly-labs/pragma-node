@@ -54,7 +54,7 @@ services:
       dockerfile: infra/pragma-node/Dockerfile
 
   onchain-db:
-    image: timescale/timescaledb-ha:pg14-latest
+    image: timescale/timescaledb-ha:pg17.4-ts2.18.2
     restart: always
     user: postgres
     secrets:
@@ -63,14 +63,13 @@ services:
       - pragma-db-network
     volumes:
       - ./sql/01-init.sql:/docker-entrypoint-initdb.d/01-init.sql
-      - ./sql/02-add-publishers.sql:/docker-entrypoint-initdb.d/02-add-publishers.sql
-      - ./sql/03-create-publishers-index.sql:/docker-entrypoint-initdb.d/03-create-publishers-index.sql
-      - ./sql/04-create-timescale-hypertables.sql:/docker-entrypoint-initdb.d/04-create-timescale-hypertables.sql
-      - ./sql/05-create-timescale-median-aggregates.sql:/docker-entrypoint-initdb.d/05-create-timescale-median-aggregates.sql
-      - ./sql/06-create-timescale-ohlc-aggregates.sql:/docker-entrypoint-initdb.d/06-create-timescale-ohlc-aggregates.sql
-      - ./sql/07-create-timescale-twap-aggregates.sql:/docker-entrypoint-initdb.d/07-create-timescale-twap-aggregates.sql
-      - ./sql/08-create-indexes.sql:/docker-entrypoint-initdb.d/08-create-indexes.sql
-      - ./sql/09-add-compression.sql:/docker-entrypoint-initdb.d/09-add-compression.sql
+      - ./sql/02-create-publishers.sql:/docker-entrypoint-initdb.d/02-add-publishers.sql
+      - ./sql/03-create-timescale-hypertables.sql:/docker-entrypoint-initdb.d/04-create-timescale-hypertables.sql
+      - ./sql/04-create-timescale-median-aggregates.sql:/docker-entrypoint-initdb.d/05-create-timescale-median-aggregates.sql
+      - ./sql/05-create-timescale-ohlc-aggregates.sql:/docker-entrypoint-initdb.d/06-create-timescale-ohlc-aggregates.sql
+      - ./sql/06-create-timescale-twap-aggregates.sql:/docker-entrypoint-initdb.d/07-create-timescale-twap-aggregates.sql
+      - ./sql/07-create-indexes.sql:/docker-entrypoint-initdb.d/08-create-indexes.sql
+      - ./sql/08-add-compression.sql:/docker-entrypoint-initdb.d/09-add-compression.sql
       - onchain-db-data:/var/lib/postgresql/data
     environment:
       - POSTGRES_DB=pragma
@@ -87,7 +86,7 @@ services:
       retries: 5
 
   offchain-db:
-    image: timescale/timescaledb-ha:pg14-latest
+    image: timescale/timescaledb-ha:pg17.4-ts2.18.2
     restart: always
     user: postgres
     secrets:

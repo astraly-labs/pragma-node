@@ -29,9 +29,8 @@ BEGIN
     EXECUTE format('
         SELECT add_continuous_aggregate_policy(%L,
             start_offset => %L,
-            end_offset => ''0''::interval,
-            schedule_interval => %L);',
-        p_candle_name, p_start_offset, p_interval);
+            end_offset => %L,
+            schedule_interval => %L);', p_candle_name, p_start_offset, '0'::interval, p_interval);
 END;
 $$ LANGUAGE plpgsql;
 
