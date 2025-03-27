@@ -22,7 +22,6 @@ pub struct GetOnchainOHLCResponse {
     pub data: Vec<OHLCEntry>,
 }
 
-// Endpoint-specific code
 #[tracing::instrument(skip(state, ws), fields(endpoint_name = "subscribe_to_onchain_ohlc"))]
 pub async fn subscribe_to_onchain_ohlc(
     ws: WebSocketUpgrade,
