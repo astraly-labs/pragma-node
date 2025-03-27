@@ -1,18 +1,18 @@
--- This file should undo anything in `up.sql`
+-- Drop materialized views for spot candlesticks
+DROP MATERIALIZED VIEW candle_10_s_spot;
+DROP MATERIALIZED VIEW candle_1_min_spot;
+DROP MATERIALIZED VIEW candle_5_min_spot;
+DROP MATERIALIZED VIEW candle_15_min_spot;
+DROP MATERIALIZED VIEW candle_1_h_spot;
+DROP MATERIALIZED VIEW candle_1_day_spot;
 
--- Drop spot candlestick views
-DROP MATERIALIZED VIEW IF EXISTS candle_1_min;
-DROP MATERIALIZED VIEW IF EXISTS candle_5_min;
-DROP MATERIALIZED VIEW IF EXISTS candle_15_min;
-DROP MATERIALIZED VIEW IF EXISTS candle_1_h;
-DROP MATERIALIZED VIEW IF EXISTS candle_1_day;
-
--- Drop future candlestick views
-DROP MATERIALIZED VIEW IF EXISTS candle_1_min_future;
-DROP MATERIALIZED VIEW IF EXISTS candle_5_min_future;
-DROP MATERIALIZED VIEW IF EXISTS candle_15_min_future;
-DROP MATERIALIZED VIEW IF EXISTS candle_1_h_future;
-DROP MATERIALIZED VIEW IF EXISTS candle_1_day_future;
+-- Drop materialized views for perp candlesticks
+DROP MATERIALIZED VIEW candle_10_s_perp;
+DROP MATERIALIZED VIEW candle_1_min_perp;
+DROP MATERIALIZED VIEW candle_5_min_perp;
+DROP MATERIALIZED VIEW candle_15_min_perp;
+DROP MATERIALIZED VIEW candle_1_h_perp;
+DROP MATERIALIZED VIEW candle_1_day_perp;
 
 -- Drop the function
-DROP FUNCTION IF EXISTS create_candlestick_view;
+DROP FUNCTION create_candlestick_view(text, interval, interval, text);
