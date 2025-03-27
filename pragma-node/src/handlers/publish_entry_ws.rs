@@ -94,7 +94,7 @@ const CHANNEL_UPDATE_INTERVAL_IN_MS: u64 = 500;
     )
 )]
 async fn create_new_subscriber(socket: WebSocket, app_state: AppState, client_addr: SocketAddr) {
-    let (mut subscriber, _) = match Subscriber::<PublishEntryState>::new(
+    let mut subscriber = match Subscriber::<PublishEntryState>::new(
         "publish_entry".into(),
         socket,
         client_addr.ip(),
@@ -137,7 +137,7 @@ async fn create_new_subscriber(socket: WebSocket, app_state: AppState, client_ad
 
 pub struct PublishEntryHandler;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 struct PublishResponse {
     status: String,
     message: String,
@@ -206,7 +206,7 @@ impl ChannelHandler<PublishEntryState, ClientMessage, WebSocketError> for Publis
                     },
                 };
                 subscriber
-                    .send_msg(serde_json::to_string(&response).unwrap())
+                    .send_msg(response)
                     .await
                     .map_err(|_| WebSocketError::ChannelClose)?;
 
@@ -260,7 +260,7 @@ impl ChannelHandler<PublishEntryState, ClientMessage, WebSocketError> for Publis
 
                 if let Some(error_response) = should_send_error {
                     subscriber
-                        .send_msg(serde_json::to_string(&error_response).unwrap())
+                        .send_msg(error_response.clone())
                         .await
                         .map_err(|_| WebSocketError::ChannelClose)?;
                     if error_response.message.contains("expired") {
@@ -284,7 +284,7 @@ impl ChannelHandler<PublishEntryState, ClientMessage, WebSocketError> for Publis
                     },
                 };
                 subscriber
-                    .send_msg(serde_json::to_string(&response).unwrap())
+                    .send_msg(response)
                     .await
                     .map_err(|_| WebSocketError::ChannelClose)?;
             }
@@ -326,7 +326,7 @@ impl ChannelHandler<PublishEntryState, ClientMessage, WebSocketError> for Publis
                 data: None,
             };
             subscriber
-                .send_msg(serde_json::to_string(&response).unwrap())
+                .send_msg(response)
                 .await
                 .map_err(|_| WebSocketError::ChannelClose)?;
             return Err(WebSocketError::ChannelClose);

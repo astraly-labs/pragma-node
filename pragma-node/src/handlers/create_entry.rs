@@ -32,7 +32,7 @@ impl AsRef<[Entry]> for CreateEntryRequest {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, ToSchema, ToResponse)]
+#[derive(Debug, Serialize, Deserialize, ToSchema, ToResponse, Clone)]
 pub struct CreateEntryResponse {
     pub number_entries_created: usize,
 }

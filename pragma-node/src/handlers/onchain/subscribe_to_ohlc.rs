@@ -40,7 +40,7 @@ pub async fn subscribe_to_onchain_ohlc(
 )]
 async fn create_new_subscriber(socket: WebSocket, app_state: AppState, client_addr: SocketAddr) {
     const CHANNEL_UPDATE_INTERVAL_IN_MS: u64 = 30000; // 30 seconds
-    let (mut subscriber, _) = match Subscriber::<SubscriptionState>::new(
+    let mut subscriber = match Subscriber::<SubscriptionState>::new(
         "subscribe_to_onchain_ohlc".into(),
         socket,
         client_addr.ip(),

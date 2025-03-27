@@ -52,7 +52,7 @@ const CHANNEL_UPDATE_INTERVAL_IN_MS: u64 = 500;
     )
 )]
 async fn create_new_subscriber(socket: WebSocket, app_state: AppState, client_addr: SocketAddr) {
-    let (mut subscriber, _) = match Subscriber::<SubscriptionState>::new(
+    let mut subscriber = match Subscriber::<SubscriptionState>::new(
         "subscribe_to_price".into(),
         socket,
         client_addr.ip(),
@@ -112,16 +112,12 @@ impl ChannelHandler<SubscriptionState, SubscriptionRequest, EntryError> for WsEn
         drop(state);
         // We send an ack message to the client with the subscribed pairs (so
         // the client knows which pairs are successfully subscribed).
-        if let Ok(ack_message) = serde_json::to_string(&SubscriptionAck {
+        let ack_message = &SubscriptionAck {
             msg_type: request.msg_type,
             pairs: subscribed_pairs,
-        }) {
-            if subscriber.send_msg(ack_message).await.is_err() {
-                let error_msg = "Message received but could not send ack message.";
-                subscriber.send_err(error_msg).await;
-            }
-        } else {
-            let error_msg = "Could not serialize ack message.";
+        };
+        if subscriber.send_msg(ack_message).await.is_err() {
+            let error_msg = "Message received but could not send ack message.";
             subscriber.send_err(error_msg).await;
         }
         Ok(())
@@ -153,12 +149,8 @@ impl ChannelHandler<SubscriptionState, SubscriptionRequest, EntryError> for WsEn
             }
         };
         drop(subscription);
-        if let Ok(json_response) = serde_json::to_string(&response) {
-            if subscriber.send_msg(json_response).await.is_err() {
-                subscriber.send_err("Could not send prices.").await;
-            }
-        } else {
-            subscriber.send_err("Could not serialize prices.").await;
+        if subscriber.send_msg(response).await.is_err() {
+            subscriber.send_err("Could not send prices.").await;
         }
         Ok(())
     }

@@ -4,6 +4,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use axum::extract::ws::{Message, WebSocket};
+use futures::stream::{SplitSink, SplitStream};
 use futures_util::{SinkExt, StreamExt};
 use governor::{Quota, RateLimiter};
 use nonzero_ext::nonzero;
@@ -54,7 +55,7 @@ pub struct Subscriber<ChannelState> {
     pub app_state: Arc<AppState>,
     endpoint_name: String,
     pub ip_address: IpAddr,
-    send_sender: mpsc::Sender<Message>,
+    server_msg_sender: mpsc::Sender<Message>,
     client_msg_receiver: mpsc::Receiver<Message>,
     update_interval: Interval,
     rate_limiter: RateLimiter<
@@ -117,7 +118,7 @@ where
         state: Option<ChannelState>,
         update_interval_in_ms: u64,
         rate_limit_quota: Option<Quota>,
-    ) -> Result<(Self, mpsc::Sender<Message>), WebSocketError> {
+    ) -> Result<Self, WebSocketError> {
         /// The maximum number of bytes that can be sent per second per IP address.
         /// If the limit is exceeded, the connection is closed.
         const BYTES_LIMIT_PER_IP_PER_SECOND: u32 = 256 * 1024; // 256 KiB
@@ -126,16 +127,20 @@ where
 
         let id = Uuid::new_v4();
         let (ws_sender, ws_receiver) = socket.split();
-        let (notify_sender, notify_receiver) = mpsc::channel::<Message>(32);
-        let (client_msg_sender, client_msg_receiver) = mpsc::channel::<Message>(32);
+        let (server_msg_sender, server_msg_receiver) = mpsc::channel::<Message>(128);
+        let (client_msg_sender, client_msg_receiver) = mpsc::channel::<Message>(128);
 
         let rate_limit_quota =
             rate_limit_quota.unwrap_or(Quota::per_second(nonzero!(BYTES_LIMIT_PER_IP_PER_SECOND)));
         let msg_limit_quota = Quota::per_second(nonzero!(MESSAGES_LIMIT_PER_IP_PER_SECOND));
 
         // Spawn sending and receiving tasks
-        let cancellation_token =
-            Self::spawn_ws_tasks(ws_sender, ws_receiver, notify_receiver, client_msg_sender);
+        let cancellation_token = Self::spawn_ws_tasks(
+            ws_sender,
+            ws_receiver,
+            server_msg_receiver,
+            client_msg_sender,
+        );
 
         let subscriber = Self {
             id,
@@ -143,7 +148,7 @@ where
             app_state,
             endpoint_name,
             ip_address,
-            send_sender: notify_sender.clone(),
+            server_msg_sender,
             client_msg_receiver,
             update_interval: tokio::time::interval(Duration::from_millis(update_interval_in_ms)),
             rate_limiter: RateLimiter::dashmap(rate_limit_quota),
@@ -162,7 +167,7 @@ where
             metrics::Status::Success,
         );
 
-        Ok((subscriber, notify_sender))
+        Ok(subscriber)
     }
 
     /// Spawns WebSocket tasks and returns a cancellation token.
@@ -170,49 +175,46 @@ where
     /// The tasks are responsible for sending & receiving message for the socket
     /// that we after forward to the Subscriber.
     fn spawn_ws_tasks(
-        mut ws_sender: futures_util::stream::SplitSink<WebSocket, Message>,
-        mut ws_receiver: futures_util::stream::SplitStream<WebSocket>,
-        mut notify_receiver: mpsc::Receiver<Message>,
+        mut ws_sender: SplitSink<WebSocket, Message>,
+        mut ws_receiver: SplitStream<WebSocket>,
+        mut server_msg_receiver: mpsc::Receiver<Message>,
         client_msg_sender: mpsc::Sender<Message>,
     ) -> CancellationToken {
-        // Create cancellation token for all tasks
         let token = CancellationToken::new();
-        let send_token = token.clone();
-        let recv_token = token.clone();
+        let task_token = token.clone();
 
-        // Spawn sending task
         tokio::spawn(async move {
-            tokio::select! {
-                () = send_token.cancelled() => {
-                },
-                () = async {
-                    while let Some(msg) = notify_receiver.recv().await {
+            loop {
+                tokio::select! {
+                    // Handle cancellation
+                    () = task_token.cancelled() => {
+                        let _ = ws_sender.close().await;
+                        break;
+                    }
+
+                    // Send messages from server to client
+                    Some(msg) = server_msg_receiver.recv() => {
                         if ws_sender.send(msg).await.is_err() {
                             break;
                         }
                     }
-                } => {
-                }
-            }
-        });
 
-        // Spawn receiving task
-        tokio::spawn(async move {
-            tokio::select! {
-                () = recv_token.cancelled() => {
-                },
-                () = async {
-                    while let Some(result) = ws_receiver.next().await {
+                    // Receive messages from client to server
+                    Some(result) = ws_receiver.next() => {
                         match result {
                             Ok(msg) => {
                                 if client_msg_sender.send(msg).await.is_err() {
                                     break;
                                 }
-                            },
-                            Err(_) => break
+                            }
+                            Err(_) => {
+                                break;
+                            }
                         }
                     }
-                } => {
+
+                    // Ensure we don’t spin if no messages are available
+                    else => break,
                 }
             }
         });
@@ -234,13 +236,8 @@ where
                 // Check for inactivity
                 _ = inactivity_timer.tick() => {
                     if self.is_inactive() {
-                        tracing::warn!(
-                            subscriber_id = %self.id,
-                            ip = %self.ip_address,
-                            "Connection timeout due to inactivity"
-                        );
                         self.send_err("Connection timeout due to inactivity").await;
-                        self.send_sender.send(Message::Close(None)).await.ok();
+                        self.server_msg_sender.send(Message::Close(None)).await.ok();
                         if self.exit.0.send(true).is_err() {
                             self.record_metric(Interaction::CloseConnection, Status::Error);
                         } else {
@@ -371,7 +368,7 @@ where
 
             Message::Ping(payload) => {
                 self.last_activity = std::time::Instant::now();
-                let _ = self.send_sender.send(Message::Pong(payload)).await;
+                let _ = self.server_msg_sender.send(Message::Pong(payload)).await;
             }
 
             Message::Pong(_) => {}
@@ -388,7 +385,7 @@ where
 
         let message_size = message.len();
         self.check_rate_limit(message_size).await?;
-        self.send_sender
+        self.server_msg_sender
             .send(Message::Text(message.into()))
             .await
             .map_err(WebSocketError::SendError)?;
@@ -404,7 +401,7 @@ where
             "timestamp": chrono::Utc::now().timestamp_millis(),
         });
         let _ = self
-            .send_sender
+            .server_msg_sender
             .send(Message::Text(err.to_string().into()))
             .await;
     }
@@ -431,7 +428,7 @@ where
         self.send_err("Rate limit exceeded. Closing connection.")
             .await;
 
-        self.send_sender
+        self.server_msg_sender
             .send(Message::Close(None))
             .await
             .map_err(WebSocketError::SendError)?;

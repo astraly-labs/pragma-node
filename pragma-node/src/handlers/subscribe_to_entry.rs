@@ -124,7 +124,7 @@ async fn create_new_subscriber(socket: WebSocket, app_state: AppState, client_ad
     /// Interval in milliseconds that the channel will update the client with the latest prices.
     const CHANNEL_UPDATE_INTERVAL_IN_MS: u64 = 500;
 
-    let (mut subscriber, _) = match Subscriber::<SubscriptionState>::new(
+    let mut subscriber = match Subscriber::<SubscriptionState>::new(
         "subscribe_to_entry".into(),
         socket,
         client_addr.ip(),
