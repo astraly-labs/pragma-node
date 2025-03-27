@@ -60,6 +60,8 @@ pub struct GetEntryParams {
     /// # Examples
     /// - `1_647_820_800`: Returns price data from March 21, 2022 00:00:00 UTC
     /// - `null`: Returns the most recent price update
+    /// 
+    /// NOTE: This only works for `median` aggregation
     #[schema(value_type = i64, example = 1_647_820_800)]
     pub timestamp: Option<UnixTimestamp>,
 
@@ -86,7 +88,7 @@ pub struct GetEntryParams {
     /// # Example
     /// For BTC/EUR when routing is enabled:
     /// - If direct BTC/EUR price is unavailable
-    /// - System might route through BTC/USD and EUR/EUR
+    /// - System might route through BTC/USD and EUR/USD
     ///
     /// Default: true
     #[schema(example = true)]

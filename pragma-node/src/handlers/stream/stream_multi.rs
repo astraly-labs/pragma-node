@@ -41,7 +41,7 @@ pub struct StreamEntryMultipairParams {
 
 #[utoipa::path(
     get,
-    path = "/node/v1/multi/stream",
+    path = "/node/v1/data/multi/stream",
     params(
         StreamEntryMultipairParams
     ),
