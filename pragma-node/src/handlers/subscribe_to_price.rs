@@ -14,7 +14,6 @@ use utoipa::{ToResponse, ToSchema};
 use crate::infra::repositories::entry_repository::MedianEntryWithComponents;
 use crate::state::AppState;
 use crate::utils::only_existing_pairs;
-use crate::utils::pricer::{IndexPricer, Pricer};
 use crate::utils::ws::{ChannelHandler, Subscriber, SubscriptionType};
 use pragma_common::types::timestamp::UnixTimestamp;
 
@@ -204,12 +203,8 @@ impl WsEntriesHandler {
         state: &AppState,
         subscription: &SubscriptionState,
     ) -> Result<Vec<MedianEntryWithComponents>, EntryError> {
-        let index_pricer = IndexPricer::new(
-            subscription.get_subscribed_spot_pairs(),
-            DataType::SpotEntry,
-        );
-
-        let median_entries = index_pricer.compute(&state.offchain_pool).await?;
+        // TODO: Just retrieve all spot prices 
+        let median_entries = todo!();
 
         Ok(median_entries)
     }

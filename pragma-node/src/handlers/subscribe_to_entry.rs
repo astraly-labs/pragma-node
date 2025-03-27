@@ -19,7 +19,6 @@ use crate::constants::starkex_ws::PRAGMA_ORACLE_NAME_FOR_STARKEX;
 use crate::infra::repositories::entry_repository::MedianEntryWithComponents;
 use crate::state::AppState;
 use crate::utils::only_existing_pairs;
-use crate::utils::pricer::{IndexPricer, MarkPricer, Pricer};
 use crate::utils::{ChannelHandler, Subscriber, SubscriptionType};
 
 /// Response format for `StarkEx` price subscriptions
@@ -216,18 +215,20 @@ impl ChannelHandler<SubscriptionState, SubscriptionRequest, EntryError> for WsEn
         if subscription.is_empty() {
             return Ok(());
         }
-        let response = match self
-            .get_subscribed_pairs_medians(&subscriber.app_state, &subscription)
-            .await
-        {
+
+        // TODO(akhercha): Get the most recent prices here
+        let response: SubscribeToEntryResponse = match todo!() {
             Ok(response) => response,
             Err(e) => {
                 drop(subscription);
-                subscriber.send_err(&e.to_string()).await;
+                // TODO(akhercha): Re-activate this
+                // subscriber.send_err(&e.to_string()).await;
                 return Err(e);
             }
         };
         drop(subscription);
+
+        // TODO(akhercha): Send the most recent prices here
         if let Ok(json_response) = serde_json::to_string(&response) {
             if subscriber.send_msg(json_response).await.is_err() {
                 subscriber.send_err("Could not send prices.").await;
@@ -239,109 +240,7 @@ impl ChannelHandler<SubscriptionState, SubscriptionRequest, EntryError> for WsEn
     }
 }
 
-impl WsEntriesHandler {
-    /// Get the current median entries for the subscribed pairs and sign them as Pragma.
-    #[tracing::instrument(
-        skip(self, state, subscription),
-        fields(
-            spot_pairs = ?subscription.get_subscribed_spot_pairs().len(),
-            perp_pairs = ?subscription.get_subscribed_perp_pairs().len()
-        )
-    )]
-    async fn get_subscribed_pairs_medians(
-        &self,
-        state: &AppState,
-        subscription: &SubscriptionState,
-    ) -> Result<SubscribeToEntryResponse, EntryError> {
-        let median_entries = self.get_all_entries(state, subscription).await?;
-
-        let mut response: SubscribeToEntryResponse = Default::default();
-        let now = chrono::Utc::now().timestamp();
-
-        let pragma_signer = state
-            .pragma_signer
-            .as_ref()
-            // Should not happen, as the endpoint is disabled if the signer is not found.
-            .ok_or(EntryError::InternalServerError(
-                "No Signer for Pragma".into(),
-            ))?;
-
-        for entry in median_entries {
-            let pair_id = entry.pair_id.clone();
-
-            let starkex_price = StarkexPrice {
-                oracle_name: PRAGMA_ORACLE_NAME_FOR_STARKEX.to_string(),
-                pair_id: pair_id.clone(),
-                timestamp: now as u64,
-                price: entry.median_price.clone(),
-            };
-            let signature =
-                sign_data(pragma_signer, &starkex_price).map_err(|_| EntryError::InvalidSigner)?;
-
-            // Create AssetOraclePrice with the original entry (it will be scaled in the TryFrom implementation)
-            let mut oracle_price: AssetOraclePrice = entry.try_into().map_err(|_| {
-                EntryError::InternalServerError("Could not create Oracle price".into())
-            })?;
-            oracle_price.signature = signature;
-            response.oracle_prices.push(oracle_price);
-        }
-        response.timestamp = now;
-        Ok(response)
-    }
-
-    /// Get index & mark prices for the subscribed pairs.
-    #[tracing::instrument(skip(self, state, subscription))]
-    async fn get_all_entries(
-        &self,
-        state: &AppState,
-        subscription: &SubscriptionState,
-    ) -> Result<Vec<MedianEntryWithComponents>, EntryError> {
-        let index_pricer = IndexPricer::new(
-            subscription.get_subscribed_spot_pairs(),
-            DataType::SpotEntry,
-        );
-
-        let (usd_pairs, non_usd_pairs): (Vec<String>, Vec<String>) = subscription
-            .get_subscribed_perp_pairs()
-            .into_iter()
-            .partition(|pair| {
-                tracing::debug!("Checking pair for USD: {}", pair);
-                pair.ends_with("USD")
-            });
-        tracing::debug!(
-            "USD pairs: {:?}, non-USD pairs: {:?}",
-            usd_pairs,
-            non_usd_pairs
-        );
-        let mark_pricer_usd = IndexPricer::new(usd_pairs, DataType::PerpEntry);
-        let mark_pricer_non_usd = MarkPricer::new(non_usd_pairs, DataType::PerpEntry);
-
-        // Compute entries concurrently
-        let (index_entries, usd_mark_entries, non_usd_mark_entries) = tokio::join!(
-            index_pricer.compute(&state.offchain_pool),
-            mark_pricer_usd.compute(&state.offchain_pool),
-            mark_pricer_non_usd.compute(&state.offchain_pool)
-        );
-
-        let mut median_entries = vec![];
-        median_entries.extend(index_entries.unwrap_or_default());
-
-        // Add :MARK suffix to mark prices
-        let mut usd_mark_entries = usd_mark_entries.unwrap_or_default();
-        for entry in &mut usd_mark_entries {
-            entry.pair_id = format!("{}:MARK", entry.pair_id);
-        }
-        median_entries.extend(usd_mark_entries);
-
-        let mut non_usd_mark_entries = non_usd_mark_entries.unwrap_or_default();
-        for entry in &mut non_usd_mark_entries {
-            entry.pair_id = format!("{}:MARK", entry.pair_id);
-        }
-        median_entries.extend(non_usd_mark_entries);
-
-        Ok(median_entries)
-    }
-}
+impl WsEntriesHandler {}
 
 #[derive(Debug, Serialize, Deserialize)]
 struct SubscriptionRequest {
