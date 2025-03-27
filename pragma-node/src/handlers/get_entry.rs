@@ -26,6 +26,7 @@ pub struct EntryParams {
     pub aggregation_mode: AggregationMode,
     pub data_type: DataType,
     pub expiry: String,
+    pub with_components: bool,
 }
 
 impl TryFrom<GetEntryParams> for EntryParams {
@@ -47,6 +48,7 @@ impl TryFrom<GetEntryParams> for EntryParams {
         // Unwrap parameters with their defaults
         let interval = params.interval.unwrap_or_default();
         let aggregation_mode = params.aggregation.unwrap_or_default();
+        let with_components = params.with_components.unwrap_or(false);
 
         // Convert entry_type to DataType
         let data_type = params
@@ -68,18 +70,19 @@ impl TryFrom<GetEntryParams> for EntryParams {
             aggregation_mode,
             data_type,
             expiry,
+            with_components,
         })
     }
 }
 #[derive(Debug, Serialize, Deserialize, ToSchema, ToResponse)]
 pub struct GetEntryResponse {
-    num_sources_aggregated: usize,
-    pair_id: String,
-    price: String,
-    timestamp: u64,
-    decimals: u32,
+    pub num_sources_aggregated: usize,
+    pub pair_id: String,
+    pub price: String,
+    pub timestamp: u64,
+    pub decimals: u32,
+    pub components: Option<Vec<EntryComponent>>,
 }
-
 /// Get the latest price entry for a trading pair
 #[utoipa::path(
     get,
@@ -92,7 +95,14 @@ pub struct GetEntryResponse {
             "pair_id": "BTC/USD",
             "price": "0x1234567890abcdef",
             "timestamp": 1_647_820_800,
-            "decimals": 18
+            "decimals": 18, 
+            "components": [
+                {
+                    "source": "BINANCE",
+                    "price": "0x6cc61113f5871b1000",
+                    "timestamp": 1_743_082_057
+                },
+            ]
          })
         ),
         (status = 400, description = "Invalid request parameters", body = EntryError),
@@ -150,5 +160,16 @@ pub fn adapt_entry_to_entry_response(
         num_sources_aggregated: entry.num_sources as usize,
         price: big_decimal_price_to_hex(&entry.median_price),
         decimals: EIGHTEEN_DECIMALS,
+        components: entry
+            .components
+            .as_ref()
+            .map(|prices| prices.iter().cloned().map(Into::into).collect()),
     }
+}
+
+#[derive(Serialize, Deserialize, Default, ToSchema, Clone, ToResponse, Debug)]
+pub struct EntryComponent {
+    pub source: String,
+    pub price: String,
+    pub timestamp: u64,
 }
