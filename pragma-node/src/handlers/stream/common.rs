@@ -55,21 +55,14 @@ pub async fn get_latest_entry(
     pair: &Pair,
     is_routing: bool,
     entry_params: &EntryParams,
-    with_components: bool,
 ) -> Result<GetEntryResponse, EntryError> {
     // We have to update the timestamp to now every tick
     let mut new_routing = entry_params.clone();
     new_routing.timestamp = chrono::Utc::now().timestamp();
 
-    let entry = entry_repository::routing(
-        &state.offchain_pool,
-        is_routing,
-        pair,
-        &new_routing,
-        with_components,
-    )
-    .await
-    .map_err(EntryError::from)?;
+    let entry = entry_repository::routing(&state.offchain_pool, is_routing, pair, &new_routing)
+        .await
+        .map_err(EntryError::from)?;
 
     let last_updated_timestamp = entry_repository::get_last_updated_timestamp(
         &state.offchain_pool,
@@ -122,12 +115,11 @@ pub async fn get_latest_entries_multi_pair(
     pairs: &[Pair],
     is_routing: bool,
     entry_params: &EntryParams,
-    with_components: bool,
 ) -> Result<Vec<GetEntryResponse>, EntryError> {
     let mut latest_entries = Vec::with_capacity(pairs.len());
 
     for pair in pairs {
-        match get_latest_entry(state, pair, is_routing, entry_params, with_components).await {
+        match get_latest_entry(state, pair, is_routing, entry_params).await {
             Ok(entry) => latest_entries.push(entry),
             Err(e) => {
                 tracing::warn!(

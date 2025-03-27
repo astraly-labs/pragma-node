@@ -118,6 +118,15 @@ pub struct GetEntryParams {
     /// - `null`: Not applicable for spot/perp markets
     #[schema(example = "2024-12-31")]
     pub expiry: Option<String>,
+
+    /// Include source components in the response.
+    /// When true, the response will include price data from individual sources.
+    ///
+    /// # Example
+    /// - `true`: Include source breakdown in response
+    /// - `false`: Return aggregated data only (default)
+    #[schema(example = false)]
+    pub with_components: Option<bool>,
 }
 
 impl Default for GetEntryParams {
@@ -129,6 +138,7 @@ impl Default for GetEntryParams {
             aggregation: Some(AggregationMode::default()),
             entry_type: Some(EntryType::default()),
             expiry: None,
+            with_components: Some(false),
         }
     }
 }

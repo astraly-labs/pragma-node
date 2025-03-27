@@ -9,6 +9,6 @@ impl HexFormat for BigDecimal {
     fn to_hex_string(&self) -> String {
         let bigint = self.to_bigint().unwrap_or_default();
 
-        format!("0x{:x}", bigint)
+        format!("0x{bigint:x}")
     }
 }

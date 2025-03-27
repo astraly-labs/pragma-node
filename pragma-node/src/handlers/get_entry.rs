@@ -26,6 +26,7 @@ pub struct EntryParams {
     pub aggregation_mode: AggregationMode,
     pub data_type: DataType,
     pub expiry: String,
+    pub with_components: bool,
 }
 
 impl TryFrom<GetEntryParams> for EntryParams {
@@ -47,6 +48,7 @@ impl TryFrom<GetEntryParams> for EntryParams {
         // Unwrap parameters with their defaults
         let interval = params.interval.unwrap_or_default();
         let aggregation_mode = params.aggregation.unwrap_or_default();
+        let with_components = params.with_components.unwrap_or(false);
 
         // Convert entry_type to DataType
         let data_type = params
@@ -68,6 +70,7 @@ impl TryFrom<GetEntryParams> for EntryParams {
             aggregation_mode,
             data_type,
             expiry,
+            with_components,
         })
     }
 }
@@ -92,7 +95,14 @@ pub struct GetEntryResponse {
             "pair_id": "BTC/USD",
             "price": "0x1234567890abcdef",
             "timestamp": 1_647_820_800,
-            "decimals": 18
+            "decimals": 18, 
+            "components": [
+                {
+                    "source": "BINANCE",
+                    "price": "0x6cc61113f5871b1000",
+                    "timestamp": 1_743_082_057
+                },
+            ]
          })
         ),
         (status = 400, description = "Invalid request parameters", body = EntryError),
@@ -120,15 +130,9 @@ pub async fn get_entry(
 
     let pair = Pair::from(pair);
 
-    let entry = routing(
-        &state.offchain_pool,
-        is_routing,
-        &pair,
-        &entry_params,
-        false,
-    )
-    .await
-    .map_err(EntryError::from)?;
+    let entry = routing(&state.offchain_pool, is_routing, &pair, &entry_params)
+        .await
+        .map_err(EntryError::from)?;
 
     let last_updated_timestamp: NaiveDateTime = get_last_updated_timestamp(
         &state.offchain_pool,

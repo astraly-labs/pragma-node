@@ -74,7 +74,6 @@ pub async fn routing(
     is_routing: bool,
     pair: &Pair,
     entry_params: &EntryParams,
-    with_components: bool,
 ) -> Result<MedianEntry, InfraError> {
     // If we have entries for the pair_id and the latest entry is fresh enough,
     // Or if we are not routing, we can return the price directly.
@@ -87,10 +86,10 @@ pub async fn routing(
                 .timestamp()
                 >= entry_params.timestamp - ROUTING_FRESHNESS_THRESHOLD)
     {
-        return get_price(pool, pair, entry_params, with_components).await;
+        return get_price(pool, pair, entry_params).await;
     }
 
-    (find_alternative_pair_price(pool, pair, entry_params, with_components).await)
+    (find_alternative_pair_price(pool, pair, entry_params).await)
         .map_or_else(|_| Err(InfraError::RoutingError(pair.to_pair_id())), Ok)
 }
 
@@ -133,7 +132,6 @@ async fn find_alternative_pair_price(
     pool: &deadpool_diesel::postgres::Pool,
     pair: &Pair,
     entry_params: &EntryParams,
-    with_components: bool,
 ) -> Result<MedianEntry, InfraError> {
     for alt_currency in ABSTRACT_CURRENCIES {
         let base_alt_pair = Pair::from((pair.base.clone(), alt_currency.to_string()));
@@ -142,10 +140,8 @@ async fn find_alternative_pair_price(
         if pair_id_exist(pool, &base_alt_pair.clone()).await?
             && pair_id_exist(pool, &alt_quote_pair.clone()).await?
         {
-            let base_alt_result =
-                get_price(pool, &base_alt_pair, entry_params, with_components).await?;
-            let alt_quote_result =
-                get_price(pool, &alt_quote_pair, entry_params, with_components).await?;
+            let base_alt_result = get_price(pool, &base_alt_pair, entry_params).await?;
+            let alt_quote_result = get_price(pool, &alt_quote_pair, entry_params).await?;
 
             return calculate_rebased_price(base_alt_result, alt_quote_result);
         }
@@ -174,15 +170,10 @@ async fn get_price(
     pool: &deadpool_diesel::postgres::Pool,
     pair: &Pair,
     entry_params: &EntryParams,
-    with_components: bool,
 ) -> Result<MedianEntry, InfraError> {
     let entry = match entry_params.aggregation_mode {
-        AggregationMode::Median => {
-            get_median_price(pool, pair.to_pair_id(), entry_params, with_components).await?
-        }
-        AggregationMode::Twap => {
-            get_twap_price(pool, pair.to_pair_id(), entry_params, with_components).await?
-        }
+        AggregationMode::Median => get_median_price(pool, pair.to_pair_id(), entry_params).await?,
+        AggregationMode::Twap => get_twap_price(pool, pair.to_pair_id(), entry_params).await?,
     };
 
     Ok(entry)
@@ -192,9 +183,8 @@ pub async fn get_twap_price(
     pool: &deadpool_diesel::postgres::Pool,
     pair_id: String,
     entry_params: &EntryParams,
-    with_components: bool,
 ) -> Result<MedianEntry, InfraError> {
-    if with_components {
+    if entry_params.with_components {
         get_twap_price_with_components(pool, pair_id, entry_params).await
     } else {
         get_twap_price_without_components(pool, pair_id, entry_params).await
@@ -313,7 +303,7 @@ pub async fn get_twap_price_with_components(
         raw_entry
             .components
             .iter()
-            .map(|tuple| tuple.to_component())
+            .map(ComponentConverter::to_component)
             .collect()
     });
 
@@ -330,9 +320,8 @@ pub async fn get_median_price(
     pool: &deadpool_diesel::postgres::Pool,
     pair_id: String,
     entry_params: &EntryParams,
-    include_components: bool,
 ) -> Result<MedianEntry, InfraError> {
-    if include_components {
+    if entry_params.with_components {
         get_median_price_with_components(pool, pair_id, entry_params).await
     } else {
         get_median_price_without_components(pool, pair_id, entry_params).await
@@ -451,7 +440,7 @@ pub async fn get_median_price_with_components(
         raw_entry
             .components
             .iter()
-            .map(|tuple| tuple.to_component())
+            .map(ComponentConverter::to_component)
             .collect()
     });
 
@@ -542,8 +531,7 @@ pub async fn get_median_prices_between(
             bucket AS time,
             median_price,
             num_sources
-            components,
-            (components IS NOT NULL AND array_length(components, 1) > 0) as has_components
+            components
         FROM
             median_{}_{}
         WHERE
@@ -577,7 +565,7 @@ pub async fn get_median_prices_between(
                 raw_entry
                     .components
                     .iter()
-                    .map(|tuple| tuple.to_component())
+                    .map(ComponentConverter::to_component)
                     .collect()
             });
 
@@ -617,7 +605,7 @@ pub async fn get_twap_prices_between(
             bucket AS time,
             price_twap AS median_price,
             num_sources,
-            NULL as components
+            components
         FROM
             twap_{}_{}
         WHERE
@@ -637,7 +625,7 @@ pub async fn get_twap_prices_between(
                 .bind::<diesel::sql_types::Text, _>(pair_id)
                 .bind::<diesel::sql_types::Timestamptz, _>(start_datetime)
                 .bind::<diesel::sql_types::Timestamptz, _>(end_datetime)
-                .load::<MedianEntryRawBase>(conn)
+                .load::<MedianEntryRawWithComponents>(conn)
         })
         .await
         .map_err(InfraError::DbInteractionError)?
@@ -645,11 +633,20 @@ pub async fn get_twap_prices_between(
 
     let entries: Vec<MedianEntry> = raw_entries
         .into_iter()
-        .map(|raw_entry| MedianEntry {
-            time: raw_entry.time,
-            median_price: raw_entry.median_price,
-            num_sources: raw_entry.num_sources,
-            components: None,
+        .map(|raw_entry| {
+            let components = (!raw_entry.components.is_empty()).then(|| {
+                raw_entry
+                    .components
+                    .iter()
+                    .map(ComponentConverter::to_component)
+                    .collect()
+            });
+            MedianEntry {
+                time: raw_entry.time,
+                median_price: raw_entry.median_price,
+                num_sources: raw_entry.num_sources,
+                components,
+            }
         })
         .collect();
 
@@ -685,9 +682,10 @@ impl TryFrom<crate::handlers::get_entry::EntryComponent> for Component {
             .price
             .parse::<BigDecimal>()
             .map_err(|_| InfraError::InternalServerError)?;
-
+        #[allow(clippy::cast_possible_wrap)]
         let timestamp = DateTime::from_timestamp_millis(component.timestamp as i64)
             .ok_or(InfraError::InvalidTimestamp(
+                #[allow(clippy::cast_possible_wrap)]
                 TimestampError::ToDatetimeErrorI64(component.timestamp as i64),
             ))?
             .naive_utc();

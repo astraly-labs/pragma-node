@@ -110,8 +110,7 @@ pub async fn stream_entry(
                             }
                         } else {
                             // For subsequent updates, get latest price
-                            match get_latest_entry(&state, &pair, is_routing, &params, false).await
-                            {
+                            match get_latest_entry(&state, &pair, is_routing, &params).await {
                                 Ok(entry_response) => Event::default()
                                     .json_data(&entry_response)
                                     .unwrap_or_else(|e| {
