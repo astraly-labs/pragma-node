@@ -11,7 +11,6 @@ use utoipa::{ToResponse, ToSchema};
 
 use pragma_common::signing::sign_data;
 use pragma_common::signing::starkex::StarkexPrice;
-use pragma_common::types::DataType;
 use pragma_common::types::timestamp::UnixTimestamp;
 use pragma_entities::EntryError;
 
@@ -19,7 +18,6 @@ use crate::constants::starkex_ws::PRAGMA_ORACLE_NAME_FOR_STARKEX;
 use crate::infra::repositories::entry_repository::MedianEntryWithComponents;
 use crate::state::AppState;
 use crate::utils::only_existing_pairs;
-use crate::utils::pricer::{IndexPricer, MarkPricer, Pricer};
 use crate::utils::{ChannelHandler, Subscriber, SubscriptionType};
 
 /// Response format for `StarkEx` price subscriptions
@@ -186,17 +184,13 @@ impl ChannelHandler<SubscriptionState, SubscriptionRequest, EntryError> for WsEn
         drop(state);
         // We send an ack message to the client with the subscribed pairs (so
         // the client knows which pairs are successfully subscribed).
-        if let Ok(ack_message) = serde_json::to_string(&SubscriptionAck {
+        let ack = SubscriptionAck {
             msg_type: request.msg_type,
             pairs: subscribed_pairs,
-        }) {
-            if subscriber.send_msg(ack_message).await.is_err() {
-                let error_msg = "Message received but could not send ack message.";
-                subscriber.send_err(error_msg).await;
-            }
-        } else {
-            let error_msg = "Could not serialize ack message.";
-            subscriber.send_err(error_msg).await;
+        };
+        if let Err(e) = subscriber.send_msg(ack).await {
+            let error_msg = format!("Message received but could not send ack message: {e}");
+            subscriber.send_err(&error_msg).await;
         }
         Ok(())
     }
@@ -227,12 +221,10 @@ impl ChannelHandler<SubscriptionState, SubscriptionRequest, EntryError> for WsEn
             }
         };
         drop(subscription);
-        if let Ok(json_response) = serde_json::to_string(&response) {
-            if subscriber.send_msg(json_response).await.is_err() {
-                subscriber.send_err("Could not send prices.").await;
-            }
-        } else {
-            subscriber.send_err("Could not serialize prices.").await;
+        if let Err(e) = subscriber.send_msg(response).await {
+            subscriber
+                .send_err(&format!("Could not send prices: {e}"))
+                .await;
         }
         Ok(())
     }
@@ -252,7 +244,7 @@ impl WsEntriesHandler {
         state: &AppState,
         subscription: &SubscriptionState,
     ) -> Result<SubscribeToEntryResponse, EntryError> {
-        let median_entries = self.get_all_entries(state, subscription).await?;
+        let median_entries: Vec<MedianEntryWithComponents> = todo!();
 
         let mut response: SubscribeToEntryResponse = Default::default();
         let now = chrono::Utc::now().timestamp();
@@ -286,59 +278,6 @@ impl WsEntriesHandler {
         }
         response.timestamp = now;
         Ok(response)
-    }
-
-    /// Get index & mark prices for the subscribed pairs.
-    #[tracing::instrument(skip(self, state, subscription))]
-    async fn get_all_entries(
-        &self,
-        state: &AppState,
-        subscription: &SubscriptionState,
-    ) -> Result<Vec<MedianEntryWithComponents>, EntryError> {
-        let index_pricer = IndexPricer::new(
-            subscription.get_subscribed_spot_pairs(),
-            DataType::SpotEntry,
-        );
-
-        let (usd_pairs, non_usd_pairs): (Vec<String>, Vec<String>) = subscription
-            .get_subscribed_perp_pairs()
-            .into_iter()
-            .partition(|pair| {
-                tracing::debug!("Checking pair for USD: {}", pair);
-                pair.ends_with("USD")
-            });
-        tracing::debug!(
-            "USD pairs: {:?}, non-USD pairs: {:?}",
-            usd_pairs,
-            non_usd_pairs
-        );
-        let mark_pricer_usd = IndexPricer::new(usd_pairs, DataType::PerpEntry);
-        let mark_pricer_non_usd = MarkPricer::new(non_usd_pairs, DataType::PerpEntry);
-
-        // Compute entries concurrently
-        let (index_entries, usd_mark_entries, non_usd_mark_entries) = tokio::join!(
-            index_pricer.compute(&state.offchain_pool),
-            mark_pricer_usd.compute(&state.offchain_pool),
-            mark_pricer_non_usd.compute(&state.offchain_pool)
-        );
-
-        let mut median_entries = vec![];
-        median_entries.extend(index_entries.unwrap_or_default());
-
-        // Add :MARK suffix to mark prices
-        let mut usd_mark_entries = usd_mark_entries.unwrap_or_default();
-        for entry in &mut usd_mark_entries {
-            entry.pair_id = format!("{}:MARK", entry.pair_id);
-        }
-        median_entries.extend(usd_mark_entries);
-
-        let mut non_usd_mark_entries = non_usd_mark_entries.unwrap_or_default();
-        for entry in &mut non_usd_mark_entries {
-            entry.pair_id = format!("{}:MARK", entry.pair_id);
-        }
-        median_entries.extend(non_usd_mark_entries);
-
-        Ok(median_entries)
     }
 }
 

@@ -7,7 +7,6 @@ use axum::extract::{ConnectInfo, State};
 use axum::response::IntoResponse;
 use serde::{Deserialize, Serialize};
 
-use pragma_common::types::DataType;
 use pragma_common::types::timestamp::UnixTimestamp;
 use pragma_entities::EntryError;
 use utoipa::{ToResponse, ToSchema};
@@ -15,7 +14,6 @@ use utoipa::{ToResponse, ToSchema};
 use crate::infra::repositories::entry_repository::MedianEntryWithComponents;
 use crate::state::AppState;
 use crate::utils::only_existing_pairs;
-use crate::utils::pricer::{IndexPricer, Pricer};
 use crate::utils::ws::{ChannelHandler, Subscriber, SubscriptionType};
 
 #[derive(Debug, Default, Serialize, Deserialize, ToResponse, ToSchema)]
@@ -112,13 +110,13 @@ impl ChannelHandler<SubscriptionState, SubscriptionRequest, EntryError> for WsEn
         drop(state);
         // We send an ack message to the client with the subscribed pairs (so
         // the client knows which pairs are successfully subscribed).
-        let ack_message = &SubscriptionAck {
+        let ack = SubscriptionAck {
             msg_type: request.msg_type,
             pairs: subscribed_pairs,
         };
-        if subscriber.send_msg(ack_message).await.is_err() {
-            let error_msg = "Message received but could not send ack message.";
-            subscriber.send_err(error_msg).await;
+        if let Err(e) = subscriber.send_msg(ack).await {
+            let error_msg = format!("Message received but could not send ack message: {e}");
+            subscriber.send_err(&error_msg).await;
         }
         Ok(())
     }
@@ -149,8 +147,10 @@ impl ChannelHandler<SubscriptionState, SubscriptionRequest, EntryError> for WsEn
             }
         };
         drop(subscription);
-        if subscriber.send_msg(response).await.is_err() {
-            subscriber.send_err("Could not send prices.").await;
+        if let Err(e) = subscriber.send_msg(response).await {
+            subscriber
+                .send_err(&format!("Could not send prices: {e}"))
+                .await;
         }
         Ok(())
     }
@@ -169,7 +169,7 @@ impl WsEntriesHandler {
         state: &AppState,
         subscription: &SubscriptionState,
     ) -> Result<SubscribeToPriceResponse, EntryError> {
-        let median_entries = self.get_all_entries(state, subscription).await?;
+        let median_entries: Vec<MedianEntryWithComponents> = todo!();
 
         let now = chrono::Utc::now().timestamp();
 
@@ -186,23 +186,6 @@ impl WsEntriesHandler {
             timestamp: now,
             oracle_prices,
         })
-    }
-
-    /// Get index & mark prices for the subscribed pairs.
-    #[tracing::instrument(skip(self, state, subscription))]
-    async fn get_all_entries(
-        &self,
-        state: &AppState,
-        subscription: &SubscriptionState,
-    ) -> Result<Vec<MedianEntryWithComponents>, EntryError> {
-        let index_pricer = IndexPricer::new(
-            subscription.get_subscribed_spot_pairs(),
-            DataType::SpotEntry,
-        );
-
-        let median_entries = index_pricer.compute(&state.offchain_pool).await?;
-
-        Ok(median_entries)
     }
 }
 
