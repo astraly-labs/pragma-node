@@ -2,6 +2,7 @@ pub mod conversion;
 pub mod custom_extractors;
 pub mod kafka;
 pub mod macros;
+pub mod pricer;
 pub mod sql;
 pub mod ws;
 

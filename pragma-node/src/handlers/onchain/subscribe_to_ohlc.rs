@@ -1,23 +1,20 @@
 use std::net::SocketAddr;
-use std::num::NonZeroU32;
 use std::sync::Arc;
 
+use axum::extract::ws::{WebSocket, WebSocketUpgrade};
 use axum::extract::{ConnectInfo, State};
 use axum::response::IntoResponse;
-use futures_util::SinkExt;
 use pragma_entities::InfraError;
 use serde::{Deserialize, Serialize};
+use utoipa::{ToResponse, ToSchema};
 
 use pragma_common::types::{Interval, Network};
-use utoipa::{ToResponse, ToSchema};
 
 use crate::infra::repositories::entry_repository::OHLCEntry;
 use crate::infra::repositories::onchain_repository;
-use crate::utils::is_onchain_existing_pair;
-use crate::utils::{ChannelHandler, Subscriber, SubscriptionType};
-use crate::{metrics, state::AppState};
-
-use axum::extract::ws::{WebSocket, WebSocketUpgrade};
+use crate::state::AppState;
+use crate::utils::ChannelHandler;
+use crate::utils::{Subscriber, SubscriptionType};
 
 #[derive(Debug, Default, Serialize, Deserialize, ToSchema, ToResponse)]
 pub struct GetOnchainOHLCResponse {
@@ -25,6 +22,7 @@ pub struct GetOnchainOHLCResponse {
     pub data: Vec<OHLCEntry>,
 }
 
+// Endpoint-specific code
 #[tracing::instrument(skip(state, ws), fields(endpoint_name = "subscribe_to_onchain_ohlc"))]
 pub async fn subscribe_to_onchain_ohlc(
     ws: WebSocketUpgrade,
@@ -34,9 +32,6 @@ pub async fn subscribe_to_onchain_ohlc(
     ws.on_upgrade(move |socket| create_new_subscriber(socket, state, client_addr))
 }
 
-/// Interval in milliseconds that the channel will update the client with the latest prices.
-const CHANNEL_UPDATE_INTERVAL_IN_MS: u64 = 30000; // 30 seconds
-
 #[tracing::instrument(
     skip(socket, app_state),
     fields(
@@ -45,27 +40,25 @@ const CHANNEL_UPDATE_INTERVAL_IN_MS: u64 = 30000; // 30 seconds
     )
 )]
 async fn create_new_subscriber(socket: WebSocket, app_state: AppState, client_addr: SocketAddr) {
+    const CHANNEL_UPDATE_INTERVAL_IN_MS: u64 = 30000; // 30 seconds
     let (mut subscriber, _) = match Subscriber::<SubscriptionState>::new(
-        "subscribe_to_ohlc".into(),
+        "subscribe_to_onchain_ohlc".into(),
         socket,
         client_addr.ip(),
         Arc::new(app_state),
         None,
         CHANNEL_UPDATE_INTERVAL_IN_MS,
-    )
-    .await
-    {
+        None,
+    ) {
         Ok(subscriber) => subscriber,
         Err(e) => {
-            tracing::error!("Failed to register subscriber: {}", e);
+            tracing::error!("Failed to register subscriber: {:?}", e);
             return;
         }
     };
 
-    // Main event loop for the subscriber
     let handler = WsOHLCHandler;
-    let status = subscriber.listen(handler).await;
-    if let Err(e) = status {
+    if let Err(e) = subscriber.listen(handler).await {
         tracing::error!(
             "[{}] Error occurred while listening to the subscriber: {:?}",
             subscriber.id,
@@ -78,15 +71,6 @@ struct WsOHLCHandler;
 
 #[async_trait::async_trait]
 impl ChannelHandler<SubscriptionState, SubscriptionRequest, InfraError> for WsOHLCHandler {
-    #[tracing::instrument(
-        skip(self, subscriber),
-        fields(
-            subscriber_id = %subscriber.id,
-            network = ?subscription.network,
-            pair = %subscription.pair,
-            interval = ?subscription.interval
-        )
-    )]
     async fn handle_client_msg(
         &mut self,
         subscriber: &mut Subscriber<SubscriptionState>,
@@ -94,18 +78,19 @@ impl ChannelHandler<SubscriptionState, SubscriptionRequest, InfraError> for WsOH
     ) -> Result<(), InfraError> {
         match subscription.msg_type {
             SubscriptionType::Subscribe => {
-                let pair_exists = is_onchain_existing_pair(
+                let pair_exists = crate::utils::is_onchain_existing_pair(
                     &subscriber.app_state.onchain_pool,
                     &subscription.pair,
                     subscription.network,
                 )
                 .await;
                 if !pair_exists {
-                    let error_msg = "Pair does not exist in the onchain database.";
-                    subscriber.send_err(error_msg).await;
+                    subscriber
+                        .send_err("Pair does not exist in the onchain database.")
+                        .await;
                     return Ok(());
                 }
-                let mut state = subscriber.state.lock().await;
+                let mut state = subscriber.state.write().await;
                 *state = SubscriptionState {
                     subscribed_pair: Some(subscription.pair.clone()),
                     network: subscription.network,
@@ -115,28 +100,20 @@ impl ChannelHandler<SubscriptionState, SubscriptionRequest, InfraError> for WsOH
                 };
             }
             SubscriptionType::Unsubscribe => {
-                let mut state = subscriber.state.lock().await;
+                let mut state = subscriber.state.write().await;
                 *state = SubscriptionState::default();
             }
         };
         self.send_ack_message(subscriber, subscription).await?;
-        // Trigger the first update manually
         self.periodic_interval(subscriber).await?;
         Ok(())
     }
 
-    #[tracing::instrument(
-        skip(self, subscriber),
-        fields(
-            subscriber_id = %subscriber.id
-        ),
-        err(Debug)
-    )]
     async fn periodic_interval(
         &mut self,
         subscriber: &mut Subscriber<SubscriptionState>,
     ) -> Result<(), InfraError> {
-        let mut state = subscriber.state.lock().await;
+        let mut state = subscriber.state.write().await;
         if state.subscribed_pair.is_none() {
             return Ok(());
         }
@@ -164,18 +141,8 @@ impl ChannelHandler<SubscriptionState, SubscriptionRequest, InfraError> for WsOH
             return Err(e);
         }
 
-        match serde_json::to_string(&ohlc_data_res.unwrap()) {
-            Ok(json_response) => {
-                self.check_rate_limit(subscriber, &json_response).await?;
-
-                if subscriber.send_msg(json_response).await.is_err() {
-                    subscriber.send_err("Could not send prices.").await;
-                    return Err(InfraError::InternalServerError);
-                }
-            }
-            Err(_) => {
-                subscriber.send_err("Could not serialize prices.").await;
-            }
+        if subscriber.send_msg(ohlc_data_res.unwrap()).await.is_err() {
+            return Err(InfraError::InternalServerError);
         }
 
         Ok(())
@@ -188,57 +155,18 @@ impl WsOHLCHandler {
         subscriber: &mut Subscriber<SubscriptionState>,
         subscription: SubscriptionRequest,
     ) -> Result<(), InfraError> {
-        if let Ok(ack_message) = serde_json::to_string(&SubscriptionAck {
+        let ack_message = SubscriptionAck {
             msg_type: subscription.msg_type,
             pair: subscription.pair,
             network: subscription.network,
             interval: subscription.interval,
-        }) {
-            if subscriber.send_msg(ack_message).await.is_err() {
-                let error_msg = "Message received but could not send ack message.";
-                subscriber.send_err(error_msg).await;
-            }
-        } else {
-            let error_msg = "Could not serialize ack message.";
-            subscriber.send_err(error_msg).await;
+        };
+
+        if subscriber.send_msg(ack_message).await.is_err() {
+            subscriber
+                .send_err("Message received but could not send ack message.")
+                .await;
         }
-        Ok(())
-    }
-
-    #[tracing::instrument(
-        skip(self, subscriber, message),
-        fields(
-            subscriber_id = %subscriber.id,
-            ip = %subscriber.ip_address,
-            msg_len = message.len()
-        )
-    )]
-
-    async fn check_rate_limit(
-        &self,
-        subscriber: &mut Subscriber<SubscriptionState>,
-        message: &str,
-    ) -> Result<(), InfraError> {
-        let ip_addr = subscriber.ip_address;
-        // Close the connection if rate limit is exceeded.
-        if subscriber.rate_limiter.check_key_n(
-            &ip_addr,
-            NonZeroU32::new(message.len().try_into()?).ok_or(InfraError::InternalServerError)?,
-        ) != Ok(Ok(()))
-        {
-            tracing::warn!(
-                subscriber_id = %subscriber.id,
-                ip = %ip_addr,
-                "Rate limit exceeded. Closing connection.",
-            );
-
-            subscriber.record_metric(metrics::Interaction::RateLimit, metrics::Status::Error);
-
-            subscriber.send_err("Rate limit exceeded.").await;
-            subscriber.sender.close().await?;
-            subscriber.closed = true;
-        }
-
         Ok(())
     }
 }

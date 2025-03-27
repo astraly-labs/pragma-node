@@ -95,6 +95,7 @@ strum = { version = "0.26", features = ["derive"] }
 url = "2.5.0"
 tower-http = { version = "0.6.2", features = ["fs", "trace", "cors"] }
 tokio = { version = "^1.43.0", features = ["full"] }
+tokio-util = "0.7.14"
 utoipa = { version = "5", features = ["axum_extras", "chrono", "uuid"] }
 utoipauto = "0.1.14"
 utoipa-swagger-ui = { version = "9", features = ["axum"] }

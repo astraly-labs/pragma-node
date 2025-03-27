@@ -104,12 +104,11 @@ async fn create_new_subscriber(socket: WebSocket, app_state: AppState, client_ad
             is_logged_in: false,
         }),
         CHANNEL_UPDATE_INTERVAL_IN_MS,
-    )
-    .await
-    {
+        None,
+    ) {
         Ok(subscriber) => subscriber,
         Err(e) => {
-            tracing::error!("Failed to register subscriber: {}", e);
+            tracing::error!("Failed to register subscriber: {:?}", e);
             return;
         }
     };
@@ -119,7 +118,7 @@ async fn create_new_subscriber(socket: WebSocket, app_state: AppState, client_ad
     let status = subscriber.listen(handler).await;
 
     // Clean up session on disconnect
-    let publisher_name = &subscriber.state.lock().await.publisher_name;
+    let publisher_name = &subscriber.state.read().await.publisher_name;
     if let Some(publisher_name) = publisher_name {
         subscriber
             .app_state
@@ -190,7 +189,7 @@ impl ChannelHandler<PublishEntryState, ClientMessage, WebSocketError> for Publis
                         );
                         // Update subscriber state
                         {
-                            let mut state = subscriber.state.lock().await;
+                            let mut state = subscriber.state.write().await;
                             *state = PublishEntryState {
                                 publisher_name: Some(login_message.publisher_name),
                                 is_logged_in: true,
@@ -219,7 +218,7 @@ impl ChannelHandler<PublishEntryState, ClientMessage, WebSocketError> for Publis
             ClientMessage::Publish(new_entries) => {
                 // Check login state, session expiry and IP match
                 let should_send_error = {
-                    let state = subscriber.state.lock().await;
+                    let state = subscriber.state.read().await;
 
                     if !state.is_logged_in {
                         Some(PublishResponse {
@@ -300,7 +299,7 @@ impl ChannelHandler<PublishEntryState, ClientMessage, WebSocketError> for Publis
     ) -> Result<(), WebSocketError> {
         // Check session expiry periodically
         let should_close = {
-            let state = subscriber.state.lock().await;
+            let state = subscriber.state.read().await;
             if let Some(publisher_name) = &state.publisher_name {
                 if let Some(session) = subscriber.app_state.publisher_sessions.get(publisher_name) {
                     if session.is_expired() {
@@ -349,7 +348,7 @@ async fn process_entries_without_verification(
         });
     }
 
-    let publisher_name = &subscriber.state.lock().await.publisher_name;
+    let publisher_name = &subscriber.state.read().await.publisher_name;
     let publisher_name = publisher_name.as_ref().ok_or_else(|| {
         EntryError::PublisherNotFound("No publisher name in session state".to_string())
     })?;

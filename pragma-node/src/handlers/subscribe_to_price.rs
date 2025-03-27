@@ -8,14 +8,15 @@ use axum::response::IntoResponse;
 use serde::{Deserialize, Serialize};
 
 use pragma_common::types::DataType;
+use pragma_common::types::timestamp::UnixTimestamp;
 use pragma_entities::EntryError;
 use utoipa::{ToResponse, ToSchema};
 
 use crate::infra::repositories::entry_repository::MedianEntryWithComponents;
 use crate::state::AppState;
 use crate::utils::only_existing_pairs;
+use crate::utils::pricer::{IndexPricer, Pricer};
 use crate::utils::ws::{ChannelHandler, Subscriber, SubscriptionType};
-use pragma_common::types::timestamp::UnixTimestamp;
 
 #[derive(Debug, Default, Serialize, Deserialize, ToResponse, ToSchema)]
 pub struct AssetOraclePrice {
@@ -58,9 +59,8 @@ async fn create_new_subscriber(socket: WebSocket, app_state: AppState, client_ad
         Arc::new(app_state),
         None,
         CHANNEL_UPDATE_INTERVAL_IN_MS,
-    )
-    .await
-    {
+        None,
+    ) {
         Ok(subscriber) => subscriber,
         Err(e) => {
             tracing::error!("Failed to register subscriber: {}", e);
@@ -99,7 +99,7 @@ impl ChannelHandler<SubscriptionState, SubscriptionRequest, EntryError> for WsEn
     ) -> Result<(), EntryError> {
         let (existing_spot_pairs, _existing_perp_pairs) =
             only_existing_pairs(&subscriber.app_state.offchain_pool, request.pairs).await;
-        let mut state = subscriber.state.lock().await;
+        let mut state = subscriber.state.write().await;
         match request.msg_type {
             SubscriptionType::Subscribe => {
                 state.add_spot_pairs(existing_spot_pairs);
@@ -137,7 +137,7 @@ impl ChannelHandler<SubscriptionState, SubscriptionRequest, EntryError> for WsEn
         &mut self,
         subscriber: &mut Subscriber<SubscriptionState>,
     ) -> Result<(), EntryError> {
-        let subscription = subscriber.state.lock().await;
+        let subscription = subscriber.state.read().await;
         if subscription.is_empty() {
             return Ok(());
         }
@@ -203,8 +203,12 @@ impl WsEntriesHandler {
         state: &AppState,
         subscription: &SubscriptionState,
     ) -> Result<Vec<MedianEntryWithComponents>, EntryError> {
-        // TODO: Just retrieve all spot prices 
-        let median_entries = todo!();
+        let index_pricer = IndexPricer::new(
+            subscription.get_subscribed_spot_pairs(),
+            DataType::SpotEntry,
+        );
+
+        let median_entries = index_pricer.compute(&state.offchain_pool).await?;
 
         Ok(median_entries)
     }
