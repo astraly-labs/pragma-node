@@ -70,6 +70,15 @@ struct WsOHLCHandler;
 
 #[async_trait::async_trait]
 impl ChannelHandler<SubscriptionState, SubscriptionRequest, InfraError> for WsOHLCHandler {
+    #[tracing::instrument(
+        skip(self, subscriber),
+        fields(
+            subscriber_id = %subscriber.id,
+            network = ?subscription.network,
+            pair = %subscription.pair,
+            interval = ?subscription.interval
+        )
+    )]
     async fn handle_client_msg(
         &mut self,
         subscriber: &mut Subscriber<SubscriptionState>,
@@ -108,6 +117,13 @@ impl ChannelHandler<SubscriptionState, SubscriptionRequest, InfraError> for WsOH
         Ok(())
     }
 
+    #[tracing::instrument(
+        skip(self, subscriber),
+        fields(
+            subscriber_id = %subscriber.id
+        ),
+        err(Debug)
+    )]
     async fn periodic_interval(
         &mut self,
         subscriber: &mut Subscriber<SubscriptionState>,

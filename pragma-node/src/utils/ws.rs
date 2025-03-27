@@ -167,7 +167,8 @@ where
 
     /// Spawns WebSocket tasks and returns a cancellation token.
     ///
-    /// The tasks are responsible for sending & receiving message
+    /// The tasks are responsible for sending & receiving message for the socket
+    /// that we after forward to the Subscriber.
     fn spawn_ws_tasks(
         mut ws_sender: futures_util::stream::SplitSink<WebSocket, Message>,
         mut ws_receiver: futures_util::stream::SplitStream<WebSocket>,
