@@ -241,7 +241,11 @@ where
                         );
                         self.send_err("Connection timeout due to inactivity").await;
                         self.send_sender.send(Message::Close(None)).await.ok();
-                        self.record_metric(Interaction::CloseConnection, Status::Success);
+                        if self.exit.0.send(true).is_err() {
+                            self.record_metric(Interaction::CloseConnection, Status::Error);
+                        } else {
+                            self.record_metric(Interaction::CloseConnection, Status::Success);
+                        }
                         return Ok(());
                     }
                 },
