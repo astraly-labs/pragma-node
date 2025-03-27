@@ -278,7 +278,7 @@ pub async fn get_twap_price_with_components(
             components,
             (components IS NOT NULL AND array_length(components, 1) > 0) as has_components
         FROM
-            twap_{}_agg{}
+            twap_{}_{}
         WHERE
             pair_id = $1
             AND
@@ -425,7 +425,7 @@ pub async fn get_median_price_with_components(
             components,
             (components IS NOT NULL AND array_length(components, 1) > 0) as has_components
         FROM
-            price_{}_agg{}
+            median_{}_{}
         WHERE
             pair_id = $1
             AND
