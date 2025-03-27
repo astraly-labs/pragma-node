@@ -131,9 +131,8 @@ async fn create_new_subscriber(socket: WebSocket, app_state: AppState, client_ad
         Arc::new(app_state),
         None,
         CHANNEL_UPDATE_INTERVAL_IN_MS,
-    )
-    .await
-    {
+        None,
+    ) {
         Ok(subscriber) => subscriber,
         Err(e) => {
             tracing::error!("Failed to register subscriber: {}", e);
@@ -172,7 +171,7 @@ impl ChannelHandler<SubscriptionState, SubscriptionRequest, EntryError> for WsEn
     ) -> Result<(), EntryError> {
         let (existing_spot_pairs, existing_perp_pairs) =
             only_existing_pairs(&subscriber.app_state.offchain_pool, request.pairs).await;
-        let mut state = subscriber.state.lock().await;
+        let mut state = subscriber.state.write().await;
         match request.msg_type {
             SubscriptionType::Subscribe => {
                 state.add_spot_pairs(existing_spot_pairs);
@@ -212,7 +211,7 @@ impl ChannelHandler<SubscriptionState, SubscriptionRequest, EntryError> for WsEn
         &mut self,
         subscriber: &mut Subscriber<SubscriptionState>,
     ) -> Result<(), EntryError> {
-        let subscription = subscriber.state.lock().await;
+        let subscription = subscriber.state.read().await;
         if subscription.is_empty() {
             return Ok(());
         }
