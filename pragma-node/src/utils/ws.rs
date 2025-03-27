@@ -369,12 +369,9 @@ where
                 }
             }
 
-            Message::Ping(_) => {
+            Message::Ping(payload) => {
                 self.last_activity = std::time::Instant::now();
-                let _ = self
-                    .send_sender
-                    .send(Message::Pong(Default::default()))
-                    .await;
+                let _ = self.send_sender.send(Message::Pong(payload)).await;
             }
 
             Message::Pong(_) => {}
@@ -401,7 +398,11 @@ where
 
     /// Sends an error message to the client.
     pub async fn send_err(&self, msg: &str) {
-        let err = json!({"error": msg});
+        let err = json!({
+            "status": "error",
+            "error": msg,
+            "timestamp": chrono::Utc::now().timestamp_millis(),
+        });
         let _ = self
             .send_sender
             .send(Message::Text(err.to_string().into()))
@@ -426,14 +427,9 @@ where
     ///
     /// Sends an error message to the client and closes the connection.
     async fn handle_rate_limit_exceeded(&self) -> Result<(), WebSocketError> {
-        tracing::warn!(
-            subscriber_id = %self.id,
-            ip = %self.ip_address,
-            "Rate limit exceeded. Closing connection."
-        );
-
         self.record_metric(metrics::Interaction::RateLimit, metrics::Status::Error);
-        self.send_err("Rate limit exceeded").await;
+        self.send_err("Rate limit exceeded. Closing connection.")
+            .await;
 
         self.send_sender
             .send(Message::Close(None))
@@ -450,8 +446,9 @@ where
         const MAX_MESSAGE_SIZE: usize = 1_048_576; // 1MB limit
 
         if len > MAX_MESSAGE_SIZE {
-            self.send_err("Message too large.").await;
-            return Err(WebSocketError::DecodingError("Message too large".into()));
+            let err = "Message too large.";
+            self.send_err(err).await;
+            return Err(WebSocketError::DecodingError(err.into()));
         }
 
         Ok(())
