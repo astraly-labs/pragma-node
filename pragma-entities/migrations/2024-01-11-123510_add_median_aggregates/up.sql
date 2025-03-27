@@ -61,9 +61,9 @@ BEGIN
         WITH NO DATA;',
     p_name, p_interval, p_name || '_per_source');
 
-    -- Set the chunk time interval to 7 days
-    EXECUTE format('SELECT set_chunk_time_interval(%L, INTERVAL ''7 days'');', p_name || '_per_source');
-    EXECUTE format('SELECT set_chunk_time_interval(%L, INTERVAL ''7 days'');', p_name);
+    -- Set the chunk time interval to 12 hours
+    EXECUTE format('SELECT set_chunk_time_interval(%L, INTERVAL ''12 hours'');', p_name || '_per_source');
+    EXECUTE format('SELECT set_chunk_time_interval(%L, INTERVAL ''12 hours'');', p_name);
 
     -- Add the continuous aggregate refresh policy
     EXECUTE format('

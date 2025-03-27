@@ -50,18 +50,9 @@ BEGIN
             SELECT unnest(candle_views)
         ) AS all_views
     LOOP
-        compress_after := 
-            CASE 
-                WHEN view_to_compress LIKE '%100_ms%' OR view_to_compress LIKE '%s%' THEN INTERVAL '1 hour'
-                WHEN view_to_compress LIKE '%min%' THEN INTERVAL '6 hours'
-                WHEN view_to_compress LIKE '%h%' OR view_to_compress LIKE '%2_h%' THEN INTERVAL '1 day'
-                WHEN view_to_compress LIKE '%day%' THEN INTERVAL '7 days'
-                WHEN view_to_compress LIKE '%week%' THEN INTERVAL '30 days'
-            END;
-
         -- Perform operations sequentially within a transaction
         EXECUTE format('ALTER MATERIALIZED VIEW %I SET (timescaledb.enable_columnstore = true, timescaledb.segmentby = ''pair_id'')', view_to_compress);
-        EXECUTE format('CALL add_columnstore_policy(%L, after => $1)', view_to_compress) USING compress_after;
+        EXECUTE format('CALL add_columnstore_policy(%L, after => INTERVAL ''1 day'')', view_to_compress);
     END LOOP;
 END;
 $$ LANGUAGE plpgsql;

@@ -19,14 +19,14 @@ CREATE UNIQUE INDEX idx_entries_unique
 CREATE INDEX entries_pair_id_timestamp_idx ON entries (pair_id, timestamp DESC);
 
 SELECT
-  create_hypertable('entries', by_range('timestamp', INTERVAL '1 day'));
+  create_hypertable('entries', by_range('timestamp', INTERVAL '6 hours'));
 
 ALTER TABLE entries SET (
     timescaledb.enable_columnstore = true, 
     timescaledb.segmentby = 'pair_id'
 );
 
-CALL add_columnstore_policy('entries', after => INTERVAL '1d');
+CALL add_columnstore_policy('entries', after => INTERVAL '2 hours');
 
 -- FUTURE (contains perp) entries
 
@@ -47,11 +47,11 @@ CREATE INDEX idx_future_entries_pair_id_timestamp ON future_entries (pair_id, ti
 CREATE INDEX idx_future_entries_pair_id_timestamp_expiration_timestamp ON future_entries (pair_id, expiration_timestamp, timestamp DESC);
 
 SELECT
-  create_hypertable('future_entries', by_range('timestamp', INTERVAL '1 day'));
+  create_hypertable('future_entries', by_range('timestamp', INTERVAL '6 hours'));
 
 ALTER TABLE future_entries SET (
     timescaledb.enable_columnstore = true,
     timescaledb.segmentby = 'pair_id'
 );
 
-CALL add_columnstore_policy('future_entries', after => INTERVAL '1d');
+CALL add_columnstore_policy('future_entries', after => INTERVAL '2 hours');
