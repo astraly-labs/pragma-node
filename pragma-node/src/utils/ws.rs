@@ -134,13 +134,8 @@ where
         let msg_limit_quota = Quota::per_second(nonzero!(MESSAGES_LIMIT_PER_IP_PER_SECOND));
 
         // Spawn sending and receiving tasks
-        let cancellation_token = Self::spawn_ws_tasks(
-            ws_sender,
-            ws_receiver,
-            notify_receiver,
-            client_msg_sender,
-            id,
-        );
+        let cancellation_token =
+            Self::spawn_ws_tasks(ws_sender, ws_receiver, notify_receiver, client_msg_sender);
 
         let subscriber = Self {
             id,
@@ -170,13 +165,14 @@ where
         Ok((subscriber, notify_sender))
     }
 
-    /// Spawns WebSocket tasks and returns a cancellation token
+    /// Spawns WebSocket tasks and returns a cancellation token.
+    ///
+    /// The tasks are responsible for sending & receiving message
     fn spawn_ws_tasks(
         mut ws_sender: futures_util::stream::SplitSink<WebSocket, Message>,
         mut ws_receiver: futures_util::stream::SplitStream<WebSocket>,
         mut notify_receiver: mpsc::Receiver<Message>,
         client_msg_sender: mpsc::Sender<Message>,
-        id: Uuid,
     ) -> CancellationToken {
         // Create cancellation token for all tasks
         let token = CancellationToken::new();
@@ -187,7 +183,6 @@ where
         tokio::spawn(async move {
             tokio::select! {
                 () = send_token.cancelled() => {
-                    tracing::info!(subscriber_id = %id, "Send task cancelled");
                 },
                 () = async {
                     while let Some(msg) = notify_receiver.recv().await {
@@ -196,7 +191,6 @@ where
                         }
                     }
                 } => {
-                    tracing::info!(subscriber_id = %id, "Send task completed naturally");
                 }
             }
         });
@@ -205,7 +199,6 @@ where
         tokio::spawn(async move {
             tokio::select! {
                 () = recv_token.cancelled() => {
-                    tracing::info!(subscriber_id = %id, "Receive task cancelled");
                 },
                 () = async {
                     while let Some(result) = ws_receiver.next().await {
@@ -219,7 +212,6 @@ where
                         }
                     }
                 } => {
-                    tracing::info!(subscriber_id = %id, "Receive task completed naturally");
                 }
             }
         });
