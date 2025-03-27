@@ -206,6 +206,7 @@ impl ChannelHandler<SubscriptionState, SubscriptionRequest, EntryError> for WsEn
         subscriber: &mut Subscriber<SubscriptionState>,
     ) -> Result<(), EntryError> {
         let subscription = subscriber.state.read().await;
+
         if subscription.is_empty() {
             return Ok(());
         }
