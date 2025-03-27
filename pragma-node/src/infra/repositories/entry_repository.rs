@@ -530,7 +530,7 @@ pub async fn get_median_prices_between(
         SELECT
             bucket AS time,
             median_price,
-            num_sources
+            num_sources,
             components
         FROM
             median_{}_{}
