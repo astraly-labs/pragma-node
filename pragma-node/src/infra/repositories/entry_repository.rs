@@ -9,7 +9,6 @@ use pragma_common::timestamp::TimestampError;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use bigdecimal::num_bigint::ToBigInt;
 use pragma_common::errors::ConversionError;
 use pragma_common::signing::starkex::StarkexPrice;
 use pragma_common::types::pair::Pair;
@@ -27,6 +26,8 @@ use crate::handlers::get_entry::EntryParams;
 use crate::handlers::subscribe_to_entry::{AssetOraclePrice, SignedPublisherPrice};
 use crate::utils::convert_via_quote;
 use crate::utils::sql::{get_interval_specifier, get_table_suffix};
+
+use super::utils::HexFormat;
 
 #[derive(Debug, Serialize, Queryable)]
 pub struct MedianEntry {
@@ -60,9 +61,6 @@ pub struct MedianEntryRawWithComponents {
 
     #[diesel(sql_type = diesel::sql_types::Array<Record<(diesel::sql_types::Text, diesel::sql_types::Numeric, diesel::sql_types::Timestamptz)>>)]
     pub components: Vec<(String, BigDecimal, NaiveDateTime)>,
-
-    #[diesel(sql_type = diesel::sql_types::Bool)]
-    pub has_components: bool,
 }
 
 #[derive(Serialize, QueryableByName, Clone, Debug)]
@@ -275,8 +273,7 @@ pub async fn get_twap_price_with_components(
             bucket AS time,
             price_twap AS median_price,
             num_sources,
-            components,
-            (components IS NOT NULL AND array_length(components, 1) > 0) as has_components
+            components
         FROM
             twap_{}_{}
         WHERE
@@ -311,22 +308,14 @@ pub async fn get_twap_price_with_components(
         .first()
         .ok_or(InfraError::EntryNotFound(pair_id))?;
 
-    // Only create components if the flag indicates they exist
-    let components = if raw_entry.has_components {
-        Some(
-            raw_entry
-                .components
-                .iter()
-                .map(|(source, price, timestamp)| Component {
-                    source: source.clone(),
-                    price: price.to_hex_string(),
-                    timestamp: *timestamp,
-                })
-                .collect(),
-        )
-    } else {
-        None
-    };
+    // Convert components if they exist
+    let components = (!raw_entry.components.is_empty()).then(|| {
+        raw_entry
+            .components
+            .iter()
+            .map(|tuple| tuple.to_component())
+            .collect()
+    });
 
     Ok(MedianEntry {
         time: raw_entry.time,
@@ -422,8 +411,7 @@ pub async fn get_median_price_with_components(
             bucket AS time,
             median_price,
             num_sources,
-            components,
-            (components IS NOT NULL AND array_length(components, 1) > 0) as has_components
+            components
         FROM
             median_{}_{}
         WHERE
@@ -458,22 +446,14 @@ pub async fn get_median_price_with_components(
         .first()
         .ok_or(InfraError::EntryNotFound(pair_id))?;
 
-    // Only create components if the flag indicates they exist
-    let components = if raw_entry.has_components {
-        Some(
-            raw_entry
-                .components
-                .iter()
-                .map(|(source, price, timestamp)| Component {
-                    source: source.clone(),
-                    price: price.to_hex_string(),
-                    timestamp: *timestamp,
-                })
-                .collect(),
-        )
-    } else {
-        None
-    };
+    // Convert components if they exist
+    let components = (!raw_entry.components.is_empty()).then(|| {
+        raw_entry
+            .components
+            .iter()
+            .map(|tuple| tuple.to_component())
+            .collect()
+    });
 
     Ok(MedianEntry {
         time: raw_entry.time,
@@ -504,7 +484,6 @@ pub async fn get_spot_median_entries_1_min_between(
             bucket AS time,
             median_price,
             num_sources
-            NULL as components
         FROM median_1_min_spot
         WHERE 
             pair_id = $1
@@ -520,7 +499,7 @@ pub async fn get_spot_median_entries_1_min_between(
                 .bind::<diesel::sql_types::Text, _>(pair_id)
                 .bind::<diesel::sql_types::Timestamptz, _>(start_datetime)
                 .bind::<diesel::sql_types::Timestamptz, _>(end_datetime)
-                .load::<MedianEntryRawWithComponents>(conn)
+                .load::<MedianEntryRawBase>(conn)
         })
         .await
         .map_err(InfraError::DbInteractionError)?
@@ -594,21 +573,13 @@ pub async fn get_median_prices_between(
         .into_iter()
         .map(|raw_entry| {
             // Process components only if they exist
-            let components = if raw_entry.has_components {
-                Some(
-                    raw_entry
-                        .components
-                        .iter()
-                        .map(|(source, price, timestamp)| Component {
-                            source: source.clone(),
-                            price: price.to_hex_string(),
-                            timestamp: *timestamp,
-                        })
-                        .collect(),
-                )
-            } else {
-                None
-            };
+            let components = (!raw_entry.components.is_empty()).then(|| {
+                raw_entry
+                    .components
+                    .iter()
+                    .map(|tuple| tuple.to_component())
+                    .collect()
+            });
 
             MedianEntry {
                 time: raw_entry.time,
@@ -729,15 +700,17 @@ impl TryFrom<crate::handlers::get_entry::EntryComponent> for Component {
     }
 }
 
-trait HexFormat {
-    fn to_hex_string(&self) -> String;
+trait ComponentConverter {
+    fn to_component(&self) -> Component;
 }
 
-impl HexFormat for BigDecimal {
-    fn to_hex_string(&self) -> String {
-        let bigint = self.to_bigint().unwrap_or_default();
-
-        format!("0x{:x}", bigint)
+impl ComponentConverter for (String, BigDecimal, NaiveDateTime) {
+    fn to_component(&self) -> Component {
+        Component {
+            source: self.0.clone(),
+            price: self.1.to_hex_string(),
+            timestamp: self.2,
+        }
     }
 }
 
