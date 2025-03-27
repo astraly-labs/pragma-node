@@ -171,8 +171,6 @@ impl WsEntriesHandler {
     ) -> Result<SubscribeToPriceResponse, EntryError> {
         let median_entries: Vec<MedianEntryWithComponents> = todo!();
 
-        let now = chrono::Utc::now().timestamp();
-
         let oracle_prices = median_entries
             .into_iter()
             .map(|entry| AssetOraclePrice {
@@ -183,7 +181,7 @@ impl WsEntriesHandler {
             .collect();
 
         Ok(SubscribeToPriceResponse {
-            timestamp: now,
+            timestamp: chrono::Utc::now().timestamp(),
             oracle_prices,
         })
     }
