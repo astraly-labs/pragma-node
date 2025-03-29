@@ -41,6 +41,7 @@ SELECT create_onchain_candlestick_view('mainnet_spot_candle_5_min', '5 minutes':
 SELECT create_onchain_candlestick_view('mainnet_spot_candle_15_min', '15 minutes'::interval, '45 minutes'::interval, 'mainnet_spot_median_10_s');
 SELECT create_onchain_candlestick_view('mainnet_spot_candle_1_h', '1 hour'::interval, '3 hours'::interval, 'mainnet_spot_median_10_s');
 SELECT create_onchain_candlestick_view('mainnet_spot_candle_1_day', '1 day'::interval, '3 days'::interval, 'mainnet_spot_median_10_s');
+SELECT create_onchain_candlestick_view('mainnet_spot_candle_1_week', '1 week'::interval, '3 weeks'::interval, 'mainnet_spot_median_10_s');
 
 -- Testnet Spot Candlesticks
 SELECT create_onchain_candlestick_view('spot_candle_10_s', '10 seconds'::interval, '30 seconds'::interval, 'spot_median_1_s');
@@ -49,6 +50,7 @@ SELECT create_onchain_candlestick_view('spot_candle_5_min', '5 minutes'::interva
 SELECT create_onchain_candlestick_view('spot_candle_15_min', '15 minutes'::interval, '45 minutes'::interval, 'spot_median_10_s');
 SELECT create_onchain_candlestick_view('spot_candle_1_h', '1 hour'::interval, '3 hours'::interval, 'spot_median_10_s');
 SELECT create_onchain_candlestick_view('spot_candle_1_day', '1 day'::interval, '3 days'::interval, 'spot_median_10_s');
+SELECT create_onchain_candlestick_view('spot_candle_1_week', '1 week'::interval, '3 weeks'::interval, 'spot_median_10_s');
 
 -- Mainnet Perp Candlesticks
 SELECT create_onchain_candlestick_view('mainnet_perp_candle_10_s', '10 seconds'::interval, '30 seconds'::interval, 'mainnet_perp_median_1_s');
@@ -57,6 +59,7 @@ SELECT create_onchain_candlestick_view('mainnet_perp_candle_5_min', '5 minutes':
 SELECT create_onchain_candlestick_view('mainnet_perp_candle_15_min', '15 minutes'::interval, '45 minutes'::interval, 'mainnet_perp_median_10_s');
 SELECT create_onchain_candlestick_view('mainnet_perp_candle_1_h', '1 hour'::interval, '3 hours'::interval, 'mainnet_perp_median_10_s');
 SELECT create_onchain_candlestick_view('mainnet_perp_candle_1_day', '1 day'::interval, '3 days'::interval, 'mainnet_perp_median_10_s');
+SELECT create_onchain_candlestick_view('mainnet_perp_candle_1_week', '1 week'::interval, '3 weeks'::interval, 'mainnet_perp_median_10_s');
 
 -- Testnet Perp Candlesticks
 SELECT create_onchain_candlestick_view('perp_candle_10_s', '10 seconds'::interval, '30 seconds'::interval, 'perp_median_1_s');
@@ -65,3 +68,4 @@ SELECT create_onchain_candlestick_view('perp_candle_5_min', '5 minutes'::interva
 SELECT create_onchain_candlestick_view('perp_candle_15_min', '15 minutes'::interval, '45 minutes'::interval, 'perp_median_10_s');
 SELECT create_onchain_candlestick_view('perp_candle_1_h', '1 hour'::interval, '3 hours'::interval, 'perp_median_10_s');
 SELECT create_onchain_candlestick_view('perp_candle_1_day', '1 day'::interval, '3 days'::interval, 'perp_median_10_s');
+SELECT create_onchain_candlestick_view('perp_candle_1_week', '1 week'::interval, '3 weeks'::interval, 'perp_median_10_s');
