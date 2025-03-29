@@ -99,7 +99,7 @@ pub(crate) fn get_onchain_ohlc_table_name(
         Interval::OneMinute => Ok("1_min"),
         Interval::FiveMinutes => Ok("5_min"),
         Interval::FifteenMinutes => Ok("15_min"),
-        Interval::OneHour => Ok("1_hour"),
+        Interval::OneHour => Ok("1_h"),
         Interval::OneDay => Ok("1_day"),
         // We support less intervals for candles
         _ => Err(InfraError::UnsupportedOnchainInterval(interval)),
