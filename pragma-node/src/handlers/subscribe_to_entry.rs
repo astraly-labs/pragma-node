@@ -18,10 +18,9 @@ use pragma_entities::EntryError;
 
 use crate::constants::starkex_ws::PRAGMA_ORACLE_NAME_FOR_STARKEX;
 use crate::infra::repositories::entry_repository::{MedianEntry, get_price_with_components};
-use crate::infra::repositories::utils::HexFormat;
 use crate::state::AppState;
-use crate::utils::only_existing_pairs;
 use crate::utils::{ChannelHandler, Subscriber, SubscriptionType};
+use crate::utils::{hex_string_to_bigdecimal, only_existing_pairs};
 
 /// Response format for `StarkEx` price subscriptions
 #[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
@@ -264,13 +263,13 @@ impl WsEntriesHandler {
         let mut all_entries = if spot_pairs.is_empty() {
             HashMap::new()
         } else {
-            get_price_with_components(&state.offchain_pool, spot_pairs)
+            get_price_with_components(&state.offchain_pool, spot_pairs, false)
                 .await
                 .map_err(|e| EntryError::DatabaseError(format!("Failed to fetch spot data: {e}")))?
         };
 
         if !perp_pairs.is_empty() {
-            let perp_entries = get_price_with_components(&state.offchain_pool, perp_pairs)
+            let perp_entries = get_price_with_components(&state.offchain_pool, perp_pairs, true)
                 .await
                 .map_err(|e| {
                     EntryError::DatabaseError(format!("Failed to fetch perp data: {e}"))
@@ -323,22 +322,35 @@ impl TryFrom<(String, MedianEntry, SigningKey)> for AssetOraclePrice {
         let global_asset_id = StarkexPrice::get_global_asset_id(&pair_id)?;
         let oracle_asset_id =
             StarkexPrice::get_oracle_asset_id(PRAGMA_ORACLE_NAME_FOR_STARKEX, &pair_id)?;
-        let signed_prices = entry
+        let signed_prices_result: Result<Vec<_>, ConversionError> = entry
             .components
             .unwrap_or_default()
             .into_iter()
-            .map(|comp| SignedPublisherPrice {
-                oracle_asset_id: oracle_asset_id.to_string(),
-                oracle_price: comp.price.clone(),
-                signing_key: signing_key.secret_scalar().to_hex_string(),
-                timestamp: comp.timestamp.to_string(),
-                // TODO: which signature goes there ??
+            .map(|comp| {
+                let timestamp = comp.timestamp.and_utc().timestamp() as u64;
+                let price = hex_string_to_bigdecimal(&comp.price)
+                    .map_err(|_| ConversionError::StringPriceConversion)?;
+                let starkex_price = StarkexPrice {
+                    oracle_name: PRAGMA_ORACLE_NAME_FOR_STARKEX.to_string(),
+                    pair_id: pair_id.clone(),
+                    timestamp,
+                    price: price.clone(),
+                };
+                let signature = sign_data(&signing_key, &starkex_price).unwrap(); // TODO: Proper error handling
+                Ok(SignedPublisherPrice {
+                    oracle_asset_id: format!("0x{}", oracle_asset_id),
+                    oracle_price: price.to_string(),
+                    signing_key: signing_key.secret_scalar().to_hex_string(),
+                    timestamp: timestamp.to_string(),
+                    signature,
+                })
             })
             .collect();
+        let signed_prices = signed_prices_result?;
 
         Ok(Self {
-            global_asset_id,
-            median_price: entry.median_price.to_hex_string(),
+            global_asset_id: format!("0x{}", global_asset_id),
+            median_price: entry.median_price.to_string(),
             signature: String::new(),
             signed_prices,
         })

@@ -11,7 +11,7 @@ pub use kafka::publish_to_kafka;
 use pragma_common::entries::{EntryTrait as _, PerpEntry};
 pub use ws::*;
 
-use bigdecimal::num_bigint::ToBigInt;
+use bigdecimal::num_bigint::{BigUint, ToBigInt};
 use bigdecimal::{BigDecimal, ToPrimitive};
 use chrono::NaiveDateTime;
 use deadpool_diesel::postgres::Pool;
@@ -147,6 +147,20 @@ pub(crate) fn big_decimal_price_to_hex(price: &BigDecimal) -> String {
     )
 }
 
+pub(crate) fn hex_string_to_bigdecimal(
+    hex_str: &str,
+) -> Result<BigDecimal, Box<dyn std::error::Error>> {
+    // Remove "0x" prefix if present
+    let cleaned_hex = hex_str.trim_start_matches("0x");
+
+    // Parse hex string to BigUint
+    let bigint =
+        BigUint::parse_bytes(cleaned_hex.as_bytes(), 16).ok_or("Failed to parse hex string")?;
+    let big_int = bigint.to_bigint().ok_or("Failed to convert to BigInt")?;
+    let decimal = BigDecimal::new(big_int, 0);
+
+    Ok(decimal)
+}
 /// Given a list of pairs, only return the ones that exists in the
 /// database in separate lists.
 /// TODO: handle future pairs?

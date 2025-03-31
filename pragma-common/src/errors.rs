@@ -14,4 +14,6 @@ pub enum ConversionError {
     U128Conversion,
     #[error("failed to convert timestamp string")]
     StringTimestampConversion,
+    #[error("failed to convert price string")]
+    StringPriceConversion,
 }

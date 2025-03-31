@@ -1,9 +1,9 @@
-use std::collections::HashSet;
+use std::collections::HashMap;
 
 use bigdecimal::{BigDecimal, FromPrimitive, ToPrimitive};
 use chrono::{DateTime, NaiveDateTime};
 use diesel::prelude::QueryableByName;
-use diesel::sql_types::Record;
+use diesel::sql_types::{Double, Jsonb, Record, VarChar};
 use diesel::{Queryable, RunQueryDsl};
 use pragma_common::signing::{Signable, sign_data};
 use pragma_common::timestamp::TimestampError;
@@ -16,7 +16,6 @@ use utoipa::ToSchema;
 
 use pragma_common::errors::ConversionError;
 use pragma_common::signing::starkex::StarkexPrice;
-use pragma_common::timestamp::TimestampError;
 use pragma_common::types::pair::Pair;
 use pragma_common::types::{AggregationMode, Interval};
 use pragma_entities::{Entry, error::InfraError};
@@ -24,10 +23,7 @@ use pragma_entities::{Entry, error::InfraError};
 use crate::constants::EIGHTEEN_DECIMALS;
 use crate::constants::currencies::ABSTRACT_CURRENCIES;
 use crate::constants::others::ROUTING_FRESHNESS_THRESHOLD;
-use crate::constants::starkex_ws::{
-    INITAL_INTERVAL_IN_MS, INTERVAL_INCREMENT_IN_MS, MAX_INTERVAL_WITHOUT_ENTRIES,
-    MINIMUM_NUMBER_OF_PUBLISHERS, PRAGMA_ORACLE_NAME_FOR_STARKEX,
-};
+use crate::constants::starkex_ws::PRAGMA_ORACLE_NAME_FOR_STARKEX;
 use crate::handlers::get_entry::EntryParams;
 use crate::handlers::subscribe_to_entry::{AssetOraclePrice, SignedPublisherPrice};
 use crate::utils::convert_via_quote;
@@ -852,6 +848,38 @@ pub async fn get_spot_ohlc(
     Ok(entries)
 }
 
+pub async fn get_expiries_list(
+    pool: &deadpool_diesel::postgres::Pool,
+    pair_id: String,
+) -> Result<Vec<NaiveDateTime>, InfraError> {
+    let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
+
+    let sql_request: String = r"
+        SELECT DISTINCT expiration_timestamp
+        FROM future_entries
+        WHERE pair_id = $1 AND expiration_timestamp IS NOT NULL
+        ORDER BY expiration_timestamp;
+        "
+    .to_string();
+
+    let raw_exp = conn
+        .interact(move |conn| {
+            diesel::sql_query(&sql_request)
+                .bind::<diesel::sql_types::Text, _>(pair_id)
+                .load::<ExpiriesListRaw>(conn)
+        })
+        .await
+        .map_err(InfraError::DbInteractionError)?
+        .map_err(InfraError::DbResultError)?;
+
+    let expiries: Vec<NaiveDateTime> = raw_exp
+        .into_iter()
+        .map(|r| r.expiration_timestamp)
+        .collect();
+
+    Ok(expiries)
+}
+
 #[derive(Debug, Queryable, QueryableByName, Deserialize, Serialize)]
 struct RawMedianEntryWithComponents {
     #[diesel(sql_type = VarChar)]
@@ -1038,34 +1066,10 @@ impl AssetOraclePrice {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct EntryComponent {
-    pub pair_id: String,
-    pub price: BigDecimal,
-    pub timestamp: String,
-    pub publisher: String,
-    pub publisher_address: String,
-    pub publisher_signature: String,
-}
-
-impl TryFrom<EntryComponent> for SignedPublisherPrice {
-    type Error = ConversionError;
-
-    fn try_from(component: EntryComponent) -> Result<Self, Self::Error> {
-        let asset_id = StarkexPrice::get_oracle_asset_id(&component.publisher, &component.pair_id)?;
-
-        Ok(Self {
-            oracle_asset_id: format!("0x{asset_id}"),
-            oracle_price: component.price.to_string(),
-            timestamp: component.timestamp.to_string(),
-            signing_key: component.publisher_address,
-        })
-    }
-}
-
 pub async fn get_price_with_components(
     pool: &deadpool_diesel::postgres::Pool,
     pair_ids: Vec<String>,
+    is_perp: bool,
 ) -> Result<HashMap<String, MedianEntry>, InfraError> {
     let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
 
@@ -1073,16 +1077,11 @@ pub async fn get_price_with_components(
     if pair_ids.is_empty() {
         return Ok(HashMap::new());
     }
-
-    // Determine the table to query based on whether pairs are MARK type
-    // We assume the caller has properly formatted the pairs (either all spot or all mark)
-    let table_name = if pair_ids.first().map_or(false, |p| p.ends_with(":MARK")) {
+    let table_name = if is_perp {
         "median_100_ms_perp"
     } else {
         "median_100_ms_spot"
     };
-
-    // Use a window function to get only the latest entry for each pair_id
     let sql_request = format!(
         r"
         WITH ranked_entries AS (
@@ -1112,27 +1111,17 @@ pub async fn get_price_with_components(
         table_name
     );
 
-    // For MARK pairs, we need to strip the suffix for the database query
-    let query_pair_ids = if table_name == "median_100_ms_perp" {
-        pair_ids
-            .iter()
-            .map(|p| p.trim_end_matches(":MARK").to_string())
-            .collect()
-    } else {
-        pair_ids.clone()
-    };
-
     let raw_entries = conn
         .interact(move |conn| {
             diesel::sql_query(&sql_request)
-                .bind::<diesel::sql_types::Array<diesel::sql_types::Text>, _>(query_pair_ids)
+                .bind::<diesel::sql_types::Array<diesel::sql_types::Text>, _>(pair_ids)
                 .load::<ExtendedMedianEntryRaw>(conn)
         })
         .await
         .map_err(InfraError::DbInteractionError)?
         .map_err(InfraError::DbResultError)?;
 
-    // Build result HashMap - for perp pairs, we need to add back the MARK suffix
+    // Build result HashMap - add :MARK suffix to keys if is_perp
     let mut result = HashMap::with_capacity(raw_entries.len());
     for raw_entry in raw_entries {
         let components = (!raw_entry.components.is_empty()).then(|| {
@@ -1150,8 +1139,8 @@ pub async fn get_price_with_components(
             components,
         };
 
-        // For perp table results, add the MARK suffix back to the pair_id
-        let key = if table_name == "median_100_ms_perp" {
+        // Add :MARK suffix to the key if it's a perp pair
+        let key = if is_perp {
             format!("{}:MARK", raw_entry.pair_id)
         } else {
             raw_entry.pair_id

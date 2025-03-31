@@ -170,11 +170,10 @@ impl WsEntriesHandler {
         subscription: &SubscriptionState,
     ) -> Result<SubscribeToPriceResponse, EntryError> {
         let spot_pairs = subscription.get_subscribed_spot_pairs();
-
         if spot_pairs.is_empty() {
             return Ok(Default::default());
         }
-        let median_entries = get_price_with_components(&state.offchain_pool, spot_pairs)
+        let median_entries = get_price_with_components(&state.offchain_pool, spot_pairs, false)
             .await
             .map_err(|e| EntryError::DatabaseError(format!("Failed to fetch price data: {e}")))?;
 
