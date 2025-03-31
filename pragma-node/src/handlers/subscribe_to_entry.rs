@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::net::SocketAddr;
 use std::sync::Arc;
 
@@ -6,7 +6,9 @@ use axum::extract::ws::{WebSocket, WebSocketUpgrade};
 use axum::extract::{ConnectInfo, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
+use pragma_common::errors::ConversionError;
 use serde::{Deserialize, Serialize};
+use starknet::signers::SigningKey;
 use utoipa::{ToResponse, ToSchema};
 
 use pragma_common::signing::sign_data;
@@ -15,7 +17,8 @@ use pragma_common::types::timestamp::UnixTimestamp;
 use pragma_entities::EntryError;
 
 use crate::constants::starkex_ws::PRAGMA_ORACLE_NAME_FOR_STARKEX;
-use crate::infra::repositories::entry_repository::MedianEntryWithComponents;
+use crate::infra::repositories::entry_repository::{MedianEntry, get_price_with_components};
+use crate::infra::repositories::utils::HexFormat;
 use crate::state::AppState;
 use crate::utils::only_existing_pairs;
 use crate::utils::{ChannelHandler, Subscriber, SubscriptionType};
@@ -245,7 +248,31 @@ impl WsEntriesHandler {
         state: &AppState,
         subscription: &SubscriptionState,
     ) -> Result<SubscribeToEntryResponse, EntryError> {
-        let median_entries: Vec<MedianEntryWithComponents> = todo!();
+        let spot_pairs = subscription.get_subscribed_spot_pairs();
+        let perp_pairs = subscription.get_subscribed_perp_pairs();
+
+        if spot_pairs.is_empty() && perp_pairs.is_empty() {
+            return Ok(Default::default());
+        }
+
+        let mut all_entries = if spot_pairs.is_empty() {
+            HashMap::new()
+        } else {
+            get_price_with_components(&state.offchain_pool, spot_pairs)
+                .await
+                .map_err(|e| EntryError::DatabaseError(format!("Failed to fetch spot data: {e}")))?
+        };
+
+        if !perp_pairs.is_empty() {
+            let perp_entries = get_price_with_components(&state.offchain_pool, perp_pairs)
+                .await
+                .map_err(|e| {
+                    EntryError::DatabaseError(format!("Failed to fetch perp data: {e}"))
+                })?;
+
+            // Merge the results
+            all_entries.extend(perp_entries);
+        }
 
         let mut response: SubscribeToEntryResponse = Default::default();
         let now = chrono::Utc::now().timestamp();
@@ -258,9 +285,7 @@ impl WsEntriesHandler {
                 "No Signer for Pragma".into(),
             ))?;
 
-        for entry in median_entries {
-            let pair_id = entry.pair_id.clone();
-
+        for (pair_id, entry) in all_entries {
             let starkex_price = StarkexPrice {
                 oracle_name: PRAGMA_ORACLE_NAME_FOR_STARKEX.to_string(),
                 pair_id: pair_id.clone(),
@@ -270,15 +295,47 @@ impl WsEntriesHandler {
             let signature =
                 sign_data(pragma_signer, &starkex_price).map_err(|_| EntryError::InvalidSigner)?;
 
-            // Create AssetOraclePrice with the original entry (it will be scaled in the TryFrom implementation)
-            let mut oracle_price: AssetOraclePrice = entry.try_into().map_err(|_| {
-                EntryError::InternalServerError("Could not create Oracle price".into())
-            })?;
+            let mut oracle_price: AssetOraclePrice =
+                AssetOraclePrice::try_from((pair_id, entry, pragma_signer.clone())) // TODO: remove clone
+                    .map_err(|_| {
+                        EntryError::InternalServerError("Could not create Oracle price".into())
+                    })?;
             oracle_price.signature = signature;
             response.oracle_prices.push(oracle_price);
         }
         response.timestamp = now;
         Ok(response)
+    }
+}
+
+impl TryFrom<(String, MedianEntry, SigningKey)> for AssetOraclePrice {
+    type Error = ConversionError;
+
+    fn try_from(value: (String, MedianEntry, SigningKey)) -> Result<Self, Self::Error> {
+        let (pair_id, entry, signing_key) = value;
+
+        let global_asset_id = StarkexPrice::get_global_asset_id(&pair_id)?;
+        let oracle_asset_id =
+            StarkexPrice::get_oracle_asset_id(PRAGMA_ORACLE_NAME_FOR_STARKEX, &pair_id)?;
+        let signed_prices = entry
+            .components
+            .unwrap_or_default()
+            .into_iter()
+            .map(|comp| SignedPublisherPrice {
+                oracle_asset_id: oracle_asset_id.to_string(),
+                oracle_price: comp.price.clone(),
+                signing_key: signing_key.secret_scalar().to_hex_string(),
+                timestamp: comp.timestamp.to_string(),
+                // TODO: which signature goes there ??
+            })
+            .collect();
+
+        Ok(Self {
+            global_asset_id,
+            median_price: entry.median_price.to_hex_string(),
+            signature: String::new(),
+            signed_prices,
+        })
     }
 }
 

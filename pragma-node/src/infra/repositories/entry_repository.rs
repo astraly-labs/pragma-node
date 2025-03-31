@@ -4,6 +4,7 @@ use diesel::prelude::QueryableByName;
 use diesel::sql_types::Record;
 use diesel::{Queryable, RunQueryDsl};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use utoipa::ToSchema;
 
 use pragma_common::errors::ConversionError;
@@ -44,6 +45,24 @@ pub struct MedianEntryRawBase {
 // Extended struct with components (non-optional)
 #[derive(Serialize, QueryableByName, Clone, Debug)]
 pub struct MedianEntryRawWithComponents {
+    #[diesel(sql_type = diesel::sql_types::Timestamptz)]
+    pub time: NaiveDateTime,
+
+    #[diesel(sql_type = diesel::sql_types::Numeric)]
+    pub median_price: BigDecimal,
+
+    #[diesel(sql_type = diesel::sql_types::BigInt)]
+    pub num_sources: i64,
+
+    #[diesel(sql_type = diesel::sql_types::Array<Record<(diesel::sql_types::Text, diesel::sql_types::Numeric, diesel::sql_types::Timestamptz)>>)]
+    pub components: Vec<(String, BigDecimal, NaiveDateTime)>,
+}
+
+// Extended struct with components (non-optional)
+#[derive(Serialize, QueryableByName, Clone, Debug)]
+pub struct ExtendedMedianEntryRaw {
+    #[diesel(sql_type = diesel::sql_types::Text)]
+    pub pair_id: String,
     #[diesel(sql_type = diesel::sql_types::Timestamptz)]
     pub time: NaiveDateTime,
 
@@ -905,4 +924,104 @@ impl TryFrom<EntryComponent> for SignedPublisherPrice {
             signing_key: component.publisher_address,
         })
     }
+}
+
+pub async fn get_price_with_components(
+    pool: &deadpool_diesel::postgres::Pool,
+    pair_ids: Vec<String>,
+) -> Result<HashMap<String, MedianEntry>, InfraError> {
+    let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
+
+    // Handle empty input case
+    if pair_ids.is_empty() {
+        return Ok(HashMap::new());
+    }
+
+    // Determine the table to query based on whether pairs are MARK type
+    // We assume the caller has properly formatted the pairs (either all spot or all mark)
+    let table_name = if pair_ids.first().map_or(false, |p| p.ends_with(":MARK")) {
+        "median_100_ms_perp"
+    } else {
+        "median_100_ms_spot"
+    };
+
+    // Use a window function to get only the latest entry for each pair_id
+    let sql_request = format!(
+        r"
+        WITH ranked_entries AS (
+            SELECT
+                pair_id,
+                bucket AS time,
+                median_price,
+                num_sources,
+                components,
+                ROW_NUMBER() OVER (PARTITION BY pair_id ORDER BY bucket DESC) as rn
+            FROM
+                {}
+            WHERE
+                pair_id = ANY($1)
+        )
+        SELECT
+            pair_id,
+            time,
+            median_price,
+            num_sources,
+            components
+        FROM
+            ranked_entries
+        WHERE
+            rn = 1
+        ",
+        table_name
+    );
+
+    // For MARK pairs, we need to strip the suffix for the database query
+    let query_pair_ids = if table_name == "median_100_ms_perp" {
+        pair_ids
+            .iter()
+            .map(|p| p.trim_end_matches(":MARK").to_string())
+            .collect()
+    } else {
+        pair_ids.clone()
+    };
+
+    let raw_entries = conn
+        .interact(move |conn| {
+            diesel::sql_query(&sql_request)
+                .bind::<diesel::sql_types::Array<diesel::sql_types::Text>, _>(query_pair_ids)
+                .load::<ExtendedMedianEntryRaw>(conn)
+        })
+        .await
+        .map_err(InfraError::DbInteractionError)?
+        .map_err(InfraError::DbResultError)?;
+
+    // Build result HashMap - for perp pairs, we need to add back the MARK suffix
+    let mut result = HashMap::with_capacity(raw_entries.len());
+    for raw_entry in raw_entries {
+        let components = (!raw_entry.components.is_empty()).then(|| {
+            raw_entry
+                .components
+                .iter()
+                .map(ComponentConverter::to_component)
+                .collect()
+        });
+
+        let entry = MedianEntry {
+            time: raw_entry.time,
+            median_price: raw_entry.median_price,
+            num_sources: raw_entry.num_sources,
+            components,
+        };
+
+        // For perp table results, add the MARK suffix back to the pair_id
+        let key = if table_name == "median_100_ms_perp" {
+            format!("{}:MARK", raw_entry.pair_id)
+        } else {
+            raw_entry.pair_id
+        };
+
+        result.insert(key, entry);
+    }
+
+    Ok(result)
 }

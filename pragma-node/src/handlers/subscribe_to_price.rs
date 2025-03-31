@@ -11,7 +11,7 @@ use pragma_common::types::timestamp::UnixTimestamp;
 use pragma_entities::EntryError;
 use utoipa::{ToResponse, ToSchema};
 
-use crate::infra::repositories::entry_repository::MedianEntryWithComponents;
+use crate::infra::repositories::entry_repository::get_price_with_components;
 use crate::state::AppState;
 use crate::utils::only_existing_pairs;
 use crate::utils::ws::{ChannelHandler, Subscriber, SubscriptionType};
@@ -169,13 +169,21 @@ impl WsEntriesHandler {
         state: &AppState,
         subscription: &SubscriptionState,
     ) -> Result<SubscribeToPriceResponse, EntryError> {
-        let median_entries: Vec<MedianEntryWithComponents> = todo!();
+        let spot_pairs = subscription.get_subscribed_spot_pairs();
 
+        if spot_pairs.is_empty() {
+            return Ok(Default::default());
+        }
+        let median_entries = get_price_with_components(&state.offchain_pool, spot_pairs)
+            .await
+            .map_err(|e| EntryError::DatabaseError(format!("Failed to fetch price data: {e}")))?;
+
+        // Convert HashMap entries to the expected response format
         let oracle_prices = median_entries
             .into_iter()
-            .map(|entry| AssetOraclePrice {
-                num_sources_aggregated: entry.components.len(),
-                pair_id: entry.pair_id,
+            .map(|(pair_id, entry)| AssetOraclePrice {
+                num_sources_aggregated: entry.num_sources as usize,
+                pair_id,
                 price: entry.median_price.to_string(),
             })
             .collect();

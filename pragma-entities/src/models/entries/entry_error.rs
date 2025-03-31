@@ -67,6 +67,10 @@ pub enum EntryError {
     #[error("could not sign price")]
     InvalidSigner,
 
+    // Onchain db error
+    #[error("could not fetch price data")]
+    DatabaseError(String),
+
     // 500 Error - Internal server error
     #[error("internal server error: {0}")]
     InternalServerError(String),
@@ -155,6 +159,10 @@ impl IntoResponse for EntryError {
             Self::BuildPublish(err) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 format!("Can't build publish message: {err}"),
+            ),
+            Self::DatabaseError(reason) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to fetch price data: {reason}"),
             ),
             Self::InvalidSigner => (StatusCode::BAD_REQUEST, "Could not sign price".to_string()),
             Self::InternalServerError(reason) => (
