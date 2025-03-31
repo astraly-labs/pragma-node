@@ -60,7 +60,7 @@ pub struct GetEntryParams {
     /// # Examples
     /// - `1_647_820_800`: Returns price data from March 21, 2022 00:00:00 UTC
     /// - `null`: Returns the most recent price update
-    /// 
+    ///
     /// NOTE: This only works for `median` aggregation
     #[schema(value_type = i64, example = 1_647_820_800)]
     pub timestamp: Option<UnixTimestamp>,
@@ -155,11 +155,13 @@ where
 {
     // First, try to deserialize as an Option<String>
     let opt_str = Option::<String>::deserialize(deserializer)?;
-    
+
     match opt_str.as_deref() {
         Some("true") => Ok(Some(true)),
         Some("false") => Ok(Some(false)),
-        Some(s) => Err(serde::de::Error::custom(format!("Invalid boolean value: {}", s))),
-        None => Ok(None)
+        Some(s) => Err(serde::de::Error::custom(format!(
+            "Invalid boolean value: {s}"
+        ))),
+        None => Ok(None),
     }
 }
