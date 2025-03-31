@@ -60,7 +60,7 @@ pub struct GetEntryParams {
     /// # Examples
     /// - `1_647_820_800`: Returns price data from March 21, 2022 00:00:00 UTC
     /// - `null`: Returns the most recent price update
-    /// 
+    ///
     /// NOTE: This only works for `median` aggregation
     #[schema(value_type = i64, example = 1_647_820_800)]
     pub timestamp: Option<UnixTimestamp>,
@@ -92,6 +92,8 @@ pub struct GetEntryParams {
     ///
     /// Default: true
     #[schema(example = true)]
+    #[serde(default)]
+    #[serde(deserialize_with = "deserialize_bool_from_string")]
     pub routing: Option<bool>,
 
     /// Method used to aggregate prices from multiple sources.
@@ -128,6 +130,8 @@ pub struct GetEntryParams {
     /// - `true`: Include source breakdown in response
     /// - `false`: Return aggregated data only (default)
     #[schema(example = false)]
+    #[serde(default)]
+    #[serde(deserialize_with = "deserialize_bool_from_string")]
     pub with_components: Option<bool>,
 }
 
@@ -142,5 +146,22 @@ impl Default for GetEntryParams {
             expiry: None,
             with_components: Some(false),
         }
+    }
+}
+
+fn deserialize_bool_from_string<'de, D>(deserializer: D) -> Result<Option<bool>, D::Error>
+where
+    D: serde::de::Deserializer<'de>,
+{
+    // First, try to deserialize as an Option<String>
+    let opt_str = Option::<String>::deserialize(deserializer)?;
+
+    match opt_str.as_deref() {
+        Some("true") => Ok(Some(true)),
+        Some("false") => Ok(Some(false)),
+        Some(s) => Err(serde::de::Error::custom(format!(
+            "Invalid boolean value: {s}"
+        ))),
+        None => Ok(None),
     }
 }
