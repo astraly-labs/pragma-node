@@ -12,4 +12,6 @@ pub enum ConversionError {
     FeltConversion,
     #[error("failed to convert u128")]
     U128Conversion,
+    #[error("failed to convert timestamp string")]
+    StringTimestampConversion,
 }

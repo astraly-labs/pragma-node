@@ -42,6 +42,12 @@ pub struct SignedPublisherPrice {
     /// Unix timestamp as string
     #[schema(example = "1741594457")]
     pub timestamp: String,
+
+    // Signature
+    #[schema(
+        example = "0x03ac186cbbb633b7eb13e5a1c22454da7a6e9f6a4b81236380ec4564634afc30638641c0f2a613edc947241a68c54f0da4f08bc9dbb3b79154c87ad3d74ad83"
+    )]
+    pub signature: String,
 }
 
 /// Price data structure for `StarkEx` oracle integration
