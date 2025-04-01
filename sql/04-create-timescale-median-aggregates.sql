@@ -68,9 +68,6 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Mainnet Spot Median
-SELECT create_onchain_median_aggregate('mainnet_spot_median_100_ms', 'mainnet_spot_entry', '100 milliseconds'::interval, '300 milliseconds'::interval, 'spot');
-SELECT create_onchain_median_aggregate('mainnet_spot_median_1_s', 'mainnet_spot_entry', '1 second'::interval, '3 seconds'::interval, 'spot');
-SELECT create_onchain_median_aggregate('mainnet_spot_median_5_s', 'mainnet_spot_entry', '5 seconds'::interval, '15 seconds'::interval, 'spot');
 SELECT create_onchain_median_aggregate('mainnet_spot_median_10_s', 'mainnet_spot_entry', '10 seconds'::interval, '30 seconds'::interval, 'spot');
 SELECT create_onchain_median_aggregate('mainnet_spot_median_1_min', 'mainnet_spot_entry', '1 minute'::interval, '3 minutes'::interval, 'spot');
 SELECT create_onchain_median_aggregate('mainnet_spot_median_15_min', 'mainnet_spot_entry', '15 minutes'::interval, '45 minutes'::interval, 'spot');
@@ -80,9 +77,6 @@ SELECT create_onchain_median_aggregate('mainnet_spot_median_1_day', 'mainnet_spo
 SELECT create_onchain_median_aggregate('mainnet_spot_median_1_week', 'mainnet_spot_entry', '1 week'::interval, '3 weeks'::interval, 'spot');
 
 -- Testnet Spot Median
-SELECT create_onchain_median_aggregate('spot_median_100_ms', 'spot_entry', '100 milliseconds'::interval, '300 milliseconds'::interval, 'spot');
-SELECT create_onchain_median_aggregate('spot_median_1_s', 'spot_entry', '1 second'::interval, '3 seconds'::interval, 'spot');
-SELECT create_onchain_median_aggregate('spot_median_5_s', 'spot_entry', '5 seconds'::interval, '15 seconds'::interval, 'spot');
 SELECT create_onchain_median_aggregate('spot_median_10_s', 'spot_entry', '10 seconds'::interval, '30 seconds'::interval, 'spot');
 SELECT create_onchain_median_aggregate('spot_median_1_min', 'spot_entry', '1 minute'::interval, '3 minutes'::interval, 'spot');
 SELECT create_onchain_median_aggregate('spot_median_15_min', 'spot_entry', '15 minutes'::interval, '45 minutes'::interval, 'spot');
@@ -92,9 +86,6 @@ SELECT create_onchain_median_aggregate('spot_median_1_day', 'spot_entry', '1 day
 SELECT create_onchain_median_aggregate('spot_median_1_week', 'spot_entry', '1 week'::interval, '3 weeks'::interval, 'spot');
 
 -- Mainnet Perp Median
-SELECT create_onchain_median_aggregate('mainnet_perp_median_100_ms', 'mainnet_future_entry', '100 milliseconds'::interval, '300 milliseconds'::interval, 'perp');
-SELECT create_onchain_median_aggregate('mainnet_perp_median_1_s', 'mainnet_future_entry', '1 second'::interval, '3 seconds'::interval, 'perp');
-SELECT create_onchain_median_aggregate('mainnet_perp_median_5_s', 'mainnet_future_entry', '5 seconds'::interval, '15 seconds'::interval, 'perp');
 SELECT create_onchain_median_aggregate('mainnet_perp_median_10_s', 'mainnet_future_entry', '10 seconds'::interval, '30 seconds'::interval, 'perp');
 SELECT create_onchain_median_aggregate('mainnet_perp_median_1_min', 'mainnet_future_entry', '1 minute'::interval, '3 minutes'::interval, 'perp');
 SELECT create_onchain_median_aggregate('mainnet_perp_median_15_min', 'mainnet_future_entry', '15 minutes'::interval, '45 minutes'::interval, 'perp');
@@ -104,9 +95,6 @@ SELECT create_onchain_median_aggregate('mainnet_perp_median_1_day', 'mainnet_fut
 SELECT create_onchain_median_aggregate('mainnet_perp_median_1_week', 'mainnet_future_entry', '1 week'::interval, '3 weeks'::interval, 'perp');
 
 -- Testnet Perp Median
-SELECT create_onchain_median_aggregate('perp_median_100_ms', 'future_entry', '100 milliseconds'::interval, '300 milliseconds'::interval, 'perp');
-SELECT create_onchain_median_aggregate('perp_median_1_s', 'future_entry', '1 second'::interval, '3 seconds'::interval, 'perp');
-SELECT create_onchain_median_aggregate('perp_median_5_s', 'future_entry', '5 seconds'::interval, '15 seconds'::interval, 'perp');
 SELECT create_onchain_median_aggregate('perp_median_10_s', 'future_entry', '10 seconds'::interval, '30 seconds'::interval, 'perp');
 SELECT create_onchain_median_aggregate('perp_median_1_min', 'future_entry', '1 minute'::interval, '3 minutes'::interval, 'perp');
 SELECT create_onchain_median_aggregate('perp_median_15_min', 'future_entry', '15 minutes'::interval, '45 minutes'::interval, 'perp');
