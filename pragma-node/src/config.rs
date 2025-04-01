@@ -48,7 +48,7 @@ pub enum CloudEnv {
 #[derive(Default, Debug, Deserialize, Clone)]
 pub struct ModeConfig {
     mode: Mode,
-    cloud_env: CloudEnv,
+    cloud_env: Option<CloudEnv>,
 }
 
 #[derive(Default, Debug, Deserialize, Clone)]
@@ -64,7 +64,7 @@ impl Config {
     }
 
     pub fn cloud_env(&self) -> CloudEnv {
-        self.mode.cloud_env.clone()
+        self.mode.cloud_env.clone().unwrap_or_default()
     }
 
     pub fn server_host(&self) -> &str {
