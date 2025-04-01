@@ -3,4 +3,4 @@
 /// Needed for `StarkEx` signature.
 /// See:
 /// <https://docs.starkware.co/starkex/perpetual/becoming-an-oracle-provider-for-starkex.html>
-pub const PRAGMA_ORACLE_NAME_FOR_STARKEX: &str = "PRGM";
+pub const PRAGMA_ORACLE_NAME_FOR_STARKEX: &str = "PRAGMA";
