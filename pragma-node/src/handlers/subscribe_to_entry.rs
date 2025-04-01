@@ -319,9 +319,11 @@ impl TryFrom<(String, MedianEntry, SigningKey)> for AssetOraclePrice {
     fn try_from(value: (String, MedianEntry, SigningKey)) -> Result<Self, Self::Error> {
         let (pair_id, entry, signing_key) = value;
 
+        // Computes IDs
         let global_asset_id = StarkexPrice::get_global_asset_id(&pair_id)?;
         let oracle_asset_id =
             StarkexPrice::get_oracle_asset_id(PRAGMA_ORACLE_NAME_FOR_STARKEX, &pair_id)?;
+
         let signed_prices_result: Result<Vec<_>, ConversionError> = entry
             .components
             .unwrap_or_default()
@@ -336,9 +338,10 @@ impl TryFrom<(String, MedianEntry, SigningKey)> for AssetOraclePrice {
                     timestamp,
                     price: price.clone(),
                 };
-                let signature = sign_data(&signing_key, &starkex_price).unwrap(); // TODO: Proper error handling
+                let signature = sign_data(&signing_key, &starkex_price)
+                    .map_err(|_| ConversionError::FailedSignature(pair_id.clone()))?;
                 Ok(SignedPublisherPrice {
-                    oracle_asset_id: format!("0x{}", oracle_asset_id),
+                    oracle_asset_id: format!("0x{oracle_asset_id}"),
                     oracle_price: price.to_string(),
                     signing_key: signing_key.secret_scalar().to_hex_string(),
                     timestamp: timestamp.to_string(),
@@ -349,7 +352,7 @@ impl TryFrom<(String, MedianEntry, SigningKey)> for AssetOraclePrice {
         let signed_prices = signed_prices_result?;
 
         Ok(Self {
-            global_asset_id: format!("0x{}", global_asset_id),
+            global_asset_id: format!("0x{global_asset_id}"),
             median_price: entry.median_price.to_string(),
             signature: String::new(),
             signed_prices,

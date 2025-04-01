@@ -38,11 +38,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Build the pragma signer based on cloud environment
     let pragma_signer = build_signer(config.cloud_env(), config.is_production_mode()).await;
-    println!("Here is the cloud env: {:?}", config.cloud_env());
-    println!(
-        "The pragma signer is the following: {}",
-        pragma_signer.is_none()
-    );
     let state = AppState {
         offchain_pool,
         onchain_pool,

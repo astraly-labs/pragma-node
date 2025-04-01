@@ -154,9 +154,11 @@ pub(crate) fn hex_string_to_bigdecimal(
     let cleaned_hex = hex_str.trim_start_matches("0x");
 
     // Parse hex string to BigUint
-    let bigint =
+    let parsed_big_int =
         BigUint::parse_bytes(cleaned_hex.as_bytes(), 16).ok_or("Failed to parse hex string")?;
-    let big_int = bigint.to_bigint().ok_or("Failed to convert to BigInt")?;
+    let big_int = parsed_big_int
+        .to_bigint()
+        .ok_or("Failed to convert to BigInt")?;
     let decimal = BigDecimal::new(big_int, 0);
 
     Ok(decimal)

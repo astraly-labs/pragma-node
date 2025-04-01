@@ -40,7 +40,6 @@ pub async fn build_signer(cloud_env: CloudEnv, is_production: bool) -> Option<Si
             }
         }
     };
-    println!("do we have prod: {}", is_production);
     if !is_production && cloud_signer.is_none() {
         tracing::info!(
             "Not in production mode and no cloud signer found. Generating random signing key for development."

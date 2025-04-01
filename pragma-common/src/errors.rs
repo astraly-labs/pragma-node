@@ -16,4 +16,7 @@ pub enum ConversionError {
     StringTimestampConversion,
     #[error("failed to convert price string")]
     StringPriceConversion,
+    #[error("fail to sign for pair {0:?}")]
+    #[schema(value_type = String)]
+    FailedSignature(String),
 }

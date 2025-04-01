@@ -1,21 +1,15 @@
 use std::collections::HashMap;
 
-use bigdecimal::{BigDecimal, FromPrimitive, ToPrimitive};
+use bigdecimal::{BigDecimal, FromPrimitive};
 use chrono::{DateTime, NaiveDateTime};
 use diesel::prelude::QueryableByName;
 use diesel::sql_types::{Double, Jsonb, Record, VarChar};
 use diesel::{Queryable, RunQueryDsl};
-use pragma_common::signing::{Signable, sign_data};
 use pragma_common::timestamp::TimestampError;
-use pragma_entities::EntryError;
 use serde::{Deserialize, Serialize};
-use starknet::core::utils::cairo_short_string_to_felt;
-use starknet::signers::SigningKey;
-use starknet_crypto::{Felt, pedersen_hash};
 use utoipa::ToSchema;
 
 use pragma_common::errors::ConversionError;
-use pragma_common::signing::starkex::StarkexPrice;
 use pragma_common::types::pair::Pair;
 use pragma_common::types::{AggregationMode, Interval};
 use pragma_entities::{Entry, error::InfraError};
@@ -23,9 +17,7 @@ use pragma_entities::{Entry, error::InfraError};
 use crate::constants::EIGHTEEN_DECIMALS;
 use crate::constants::currencies::ABSTRACT_CURRENCIES;
 use crate::constants::others::ROUTING_FRESHNESS_THRESHOLD;
-use crate::constants::starkex_ws::PRAGMA_ORACLE_NAME_FOR_STARKEX;
 use crate::handlers::get_entry::EntryParams;
-use crate::handlers::subscribe_to_entry::{AssetOraclePrice, SignedPublisherPrice};
 use crate::utils::convert_via_quote;
 use crate::utils::sql::{get_interval_specifier, get_table_suffix};
 
@@ -933,137 +925,11 @@ pub struct EntryComponent {
     pub publisher_signature: String,
 }
 
-impl SignedPublisherPrice {
-    fn from_entry_component(
-        component: EntryComponent,
-        pragma_signer: &SigningKey,
-    ) -> Result<Self, EntryError> {
-        let asset_id = StarkexPrice::get_oracle_asset_id(&component.publisher, &component.pair_id)
-            .map_err(|e| EntryError::InternalServerError(format!("Conversion error: {:?}", e)))?;
-        let signature =
-            sign_data(pragma_signer, &component).map_err(|_| EntryError::InvalidSigner)?;
-
-        Ok(Self {
-            oracle_asset_id: format!("0x{asset_id}"),
-            oracle_price: component.price.to_string(),
-            timestamp: component.timestamp.to_string(),
-            signing_key: component.publisher_address,
-            signature,
-        })
-    }
-}
-
-impl EntryComponent {
-    pub fn get_global_asset_id(pair_id: &str) -> Result<String, ConversionError> {
-        let pair_id = pair_id.replace('/', "-");
-        let pair_id = if pair_id.contains('-') {
-            format!("{pair_id}-8")
-        } else {
-            let (first, second) = pair_id.split_at(3);
-            format!("{first}-{second}-8")
-        };
-
-        let felt =
-            cairo_short_string_to_felt(&pair_id).map_err(|_| ConversionError::FeltConversion)?;
-        let hex = format!("{felt:x}");
-        Ok(format!("{hex:0<30}"))
-    }
-
-    pub fn get_oracle_asset_id(
-        oracle_name: &str,
-        pair_id: &str,
-    ) -> Result<String, ConversionError> {
-        let market_name = pair_id.replace(['/', '-'], "");
-
-        let market_felt = cairo_short_string_to_felt(&market_name)
-            .map_err(|_| ConversionError::FeltConversion)?;
-        let oracle_felt =
-            cairo_short_string_to_felt(oracle_name).map_err(|_| ConversionError::FeltConversion)?;
-
-        let market_hex = format!("{market_felt:x}");
-        let oracle_hex = format!("{oracle_felt:x}");
-
-        Ok(format!("{market_hex:0<32}{oracle_hex:0<8}00"))
-    }
-    /// Builds the first number for the hash computation based on oracle name and pair id.
-    pub fn build_external_asset_id(
-        oracle_name: &str,
-        pair_id: &str,
-    ) -> Result<Felt, ConversionError> {
-        let external_asset_id = Self::get_oracle_asset_id(oracle_name, pair_id)?;
-        Felt::from_hex(&external_asset_id).map_err(|_| ConversionError::FeltConversion)
-    }
-
-    /// Builds the second number for the hash computation based on timestamp and price.
-    pub fn build_second_number(
-        timestamp: u128,
-        price: &BigDecimal,
-    ) -> Result<Felt, ConversionError> {
-        let price = price.to_u128().ok_or(ConversionError::U128Conversion)?;
-        let price_as_hex = format!("{price:x}");
-        let timestamp_as_hex = format!("{timestamp:x}");
-        let v = format!("{price_as_hex}{timestamp_as_hex}");
-        Felt::from_hex(&v).map_err(|_| ConversionError::FeltConversion)
-    }
-}
-
-impl Signable for EntryComponent {
-    /// Computes a signature-ready message based on oracle, asset, timestamp
-    /// and price.
-    /// The signature is the pedersen hash of two `FieldElements`:
-    ///
-    /// first number (`oracle_asset_id`):
-    ///  ---------------------------------------------------------------------------------
-    ///  | `asset_name` (rest of the number)  - 211 bits       |   `oracle_name` (40 bits)   |
-    ///  ---------------------------------------------------------------------------------
-    ///
-    /// second number:
-    ///  ---------------------------------------------------------------------------------
-    ///  | 0 (92 bits)         | price (120 bits)              |   timestamp (32 bits)   |
-    ///  ---------------------------------------------------------------------------------
-    ///
-    /// See:
-    /// <https://docs.starkware.co/starkex/perpetual/becoming-an-oracle-provider-for-starkex.html#signing_prices>
-    fn try_get_hash(&self) -> Result<Felt, ConversionError> {
-        let first_number =
-            Self::build_external_asset_id(&PRAGMA_ORACLE_NAME_FOR_STARKEX, &self.pair_id)?;
-        let timestamp = self
-            .timestamp
-            .parse::<u128>()
-            .map_err(|_| ConversionError::StringTimestampConversion)?;
-        let second_number = Self::build_second_number(timestamp, &self.price)?;
-        Ok(pedersen_hash(&first_number, &second_number))
-    }
-}
-
 #[derive(Debug, Deserialize, Serialize)]
 pub struct MedianEntryWithComponents {
     pub pair_id: String,
     pub median_price: BigDecimal,
     pub components: Vec<EntryComponent>,
-}
-
-impl AssetOraclePrice {
-    pub fn from_median_entry_with_components(
-        median_entry: MedianEntryWithComponents,
-        pragma_signer: &SigningKey,
-    ) -> Result<Self, ConversionError> {
-        let signed_prices: Vec<SignedPublisherPrice> = median_entry
-            .components
-            .into_iter()
-            .map(|component| SignedPublisherPrice::from_entry_component(component, pragma_signer))
-            .collect::<Result<Vec<_>, EntryError>>() // Collect into Result<Vec<_>, EntryError>
-            .map_err(|_| ConversionError::FeltConversion)?;
-
-        let global_asset_id = StarkexPrice::get_global_asset_id(&median_entry.pair_id)?;
-
-        Ok(Self {
-            global_asset_id: format!("0x{global_asset_id}"),
-            median_price: median_entry.median_price.to_string(),
-            signed_prices: signed_prices,
-            signature: Default::default(),
-        })
-    }
 }
 
 pub async fn get_price_with_components(
@@ -1093,7 +959,7 @@ pub async fn get_price_with_components(
                 components,
                 ROW_NUMBER() OVER (PARTITION BY pair_id ORDER BY bucket DESC) as rn
             FROM
-                {}
+                {table_name}
             WHERE
                 pair_id = ANY($1)
         )
@@ -1107,8 +973,7 @@ pub async fn get_price_with_components(
             ranked_entries
         WHERE
             rn = 1
-        ",
-        table_name
+        "
     );
 
     let raw_entries = conn
