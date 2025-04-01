@@ -40,7 +40,7 @@ pub async fn subscribe_to_price(
 }
 
 /// Interval in milliseconds that the channel will update the client with the latest prices.
-const CHANNEL_UPDATE_INTERVAL_IN_MS: u64 = 500;
+const CHANNEL_UPDATE_INTERVAL_IN_MS: u64 = 100;
 
 #[tracing::instrument(
     skip(socket, app_state),
