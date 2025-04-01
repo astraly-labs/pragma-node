@@ -255,6 +255,8 @@ impl WsEntriesHandler {
     ) -> Result<SubscribeToEntryResponse, EntryError> {
         let spot_pairs = subscription.get_subscribed_spot_pairs();
         let perp_pairs = subscription.get_subscribed_perp_pairs();
+        let number_of_spot_pairs = spot_pairs.len();
+        let number_of_perp_pairs = perp_pairs.len();
 
         if spot_pairs.is_empty() && perp_pairs.is_empty() {
             return Ok(Default::default());
@@ -263,9 +265,21 @@ impl WsEntriesHandler {
         let mut all_entries = if spot_pairs.is_empty() {
             HashMap::new()
         } else {
-            get_price_with_components(&state.offchain_pool, spot_pairs, false)
+            let entries = get_price_with_components(&state.offchain_pool, spot_pairs, false)
                 .await
-                .map_err(|e| EntryError::DatabaseError(format!("Failed to fetch spot data: {e}")))?
+                .map_err(|e| {
+                    EntryError::DatabaseError(format!("Failed to fetch spot data: {e}"))
+                })?;
+            // Check if we got entries for all requested spot pairs
+            if entries.len() < number_of_spot_pairs {
+                tracing::debug!(
+                    "Missing spot prices for some pairs. Found {} of {} requested pairs.",
+                    entries.len(),
+                    number_of_spot_pairs
+                );
+                return Ok(Default::default());
+            }
+            entries
         };
 
         if !perp_pairs.is_empty() {
@@ -274,13 +288,21 @@ impl WsEntriesHandler {
                 .map_err(|e| {
                     EntryError::DatabaseError(format!("Failed to fetch perp data: {e}"))
                 })?;
-
+            // Check if we got entries for all requested perp pairs
+            if perp_entries.len() < number_of_perp_pairs {
+                tracing::debug!(
+                    "Missing perp prices for some pairs. Found {} of {} requested pairs.",
+                    perp_entries.len(),
+                    number_of_perp_pairs
+                );
+                return Ok(Default::default());
+            }
             // Merge the results
             all_entries.extend(perp_entries);
         }
 
         let mut response: SubscribeToEntryResponse = Default::default();
-        let now = chrono::Utc::now().timestamp();
+        let now = chrono::Utc::now().timestamp_millis();
 
         let pragma_signer = state
             .pragma_signer
@@ -329,7 +351,7 @@ impl TryFrom<(String, MedianEntry, SigningKey)> for AssetOraclePrice {
             .unwrap_or_default()
             .into_iter()
             .map(|comp| {
-                let timestamp = comp.timestamp.and_utc().timestamp() as u64;
+                let timestamp = comp.timestamp.and_utc().timestamp_millis() as u64;
                 let price = hex_string_to_bigdecimal(&comp.price)
                     .map_err(|_| ConversionError::StringPriceConversion)?;
                 let starkex_price = StarkexPrice {

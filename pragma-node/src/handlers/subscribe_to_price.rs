@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::net::SocketAddr;
 use std::sync::Arc;
 
@@ -95,18 +95,20 @@ impl ChannelHandler<SubscriptionState, SubscriptionRequest, EntryError> for WsEn
         subscriber: &mut Subscriber<SubscriptionState>,
         request: SubscriptionRequest,
     ) -> Result<(), EntryError> {
-        let (existing_spot_pairs, _existing_perp_pairs) =
+        let (existing_spot_pairs, existing_perp_pairs) =
             only_existing_pairs(&subscriber.app_state.offchain_pool, request.pairs).await;
         let mut state = subscriber.state.write().await;
         match request.msg_type {
             SubscriptionType::Subscribe => {
                 state.add_spot_pairs(existing_spot_pairs);
+                state.add_perp_pairs(existing_perp_pairs);
             }
             SubscriptionType::Unsubscribe => {
                 state.remove_spot_pairs(&existing_spot_pairs);
+                state.remove_perp_pairs(&existing_perp_pairs);
             }
         };
-        let subscribed_pairs = state.get_subscribed_spot_pairs();
+        let subscribed_pairs = state.get_fmt_subscribed_pairs();
         drop(state);
         // We send an ack message to the client with the subscribed pairs (so
         // the client knows which pairs are successfully subscribed).
@@ -161,7 +163,8 @@ impl WsEntriesHandler {
     #[tracing::instrument(
         skip(self, state, subscription),
         fields(
-            subscribed_pairs = ?subscription.get_subscribed_spot_pairs().len()
+            spot_pairs_count = ?subscription.get_subscribed_spot_pairs().len(),
+            perp_pairs_count = ?subscription.get_subscribed_perp_pairs().len()
         )
     )]
     async fn get_subscribed_pairs_medians(
@@ -170,12 +173,56 @@ impl WsEntriesHandler {
         subscription: &SubscriptionState,
     ) -> Result<SubscribeToPriceResponse, EntryError> {
         let spot_pairs = subscription.get_subscribed_spot_pairs();
-        if spot_pairs.is_empty() {
+        let perp_pairs = subscription.get_subscribed_perp_pairs();
+        let number_of_spot_pairs = spot_pairs.len();
+        let number_of_perp_pairs = perp_pairs.len();
+
+        // Return early if there are no pairs to process
+        if spot_pairs.is_empty() && perp_pairs.is_empty() {
             return Ok(Default::default());
         }
-        let median_entries = get_price_with_components(&state.offchain_pool, spot_pairs, false)
-            .await
-            .map_err(|e| EntryError::DatabaseError(format!("Failed to fetch price data: {e}")))?;
+
+        // Get spot prices
+        let mut median_entries = if spot_pairs.is_empty() {
+            HashMap::new()
+        } else {
+            let entries = get_price_with_components(&state.offchain_pool, spot_pairs, false)
+                .await
+                .map_err(|e| {
+                    EntryError::DatabaseError(format!("Failed to fetch spot price data: {e}"))
+                })?;
+            // Check if we got entries for all requested spot pairs
+            if entries.len() < number_of_spot_pairs {
+                tracing::debug!(
+                    "Missing spot prices for some pairs. Found {} of {} requested pairs.",
+                    entries.len(),
+                    number_of_spot_pairs
+                );
+                return Ok(Default::default());
+            }
+            entries
+        };
+
+        // Get perp prices and extend the HashMap
+        if !perp_pairs.is_empty() {
+            let perp_entries = get_price_with_components(&state.offchain_pool, perp_pairs, true)
+                .await
+                .map_err(|e| {
+                    EntryError::DatabaseError(format!("Failed to fetch perp price data: {e}"))
+                })?;
+            // Check if we got entries for all requested perp pairs
+            if perp_entries.len() < number_of_perp_pairs {
+                tracing::debug!(
+                    "Missing perp prices for some pairs. Found {} of {} requested pairs.",
+                    perp_entries.len(),
+                    number_of_perp_pairs
+                );
+                return Ok(Default::default());
+            }
+
+            // Add perp entries to the result
+            median_entries.extend(perp_entries);
+        }
 
         // Convert HashMap entries to the expected response format
         let oracle_prices = median_entries
@@ -188,7 +235,7 @@ impl WsEntriesHandler {
             .collect();
 
         Ok(SubscribeToPriceResponse {
-            timestamp: chrono::Utc::now().timestamp(),
+            timestamp: chrono::Utc::now().timestamp_millis(),
             oracle_prices,
         })
     }
@@ -209,6 +256,7 @@ struct SubscriptionAck {
 #[derive(Debug, Default, Serialize, Deserialize)]
 struct SubscriptionState {
     spot_pairs: HashSet<String>,
+    perp_pairs: HashSet<String>,
 }
 
 impl SubscriptionState {
@@ -225,9 +273,40 @@ impl SubscriptionState {
             self.spot_pairs.remove(pair);
         }
     }
+    fn add_perp_pairs(&mut self, pairs: Vec<String>) {
+        self.perp_pairs.extend(pairs);
+    }
+
+    fn remove_perp_pairs(&mut self, pairs: &[String]) {
+        for pair in pairs {
+            self.perp_pairs.remove(pair);
+        }
+    }
 
     /// Get the subscribed spot pairs.
     fn get_subscribed_spot_pairs(&self) -> Vec<String> {
         self.spot_pairs.iter().cloned().collect()
+    }
+
+    /// Get the subscribed perps pairs (without suffix).
+    fn get_subscribed_perp_pairs(&self) -> Vec<String> {
+        self.perp_pairs.iter().cloned().collect()
+    }
+
+    /// Get the subscribed perps pairs with the MARK suffix.
+    fn get_fmt_subscribed_perp_pairs(&self) -> Vec<String> {
+        self.perp_pairs
+            .iter()
+            .map(|pair| format!("{pair}:MARK"))
+            .collect()
+    }
+
+    /// Get all the currently subscribed pairs.
+    /// (Spot and Perp pairs with the suffix)
+    fn get_fmt_subscribed_pairs(&self) -> Vec<String> {
+        let mut spot_pairs = self.get_subscribed_spot_pairs();
+        let perp_pairs = self.get_fmt_subscribed_perp_pairs();
+        spot_pairs.extend(perp_pairs);
+        spot_pairs
     }
 }
