@@ -258,11 +258,13 @@ impl WsEntriesHandler {
         let number_of_spot_pairs = spot_pairs.len();
         let number_of_perp_pairs = perp_pairs.len();
 
-        if spot_pairs.is_empty() && perp_pairs.is_empty() {
-            return Ok(Default::default());
+        if number_of_spot_pairs == 0 && number_of_perp_pairs == 0 {
+            return Err(EntryError::NoSubscribedPairs(
+                "No pairs provided for subscription".into(),
+            ));
         }
 
-        let mut all_entries = if spot_pairs.is_empty() {
+        let mut all_entries = if number_of_spot_pairs == 0 {
             HashMap::new()
         } else {
             let entries = get_price_with_components(&state.offchain_pool, spot_pairs, false)
@@ -277,12 +279,11 @@ impl WsEntriesHandler {
                     entries.len(),
                     number_of_spot_pairs
                 );
-                return Ok(Default::default());
             }
             entries
         };
 
-        if !perp_pairs.is_empty() {
+        if number_of_perp_pairs != 0 {
             let perp_entries = get_price_with_components(&state.offchain_pool, perp_pairs, true)
                 .await
                 .map_err(|e| {
@@ -295,7 +296,6 @@ impl WsEntriesHandler {
                     perp_entries.len(),
                     number_of_perp_pairs
                 );
-                return Ok(Default::default());
             }
             // Merge the results
             all_entries.extend(perp_entries);
@@ -383,60 +383,60 @@ impl TryFrom<(String, MedianEntry, SigningKey)> for AssetOraclePrice {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct SubscriptionRequest {
-    msg_type: SubscriptionType,
-    pairs: Vec<String>,
+pub struct SubscriptionRequest {
+    pub msg_type: SubscriptionType,
+    pub pairs: Vec<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct SubscriptionAck {
-    msg_type: SubscriptionType,
-    pairs: Vec<String>,
+pub struct SubscriptionAck {
+    pub msg_type: SubscriptionType,
+    pub pairs: Vec<String>,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
-struct SubscriptionState {
-    spot_pairs: HashSet<String>,
-    perp_pairs: HashSet<String>,
+pub struct SubscriptionState {
+    pub spot_pairs: HashSet<String>,
+    pub perp_pairs: HashSet<String>,
 }
 
 impl SubscriptionState {
-    fn is_empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.spot_pairs.is_empty() && self.perp_pairs.is_empty()
     }
 
-    fn add_spot_pairs(&mut self, pairs: Vec<String>) {
+    pub fn add_spot_pairs(&mut self, pairs: Vec<String>) {
         self.spot_pairs.extend(pairs);
     }
 
-    fn add_perp_pairs(&mut self, pairs: Vec<String>) {
+    pub fn add_perp_pairs(&mut self, pairs: Vec<String>) {
         self.perp_pairs.extend(pairs);
     }
 
-    fn remove_spot_pairs(&mut self, pairs: &[String]) {
+    pub fn remove_spot_pairs(&mut self, pairs: &[String]) {
         for pair in pairs {
             self.spot_pairs.remove(pair);
         }
     }
 
-    fn remove_perp_pairs(&mut self, pairs: &[String]) {
+    pub fn remove_perp_pairs(&mut self, pairs: &[String]) {
         for pair in pairs {
             self.perp_pairs.remove(pair);
         }
     }
 
     /// Get the subscribed spot pairs.
-    fn get_subscribed_spot_pairs(&self) -> Vec<String> {
+    pub fn get_subscribed_spot_pairs(&self) -> Vec<String> {
         self.spot_pairs.iter().cloned().collect()
     }
 
     /// Get the subscribed perps pairs (without suffix).
-    fn get_subscribed_perp_pairs(&self) -> Vec<String> {
+    pub fn get_subscribed_perp_pairs(&self) -> Vec<String> {
         self.perp_pairs.iter().cloned().collect()
     }
 
     /// Get the subscribed perps pairs with the MARK suffix.
-    fn get_fmt_subscribed_perp_pairs(&self) -> Vec<String> {
+    pub fn get_fmt_subscribed_perp_pairs(&self) -> Vec<String> {
         self.perp_pairs
             .iter()
             .map(|pair| format!("{pair}:MARK"))
@@ -445,7 +445,7 @@ impl SubscriptionState {
 
     /// Get all the currently subscribed pairs.
     /// (Spot and Perp pairs with the suffix)
-    fn get_fmt_subscribed_pairs(&self) -> Vec<String> {
+    pub fn get_fmt_subscribed_pairs(&self) -> Vec<String> {
         let mut spot_pairs = self.get_subscribed_spot_pairs();
         let perp_pairs = self.get_fmt_subscribed_perp_pairs();
         spot_pairs.extend(perp_pairs);

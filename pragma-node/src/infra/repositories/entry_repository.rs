@@ -932,6 +932,9 @@ pub struct MedianEntryWithComponents {
     pub components: Vec<EntryComponent>,
 }
 
+/// Retrieves the latest median prices with component data for the specified pairs
+// This function queries the most recent price in the 100ms bucket for each requested pair.
+// If a pair doesn't have data in the current bucket, it won't be included in the results.
 pub async fn get_price_with_components(
     pool: &deadpool_diesel::postgres::Pool,
     pair_ids: Vec<String>,

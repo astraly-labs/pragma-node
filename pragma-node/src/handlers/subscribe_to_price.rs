@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
@@ -15,6 +15,8 @@ use crate::infra::repositories::entry_repository::get_price_with_components;
 use crate::state::AppState;
 use crate::utils::only_existing_pairs;
 use crate::utils::ws::{ChannelHandler, Subscriber, SubscriptionType};
+
+use super::subscribe_to_entry::{SubscriptionAck, SubscriptionRequest, SubscriptionState};
 
 #[derive(Debug, Default, Serialize, Deserialize, ToResponse, ToSchema)]
 pub struct AssetOraclePrice {
@@ -178,12 +180,14 @@ impl WsEntriesHandler {
         let number_of_perp_pairs = perp_pairs.len();
 
         // Return early if there are no pairs to process
-        if spot_pairs.is_empty() && perp_pairs.is_empty() {
-            return Ok(Default::default());
+        if number_of_spot_pairs == 0 && number_of_perp_pairs == 0 {
+            return Err(EntryError::NoSubscribedPairs(
+                "No pairs provided for subscription".into(),
+            ));
         }
 
         // Get spot prices
-        let mut median_entries = if spot_pairs.is_empty() {
+        let mut median_entries = if number_of_spot_pairs == 0 {
             HashMap::new()
         } else {
             let entries = get_price_with_components(&state.offchain_pool, spot_pairs, false)
@@ -198,13 +202,12 @@ impl WsEntriesHandler {
                     entries.len(),
                     number_of_spot_pairs
                 );
-                return Ok(Default::default());
             }
             entries
         };
 
         // Get perp prices and extend the HashMap
-        if !perp_pairs.is_empty() {
+        if number_of_perp_pairs != 0 {
             let perp_entries = get_price_with_components(&state.offchain_pool, perp_pairs, true)
                 .await
                 .map_err(|e| {
@@ -217,7 +220,6 @@ impl WsEntriesHandler {
                     perp_entries.len(),
                     number_of_perp_pairs
                 );
-                return Ok(Default::default());
             }
 
             // Add perp entries to the result
@@ -238,75 +240,5 @@ impl WsEntriesHandler {
             timestamp: chrono::Utc::now().timestamp_millis(),
             oracle_prices,
         })
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct SubscriptionRequest {
-    msg_type: SubscriptionType,
-    pairs: Vec<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct SubscriptionAck {
-    msg_type: SubscriptionType,
-    pairs: Vec<String>,
-}
-
-#[derive(Debug, Default, Serialize, Deserialize)]
-struct SubscriptionState {
-    spot_pairs: HashSet<String>,
-    perp_pairs: HashSet<String>,
-}
-
-impl SubscriptionState {
-    fn is_empty(&self) -> bool {
-        self.spot_pairs.is_empty()
-    }
-
-    fn add_spot_pairs(&mut self, pairs: Vec<String>) {
-        self.spot_pairs.extend(pairs);
-    }
-
-    fn remove_spot_pairs(&mut self, pairs: &[String]) {
-        for pair in pairs {
-            self.spot_pairs.remove(pair);
-        }
-    }
-    fn add_perp_pairs(&mut self, pairs: Vec<String>) {
-        self.perp_pairs.extend(pairs);
-    }
-
-    fn remove_perp_pairs(&mut self, pairs: &[String]) {
-        for pair in pairs {
-            self.perp_pairs.remove(pair);
-        }
-    }
-
-    /// Get the subscribed spot pairs.
-    fn get_subscribed_spot_pairs(&self) -> Vec<String> {
-        self.spot_pairs.iter().cloned().collect()
-    }
-
-    /// Get the subscribed perps pairs (without suffix).
-    fn get_subscribed_perp_pairs(&self) -> Vec<String> {
-        self.perp_pairs.iter().cloned().collect()
-    }
-
-    /// Get the subscribed perps pairs with the MARK suffix.
-    fn get_fmt_subscribed_perp_pairs(&self) -> Vec<String> {
-        self.perp_pairs
-            .iter()
-            .map(|pair| format!("{pair}:MARK"))
-            .collect()
-    }
-
-    /// Get all the currently subscribed pairs.
-    /// (Spot and Perp pairs with the suffix)
-    fn get_fmt_subscribed_pairs(&self) -> Vec<String> {
-        let mut spot_pairs = self.get_subscribed_spot_pairs();
-        let perp_pairs = self.get_fmt_subscribed_perp_pairs();
-        spot_pairs.extend(perp_pairs);
-        spot_pairs
     }
 }

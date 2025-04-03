@@ -9,7 +9,7 @@ use aws::PragmaSignerBuilder as AwsPragmaSignerBuilder;
 use gcp::PragmaSignerBuilder as GcpPragmaSignerBuilder;
 
 pub async fn build_signer(cloud_env: CloudEnv, is_production: bool) -> Option<SigningKey> {
-    let cloud_signer = if is_production {
+    if is_production {
         match cloud_env {
             CloudEnv::Aws => {
                 AwsPragmaSignerBuilder::new()
@@ -39,14 +39,5 @@ pub async fn build_signer(cloud_env: CloudEnv, is_production: bool) -> Option<Si
                     .await
             }
         }
-    };
-    if !is_production && cloud_signer.is_none() {
-        tracing::info!(
-            "Not in production mode and no cloud signer found. Generating random signing key for development."
-        );
-        let random_key = SigningKey::from_random();
-        Some(random_key)
-    } else {
-        cloud_signer
     }
 }

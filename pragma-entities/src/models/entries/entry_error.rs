@@ -68,7 +68,7 @@ pub enum EntryError {
     InvalidSigner,
 
     // Onchain db error
-    #[error("could not fetch price data")]
+    #[error("could not fetch price from onchain db: {0}")]
     DatabaseError(String),
 
     // 500 Error - Internal server error
@@ -77,6 +77,10 @@ pub enum EntryError {
 
     #[error("websocket error: {0}")]
     WebSocketError(#[from] WebSocketError),
+
+    #[error("Subscription error: {0}")]
+    #[schema(value_type = String)]
+    NoSubscribedPairs(String),
 }
 
 impl From<InfraError> for EntryError {
@@ -173,6 +177,9 @@ impl IntoResponse for EntryError {
                 StatusCode::INTERNAL_SERVER_ERROR,
                 format!("WebSocket error: {err}"),
             ),
+            Self::NoSubscribedPairs(err) => {
+                (StatusCode::NOT_FOUND, format!("Subscription error: {err}"))
+            }
         };
 
         (
