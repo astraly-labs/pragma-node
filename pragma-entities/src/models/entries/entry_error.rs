@@ -77,10 +77,6 @@ pub enum EntryError {
 
     #[error("websocket error: {0}")]
     WebSocketError(#[from] WebSocketError),
-
-    #[error("Subscription error: {0}")]
-    #[schema(value_type = String)]
-    NoSubscribedPairs(String),
 }
 
 impl From<InfraError> for EntryError {
@@ -177,9 +173,6 @@ impl IntoResponse for EntryError {
                 StatusCode::INTERNAL_SERVER_ERROR,
                 format!("WebSocket error: {err}"),
             ),
-            Self::NoSubscribedPairs(err) => {
-                (StatusCode::NOT_FOUND, format!("Subscription error: {err}"))
-            }
         };
 
         (

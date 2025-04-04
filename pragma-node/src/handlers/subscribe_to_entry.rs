@@ -257,13 +257,6 @@ impl WsEntriesHandler {
         let perp_pairs = subscription.get_subscribed_perp_pairs();
         let number_of_spot_pairs = spot_pairs.len();
         let number_of_perp_pairs = perp_pairs.len();
-
-        if number_of_spot_pairs == 0 && number_of_perp_pairs == 0 {
-            return Err(EntryError::NoSubscribedPairs(
-                "No pairs provided for subscription".into(),
-            ));
-        }
-
         let mut all_entries = if number_of_spot_pairs == 0 {
             HashMap::new()
         } else {
