@@ -41,12 +41,6 @@ pub struct SignedPublisherPrice {
     /// Unix timestamp as string
     #[schema(example = "1741594457")]
     pub timestamp: String,
-
-    // Signature
-    #[schema(
-        example = "0x03ac186cbbb633b7eb13e5a1c22454da7a6e9f6a4b81236380ec4564634afc30638641c0f2a613edc947241a68c54f0da4f08bc9dbb3b79154c87ad3d74ad83"
-    )]
-    pub signature: String,
 }
 
 /// Price data structure for `StarkEx` oracle integration
@@ -347,20 +341,11 @@ impl TryFrom<(String, MedianEntry, SigningKey)> for AssetOraclePrice {
                 let timestamp = comp.timestamp.and_utc().timestamp_millis() as u64;
                 let price = hex_string_to_bigdecimal(&comp.price)
                     .map_err(|_| ConversionError::StringPriceConversion)?;
-                let starkex_price = StarkexPrice {
-                    oracle_name: PRAGMA_ORACLE_NAME_FOR_STARKEX.to_string(),
-                    pair_id: pair_id.clone(),
-                    timestamp,
-                    price: price.clone(),
-                };
-                let signature = sign_data(&signing_key, &starkex_price)
-                    .map_err(|_| ConversionError::FailedSignature(pair_id.clone()))?;
                 Ok(SignedPublisherPrice {
                     oracle_asset_id: format!("0x{oracle_asset_id}"),
                     oracle_price: price.to_string(),
                     signing_key: signing_key.secret_scalar().to_hex_string(),
                     timestamp: timestamp.to_string(),
-                    signature,
                 })
             })
             .collect();
