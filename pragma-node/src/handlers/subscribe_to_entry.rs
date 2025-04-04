@@ -6,6 +6,7 @@ use axum::extract::ws::{WebSocket, WebSocketUpgrade};
 use axum::extract::{ConnectInfo, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
+use bigdecimal::num_traits::sign;
 use pragma_common::errors::ConversionError;
 use serde::{Deserialize, Serialize};
 use starknet::signers::SigningKey;
@@ -344,7 +345,7 @@ impl TryFrom<(String, MedianEntry, SigningKey)> for AssetOraclePrice {
                 Ok(SignedPublisherPrice {
                     oracle_asset_id: format!("0x{oracle_asset_id}"),
                     oracle_price: price.to_string(),
-                    signing_key: signing_key.secret_scalar().to_hex_string(),
+                    signing_key: signing_key.verifying_key().scalar().to_hex_string(),
                     timestamp: timestamp.to_string(),
                 })
             })
