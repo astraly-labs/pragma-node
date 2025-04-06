@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::net::SocketAddr;
 use std::sync::Arc;
 
@@ -6,21 +6,22 @@ use axum::extract::ws::{WebSocket, WebSocketUpgrade};
 use axum::extract::{ConnectInfo, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
+use bigdecimal::num_traits::sign;
+use pragma_common::errors::ConversionError;
 use serde::{Deserialize, Serialize};
+use starknet::signers::SigningKey;
 use utoipa::{ToResponse, ToSchema};
 
 use pragma_common::signing::sign_data;
 use pragma_common::signing::starkex::StarkexPrice;
-use pragma_common::types::DataType;
 use pragma_common::types::timestamp::UnixTimestamp;
 use pragma_entities::EntryError;
 
 use crate::constants::starkex_ws::PRAGMA_ORACLE_NAME_FOR_STARKEX;
-use crate::infra::repositories::entry_repository::MedianEntryWithComponents;
+use crate::infra::repositories::entry_repository::{MedianEntry, get_price_with_components};
 use crate::state::AppState;
-use crate::utils::only_existing_pairs;
-use crate::utils::pricer::{IndexPricer, MarkPricer, Pricer};
 use crate::utils::{ChannelHandler, Subscriber, SubscriptionType};
+use crate::utils::{hex_string_to_bigdecimal, only_existing_pairs};
 
 /// Response format for `StarkEx` price subscriptions
 #[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
@@ -122,7 +123,7 @@ pub async fn subscribe_to_entry(
 )]
 async fn create_new_subscriber(socket: WebSocket, app_state: AppState, client_addr: SocketAddr) {
     /// Interval in milliseconds that the channel will update the client with the latest prices.
-    const CHANNEL_UPDATE_INTERVAL_IN_MS: u64 = 500;
+    const CHANNEL_UPDATE_INTERVAL_IN_MS: u64 = 100;
 
     let mut subscriber = match Subscriber::<SubscriptionState>::new(
         "subscribe_to_entry".into(),
@@ -186,17 +187,13 @@ impl ChannelHandler<SubscriptionState, SubscriptionRequest, EntryError> for WsEn
         drop(state);
         // We send an ack message to the client with the subscribed pairs (so
         // the client knows which pairs are successfully subscribed).
-        if let Ok(ack_message) = serde_json::to_string(&SubscriptionAck {
+        let ack = SubscriptionAck {
             msg_type: request.msg_type,
             pairs: subscribed_pairs,
-        }) {
-            if subscriber.send_msg(ack_message).await.is_err() {
-                let error_msg = "Message received but could not send ack message.";
-                subscriber.send_err(error_msg).await;
-            }
-        } else {
-            let error_msg = "Could not serialize ack message.";
-            subscriber.send_err(error_msg).await;
+        };
+        if let Err(e) = subscriber.send_msg(ack).await {
+            let error_msg = format!("Message received but could not send ack message: {e}");
+            subscriber.send_err(&error_msg).await;
         }
         Ok(())
     }
@@ -212,6 +209,7 @@ impl ChannelHandler<SubscriptionState, SubscriptionRequest, EntryError> for WsEn
         subscriber: &mut Subscriber<SubscriptionState>,
     ) -> Result<(), EntryError> {
         let subscription = subscriber.state.read().await;
+
         if subscription.is_empty() {
             return Ok(());
         }
@@ -227,12 +225,10 @@ impl ChannelHandler<SubscriptionState, SubscriptionRequest, EntryError> for WsEn
             }
         };
         drop(subscription);
-        if let Ok(json_response) = serde_json::to_string(&response) {
-            if subscriber.send_msg(json_response).await.is_err() {
-                subscriber.send_err("Could not send prices.").await;
-            }
-        } else {
-            subscriber.send_err("Could not serialize prices.").await;
+        if let Err(e) = subscriber.send_msg(response).await {
+            subscriber
+                .send_err(&format!("Could not send prices: {e}"))
+                .await;
         }
         Ok(())
     }
@@ -252,10 +248,49 @@ impl WsEntriesHandler {
         state: &AppState,
         subscription: &SubscriptionState,
     ) -> Result<SubscribeToEntryResponse, EntryError> {
-        let median_entries = self.get_all_entries(state, subscription).await?;
+        let spot_pairs = subscription.get_subscribed_spot_pairs();
+        let perp_pairs = subscription.get_subscribed_perp_pairs();
+        let number_of_spot_pairs = spot_pairs.len();
+        let number_of_perp_pairs = perp_pairs.len();
+        let mut all_entries = if number_of_spot_pairs == 0 {
+            HashMap::new()
+        } else {
+            let entries = get_price_with_components(&state.offchain_pool, spot_pairs, false)
+                .await
+                .map_err(|e| {
+                    EntryError::DatabaseError(format!("Failed to fetch spot data: {e}"))
+                })?;
+            // Check if we got entries for all requested spot pairs
+            if entries.len() < number_of_spot_pairs {
+                tracing::debug!(
+                    "Missing spot prices for some pairs. Found {} of {} requested pairs.",
+                    entries.len(),
+                    number_of_spot_pairs
+                );
+            }
+            entries
+        };
+
+        if number_of_perp_pairs != 0 {
+            let perp_entries = get_price_with_components(&state.offchain_pool, perp_pairs, true)
+                .await
+                .map_err(|e| {
+                    EntryError::DatabaseError(format!("Failed to fetch perp data: {e}"))
+                })?;
+            // Check if we got entries for all requested perp pairs
+            if perp_entries.len() < number_of_perp_pairs {
+                tracing::debug!(
+                    "Missing perp prices for some pairs. Found {} of {} requested pairs.",
+                    perp_entries.len(),
+                    number_of_perp_pairs
+                );
+            }
+            // Merge the results
+            all_entries.extend(perp_entries);
+        }
 
         let mut response: SubscribeToEntryResponse = Default::default();
-        let now = chrono::Utc::now().timestamp();
+        let now = chrono::Utc::now().timestamp_millis();
 
         let pragma_signer = state
             .pragma_signer
@@ -265,9 +300,7 @@ impl WsEntriesHandler {
                 "No Signer for Pragma".into(),
             ))?;
 
-        for entry in median_entries {
-            let pair_id = entry.pair_id.clone();
-
+        for (pair_id, entry) in all_entries {
             let starkex_price = StarkexPrice {
                 oracle_name: PRAGMA_ORACLE_NAME_FOR_STARKEX.to_string(),
                 pair_id: pair_id.clone(),
@@ -277,126 +310,112 @@ impl WsEntriesHandler {
             let signature =
                 sign_data(pragma_signer, &starkex_price).map_err(|_| EntryError::InvalidSigner)?;
 
-            // Create AssetOraclePrice with the original entry (it will be scaled in the TryFrom implementation)
-            let mut oracle_price: AssetOraclePrice = entry.try_into().map_err(|_| {
-                EntryError::InternalServerError("Could not create Oracle price".into())
-            })?;
+            let mut oracle_price: AssetOraclePrice =
+                AssetOraclePrice::try_from((pair_id, entry, pragma_signer.clone())) // TODO: remove clone
+                    .map_err(|_| {
+                        EntryError::InternalServerError("Could not create Oracle price".into())
+                    })?;
             oracle_price.signature = signature;
             response.oracle_prices.push(oracle_price);
         }
         response.timestamp = now;
         Ok(response)
     }
+}
 
-    /// Get index & mark prices for the subscribed pairs.
-    #[tracing::instrument(skip(self, state, subscription))]
-    async fn get_all_entries(
-        &self,
-        state: &AppState,
-        subscription: &SubscriptionState,
-    ) -> Result<Vec<MedianEntryWithComponents>, EntryError> {
-        let index_pricer = IndexPricer::new(
-            subscription.get_subscribed_spot_pairs(),
-            DataType::SpotEntry,
-        );
+impl TryFrom<(String, MedianEntry, SigningKey)> for AssetOraclePrice {
+    type Error = ConversionError;
 
-        let (usd_pairs, non_usd_pairs): (Vec<String>, Vec<String>) = subscription
-            .get_subscribed_perp_pairs()
+    fn try_from(value: (String, MedianEntry, SigningKey)) -> Result<Self, Self::Error> {
+        let (pair_id, entry, signing_key) = value;
+
+        // Computes IDs
+        let global_asset_id = StarkexPrice::get_global_asset_id(&pair_id)?;
+        let oracle_asset_id =
+            StarkexPrice::get_oracle_asset_id(PRAGMA_ORACLE_NAME_FOR_STARKEX, &pair_id)?;
+
+        let signed_prices_result: Result<Vec<_>, ConversionError> = entry
+            .components
+            .unwrap_or_default()
             .into_iter()
-            .partition(|pair| {
-                tracing::debug!("Checking pair for USD: {}", pair);
-                pair.ends_with("USD")
-            });
-        tracing::debug!(
-            "USD pairs: {:?}, non-USD pairs: {:?}",
-            usd_pairs,
-            non_usd_pairs
-        );
-        let mark_pricer_usd = IndexPricer::new(usd_pairs, DataType::PerpEntry);
-        let mark_pricer_non_usd = MarkPricer::new(non_usd_pairs, DataType::PerpEntry);
+            .map(|comp| {
+                let timestamp = comp.timestamp.and_utc().timestamp_millis() as u64;
+                let price = hex_string_to_bigdecimal(&comp.price)
+                    .map_err(|_| ConversionError::StringPriceConversion)?;
+                Ok(SignedPublisherPrice {
+                    oracle_asset_id: format!("0x{oracle_asset_id}"),
+                    oracle_price: price.to_string(),
+                    signing_key: signing_key.verifying_key().scalar().to_hex_string(),
+                    timestamp: timestamp.to_string(),
+                })
+            })
+            .collect();
+        let signed_prices = signed_prices_result?;
 
-        // Compute entries concurrently
-        let (index_entries, usd_mark_entries, non_usd_mark_entries) = tokio::join!(
-            index_pricer.compute(&state.offchain_pool),
-            mark_pricer_usd.compute(&state.offchain_pool),
-            mark_pricer_non_usd.compute(&state.offchain_pool)
-        );
-
-        let mut median_entries = vec![];
-        median_entries.extend(index_entries.unwrap_or_default());
-
-        // Add :MARK suffix to mark prices
-        let mut usd_mark_entries = usd_mark_entries.unwrap_or_default();
-        for entry in &mut usd_mark_entries {
-            entry.pair_id = format!("{}:MARK", entry.pair_id);
-        }
-        median_entries.extend(usd_mark_entries);
-
-        let mut non_usd_mark_entries = non_usd_mark_entries.unwrap_or_default();
-        for entry in &mut non_usd_mark_entries {
-            entry.pair_id = format!("{}:MARK", entry.pair_id);
-        }
-        median_entries.extend(non_usd_mark_entries);
-
-        Ok(median_entries)
+        Ok(Self {
+            global_asset_id: format!("0x{global_asset_id}"),
+            median_price: entry.median_price.to_string(),
+            signature: String::new(),
+            signed_prices,
+        })
     }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct SubscriptionRequest {
-    msg_type: SubscriptionType,
-    pairs: Vec<String>,
+pub struct SubscriptionRequest {
+    pub msg_type: SubscriptionType,
+    pub pairs: Vec<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct SubscriptionAck {
-    msg_type: SubscriptionType,
-    pairs: Vec<String>,
+pub struct SubscriptionAck {
+    pub msg_type: SubscriptionType,
+    pub pairs: Vec<String>,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
-struct SubscriptionState {
-    spot_pairs: HashSet<String>,
-    perp_pairs: HashSet<String>,
+pub struct SubscriptionState {
+    pub spot_pairs: HashSet<String>,
+    pub perp_pairs: HashSet<String>,
 }
 
 impl SubscriptionState {
-    fn is_empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.spot_pairs.is_empty() && self.perp_pairs.is_empty()
     }
 
-    fn add_spot_pairs(&mut self, pairs: Vec<String>) {
+    pub fn add_spot_pairs(&mut self, pairs: Vec<String>) {
         self.spot_pairs.extend(pairs);
     }
 
-    fn add_perp_pairs(&mut self, pairs: Vec<String>) {
+    pub fn add_perp_pairs(&mut self, pairs: Vec<String>) {
         self.perp_pairs.extend(pairs);
     }
 
-    fn remove_spot_pairs(&mut self, pairs: &[String]) {
+    pub fn remove_spot_pairs(&mut self, pairs: &[String]) {
         for pair in pairs {
             self.spot_pairs.remove(pair);
         }
     }
 
-    fn remove_perp_pairs(&mut self, pairs: &[String]) {
+    pub fn remove_perp_pairs(&mut self, pairs: &[String]) {
         for pair in pairs {
             self.perp_pairs.remove(pair);
         }
     }
 
     /// Get the subscribed spot pairs.
-    fn get_subscribed_spot_pairs(&self) -> Vec<String> {
+    pub fn get_subscribed_spot_pairs(&self) -> Vec<String> {
         self.spot_pairs.iter().cloned().collect()
     }
 
     /// Get the subscribed perps pairs (without suffix).
-    fn get_subscribed_perp_pairs(&self) -> Vec<String> {
+    pub fn get_subscribed_perp_pairs(&self) -> Vec<String> {
         self.perp_pairs.iter().cloned().collect()
     }
 
     /// Get the subscribed perps pairs with the MARK suffix.
-    fn get_fmt_subscribed_perp_pairs(&self) -> Vec<String> {
+    pub fn get_fmt_subscribed_perp_pairs(&self) -> Vec<String> {
         self.perp_pairs
             .iter()
             .map(|pair| format!("{pair}:MARK"))
@@ -405,7 +424,7 @@ impl SubscriptionState {
 
     /// Get all the currently subscribed pairs.
     /// (Spot and Perp pairs with the suffix)
-    fn get_fmt_subscribed_pairs(&self) -> Vec<String> {
+    pub fn get_fmt_subscribed_pairs(&self) -> Vec<String> {
         let mut spot_pairs = self.get_subscribed_spot_pairs();
         let perp_pairs = self.get_fmt_subscribed_perp_pairs();
         spot_pairs.extend(perp_pairs);

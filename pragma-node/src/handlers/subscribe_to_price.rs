@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
@@ -7,16 +7,16 @@ use axum::extract::{ConnectInfo, State};
 use axum::response::IntoResponse;
 use serde::{Deserialize, Serialize};
 
-use pragma_common::types::DataType;
 use pragma_common::types::timestamp::UnixTimestamp;
 use pragma_entities::EntryError;
 use utoipa::{ToResponse, ToSchema};
 
-use crate::infra::repositories::entry_repository::MedianEntryWithComponents;
+use crate::infra::repositories::entry_repository::get_price_with_components;
 use crate::state::AppState;
 use crate::utils::only_existing_pairs;
-use crate::utils::pricer::{IndexPricer, Pricer};
 use crate::utils::ws::{ChannelHandler, Subscriber, SubscriptionType};
+
+use super::subscribe_to_entry::{SubscriptionAck, SubscriptionRequest, SubscriptionState};
 
 #[derive(Debug, Default, Serialize, Deserialize, ToResponse, ToSchema)]
 pub struct AssetOraclePrice {
@@ -42,7 +42,7 @@ pub async fn subscribe_to_price(
 }
 
 /// Interval in milliseconds that the channel will update the client with the latest prices.
-const CHANNEL_UPDATE_INTERVAL_IN_MS: u64 = 500;
+const CHANNEL_UPDATE_INTERVAL_IN_MS: u64 = 100;
 
 #[tracing::instrument(
     skip(socket, app_state),
@@ -97,28 +97,30 @@ impl ChannelHandler<SubscriptionState, SubscriptionRequest, EntryError> for WsEn
         subscriber: &mut Subscriber<SubscriptionState>,
         request: SubscriptionRequest,
     ) -> Result<(), EntryError> {
-        let (existing_spot_pairs, _existing_perp_pairs) =
+        let (existing_spot_pairs, existing_perp_pairs) =
             only_existing_pairs(&subscriber.app_state.offchain_pool, request.pairs).await;
         let mut state = subscriber.state.write().await;
         match request.msg_type {
             SubscriptionType::Subscribe => {
                 state.add_spot_pairs(existing_spot_pairs);
+                state.add_perp_pairs(existing_perp_pairs);
             }
             SubscriptionType::Unsubscribe => {
                 state.remove_spot_pairs(&existing_spot_pairs);
+                state.remove_perp_pairs(&existing_perp_pairs);
             }
         };
-        let subscribed_pairs = state.get_subscribed_spot_pairs();
+        let subscribed_pairs = state.get_fmt_subscribed_pairs();
         drop(state);
         // We send an ack message to the client with the subscribed pairs (so
         // the client knows which pairs are successfully subscribed).
-        let ack_message = &SubscriptionAck {
+        let ack = SubscriptionAck {
             msg_type: request.msg_type,
             pairs: subscribed_pairs,
         };
-        if subscriber.send_msg(ack_message).await.is_err() {
-            let error_msg = "Message received but could not send ack message.";
-            subscriber.send_err(error_msg).await;
+        if let Err(e) = subscriber.send_msg(ack).await {
+            let error_msg = format!("Message received but could not send ack message: {e}");
+            subscriber.send_err(&error_msg).await;
         }
         Ok(())
     }
@@ -149,8 +151,10 @@ impl ChannelHandler<SubscriptionState, SubscriptionRequest, EntryError> for WsEn
             }
         };
         drop(subscription);
-        if subscriber.send_msg(response).await.is_err() {
-            subscriber.send_err("Could not send prices.").await;
+        if let Err(e) = subscriber.send_msg(response).await {
+            subscriber
+                .send_err(&format!("Could not send prices: {e}"))
+                .await;
         }
         Ok(())
     }
@@ -161,7 +165,8 @@ impl WsEntriesHandler {
     #[tracing::instrument(
         skip(self, state, subscription),
         fields(
-            subscribed_pairs = ?subscription.get_subscribed_spot_pairs().len()
+            spot_pairs_count = ?subscription.get_subscribed_spot_pairs().len(),
+            perp_pairs_count = ?subscription.get_subscribed_perp_pairs().len()
         )
     )]
     async fn get_subscribed_pairs_medians(
@@ -169,77 +174,63 @@ impl WsEntriesHandler {
         state: &AppState,
         subscription: &SubscriptionState,
     ) -> Result<SubscribeToPriceResponse, EntryError> {
-        let median_entries = self.get_all_entries(state, subscription).await?;
+        let spot_pairs = subscription.get_subscribed_spot_pairs();
+        let perp_pairs = subscription.get_subscribed_perp_pairs();
+        let number_of_spot_pairs = spot_pairs.len();
+        let number_of_perp_pairs = perp_pairs.len();
+        // Get spot prices
+        let mut median_entries = if number_of_spot_pairs == 0 {
+            HashMap::new()
+        } else {
+            let entries = get_price_with_components(&state.offchain_pool, spot_pairs, false)
+                .await
+                .map_err(|e| {
+                    EntryError::DatabaseError(format!("Failed to fetch spot price data: {e}"))
+                })?;
+            // Check if we got entries for all requested spot pairs
+            if entries.len() < number_of_spot_pairs {
+                tracing::debug!(
+                    "Missing spot prices for some pairs. Found {} of {} requested pairs.",
+                    entries.len(),
+                    number_of_spot_pairs
+                );
+            }
+            entries
+        };
 
-        let now = chrono::Utc::now().timestamp();
+        // Get perp prices and extend the HashMap
+        if number_of_perp_pairs != 0 {
+            let perp_entries = get_price_with_components(&state.offchain_pool, perp_pairs, true)
+                .await
+                .map_err(|e| {
+                    EntryError::DatabaseError(format!("Failed to fetch perp price data: {e}"))
+                })?;
+            // Check if we got entries for all requested perp pairs
+            if perp_entries.len() < number_of_perp_pairs {
+                tracing::debug!(
+                    "Missing perp prices for some pairs. Found {} of {} requested pairs.",
+                    perp_entries.len(),
+                    number_of_perp_pairs
+                );
+            }
 
+            // Add perp entries to the result
+            median_entries.extend(perp_entries);
+        }
+
+        // Convert HashMap entries to the expected response format
         let oracle_prices = median_entries
             .into_iter()
-            .map(|entry| AssetOraclePrice {
-                num_sources_aggregated: entry.components.len(),
-                pair_id: entry.pair_id,
+            .map(|(pair_id, entry)| AssetOraclePrice {
+                num_sources_aggregated: entry.num_sources as usize,
+                pair_id,
                 price: entry.median_price.to_string(),
             })
             .collect();
 
         Ok(SubscribeToPriceResponse {
-            timestamp: now,
+            timestamp: chrono::Utc::now().timestamp_millis(),
             oracle_prices,
         })
-    }
-
-    /// Get index & mark prices for the subscribed pairs.
-    #[tracing::instrument(skip(self, state, subscription))]
-    async fn get_all_entries(
-        &self,
-        state: &AppState,
-        subscription: &SubscriptionState,
-    ) -> Result<Vec<MedianEntryWithComponents>, EntryError> {
-        let index_pricer = IndexPricer::new(
-            subscription.get_subscribed_spot_pairs(),
-            DataType::SpotEntry,
-        );
-
-        let median_entries = index_pricer.compute(&state.offchain_pool).await?;
-
-        Ok(median_entries)
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct SubscriptionRequest {
-    msg_type: SubscriptionType,
-    pairs: Vec<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct SubscriptionAck {
-    msg_type: SubscriptionType,
-    pairs: Vec<String>,
-}
-
-#[derive(Debug, Default, Serialize, Deserialize)]
-struct SubscriptionState {
-    spot_pairs: HashSet<String>,
-}
-
-impl SubscriptionState {
-    fn is_empty(&self) -> bool {
-        self.spot_pairs.is_empty()
-    }
-
-    fn add_spot_pairs(&mut self, pairs: Vec<String>) {
-        self.spot_pairs.extend(pairs);
-    }
-
-    fn remove_spot_pairs(&mut self, pairs: &[String]) {
-        for pair in pairs {
-            self.spot_pairs.remove(pair);
-        }
-    }
-
-    /// Get the subscribed spot pairs.
-    fn get_subscribed_spot_pairs(&self) -> Vec<String> {
-        self.spot_pairs.iter().cloned().collect()
     }
 }
