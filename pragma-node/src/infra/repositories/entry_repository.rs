@@ -93,7 +93,7 @@ pub async fn routing(
         || (pair_id_exist(pool, pair).await?
             && get_last_updated_timestamp(pool, pair.to_pair_id(), entry_params.timestamp)
                 .await?
-                .unwrap_or(NaiveDateTime::default())
+                .unwrap_or(chrono::Utc::now().naive_utc())
                 .and_utc()
                 .timestamp()
                 >= entry_params.timestamp - ROUTING_FRESHNESS_THRESHOLD)

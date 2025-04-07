@@ -6,7 +6,6 @@ use axum::extract::ws::{WebSocket, WebSocketUpgrade};
 use axum::extract::{ConnectInfo, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
-use bigdecimal::num_traits::sign;
 use pragma_common::errors::ConversionError;
 use serde::{Deserialize, Serialize};
 use starknet::signers::SigningKey;
