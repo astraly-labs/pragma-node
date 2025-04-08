@@ -16,9 +16,10 @@ use crate::handlers::optimistic_oracle::{
     get_resolved_assertions::get_resolved_assertions,
 };
 use crate::handlers::stream::stream_multi::stream_entry_multi_pair;
+use crate::handlers::websocket::{subscribe_to_entry, subscribe_to_price};
 use crate::handlers::{
     create_entries, create_future_entries, get_entry, get_expiries, get_ohlc, get_volatility,
-    publish_entry, subscribe_to_entry, subscribe_to_price,
+    publish_entry,
 };
 use crate::state::AppState;
 

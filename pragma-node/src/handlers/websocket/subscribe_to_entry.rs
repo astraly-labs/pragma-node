@@ -1,5 +1,6 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::net::SocketAddr;
+use std::str::FromStr;
 use std::sync::Arc;
 
 use axum::extract::ws::{WebSocket, WebSocketUpgrade};
@@ -7,6 +8,7 @@ use axum::extract::{ConnectInfo, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use pragma_common::errors::ConversionError;
+use pragma_common::types::pair::Pair;
 use serde::{Deserialize, Serialize};
 use starknet::signers::SigningKey;
 use utoipa::{ToResponse, ToSchema};
@@ -17,10 +19,15 @@ use pragma_common::types::timestamp::UnixTimestamp;
 use pragma_entities::EntryError;
 
 use crate::constants::starkex_ws::PRAGMA_ORACLE_NAME_FOR_STARKEX;
-use crate::infra::repositories::entry_repository::{MedianEntry, get_price_with_components};
+use crate::handlers::websocket::SubscriptionState;
+use crate::infra::repositories::entry_repository::MedianEntry;
 use crate::state::AppState;
 use crate::utils::{ChannelHandler, Subscriber, SubscriptionType};
 use crate::utils::{hex_string_to_bigdecimal, only_existing_pairs};
+
+use super::{
+    SubscriptionAck, SubscriptionRequest, get_latest_entries_multi_pair, get_params_for_websocket,
+};
 
 /// Response format for `StarkEx` price subscriptions
 #[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
@@ -122,7 +129,7 @@ pub async fn subscribe_to_entry(
 )]
 async fn create_new_subscriber(socket: WebSocket, app_state: AppState, client_addr: SocketAddr) {
     /// Interval in milliseconds that the channel will update the client with the latest prices.
-    const CHANNEL_UPDATE_INTERVAL_IN_MS: u64 = 100;
+    const CHANNEL_UPDATE_INTERVAL_IN_MS: u64 = 500;
 
     let mut subscriber = match Subscriber::<SubscriptionState>::new(
         "subscribe_to_entry".into(),
@@ -247,43 +254,58 @@ impl WsEntriesHandler {
         state: &AppState,
         subscription: &SubscriptionState,
     ) -> Result<SubscribeToEntryResponse, EntryError> {
-        let spot_pairs = subscription.get_subscribed_spot_pairs();
-        let perp_pairs = subscription.get_subscribed_perp_pairs();
+        let spot_pairs: Vec<Pair> = subscription
+            .get_subscribed_spot_pairs()
+            .iter()
+            .map(|s| Pair::from_str(s).unwrap())
+            .collect();
+        let perp_pairs: Vec<Pair> = subscription
+            .get_subscribed_perp_pairs()
+            .iter()
+            .map(|s| Pair::from_str(s).unwrap())
+            .collect();
         let number_of_spot_pairs = spot_pairs.len();
         let number_of_perp_pairs = perp_pairs.len();
+
         let mut all_entries = if number_of_spot_pairs == 0 {
             HashMap::new()
         } else {
-            let entries = get_price_with_components(&state.offchain_pool, spot_pairs, false)
+            let params = get_params_for_websocket(false);
+            let entries = get_latest_entries_multi_pair(&state, &spot_pairs, false, &params)
                 .await
                 .map_err(|e| {
                     EntryError::DatabaseError(format!("Failed to fetch spot data: {e}"))
                 })?;
+
             // Check if we got entries for all requested spot pairs
             if entries.len() < number_of_spot_pairs {
-                tracing::debug!(
+                tracing::error!(
                     "Missing spot prices for some pairs. Found {} of {} requested pairs.",
                     entries.len(),
                     number_of_spot_pairs
                 );
             }
+
             entries
         };
 
         if number_of_perp_pairs != 0 {
-            let perp_entries = get_price_with_components(&state.offchain_pool, perp_pairs, true)
+            let params = get_params_for_websocket(true);
+            let perp_entries = get_latest_entries_multi_pair(&state, &perp_pairs, false, &params)
                 .await
                 .map_err(|e| {
                     EntryError::DatabaseError(format!("Failed to fetch perp data: {e}"))
                 })?;
+
             // Check if we got entries for all requested perp pairs
             if perp_entries.len() < number_of_perp_pairs {
-                tracing::debug!(
+                tracing::error!(
                     "Missing perp prices for some pairs. Found {} of {} requested pairs.",
                     perp_entries.len(),
                     number_of_perp_pairs
                 );
             }
+
             // Merge the results
             all_entries.extend(perp_entries);
         }
@@ -357,76 +379,5 @@ impl TryFrom<(String, MedianEntry, SigningKey)> for AssetOraclePrice {
             signature: String::new(),
             signed_prices,
         })
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct SubscriptionRequest {
-    pub msg_type: SubscriptionType,
-    pub pairs: Vec<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct SubscriptionAck {
-    pub msg_type: SubscriptionType,
-    pub pairs: Vec<String>,
-}
-
-#[derive(Debug, Default, Serialize, Deserialize)]
-pub struct SubscriptionState {
-    pub spot_pairs: HashSet<String>,
-    pub perp_pairs: HashSet<String>,
-}
-
-impl SubscriptionState {
-    pub fn is_empty(&self) -> bool {
-        self.spot_pairs.is_empty() && self.perp_pairs.is_empty()
-    }
-
-    pub fn add_spot_pairs(&mut self, pairs: Vec<String>) {
-        self.spot_pairs.extend(pairs);
-    }
-
-    pub fn add_perp_pairs(&mut self, pairs: Vec<String>) {
-        self.perp_pairs.extend(pairs);
-    }
-
-    pub fn remove_spot_pairs(&mut self, pairs: &[String]) {
-        for pair in pairs {
-            self.spot_pairs.remove(pair);
-        }
-    }
-
-    pub fn remove_perp_pairs(&mut self, pairs: &[String]) {
-        for pair in pairs {
-            self.perp_pairs.remove(pair);
-        }
-    }
-
-    /// Get the subscribed spot pairs.
-    pub fn get_subscribed_spot_pairs(&self) -> Vec<String> {
-        self.spot_pairs.iter().cloned().collect()
-    }
-
-    /// Get the subscribed perps pairs (without suffix).
-    pub fn get_subscribed_perp_pairs(&self) -> Vec<String> {
-        self.perp_pairs.iter().cloned().collect()
-    }
-
-    /// Get the subscribed perps pairs with the MARK suffix.
-    pub fn get_fmt_subscribed_perp_pairs(&self) -> Vec<String> {
-        self.perp_pairs
-            .iter()
-            .map(|pair| format!("{pair}:MARK"))
-            .collect()
-    }
-
-    /// Get all the currently subscribed pairs.
-    /// (Spot and Perp pairs with the suffix)
-    pub fn get_fmt_subscribed_pairs(&self) -> Vec<String> {
-        let mut spot_pairs = self.get_subscribed_spot_pairs();
-        let perp_pairs = self.get_fmt_subscribed_perp_pairs();
-        spot_pairs.extend(perp_pairs);
-        spot_pairs
     }
 }

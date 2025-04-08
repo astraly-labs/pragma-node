@@ -83,6 +83,7 @@ pub struct GetEntryResponse {
     pub decimals: u32,
     pub components: Option<Vec<EntryComponent>>,
 }
+
 /// Get the latest price entry for a trading pair
 #[utoipa::path(
     get,

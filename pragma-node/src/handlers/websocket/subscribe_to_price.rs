@@ -1,22 +1,25 @@
 use std::collections::HashMap;
 use std::net::SocketAddr;
+use std::str::FromStr;
 use std::sync::Arc;
 
 use axum::extract::ws::{WebSocket, WebSocketUpgrade};
 use axum::extract::{ConnectInfo, State};
 use axum::response::IntoResponse;
+use pragma_common::types::pair::Pair;
 use serde::{Deserialize, Serialize};
 
+use crate::state::AppState;
+use crate::utils::only_existing_pairs;
+use crate::utils::ws::{ChannelHandler, Subscriber, SubscriptionType};
 use pragma_common::types::timestamp::UnixTimestamp;
 use pragma_entities::EntryError;
 use utoipa::{ToResponse, ToSchema};
 
-use crate::infra::repositories::entry_repository::get_price_with_components;
-use crate::state::AppState;
-use crate::utils::only_existing_pairs;
-use crate::utils::ws::{ChannelHandler, Subscriber, SubscriptionType};
-
-use super::subscribe_to_entry::{SubscriptionAck, SubscriptionRequest, SubscriptionState};
+use super::{
+    SubscriptionAck, SubscriptionRequest, SubscriptionState, get_latest_entries_multi_pair,
+    get_params_for_websocket,
+};
 
 #[derive(Debug, Default, Serialize, Deserialize, ToResponse, ToSchema)]
 pub struct AssetOraclePrice {
@@ -42,7 +45,7 @@ pub async fn subscribe_to_price(
 }
 
 /// Interval in milliseconds that the channel will update the client with the latest prices.
-const CHANNEL_UPDATE_INTERVAL_IN_MS: u64 = 100;
+const CHANNEL_UPDATE_INTERVAL_IN_MS: u64 = 500;
 
 #[tracing::instrument(
     skip(socket, app_state),
@@ -174,15 +177,26 @@ impl WsEntriesHandler {
         state: &AppState,
         subscription: &SubscriptionState,
     ) -> Result<SubscribeToPriceResponse, EntryError> {
-        let spot_pairs = subscription.get_subscribed_spot_pairs();
-        let perp_pairs = subscription.get_subscribed_perp_pairs();
+        // safe to unwrap, cannot fail
+        let spot_pairs: Vec<Pair> = subscription
+            .get_subscribed_spot_pairs()
+            .iter()
+            .map(|s| Pair::from_str(s).unwrap())
+            .collect();
+        let perp_pairs: Vec<Pair> = subscription
+            .get_subscribed_perp_pairs()
+            .iter()
+            .map(|s| Pair::from_str(s).unwrap())
+            .collect();
         let number_of_spot_pairs = spot_pairs.len();
         let number_of_perp_pairs = perp_pairs.len();
+
         // Get spot prices
         let mut median_entries = if number_of_spot_pairs == 0 {
             HashMap::new()
         } else {
-            let entries = get_price_with_components(&state.offchain_pool, spot_pairs, false)
+            let params = get_params_for_websocket(false);
+            let entries = get_latest_entries_multi_pair(&state, &spot_pairs, false, &params)
                 .await
                 .map_err(|e| {
                     EntryError::DatabaseError(format!("Failed to fetch spot price data: {e}"))
@@ -200,7 +214,8 @@ impl WsEntriesHandler {
 
         // Get perp prices and extend the HashMap
         if number_of_perp_pairs != 0 {
-            let perp_entries = get_price_with_components(&state.offchain_pool, perp_pairs, true)
+            let params = get_params_for_websocket(true);
+            let perp_entries = get_latest_entries_multi_pair(&state, &perp_pairs, false, &params)
                 .await
                 .map_err(|e| {
                     EntryError::DatabaseError(format!("Failed to fetch perp price data: {e}"))
