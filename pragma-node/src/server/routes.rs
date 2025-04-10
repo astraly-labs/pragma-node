@@ -13,8 +13,7 @@ use crate::handlers::onchain::{
 use crate::handlers::stream::stream_multi::stream_entry_multi_pair;
 use crate::handlers::websocket::{subscribe_to_entry, subscribe_to_price};
 use crate::handlers::{
-    create_entries, create_future_entries, get_entry, get_expiries, get_ohlc, get_volatility,
-    publish_entry,
+    create_entries, create_future_entries, get_entry, get_expiries, get_ohlc, publish_entry,
 };
 use crate::state::AppState;
 
@@ -27,7 +26,6 @@ pub fn app_router<T: OpenApiT>(state: AppState) -> Router<AppState> {
         .nest("/node/v1/data", data_routes(state.clone()))
         .nest("/node/v1/onchain", onchain_routes(state.clone()))
         .nest("/node/v1/aggregation", aggregation_routes(state.clone()))
-        .nest("/node/v1/volatility", volatility_routes(state))
         .fallback(handler_404)
 }
 
@@ -62,12 +60,6 @@ fn onchain_routes(state: AppState) -> Router<AppState> {
         .route("/checkpoints/{base}/{quote}", get(get_onchain_checkpoints))
         .route("/publishers", get(get_onchain_publishers))
         .route("/ohlc/subscribe", get(subscribe_to_onchain_ohlc))
-        .with_state(state)
-}
-
-fn volatility_routes(state: AppState) -> Router<AppState> {
-    Router::new()
-        .route("/{base}/{quote}", get(get_volatility))
         .with_state(state)
 }
 

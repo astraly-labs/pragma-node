@@ -31,6 +31,7 @@ use crate::infra::repositories::{
     entry_repository::MedianEntry, onchain_repository::entry::get_existing_pairs,
 };
 
+#[allow(dead_code)]
 const ONE_YEAR_IN_SECONDS: f64 = 3_153_600_f64;
 
 /// Returns the mid price between two prices.
@@ -110,6 +111,7 @@ pub fn convert_perp_entry_to_db(
 /// The volatility is computed as the annualized standard deviation of the log returns.
 /// The log returns are computed as the natural logarithm of the ratio between two consecutive median prices.
 /// The annualized standard deviation is computed as the square root of the variance multiplied by 10^8.
+#[allow(dead_code)]
 pub(crate) fn compute_volatility(entries: &[MedianEntry]) -> f64 {
     if entries.len() < 2 {
         return 0.0;
