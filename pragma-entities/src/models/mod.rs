@@ -1,6 +1,5 @@
 pub mod checkpoint_error;
 pub mod entries;
-pub mod optimistic_oracle_error;
 pub mod publisher;
 pub mod publisher_error;
 pub mod volatility_error;

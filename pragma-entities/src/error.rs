@@ -63,9 +63,6 @@ pub enum InfraError {
     PairNotFound(String),
     CheckpointNotFound(String),
     PublishersNotFound,
-    // Specifics for Optimistic Oracle
-    DisputerNotSet,
-    SettlerNotSet,
     // Known internal errors
     #[error(transparent)]
     NonZeroU32Conversion(#[from] TryFromIntError),
@@ -111,8 +108,6 @@ impl fmt::Display for InfraError {
             Self::InternalServerError => write!(f, "Internal server error"),
             Self::RpcError(e) => write!(f, "RPC error: {e}"),
             // Unclassified
-            Self::DisputerNotSet => write!(f, "Unable to fetch disputer address"),
-            Self::SettlerNotSet => write!(f, "Unable to fetch settler address"),
             Self::WebSocketError(e) => write!(f, "WebSocket error {e}"),
         }
     }

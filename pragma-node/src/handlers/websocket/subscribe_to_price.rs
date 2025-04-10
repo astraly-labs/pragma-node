@@ -196,7 +196,7 @@ impl WsEntriesHandler {
             HashMap::new()
         } else {
             let params = get_params_for_websocket(false);
-            let entries = get_latest_entries_multi_pair(&state, &spot_pairs, false, &params)
+            let entries = get_latest_entries_multi_pair(state, &spot_pairs, false, &params)
                 .await
                 .map_err(|e| {
                     EntryError::DatabaseError(format!("Failed to fetch spot price data: {e}"))
@@ -215,7 +215,7 @@ impl WsEntriesHandler {
         // Get perp prices and extend the HashMap
         if number_of_perp_pairs != 0 {
             let params = get_params_for_websocket(true);
-            let perp_entries = get_latest_entries_multi_pair(&state, &perp_pairs, false, &params)
+            let perp_entries = get_latest_entries_multi_pair(state, &perp_pairs, false, &params)
                 .await
                 .map_err(|e| {
                     EntryError::DatabaseError(format!("Failed to fetch perp price data: {e}"))

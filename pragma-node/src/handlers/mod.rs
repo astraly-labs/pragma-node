@@ -5,7 +5,6 @@ pub mod get_expiries;
 pub mod get_ohlc;
 pub mod get_volatility;
 pub mod onchain;
-pub mod optimistic_oracle;
 pub mod publish_entry_ws;
 pub mod stream;
 pub mod websocket;
