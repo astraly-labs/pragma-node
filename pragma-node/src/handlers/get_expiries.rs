@@ -1,13 +1,13 @@
-use axum::extract::State;
 use axum::Json;
+use axum::extract::State;
 use chrono::NaiveDateTime;
 
 use pragma_common::types::pair::Pair;
 use pragma_entities::EntryError;
 
 use crate::infra::repositories::entry_repository;
+use crate::state::AppState;
 use crate::utils::PathExtractor;
-use crate::AppState;
 
 #[utoipa::path(
     get,
@@ -29,7 +29,7 @@ pub async fn get_expiries(
 
     let req_result = entry_repository::get_expiries_list(&state.offchain_pool, pair.to_pair_id())
         .await
-        .map_err(|e| e.to_entry_error(&(pair.into())))?;
+        .map_err(EntryError::from)?;
 
     Ok(Json(req_result))
 }

@@ -1,13 +1,13 @@
-use axum::extract::{self, State};
 use axum::Json;
+use axum::extract::{self, State};
 use pragma_entities::{EntryError, NewEntry};
 use serde::{Deserialize, Serialize};
 use starknet::core::types::Felt;
 use utoipa::{ToResponse, ToSchema};
 
 use crate::config::config;
+use crate::state::AppState;
 use crate::utils::{convert_entry_to_db, publish_to_kafka, validate_publisher};
-use crate::AppState;
 use pragma_common::signing::assert_request_signature_is_valid;
 use pragma_common::types::entries::Entry;
 use pragma_common::types::utils::felt_from_decimal;
@@ -32,7 +32,7 @@ impl AsRef<[Entry]> for CreateEntryRequest {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, ToSchema, ToResponse)]
+#[derive(Debug, Serialize, Deserialize, ToSchema, ToResponse, Clone)]
 pub struct CreateEntryResponse {
     pub number_entries_created: usize,
 }
@@ -51,7 +51,7 @@ pub async fn create_entries(
     State(state): State<AppState>,
     extract::Json(new_entries): extract::Json<CreateEntryRequest>,
 ) -> Result<Json<CreateEntryResponse>, EntryError> {
-    tracing::info!("Received new entries: {:?}", new_entries);
+    tracing::info!("Received new entries..");
 
     if new_entries.entries.is_empty() {
         return Ok(Json(CreateEntryResponse {
@@ -91,7 +91,7 @@ pub async fn create_entries(
 
 #[cfg(test)]
 mod tests {
-    use pragma_common::types::entries::{build_publish_message, BaseEntry, Entry};
+    use pragma_common::types::entries::{BaseEntry, Entry, build_publish_message};
 
     use super::*;
     use rstest::rstest;

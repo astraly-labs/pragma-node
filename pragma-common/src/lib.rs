@@ -1,5 +1,4 @@
 pub mod errors;
-pub mod hash;
 pub mod signing;
 pub mod telemetry;
 pub mod types;

@@ -1,9 +1,9 @@
 use crate::dto::entry as dto;
 use crate::models::DieselResult;
 use bigdecimal::BigDecimal;
+use diesel::BoolExpressionMethods;
 use diesel::dsl::sql;
 use diesel::internal::derives::multiconnection::chrono::NaiveDateTime;
-use diesel::BoolExpressionMethods;
 use diesel::{
     AsChangeset, ExpressionMethods, Insertable, PgConnection, PgTextExpressionMethods, QueryDsl,
     Queryable, RunQueryDsl, Selectable, SelectableHelper,

@@ -1,7 +1,7 @@
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 
-use crate::error::ErrorKind;
+use crate::error::PragmaConsumerError;
 
 lazy_static! {
     #[derive(Debug)]
@@ -16,8 +16,8 @@ pub struct Ingestor {
 }
 
 impl Ingestor {
-    pub fn from_env() -> Result<Self, ErrorKind> {
-        envy::from_env::<Self>().map_err(ErrorKind::LoadConfig)
+    pub fn from_env() -> Result<Self, PragmaConsumerError> {
+        envy::from_env::<Self>().map_err(PragmaConsumerError::LoadConfig)
     }
 }
 

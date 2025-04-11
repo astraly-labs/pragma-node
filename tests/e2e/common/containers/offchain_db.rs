@@ -10,7 +10,7 @@ pub const OFFCHAIN_DB_CONTAINER_NAME: &str = "test-offchain-db";
 pub async fn setup_offchain_db() -> ContainerAsync<Timescale> {
     Postgres::default()
         .with_name("timescale/timescaledb-ha")
-        .with_tag("pg14-latest")
+        .with_tag("pg17.4-ts2.18.2")
         .with_env_var("POSTGRES_DB", "pragma")
         .with_env_var("POSTGRES_PASSWORD", "test-password")
         .with_env_var("TIMESCALEDB_TELEMETRY", "off")

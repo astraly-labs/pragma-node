@@ -1,8 +1,8 @@
+use crate::EntryError;
 use crate::convert_timestamp_to_datetime;
 use crate::dto::entry as dto;
 use crate::models::DieselResult;
 use crate::schema::entries;
-use crate::EntryError;
 use bigdecimal::BigDecimal;
 use diesel::internal::derives::multiconnection::chrono::NaiveDateTime;
 use diesel::upsert::excluded;

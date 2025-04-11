@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use axum::extract::{Query, State};
 use axum::Json;
+use axum::extract::{Query, State};
 use bigdecimal::BigDecimal;
 use pragma_common::types::pair::Pair;
 use pragma_common::types::{AggregationMode, Interval, Network};
@@ -10,10 +10,10 @@ use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToResponse, ToSchema};
 
 use crate::infra::repositories::onchain_repository::entry::{
-    get_last_updated_timestamp, get_variations, routing, OnchainRoutingArguments,
+    OnchainEntryArguments, get_last_updated_timestamp, get_variations, routing,
 };
-use crate::utils::{big_decimal_price_to_hex, PathExtractor};
-use crate::AppState;
+use crate::state::AppState;
+use crate::utils::{PathExtractor, big_decimal_price_to_hex};
 
 #[derive(Debug, Default, Deserialize, IntoParams, ToSchema)]
 pub struct GetOnchainEntryParams {
@@ -72,7 +72,7 @@ pub async fn get_onchain_entry(
     let now = chrono::Utc::now().timestamp();
     let timestamp = params.timestamp.map_or(now, |timestamp| timestamp);
 
-    let routing_arguments = OnchainRoutingArguments {
+    let routing_arguments = OnchainEntryArguments {
         pair_id: pair.to_pair_id(),
         network: params.network,
         timestamp: (timestamp as u64),
@@ -80,24 +80,29 @@ pub async fn get_onchain_entry(
         is_routing: params.routing.unwrap_or(false),
     };
 
-    let raw_data = routing(&state.onchain_pool, &state.offchain_pool, routing_arguments)
-        .await
-        .map_err(|db_error| db_error.to_entry_error(&pair.to_pair_id()))?;
+    let raw_data = routing(
+        &state.onchain_pool,
+        routing_arguments,
+        &state.rpc_clients,
+        state.caches.onchain_decimals(),
+    )
+    .await
+    .map_err(EntryError::from)?;
 
     let entry = raw_data
         .first()
-        .ok_or_else(|| EntryError::NotFound(pair.to_pair_id()))?;
+        .ok_or_else(|| EntryError::EntryNotFound(pair.to_pair_id()))?;
 
     let last_updated_timestamp =
         get_last_updated_timestamp(&state.onchain_pool, params.network, entry.pair_used.clone())
             .await
-            .map_err(|db_error| db_error.to_entry_error(&pair.to_pair_id()))?;
+            .map_err(EntryError::from)?;
 
     let variations = if with_variations {
         Some(
             get_variations(&state.onchain_pool, params.network, pair.to_pair_id())
                 .await
-                .map_err(|db_error| db_error.to_entry_error(&pair.to_pair_id()))?,
+                .map_err(EntryError::from)?,
         )
     } else {
         None

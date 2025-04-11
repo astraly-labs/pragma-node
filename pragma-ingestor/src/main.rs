@@ -5,21 +5,18 @@ mod error;
 use deadpool_diesel::postgres::Pool;
 use dotenvy::dotenv;
 use tokio::sync::mpsc;
-use tracing::{error, info};
+use tracing::{debug, error, info};
 
 use pragma_entities::connection::ENV_OFFCHAIN_DATABASE_URL;
-use pragma_entities::{
-    adapt_infra_error, Entry, FutureEntry, InfraError, NewEntry, NewFutureEntry,
-};
+use pragma_entities::{Entry, FutureEntry, InfraError, NewEntry, NewFutureEntry};
 
 #[tokio::main]
 #[tracing::instrument]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let _ = dotenv(); // .env file is not present in prod
 
-    let otel_endpoint = std::env::var("OTEL_EXPORTER_OTLP_ENDPOINT")
-        .unwrap_or_else(|_| "http://signoz.dev.pragma.build:4317".to_string());
-    pragma_common::telemetry::init_telemetry("pragma-ingestor".into(), otel_endpoint, None)?;
+    let otel_endpoint = std::env::var("OTEL_EXPORTER_OTLP_ENDPOINT").ok();
+    pragma_common::telemetry::init_telemetry("pragma-ingestor".into(), otel_endpoint)?;
 
     info!(
         "kafka configuration : hostname={:?}, group_id={}, topic={}",
@@ -62,7 +59,7 @@ async fn process_payload(pool: &Pool, payload: Vec<u8>) -> Result<(), Box<dyn st
     } else {
         match serde_json::from_slice::<Vec<NewEntry>>(&payload) {
             Ok(entries) => {
-                info!("[SPOT] total of '{}' new entries available.", entries.len());
+                debug!("[SPOT] total of '{}' new entries available.", entries.len());
                 if let Err(e) = insert_spot_entries(pool, entries).await {
                     error!("error while inserting entries : {:?}", e);
                 }
@@ -80,15 +77,15 @@ pub async fn insert_spot_entries(
     pool: &Pool,
     new_entries: Vec<NewEntry>,
 ) -> Result<(), InfraError> {
-    let conn = pool.get().await.map_err(adapt_infra_error)?;
+    let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
     let entries = conn
         .interact(move |conn| Entry::create_many(conn, new_entries))
         .await
-        .map_err(adapt_infra_error)?
-        .map_err(adapt_infra_error)?;
+        .map_err(InfraError::DbInteractionError)?
+        .map_err(InfraError::DbResultError)?;
 
     for entry in &entries {
-        info!(
+        debug!(
             "new entry created {} - {}({}) - {}",
             entry.publisher, entry.pair_id, entry.price, entry.source
         );
@@ -102,7 +99,7 @@ pub async fn insert_future_entries(
     pool: &Pool,
     new_entries: Vec<NewFutureEntry>,
 ) -> Result<(), InfraError> {
-    let conn = pool.get().await.map_err(adapt_infra_error)?;
+    let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
 
     // Double check that we don't have expiration_timestamp set to 0,
     // if we do, we set them to NULL to be extra clear in the database
@@ -124,8 +121,8 @@ pub async fn insert_future_entries(
         .filter(|entry| entry.expiration_timestamp.is_none())
         .count();
 
-    info!("[PERP] {} new entries available", len_perp_entries);
-    info!(
+    debug!("[PERP] {} new entries available", len_perp_entries);
+    debug!(
         "[FUTURE] {} new entries available",
         new_entries.len() - len_perp_entries
     );
@@ -133,10 +130,10 @@ pub async fn insert_future_entries(
     let entries = conn
         .interact(move |conn| FutureEntry::create_many(conn, new_entries))
         .await
-        .map_err(adapt_infra_error)?
-        .map_err(adapt_infra_error)?;
+        .map_err(InfraError::DbInteractionError)?
+        .map_err(InfraError::DbResultError)?;
     for entry in &entries {
-        info!(
+        debug!(
             "new future entry created {} - {}({}) - {}",
             entry.publisher, entry.pair_id, entry.price, entry.source
         );
