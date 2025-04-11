@@ -10,11 +10,6 @@ use crate::handlers::onchain::{
     get_history::get_onchain_history, get_publishers::get_onchain_publishers,
     subscribe_to_ohlc::subscribe_to_onchain_ohlc,
 };
-use crate::handlers::optimistic_oracle::{
-    get_assertion_details::get_assertion_details, get_assertions::get_assertions,
-    get_disputed_assertions::get_disputed_assertions,
-    get_resolved_assertions::get_resolved_assertions,
-};
 use crate::handlers::stream::stream_multi::stream_entry_multi_pair;
 use crate::handlers::websocket::{subscribe_to_entry, subscribe_to_price};
 use crate::handlers::{
@@ -32,8 +27,7 @@ pub fn app_router<T: OpenApiT>(state: AppState) -> Router<AppState> {
         .nest("/node/v1/data", data_routes(state.clone()))
         .nest("/node/v1/onchain", onchain_routes(state.clone()))
         .nest("/node/v1/aggregation", aggregation_routes(state.clone()))
-        .nest("/node/v1/volatility", volatility_routes(state.clone()))
-        .nest("/node/v1/optimistic", optimistic_oracle_routes(state))
+        .nest("/node/v1/volatility", volatility_routes(state))
         .fallback(handler_404)
 }
 
@@ -80,14 +74,5 @@ fn volatility_routes(state: AppState) -> Router<AppState> {
 fn aggregation_routes(state: AppState) -> Router<AppState> {
     Router::new()
         .route("/candlestick/{base}/{quote}", get(get_ohlc))
-        .with_state(state)
-}
-
-fn optimistic_oracle_routes(state: AppState) -> Router<AppState> {
-    Router::new()
-        .route("/assertions/{assertion_id}", get(get_assertion_details))
-        .route("/assertions", get(get_assertions))
-        .route("/disputed-assertions", get(get_disputed_assertions))
-        .route("/resolved-assertions", get(get_resolved_assertions))
         .with_state(state)
 }
