@@ -11,8 +11,8 @@ pub use kafka::publish_to_kafka;
 use pragma_common::entries::{EntryTrait as _, PerpEntry};
 pub use ws::*;
 
+use bigdecimal::BigDecimal;
 use bigdecimal::num_bigint::{BigUint, ToBigInt};
-use bigdecimal::{BigDecimal, ToPrimitive};
 use chrono::NaiveDateTime;
 use deadpool_diesel::postgres::Pool;
 use moka::future::Cache;
@@ -30,8 +30,6 @@ use crate::infra::repositories::publisher_repository;
 use crate::infra::repositories::{
     entry_repository::MedianEntry, onchain_repository::entry::get_existing_pairs,
 };
-
-const ONE_YEAR_IN_SECONDS: f64 = 3_153_600_f64;
 
 /// Returns the mid price between two prices.
 pub fn get_mid_price(low: &BigDecimal, high: &BigDecimal) -> BigDecimal {
@@ -104,39 +102,6 @@ pub fn convert_perp_entry_to_db(
         publisher_signature: signature_str,
         price: entry.price().into(),
     })
-}
-
-/// Computes the volatility from a list of entries.
-/// The volatility is computed as the annualized standard deviation of the log returns.
-/// The log returns are computed as the natural logarithm of the ratio between two consecutive median prices.
-/// The annualized standard deviation is computed as the square root of the variance multiplied by 10^8.
-pub(crate) fn compute_volatility(entries: &[MedianEntry]) -> f64 {
-    if entries.len() < 2 {
-        return 0.0;
-    }
-    let mut values = Vec::new();
-    for i in 1..entries.len() {
-        if entries[i].median_price.to_f64().unwrap_or(0.0) > 0.0
-            && entries[i - 1].median_price.to_f64().unwrap() > 0.0
-            && (entries[i].time - entries[i - 1].time).num_seconds() > 0
-        {
-            let log_return = (entries[i].median_price.to_f64().unwrap()
-                / entries[i - 1].median_price.to_f64().unwrap())
-            .ln()
-            .powi(2);
-
-            let time = (entries[i].time - entries[i - 1].time)
-                .num_seconds()
-                .to_f64()
-                .unwrap()
-                / ONE_YEAR_IN_SECONDS;
-
-            values.push((log_return, time));
-        }
-    }
-
-    let variance: f64 = values.iter().map(|v| v.0 / v.1).sum::<f64>() / values.len() as f64;
-    variance.sqrt() * 10_f64.powi(8)
 }
 
 /// Converts a big decimal price to a hex string 0x prefixed.
@@ -250,110 +215,4 @@ pub async fn validate_publisher(
     })?;
 
     Ok((public_key, account_address))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use chrono::{TimeZone, Utc};
-
-    fn new_entry(median_price: u32, timestamp: i64) -> MedianEntry {
-        MedianEntry {
-            time: Utc
-                .timestamp_opt(timestamp, 0)
-                .single()
-                .expect("Invalid timestamp")
-                .naive_utc(),
-            median_price: median_price.into(),
-            num_sources: 5,
-            components: None,
-        }
-    }
-
-    #[test]
-    fn test_compute_volatility_no_entries() {
-        let entries = vec![];
-        let epsilon = 1e-10;
-        assert!((compute_volatility(&entries) - 0.0).abs() < epsilon);
-    }
-
-    #[test]
-    fn test_compute_volatility_simple() {
-        let entries = vec![new_entry(100, 1_640_995_200), new_entry(110, 1_641_081_600)];
-
-        let expected_log_return = (110_f64 / 100_f64).ln().powi(2);
-        let expected_time = f64::from(1_641_081_600 - 1_640_995_200) / ONE_YEAR_IN_SECONDS;
-        let expected_variance = expected_log_return / expected_time;
-        let expected_volatility = expected_variance.sqrt() * 10_f64.powi(8);
-        let computed_volatility = compute_volatility(&entries);
-        let epsilon: f64 = 1e-6;
-
-        assert!((computed_volatility - expected_volatility).abs() < epsilon);
-    }
-
-    #[test]
-    fn test_compute_volatility() {
-        let entries = vec![
-            new_entry(47_686, 1_640_995_200),
-            new_entry(47_345, 1_641_081_600),
-            new_entry(46_458, 1_641_168_000),
-            new_entry(45_897, 1_641_254_400),
-            new_entry(43_569, 1_641_340_800),
-        ];
-
-        let epsilon = 1e-10;
-        assert!((compute_volatility(&entries) - 17_264_357.963_673_33).abs() < epsilon);
-    }
-
-    #[test]
-    fn test_compute_volatility_zero_price() {
-        let entries = vec![
-            new_entry(47_686, 1_640_995_200),
-            new_entry(0, 1_641_081_600),
-            new_entry(46_458, 1_641_168_000),
-        ];
-        assert!(f64::is_nan(compute_volatility(&entries)));
-    }
-
-    #[test]
-    fn test_compute_volatility_constant_prices() {
-        let entries = vec![
-            new_entry(47_686, 1_640_995_200),
-            new_entry(47_686, 1_641_081_600),
-            new_entry(47_686, 1_641_168_000),
-            new_entry(47_686, 1_641_254_400),
-            new_entry(47_686, 1_641_340_800),
-        ];
-
-        let epsilon = 1e-10;
-        assert!((compute_volatility(&entries) - 0.0).abs() < epsilon);
-    }
-
-    #[test]
-    fn test_compute_volatility_increasing_prices() {
-        let entries = vec![
-            new_entry(13_569, 1_640_995_200),
-            new_entry(15_897, 1_641_081_600),
-            new_entry(16_458, 1_641_168_000),
-            new_entry(17_345, 1_641_254_400),
-            new_entry(47_686, 1_641_340_800),
-        ];
-
-        let epsilon = 1e-10;
-        assert!((compute_volatility(&entries) - 309_805_011.672_835_77).abs() < epsilon);
-    }
-
-    #[test]
-    fn test_compute_volatility_decreasing_prices() {
-        let entries = vec![
-            new_entry(27_686, 1_640_995_200),
-            new_entry(27_345, 1_641_081_600),
-            new_entry(26_458, 1_641_168_000),
-            new_entry(25_897, 1_641_254_400),
-            new_entry(23_569, 1_641_340_800),
-        ];
-
-        let epsilon = 1e-10;
-        assert!((compute_volatility(&entries) - 31_060_897.843_919_14_f64).abs() < epsilon);
-    }
 }

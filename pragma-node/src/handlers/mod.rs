@@ -3,7 +3,6 @@ pub mod create_future_entry;
 pub mod get_entry;
 pub mod get_expiries;
 pub mod get_ohlc;
-pub mod get_volatility;
 pub mod onchain;
 pub mod publish_entry_ws;
 pub mod stream;
@@ -14,7 +13,6 @@ pub use create_future_entry::create_future_entries;
 pub use get_entry::get_entry;
 pub use get_expiries::get_expiries;
 pub use get_ohlc::get_ohlc;
-pub use get_volatility::get_volatility;
 pub use publish_entry_ws::publish_entry;
 
 use serde::Deserialize;
