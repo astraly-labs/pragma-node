@@ -25,7 +25,7 @@ pub fn app_router<T: OpenApiT>(state: AppState) -> Router<AppState> {
         .route("/node", get(root))
         .nest("/node/v1/data", data_routes(state.clone()))
         .nest("/node/v1/onchain", onchain_routes(state.clone()))
-        .nest("/node/v1/aggregation", aggregation_routes(state.clone()))
+        .nest("/node/v1/aggregation", aggregation_routes(state))
         .fallback(handler_404)
 }
 

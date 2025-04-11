@@ -16,5 +16,4 @@ pub use models::{
     future_entry::{FutureEntry, NewFutureEntry},
     publisher::{NewPublisher, Publishers},
     publisher_error::PublisherError,
-    volatility_error::VolatilityError,
 };
