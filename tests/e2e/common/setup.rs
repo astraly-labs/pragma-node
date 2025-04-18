@@ -3,7 +3,7 @@ use std::sync::Arc;
 use deadpool_diesel::{Manager, postgres::Pool};
 use diesel::RunQueryDsl;
 
-use pragma_common::types::{AggregationMode, DataType, Interval};
+use pragma_common::{AggregationMode, Interval, InstrumentType};
 use pragma_node::utils::sql::{get_interval_specifier, get_table_suffix};
 use testcontainers::ContainerAsync;
 use testcontainers_modules::kafka::Kafka;
@@ -72,7 +72,7 @@ impl TestHelper {
         let interval_spec =
             get_interval_specifier(interval, matches!(aggregation, AggregationMode::Twap)).unwrap();
         let window_size = get_window_size(interval);
-        let suffix = get_table_suffix(DataType::SpotEntry).unwrap();
+        let suffix = get_table_suffix(InstrumentType::Spot).unwrap();
 
         let table_name = if matches!(aggregation, AggregationMode::Twap) {
             "twap"

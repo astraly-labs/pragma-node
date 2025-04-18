@@ -2,28 +2,31 @@ pub mod config;
 mod error;
 
 use deadpool_diesel::postgres::Pool;
-use dotenvy::dotenv;
-use faucon_rs::Message as _;
-use faucon_rs::config::{FauConfig, FauconEnvironment};
-use faucon_rs::consumer::FauConsumer;
-use faucon_rs::topics::FauconTopic;
+use dotenvy::{dotenv, var};
 use futures_util::stream::StreamExt as _;
 use pragma_common::InstrumentType;
 use tokio::sync::mpsc;
 use tokio::time::{Duration, interval};
 use tracing::{debug, info};
 
-use pragma_common::{CapnpDeserialize, entries::PriceEntry};
+use faucon_rs::Message as _;
+use faucon_rs::config::{FauConfig, FauconEnvironment};
+use faucon_rs::consumer::FauConsumer;
+use faucon_rs::topics::FauconTopic;
 
+use pragma_common::{CapnpDeserialize, entries::PriceEntry, task_group::TaskGroup};
 use pragma_entities::connection::ENV_OFFCHAIN_DATABASE_URL;
 use pragma_entities::{Entry, FutureEntry, InfraError, NewEntry, NewFutureEntry};
+
+const PUBLISHER_NAME: &str = "PRAGMA";
+const KAFKA_GROUP_ID: &str = "pragma-ingestor";
 
 #[tokio::main]
 #[tracing::instrument]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    dotenv()?;
+    let _ = dotenv();
 
-    let otel_endpoint = std::env::var("OTEL_EXPORTER_OTLP_ENDPOINT").ok();
+    let otel_endpoint = var("OTEL_EXPORTER_OTLP_ENDPOINT").ok();
     pragma_common::telemetry::init_telemetry("pragma-ingestor".into(), otel_endpoint)?;
 
     let faucon_config = FauConfig::new(FauconEnvironment::Development);
@@ -33,23 +36,66 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         faucon_config.broker_id
     );
 
-    let mut consumer = FauConsumer::new(faucon_config, "pragma_ingestor")?;
-
     let pool = pragma_entities::connection::init_pool("pragma-ingestor", ENV_OFFCHAIN_DATABASE_URL)
         .expect("cannot connect to offchain database");
 
-    consumer.subscribe(FauconTopic::PRICES_V1)?;
+    let num_consumers: usize = var("NUM_CONSUMERS")
+        .ok()
+        .map_or(1, |s| s.parse::<usize>().unwrap());
 
     // Create channels for spot and future entries
-    const CHANNEL_CAPACITY: usize = 1000;
+    const CHANNEL_CAPACITY: usize = 10000;
     let (spot_tx, spot_rx) = mpsc::channel::<NewEntry>(CHANNEL_CAPACITY);
     let (future_tx, future_rx) = mpsc::channel::<NewFutureEntry>(CHANNEL_CAPACITY);
 
     // Spawn database worker tasks
     let spot_pool = pool.clone();
-    tokio::spawn(process_spot_entries(spot_pool, spot_rx));
-    tokio::spawn(process_future_entries(pool, future_rx));
+    let db_spot_task = tokio::spawn(process_spot_entries(spot_pool, spot_rx));
+    let db_future_task = tokio::spawn(process_future_entries(pool, future_rx));
 
+    // Initialize TaskGroup with database tasks
+    let mut task_group = TaskGroup::new()
+        .with_handle(db_spot_task)
+        .with_handle(db_future_task);
+
+    // Spawn configurable number of consumer tasks
+    for _ in 0..num_consumers {
+        let config = faucon_config.clone(); // Assuming FauConfig is Clone
+        let spot_tx_clone = spot_tx.clone();
+        let future_tx_clone = future_tx.clone();
+        let consumer_task = tokio::spawn(async move {
+            if let Err(e) = run_consumer(
+                config,
+                KAFKA_GROUP_ID.to_string(),
+                spot_tx_clone,
+                future_tx_clone,
+            )
+            .await
+            {
+                tracing::error!("Consumer error: {}", e);
+            }
+        });
+        task_group = task_group.with_handle(consumer_task);
+    }
+
+    // Drop original senders so channels close when all consumers are done
+    drop(spot_tx);
+    drop(future_tx);
+
+    // Await tasks; if one fails, all are aborted
+    task_group.abort_all_if_one_resolves().await;
+
+    Ok(())
+}
+
+async fn run_consumer(
+    config: FauConfig,
+    group_id: String,
+    spot_tx: mpsc::Sender<NewEntry>,
+    future_tx: mpsc::Sender<NewFutureEntry>,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let mut consumer = FauConsumer::new(config, &group_id)?;
+    consumer.subscribe(FauconTopic::PRICES_V1)?;
     let mut stream = consumer.stream();
 
     while let Some(msg_result) = stream.next().await {
@@ -68,7 +114,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 let new_entry = NewEntry {
                                     source,
                                     pair_id: entry.pair.to_string(),
-                                    publisher: "PRAGMA".to_string(),
+                                    publisher: PUBLISHER_NAME.to_string(),
                                     price: entry.price.into(),
                                     timestamp: ts,
                                 };
@@ -79,7 +125,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             InstrumentType::Perp => {
                                 let new_entry = NewFutureEntry {
                                     pair_id: entry.pair.to_string(),
-                                    publisher: "PRAGMA".to_string(),
+                                    publisher: PUBLISHER_NAME.to_string(),
                                     source,
                                     price: entry.price.into(),
                                     timestamp: ts,
@@ -95,29 +141,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                     }
                     Err(e) => {
-                        tracing::error!("Failed to deserialize price entry: {}", e);
+                        tracing::error!("❌ Failed to deserialize price entry: {}", e);
                         continue;
                     }
                 },
                 None => {
-                    tracing::warn!("Received message with no payload");
+                    tracing::warn!("🧐 Received message with no payload");
                     continue;
                 }
             },
             Err(e) => {
-                tracing::error!("Consumer error: {}", e);
+                tracing::error!("❌Consumer error: {}", e);
                 continue;
             }
         }
     }
-
     Ok(())
 }
 
 #[tracing::instrument(skip(pool, rx))]
 async fn process_spot_entries(pool: Pool, mut rx: mpsc::Receiver<NewEntry>) {
     const BUFFER_CAPACITY: usize = 100;
-    const FLUSH_TIMEOUT: Duration = Duration::from_millis(100);
+    const FLUSH_TIMEOUT: Duration = Duration::from_millis(50);
 
     let mut buffer = Vec::with_capacity(BUFFER_CAPACITY);
     let mut flush_interval = interval(FLUSH_TIMEOUT);
@@ -129,7 +174,7 @@ async fn process_spot_entries(pool: Pool, mut rx: mpsc::Receiver<NewEntry>) {
 
                 if buffer.len() >= BUFFER_CAPACITY {
                     if let Err(e) = insert_spot_entries(&pool, std::mem::take(&mut buffer)).await {
-                        tracing::error!("Failed to insert spot entries: {}", e);
+                        tracing::error!("❌ Failed to insert spot entries: {}", e);
                     }
                     buffer = Vec::with_capacity(BUFFER_CAPACITY);
                 }
@@ -137,7 +182,7 @@ async fn process_spot_entries(pool: Pool, mut rx: mpsc::Receiver<NewEntry>) {
             _ = flush_interval.tick() => {
                 if !buffer.is_empty() {
                     if let Err(e) = insert_spot_entries(&pool, std::mem::take(&mut buffer)).await {
-                        tracing::error!("Failed to flush spot entries: {}", e);
+                        tracing::error!("❌ Failed to flush spot entries: {}", e);
                     }
                     buffer = Vec::with_capacity(BUFFER_CAPACITY);
                 }
@@ -146,7 +191,7 @@ async fn process_spot_entries(pool: Pool, mut rx: mpsc::Receiver<NewEntry>) {
                 // Channel closed, flush remaining entries
                 if !buffer.is_empty() {
                     if let Err(e) = insert_spot_entries(&pool, buffer).await {
-                        tracing::error!("Failed to flush final spot entries: {}", e);
+                        tracing::error!("❌ Failed to flush final spot entries: {}", e);
                     }
                 }
                 break;
@@ -170,7 +215,7 @@ async fn process_future_entries(pool: Pool, mut rx: mpsc::Receiver<NewFutureEntr
 
                 if buffer.len() >= BUFFER_CAPACITY {
                     if let Err(e) = insert_future_entries(&pool, std::mem::take(&mut buffer)).await {
-                        tracing::error!("Failed to insert future entries: {}", e);
+                        tracing::error!("❌ Failed to insert future entries: {}", e);
                     }
                     buffer = Vec::with_capacity(BUFFER_CAPACITY);
                 }
@@ -178,7 +223,7 @@ async fn process_future_entries(pool: Pool, mut rx: mpsc::Receiver<NewFutureEntr
             _ = flush_interval.tick() => {
                 if !buffer.is_empty() {
                     if let Err(e) = insert_future_entries(&pool, std::mem::take(&mut buffer)).await {
-                        tracing::error!("Failed to flush future entries: {}", e);
+                        tracing::error!("❌ Failed to flush future entries: {}", e);
                     }
                     buffer = Vec::with_capacity(BUFFER_CAPACITY);
                 }
@@ -187,7 +232,7 @@ async fn process_future_entries(pool: Pool, mut rx: mpsc::Receiver<NewFutureEntr
                 // Channel closed, flush remaining entries
                 if !buffer.is_empty() {
                     if let Err(e) = insert_future_entries(&pool, buffer).await {
-                        tracing::error!("Failed to flush final future entries: {}", e);
+                        tracing::error!("❌ Failed to flush final future entries: {}", e);
                     }
                 }
                 break;
@@ -237,15 +282,12 @@ pub async fn insert_future_entries(
         })
         .collect::<Vec<_>>();
 
-    let len_perp_entries = new_entries
-        .iter()
-        .filter(|entry| entry.expiration_timestamp.is_none())
-        .count();
-
-    debug!("[PERP] {} new entries available", len_perp_entries);
     debug!(
-        "[FUTURE] {} new entries available",
-        new_entries.len() - len_perp_entries
+        "[PERP] {} new entries available",
+        new_entries
+            .iter()
+            .filter(|entry| entry.expiration_timestamp.is_none())
+            .count()
     );
 
     let entries = conn
@@ -255,7 +297,7 @@ pub async fn insert_future_entries(
         .map_err(InfraError::DbResultError)?;
     for entry in &entries {
         debug!(
-            "new future entry created {} - {}({}) - {}",
+            "new perp entry created {} - {}({}) - {}",
             entry.publisher, entry.pair_id, entry.price, entry.source
         );
     }

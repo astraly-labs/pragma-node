@@ -10,7 +10,7 @@ lazy_static! {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Ingestor {
-    // TODO: add faucon config once serde feature is added
+    pub num_consumers: usize,
 }
 
 impl Ingestor {

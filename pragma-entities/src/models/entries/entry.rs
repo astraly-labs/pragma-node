@@ -6,7 +6,6 @@ use crate::models::DieselResult;
 use crate::schema::entries;
 use bigdecimal::BigDecimal;
 use diesel::internal::derives::multiconnection::chrono::NaiveDateTime;
-use diesel::upsert::excluded;
 use diesel::{
     AsChangeset, ExpressionMethods, Insertable, OptionalExtension, PgConnection,
     PgTextExpressionMethods, QueryDsl, Queryable, RunQueryDsl, Selectable, SelectableHelper,
@@ -50,15 +49,7 @@ impl Entry {
             .values(data)
             .returning(Self::as_returning())
             .on_conflict((entries::pair_id, entries::source, entries::timestamp))
-            .do_update()
-            .set((
-                entries::pair_id.eq(excluded(entries::pair_id)),
-                entries::publisher.eq(excluded(entries::publisher)),
-                entries::source.eq(excluded(entries::source)),
-                entries::publisher_signature.eq(excluded(entries::publisher_signature)),
-                entries::timestamp.eq(excluded(entries::timestamp)),
-                entries::price.eq(excluded(entries::price)),
-            ))
+            .do_nothing()
             .get_results(conn)
     }
 
