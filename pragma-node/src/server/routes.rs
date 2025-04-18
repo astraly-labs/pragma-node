@@ -1,7 +1,7 @@
 use axum::Router;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
-use axum::routing::{get, post};
+use axum::routing::get;
 use utoipa::OpenApi as OpenApiT;
 use utoipa_swagger_ui::SwaggerUi;
 
@@ -12,7 +12,7 @@ use crate::handlers::onchain::{
 };
 use crate::handlers::stream::stream_multi::stream_entry_multi_pair;
 use crate::handlers::websocket::{subscribe_to_entry, subscribe_to_price};
-use crate::handlers::{get_entry, get_expiries, get_ohlc};
+use crate::handlers::{get_entry, get_ohlc};
 use crate::state::AppState;
 
 #[allow(clippy::extra_unused_type_parameters)]
@@ -41,7 +41,6 @@ async fn handler_404() -> impl IntoResponse {
 fn data_routes(state: AppState) -> Router<AppState> {
     Router::new()
         .route("/{base}/{quote}", get(get_entry))
-        .route("/{base}/{quote}/future_expiries", get(get_expiries))
         .route("/subscribe", get(subscribe_to_entry))
         .route("/price/subscribe", get(subscribe_to_price))
         .route("/multi/stream", get(stream_entry_multi_pair))

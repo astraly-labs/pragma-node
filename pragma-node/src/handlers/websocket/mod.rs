@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use pragma_common::types::{AggregationMode, DataType, Interval, pair::Pair};
+use pragma_common::{AggregationMode, InstrumentType, Interval, pair::Pair};
 use pragma_entities::EntryError;
 use serde::{Deserialize, Serialize};
 
@@ -117,7 +117,7 @@ pub async fn get_latest_entries_multi_pair(
         match get_latest_entry(state, pair, is_routing, entry_params).await {
             Ok(entry) => {
                 // Add :MARK suffix to the key if it's a perp pair
-                let key = if entry_params.data_type == DataType::PerpEntry {
+                let key = if entry_params.data_type == InstrumentType::Perp {
                     format!("{}:MARK", pair.to_pair_id())
                 } else {
                     pair.to_pair_id()
@@ -150,9 +150,9 @@ pub fn get_params_for_websocket(is_perp: bool) -> EntryParams {
         timestamp: chrono::Utc::now().timestamp_millis(),
         aggregation_mode: AggregationMode::Median,
         data_type: if is_perp {
-            DataType::PerpEntry
+            InstrumentType::Perp
         } else {
-            DataType::SpotEntry
+            InstrumentType::Spot
         },
         expiry: String::default(),
         with_components: true,

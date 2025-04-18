@@ -1,4 +1,5 @@
 use crate::EntryError;
+use crate::TimestampError;
 use crate::convert_timestamp_to_datetime;
 use crate::dto::entry as dto;
 use crate::models::DieselResult;
@@ -33,7 +34,6 @@ pub struct NewEntry {
     pub publisher: String,
     pub source: String,
     pub timestamp: NaiveDateTime,
-    pub publisher_signature: String,
     pub price: BigDecimal,
 }
 

@@ -37,7 +37,6 @@ pub struct NewFutureEntry {
     pub source: String,
     pub timestamp: NaiveDateTime,
     pub expiration_timestamp: Option<NaiveDateTime>,
-    pub publisher_signature: String,
     pub price: BigDecimal,
 }
 

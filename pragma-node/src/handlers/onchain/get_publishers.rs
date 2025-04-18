@@ -1,7 +1,7 @@
 use axum::Json;
 use axum::extract::{Query, State};
 
-use pragma_common::types::{DataType, Network};
+use pragma_common::{InstrumentType, starknet::StarknetNetwork};
 use pragma_entities::EntryError;
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToResponse, ToSchema};
@@ -13,8 +13,8 @@ use crate::state::AppState;
 
 #[derive(Debug, Default, Deserialize, IntoParams, ToSchema)]
 pub struct GetOnchainPublishersParams {
-    pub network: Network,
-    pub data_type: DataType,
+    pub network: StarknetNetwork,
+    pub data_type: InstrumentType,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]

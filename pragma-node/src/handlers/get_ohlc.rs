@@ -1,7 +1,7 @@
 use axum::Json;
 use axum::extract::{Query, State};
-use pragma_common::timestamp::{TimestampError, TimestampRangeError};
-use pragma_common::types::pair::Pair;
+use pragma_common::Pair;
+use pragma_entities::models::entries::timestamp::TimestampRangeError;
 use serde::{Deserialize, Serialize};
 use utoipa::{ToResponse, ToSchema};
 
@@ -9,7 +9,7 @@ use crate::handlers::Interval;
 use crate::infra::repositories::entry_repository::{self, OHLCEntry};
 use crate::state::AppState;
 use crate::utils::PathExtractor;
-use pragma_entities::EntryError;
+use pragma_entities::{EntryError, TimestampError};
 
 use super::GetEntryParams;
 

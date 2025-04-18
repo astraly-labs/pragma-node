@@ -1,7 +1,7 @@
 use std::pin::Pin;
 
 use axum::response::sse::Event;
-use pragma_common::types::{AggregationMode, pair::Pair};
+use pragma_common::{AggregationMode, Pair};
 use pragma_entities::EntryError;
 
 use crate::{

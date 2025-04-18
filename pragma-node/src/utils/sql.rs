@@ -1,12 +1,11 @@
-use pragma_common::types::{AggregationMode, DataType, Interval};
+use pragma_common::{AggregationMode, InstrumentType, Interval};
 use pragma_entities::InfraError;
 
 // Retrieve the timescale table based on the network and data type.
-pub const fn get_table_suffix(data_type: DataType) -> Result<&'static str, InfraError> {
+pub const fn get_table_suffix(data_type: InstrumentType) -> Result<&'static str, InfraError> {
     match data_type {
-        DataType::SpotEntry => Ok("spot"),
-        DataType::PerpEntry => Ok("perp"),
-        DataType::FutureEntry => Ok("future"),
+        InstrumentType::Spot => Ok("spot"),
+        InstrumentType::Perp => Ok("perp"),
     }
 }
 

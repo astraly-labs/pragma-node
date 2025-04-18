@@ -1,20 +1,17 @@
 pub mod get_entry;
-pub mod get_expiries;
 pub mod get_ohlc;
 pub mod onchain;
 pub mod stream;
 pub mod websocket;
 
 pub use get_entry::get_entry;
-pub use get_expiries::get_expiries;
 pub use get_ohlc::get_ohlc;
 
+use pragma_entities::UnixTimestamp;
 use serde::Deserialize;
 use utoipa::{IntoParams, ToSchema};
 
-use pragma_common::types::{AggregationMode, DataType, Interval};
-
-use pragma_common::types::timestamp::UnixTimestamp;
+use pragma_common::{AggregationMode, InstrumentType, Interval};
 
 #[derive(Default, Debug, Deserialize, ToSchema, Clone, Copy)]
 pub enum EntryType {
@@ -27,12 +24,12 @@ pub enum EntryType {
     Future,
 }
 
-impl From<EntryType> for DataType {
+impl From<EntryType> for InstrumentType {
     fn from(value: EntryType) -> Self {
         match value {
-            EntryType::Spot => Self::SpotEntry,
-            EntryType::Future => Self::FutureEntry,
-            EntryType::Perp => Self::PerpEntry,
+            EntryType::Spot => Self::Spot,
+            EntryType::Future => Self::Perp,
+            EntryType::Perp => Self::Perp,
         }
     }
 }

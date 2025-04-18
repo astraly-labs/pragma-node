@@ -15,30 +15,31 @@ use starknet::{
 use starknet_crypto::Felt;
 use url::Url;
 
-use pragma_common::types::{Network, pair::Pair};
+use pragma_common::{Pair, starknet::StarknetNetwork};
 use pragma_entities::InfraError;
 
 pub const ENV_MAINNET_RPC_URL: &str = "MAINNET_RPC_URL";
 pub const ENV_SEPOLIA_RPC_URL: &str = "SEPOLIA_RPC_URL";
 
-pub type RpcClients = HashMap<Network, Arc<JsonRpcClient<HttpTransport>>>;
+pub type RpcClients = HashMap<StarknetNetwork, Arc<JsonRpcClient<HttpTransport>>>;
 
-pub static ORACLE_ADDRESS_PER_NETWORK: LazyLock<HashMap<Network, Felt>> = LazyLock::new(|| {
-    let mut addresses = HashMap::new();
-    addresses.insert(
-        Network::Mainnet,
-        felt_hex!("0x2a85bd616f912537c50a49a4076db02c00b29b2cdc8a197ce92ed1837fa875b"),
-    );
-    addresses.insert(
-        Network::Sepolia,
-        felt_hex!("0x36031daa264c24520b11d93af622c848b2499b66b41d611bac95e13cfca131a"),
-    );
-    addresses
-});
+pub static ORACLE_ADDRESS_PER_NETWORK: LazyLock<HashMap<StarknetNetwork, Felt>> =
+    LazyLock::new(|| {
+        let mut addresses = HashMap::new();
+        addresses.insert(
+            StarknetNetwork::Mainnet,
+            felt_hex!("0x2a85bd616f912537c50a49a4076db02c00b29b2cdc8a197ce92ed1837fa875b"),
+        );
+        addresses.insert(
+            StarknetNetwork::Sepolia,
+            felt_hex!("0x36031daa264c24520b11d93af622c848b2499b66b41d611bac95e13cfca131a"),
+        );
+        addresses
+    });
 
 /// Init the RPC clients based on the provided ENV variables.
 /// Panics if the env are not correctly set.
-pub fn init_rpc_clients() -> HashMap<Network, Arc<JsonRpcClient<HttpTransport>>> {
+pub fn init_rpc_clients() -> HashMap<StarknetNetwork, Arc<JsonRpcClient<HttpTransport>>> {
     let mainnet_rpc_url: Url = std::env::var(ENV_MAINNET_RPC_URL)
         .unwrap_or("https://free-rpc.nethermind.io/mainnet-juno".to_string())
         .parse()
@@ -52,8 +53,8 @@ pub fn init_rpc_clients() -> HashMap<Network, Arc<JsonRpcClient<HttpTransport>>>
     let sepolia_client = JsonRpcClient::new(HttpTransport::new(sepolia_rpc_url));
 
     let mut rpc_clients = HashMap::new();
-    rpc_clients.insert(Network::Mainnet, Arc::new(mainnet_client));
-    rpc_clients.insert(Network::Sepolia, Arc::new(sepolia_client));
+    rpc_clients.insert(StarknetNetwork::Mainnet, Arc::new(mainnet_client));
+    rpc_clients.insert(StarknetNetwork::Sepolia, Arc::new(sepolia_client));
 
     rpc_clients
 }
@@ -62,7 +63,7 @@ pub fn init_rpc_clients() -> HashMap<Network, Arc<JsonRpcClient<HttpTransport>>>
 pub async fn call_get_decimals(
     rpc_client: &Arc<JsonRpcClient<HttpTransport>>,
     pair: &Pair,
-    network: Network,
+    network: StarknetNetwork,
 ) -> Result<u32, InfraError> {
     let pair_id = cairo_short_string_to_felt(&pair.to_pair_id())
         .map_err(|_| InfraError::PairNotFound(pair.to_pair_id()))?;

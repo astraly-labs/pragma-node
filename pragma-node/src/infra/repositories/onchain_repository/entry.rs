@@ -6,8 +6,8 @@ use diesel::sql_types::{Numeric, Text, Timestamp, VarChar};
 use diesel::{Queryable, QueryableByName, RunQueryDsl};
 use moka::future::Cache;
 
-use pragma_common::types::pair::Pair;
-use pragma_common::types::{AggregationMode, DataType, Interval, Network};
+use pragma_common::Pair;
+use pragma_common::{AggregationMode, InstrumentType, Interval, starknet::StarknetNetwork};
 use pragma_entities::error::InfraError;
 use pragma_monitoring::models::SpotEntry;
 
@@ -27,7 +27,7 @@ pub const ENTRIES_BACKWARD_INTERVAL: &str = "1 hour";
 #[derive(Debug)]
 pub struct OnchainEntryArguments {
     pub pair_id: String,
-    pub network: Network,
+    pub network: StarknetNetwork,
     pub timestamp: u64,
     pub aggregation_mode: AggregationMode,
     pub is_routing: bool,
@@ -77,7 +77,7 @@ pub async fn routing(
     onchain_pool: &Pool,
     routing_args: OnchainEntryArguments,
     rpc_clients: &RpcClients,
-    decimals_cache: &Cache<Network, HashMap<String, u32>>,
+    decimals_cache: &Cache<StarknetNetwork, HashMap<String, u32>>,
 ) -> Result<Vec<RawOnchainData>, InfraError> {
     let pair_id = routing_args.pair_id;
     let is_routing = routing_args.is_routing;
@@ -174,11 +174,11 @@ pub async fn routing(
 }
 
 fn build_sql_query(
-    network: Network,
+    network: StarknetNetwork,
     aggregation_mode: AggregationMode,
     timestamp: u64,
 ) -> Result<String, InfraError> {
-    let table_name = get_onchain_table_name(network, DataType::SpotEntry)?;
+    let table_name = get_onchain_table_name(network, InstrumentType::Spot)?;
 
     let complete_sql_query = {
         let aggregation_query = get_aggregation_subquery(aggregation_mode)?;
@@ -275,7 +275,7 @@ pub struct AggPriceAndEntries {
 // TODO(akhercha): Only works for Spot entries
 pub async fn get_sources_and_aggregate(
     pool: &Pool,
-    network: Network,
+    network: StarknetNetwork,
     pair_id: String,
     timestamp: u64,
     aggregation_mode: AggregationMode,
@@ -356,7 +356,7 @@ struct EntryTimestamp {
 
 pub async fn get_last_updated_timestamp(
     pool: &Pool,
-    network: Network,
+    network: StarknetNetwork,
     pairs: Vec<String>,
 ) -> Result<u64, InfraError> {
     let pair_list = format!("('{}')", pairs.join("','"));
@@ -371,7 +371,7 @@ pub async fn get_last_updated_timestamp(
         ORDER BY timestamp DESC
         LIMIT 1;
     ",
-        get_onchain_table_name(network, DataType::SpotEntry)?,
+        get_onchain_table_name(network, InstrumentType::Spot)?,
         pair_list,
     );
     let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
@@ -398,7 +398,7 @@ struct VariationEntry {
 
 pub async fn get_variations(
     pool: &Pool,
-    network: Network,
+    network: StarknetNetwork,
     pair_id: String,
 ) -> Result<HashMap<Interval, f32>, InfraError> {
     let intervals = vec![Interval::OneHour, Interval::OneDay, Interval::OneWeek];
@@ -406,7 +406,7 @@ pub async fn get_variations(
     let mut variations = HashMap::new();
 
     for interval in intervals {
-        let ohlc_table_name = get_onchain_ohlc_table_name(network, DataType::SpotEntry, interval)?;
+        let ohlc_table_name = get_onchain_ohlc_table_name(network, InstrumentType::Spot, interval)?;
         let raw_sql = format!(
             r"
             WITH recent_entries AS (
@@ -484,7 +484,7 @@ pub fn onchain_pair_exist(existing_pair_list: &[EntryPairId], pair_id: &str) -> 
 // TODO(0xevolve): Only works for Spot entries
 pub async fn get_existing_pairs(
     pool: &Pool,
-    network: Network,
+    network: StarknetNetwork,
 ) -> Result<Vec<EntryPairId>, InfraError> {
     let raw_sql = format!(
         r"
@@ -493,7 +493,7 @@ pub async fn get_existing_pairs(
         FROM
             {table_name};
     ",
-        table_name = get_onchain_table_name(network, DataType::SpotEntry)?
+        table_name = get_onchain_table_name(network, InstrumentType::Spot)?
     );
 
     let conn = pool.get().await.map_err(InfraError::DbPoolError)?;

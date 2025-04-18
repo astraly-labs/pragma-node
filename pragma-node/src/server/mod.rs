@@ -50,9 +50,7 @@ impl Modify for ServerAddon {
 
 #[tracing::instrument(skip(state))]
 pub async fn run_api_server(config: &Config, state: AppState) {
-    #[utoipauto(
-        paths = "./pragma-node/src, ./pragma-common/src from pragma_common, ./pragma-entities/src from pragma_entities"
-    )]
+    #[utoipauto(paths = "./pragma-node/src, ./pragma-entities/src from pragma_entities")]
     #[derive(OpenApi)]
     #[openapi(
         modifiers(&SecurityAddon, &ServerAddon),

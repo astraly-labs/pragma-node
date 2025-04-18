@@ -3,8 +3,7 @@ use std::collections::HashMap;
 use axum::Json;
 use axum::extract::{Query, State};
 use bigdecimal::BigDecimal;
-use pragma_common::types::pair::Pair;
-use pragma_common::types::{AggregationMode, Interval, Network};
+use pragma_common::{AggregationMode, Interval, Pair, starknet::StarknetNetwork};
 use pragma_entities::EntryError;
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToResponse, ToSchema};
@@ -17,7 +16,7 @@ use crate::utils::{PathExtractor, big_decimal_price_to_hex};
 
 #[derive(Debug, Default, Deserialize, IntoParams, ToSchema)]
 pub struct GetOnchainEntryParams {
-    pub network: Network,
+    pub network: StarknetNetwork,
     pub aggregation: Option<AggregationMode>,
     pub routing: Option<bool>,
     pub timestamp: Option<i64>,

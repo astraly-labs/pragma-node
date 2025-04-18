@@ -9,10 +9,13 @@ workspace = true
 [dependencies]
 pragma-common = { workspace = true }
 pragma-entities = { workspace = true }
+faucon-rs = { workspace = true }
 
+chrono = { workspace = true }
 deadpool-diesel = { workspace = true, features = ["postgres"] }
 dotenvy = { workspace = true }
 envy = { workspace = true }
+futures-util = { workspace = true }
 lazy_static = { workspace = true }
 rdkafka = { workspace = true }
 serde = { workspace = true }

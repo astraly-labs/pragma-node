@@ -1,12 +1,14 @@
 pub mod conversion;
 pub mod custom_extractors;
 pub mod macros;
+pub mod signing;
 pub mod sql;
+pub mod starkex;
 pub mod ws;
 
 pub use conversion::{convert_via_quote, format_bigdecimal_price, normalize_to_decimals};
 pub use custom_extractors::path_extractor::PathExtractor;
-pub use pragma_common::entries::{EntryTrait as _, PerpEntry};
+use pragma_common::starknet::StarknetNetwork;
 pub use ws::*;
 
 use bigdecimal::BigDecimal;
@@ -14,15 +16,9 @@ use bigdecimal::num_bigint::{BigUint, ToBigInt};
 use chrono::NaiveDateTime;
 use deadpool_diesel::postgres::Pool;
 use moka::future::Cache;
-use starknet_crypto::{Felt, Signature};
-
-use pragma_common::types::Network;
-use pragma_common::types::entries::Entry;
 use pragma_entities::dto::Publisher;
-use pragma_entities::{
-    Entry as EntityEntry, EntryError, FutureEntry, NewEntry, NewFutureEntry, PublisherError,
-    convert_timestamp_to_datetime,
-};
+use pragma_entities::{Entry as EntityEntry, EntryError, FutureEntry, PublisherError};
+use starknet_crypto::Felt;
 
 use crate::infra::repositories::publisher_repository;
 use crate::infra::repositories::{
@@ -62,44 +58,16 @@ pub(crate) fn compute_median_price_and_time(
 
 /// Given a pair and a network, returns if it exists in the
 /// onchain database.
-pub(crate) async fn is_onchain_existing_pair(pool: &Pool, pair: &String, network: Network) -> bool {
+pub(crate) async fn is_onchain_existing_pair(
+    pool: &Pool,
+    pair: &String,
+    network: StarknetNetwork,
+) -> bool {
     let existings_pairs = get_existing_pairs(pool, network)
         .await
         .expect("Couldn't get the existing pairs from the database.");
 
     existings_pairs.into_iter().any(|p| p.pair_id == *pair)
-}
-
-pub fn convert_entry_to_db(entry: &Entry, signature: &Signature) -> Result<NewEntry, EntryError> {
-    let dt = convert_timestamp_to_datetime!(entry.base.timestamp)?;
-
-    Ok(NewEntry {
-        pair_id: entry.pair_id.clone(),
-        publisher: entry.base.publisher.clone(),
-        source: entry.base.source.clone(),
-        timestamp: dt,
-        publisher_signature: format!("0x{signature}"),
-        price: entry.price.into(),
-    })
-}
-
-pub fn convert_perp_entry_to_db(
-    entry: &PerpEntry,
-    signature: &Signature,
-) -> Result<NewFutureEntry, EntryError> {
-    let base = entry.base();
-    let dt = convert_timestamp_to_datetime!(base.timestamp)?;
-    let signature_str = format!("0x{signature}");
-
-    Ok(NewFutureEntry {
-        pair_id: entry.pair_id().clone(),
-        publisher: base.publisher.clone(),
-        source: base.source.clone(),
-        timestamp: dt,
-        expiration_timestamp: None,
-        publisher_signature: signature_str,
-        price: entry.price().into(),
-    })
 }
 
 /// Converts a big decimal price to a hex string 0x prefixed.

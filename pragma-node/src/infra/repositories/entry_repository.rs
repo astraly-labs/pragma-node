@@ -3,13 +3,12 @@ use chrono::{DateTime, NaiveDateTime};
 use diesel::prelude::QueryableByName;
 use diesel::sql_types::{Double, Jsonb, Record, VarChar};
 use diesel::{Queryable, RunQueryDsl};
-use pragma_common::timestamp::TimestampError;
+use pragma_common::starknet::ConversionError;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use pragma_common::errors::ConversionError;
-use pragma_common::types::pair::Pair;
-use pragma_common::types::{AggregationMode, Interval};
+use pragma_common::{AggregationMode, Interval, Pair};
+use pragma_entities::models::entries::timestamp::TimestampError;
 use pragma_entities::{Entry, error::InfraError};
 
 use crate::constants::EIGHTEEN_DECIMALS;

@@ -8,7 +8,7 @@ use pragma_entities::InfraError;
 use serde::{Deserialize, Serialize};
 use utoipa::{ToResponse, ToSchema};
 
-use pragma_common::types::{Interval, Network};
+use pragma_common::{Interval, starknet::StarknetNetwork};
 
 use crate::infra::repositories::entry_repository::OHLCEntry;
 use crate::infra::repositories::onchain_repository;
@@ -189,7 +189,7 @@ impl WsOHLCHandler {
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 struct SubscriptionState {
     subscribed_pair: Option<String>,
-    network: Network,
+    network: StarknetNetwork,
     interval: Interval,
     is_first_update: bool,
     candles_to_get: u64,
@@ -199,7 +199,7 @@ struct SubscriptionState {
 struct SubscriptionRequest {
     msg_type: SubscriptionType,
     pair: String,
-    network: Network,
+    network: StarknetNetwork,
     interval: Interval,
     candles_to_get: Option<u64>,
 }
@@ -208,6 +208,6 @@ struct SubscriptionRequest {
 struct SubscriptionAck {
     msg_type: SubscriptionType,
     pair: String,
-    network: Network,
+    network: StarknetNetwork,
     interval: Interval,
 }
