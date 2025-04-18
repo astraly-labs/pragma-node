@@ -91,13 +91,11 @@ pub async fn get_historical_entries_multi_pair(
         match get_historical_entries(state, pair, entry_params, count).await {
             Ok(entries) => all_entries.push(entries),
             Err(e) => {
-                tracing::warn!(
-                    "Failed to get historical entries for pair {}: {}",
+                tracing::error!(
+                    "❌ Failed to get historical entries for pair {}: {}",
                     pair.to_pair_id(),
                     e
                 );
-                // Skip this pair and continue with others
-                continue;
             }
         }
     }
@@ -122,13 +120,11 @@ pub async fn get_latest_entries_multi_pair(
         match get_latest_entry(state, pair, is_routing, entry_params).await {
             Ok(entry) => latest_entries.push(entry),
             Err(e) => {
-                tracing::warn!(
-                    "Failed to get latest entry for pair {}: {}",
+                tracing::error!(
+                    "❌ Failed to get latest entry for pair {}: {}",
                     pair.to_pair_id(),
                     e
                 );
-                // Skip this pair and continue with others
-                continue;
             }
         }
     }

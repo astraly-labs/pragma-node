@@ -18,6 +18,7 @@ use pragma_common::{CapnpDeserialize, entries::PriceEntry, task_group::TaskGroup
 use pragma_entities::connection::ENV_OFFCHAIN_DATABASE_URL;
 use pragma_entities::{Entry, FutureEntry, InfraError, NewEntry, NewFutureEntry};
 
+const CHANNEL_CAPACITY: usize = 10000;
 const PUBLISHER_NAME: &str = "PRAGMA";
 const KAFKA_GROUP_ID: &str = "pragma-ingestor";
 
@@ -27,7 +28,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let _ = dotenv();
 
     let otel_endpoint = var("OTEL_EXPORTER_OTLP_ENDPOINT").ok();
-    pragma_common::telemetry::init_telemetry("pragma-ingestor".into(), otel_endpoint)?;
+    pragma_common::telemetry::init_telemetry("pragma-ingestor", otel_endpoint)?;
 
     let faucon_config = FauConfig::new(FauconEnvironment::Development);
 
@@ -44,7 +45,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .map_or(1, |s| s.parse::<usize>().unwrap());
 
     // Create channels for spot and future entries
-    const CHANNEL_CAPACITY: usize = 10000;
     let (spot_tx, spot_rx) = mpsc::channel::<NewEntry>(CHANNEL_CAPACITY);
     let (future_tx, future_rx) = mpsc::channel::<NewFutureEntry>(CHANNEL_CAPACITY);
 
@@ -100,59 +100,60 @@ async fn run_consumer(
 
     while let Some(msg_result) = stream.next().await {
         match msg_result {
-            Ok(msg) => match msg.payload() {
-                Some(payload) => match PriceEntry::from_capnp(payload) {
-                    Ok(entry) => {
-                        let ts = chrono::DateTime::from_timestamp_millis(entry.timestamp_ms)
-                            .map(|dt| dt.naive_utc())
-                            .unwrap();
-                        let source = entry.clone().source;
-                        let instrument_type = entry.instrument_type();
+            Ok(msg) => {
+                if let Some(payload) = msg.payload() {
+                    match PriceEntry::from_capnp(payload) {
+                        Ok(entry) => {
+                            let ts = chrono::DateTime::from_timestamp_millis(entry.timestamp_ms)
+                                .map(|dt| dt.naive_utc())
+                                .unwrap();
+                            let source = entry.clone().source;
+                            let instrument_type = entry.instrument_type();
 
-                        match instrument_type {
-                            InstrumentType::Spot => {
-                                let new_entry = NewEntry {
-                                    source,
-                                    pair_id: entry.pair.to_string(),
-                                    publisher: PUBLISHER_NAME.to_string(),
-                                    price: entry.price.into(),
-                                    timestamp: ts,
-                                };
-                                if let Err(e) = spot_tx.send(new_entry).await {
-                                    tracing::error!("Failed to send spot entry to channel: {}", e);
+                            match instrument_type {
+                                InstrumentType::Spot => {
+                                    let new_entry = NewEntry {
+                                        source,
+                                        pair_id: entry.pair.to_string(),
+                                        publisher: PUBLISHER_NAME.to_string(),
+                                        price: entry.price.into(),
+                                        timestamp: ts,
+                                    };
+                                    if let Err(e) = spot_tx.send(new_entry).await {
+                                        tracing::error!(
+                                            "Failed to send spot entry to channel: {}",
+                                            e
+                                        );
+                                    }
                                 }
-                            }
-                            InstrumentType::Perp => {
-                                let new_entry = NewFutureEntry {
-                                    pair_id: entry.pair.to_string(),
-                                    publisher: PUBLISHER_NAME.to_string(),
-                                    source,
-                                    price: entry.price.into(),
-                                    timestamp: ts,
-                                    expiration_timestamp: None,
-                                };
-                                if let Err(e) = future_tx.send(new_entry).await {
-                                    tracing::error!(
-                                        "Failed to send future entry to channel: {}",
-                                        e
-                                    );
+                                InstrumentType::Perp => {
+                                    let new_entry = NewFutureEntry {
+                                        pair_id: entry.pair.to_string(),
+                                        publisher: PUBLISHER_NAME.to_string(),
+                                        source,
+                                        price: entry.price.into(),
+                                        timestamp: ts,
+                                        expiration_timestamp: None,
+                                    };
+                                    if let Err(e) = future_tx.send(new_entry).await {
+                                        tracing::error!(
+                                            "Failed to send future entry to channel: {}",
+                                            e
+                                        );
+                                    }
                                 }
                             }
                         }
+                        Err(e) => {
+                            tracing::error!("❌ Failed to deserialize price entry: {}", e);
+                        }
                     }
-                    Err(e) => {
-                        tracing::error!("❌ Failed to deserialize price entry: {}", e);
-                        continue;
-                    }
-                },
-                None => {
+                } else {
                     tracing::warn!("🧐 Received message with no payload");
-                    continue;
                 }
-            },
+            }
             Err(e) => {
                 tracing::error!("❌Consumer error: {}", e);
-                continue;
             }
         }
     }

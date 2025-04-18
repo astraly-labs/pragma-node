@@ -112,7 +112,7 @@ impl ChannelHandler<SubscriptionState, SubscriptionRequest, EntryError> for WsEn
                 state.remove_spot_pairs(&existing_spot_pairs);
                 state.remove_perp_pairs(&existing_perp_pairs);
             }
-        };
+        }
         let subscribed_pairs = state.get_fmt_subscribed_pairs();
         drop(state);
         // We send an ack message to the client with the subscribed pairs (so

@@ -258,7 +258,7 @@ pub async fn get_publishers_with_components(
     decimals_cache: &Cache<StarknetNetwork, HashMap<String, u32>>,
     rpc_clients: &RpcClients,
 ) -> Result<Vec<Publisher>, InfraError> {
-    let table_name = get_onchain_table_name(network, data_type)?;
+    let table_name = get_onchain_table_name(network, data_type);
     let publisher_names = publishers.iter().map(|p| p.name.clone()).collect();
 
     let updates =

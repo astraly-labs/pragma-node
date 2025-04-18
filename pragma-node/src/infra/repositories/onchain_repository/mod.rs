@@ -63,14 +63,13 @@ pub(crate) async fn get_onchain_decimals(
 pub(crate) const fn get_onchain_table_name(
     network: StarknetNetwork,
     data_type: InstrumentType,
-) -> Result<&'static str, InfraError> {
-    let table = match (network, data_type) {
+) -> &'static str {
+    match (network, data_type) {
         (StarknetNetwork::Sepolia, InstrumentType::Spot) => "spot_entry",
         (StarknetNetwork::Mainnet, InstrumentType::Spot) => "mainnet_spot_entry",
         (StarknetNetwork::Sepolia, InstrumentType::Perp) => "future_entry",
         (StarknetNetwork::Mainnet, InstrumentType::Perp) => "mainnet_future_entry",
-    };
-    Ok(table)
+    }
 }
 
 /// Retrieve the onchain table name for the OHLC based on network, datatype & interval.

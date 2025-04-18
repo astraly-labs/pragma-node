@@ -3,7 +3,7 @@ use std::sync::Arc;
 use deadpool_diesel::{Manager, postgres::Pool};
 use diesel::RunQueryDsl;
 
-use pragma_common::{AggregationMode, Interval, InstrumentType};
+use pragma_common::{AggregationMode, InstrumentType, Interval};
 use pragma_node::utils::sql::{get_interval_specifier, get_table_suffix};
 use testcontainers::ContainerAsync;
 use testcontainers_modules::kafka::Kafka;

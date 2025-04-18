@@ -1,12 +1,9 @@
-use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
+use std::sync::LazyLock;
 
 use crate::error::PragmaConsumerError;
 
-lazy_static! {
-    #[derive(Debug)]
-    pub static ref CONFIG: Ingestor = load_configuration();
-}
+pub static CONFIG: LazyLock<Ingestor> = LazyLock::new(load_configuration);
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Ingestor {

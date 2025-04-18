@@ -178,7 +178,7 @@ fn build_sql_query(
     aggregation_mode: AggregationMode,
     timestamp: u64,
 ) -> Result<String, InfraError> {
-    let table_name = get_onchain_table_name(network, InstrumentType::Spot)?;
+    let table_name = get_onchain_table_name(network, InstrumentType::Spot);
 
     let complete_sql_query = {
         let aggregation_query = get_aggregation_subquery(aggregation_mode)?;
@@ -371,7 +371,7 @@ pub async fn get_last_updated_timestamp(
         ORDER BY timestamp DESC
         LIMIT 1;
     ",
-        get_onchain_table_name(network, InstrumentType::Spot)?,
+        get_onchain_table_name(network, InstrumentType::Spot),
         pair_list,
     );
     let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
@@ -493,7 +493,7 @@ pub async fn get_existing_pairs(
         FROM
             {table_name};
     ",
-        table_name = get_onchain_table_name(network, InstrumentType::Spot)?
+        table_name = get_onchain_table_name(network, InstrumentType::Spot)
     );
 
     let conn = pool.get().await.map_err(InfraError::DbPoolError)?;

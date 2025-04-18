@@ -125,13 +125,7 @@ pub async fn get_latest_entries_multi_pair(
                 latest_entries.insert(key, entry);
             }
             Err(e) => {
-                tracing::warn!(
-                    "Failed to get latest entry for pair {}: {}",
-                    pair.to_pair_id(),
-                    e
-                );
-                // Skip this pair and continue with others
-                continue;
+                tracing::error!("❌ Failed to process message: {}", e);
             }
         }
     }

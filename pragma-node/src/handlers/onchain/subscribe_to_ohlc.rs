@@ -111,7 +111,7 @@ impl ChannelHandler<SubscriptionState, SubscriptionRequest, InfraError> for WsOH
                 let mut state = subscriber.state.write().await;
                 *state = SubscriptionState::default();
             }
-        };
+        }
         self.send_ack_message(subscriber, subscription).await?;
         self.periodic_interval(subscriber).await?;
         Ok(())

@@ -28,8 +28,7 @@ impl From<EntryType> for InstrumentType {
     fn from(value: EntryType) -> Self {
         match value {
             EntryType::Spot => Self::Spot,
-            EntryType::Future => Self::Perp,
-            EntryType::Perp => Self::Perp,
+            EntryType::Future | EntryType::Perp => Self::Perp,
         }
     }
 }
