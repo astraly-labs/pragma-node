@@ -1,14 +1,12 @@
 pub mod conversion;
 pub mod custom_extractors;
-pub mod kafka;
 pub mod macros;
 pub mod sql;
 pub mod ws;
 
 pub use conversion::{convert_via_quote, format_bigdecimal_price, normalize_to_decimals};
 pub use custom_extractors::path_extractor::PathExtractor;
-pub use kafka::publish_to_kafka;
-use pragma_common::entries::{EntryTrait as _, PerpEntry};
+pub use pragma_common::entries::{EntryTrait as _, PerpEntry};
 pub use ws::*;
 
 use bigdecimal::BigDecimal;

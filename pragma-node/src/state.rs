@@ -1,11 +1,9 @@
 use std::sync::Arc;
 
-use dashmap::DashMap;
 use deadpool_diesel::postgres::Pool;
 use starknet::signers::SigningKey;
 
 use crate::caches::CacheRegistry;
-use crate::handlers::publish_entry_ws::PublisherSession;
 use crate::infra::rpc::RpcClients;
 use crate::metrics::MetricsRegistry;
 
@@ -22,8 +20,6 @@ pub struct AppState {
     pub pragma_signer: Option<SigningKey>,
     // Metrics
     pub metrics: Arc<MetricsRegistry>,
-    // Publisher sessions
-    pub publisher_sessions: Arc<DashMap<String, PublisherSession>>,
 }
 
 impl std::fmt::Debug for AppState {

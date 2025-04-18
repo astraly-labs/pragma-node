@@ -12,9 +12,7 @@ use crate::handlers::onchain::{
 };
 use crate::handlers::stream::stream_multi::stream_entry_multi_pair;
 use crate::handlers::websocket::{subscribe_to_entry, subscribe_to_price};
-use crate::handlers::{
-    create_entries, create_future_entries, get_entry, get_expiries, get_ohlc, publish_entry,
-};
+use crate::handlers::{get_entry, get_expiries, get_ohlc};
 use crate::state::AppState;
 
 #[allow(clippy::extra_unused_type_parameters)]
@@ -42,9 +40,6 @@ async fn handler_404() -> impl IntoResponse {
 
 fn data_routes(state: AppState) -> Router<AppState> {
     Router::new()
-        .route("/publish", post(create_entries))
-        .route("/publish_future", post(create_future_entries))
-        .route("/publish_ws", get(publish_entry))
         .route("/{base}/{quote}", get(get_entry))
         .route("/{base}/{quote}/future_expiries", get(get_expiries))
         .route("/subscribe", get(subscribe_to_entry))
