@@ -1783,9 +1783,9 @@ checksum = "37909eebbb50d72f9059c3b6d82c0463f2ff062c9e95845c43a6c9c0355411be"
 
 [[package]]
 name = "faucon-rs"
-version = "0.1.5"
+version = "0.1.7"
 source = "sparse+https://registry.devnet.pragma.build/api/v1/crates/"
-checksum = "579a04278acd17f902c94654dfc4634d879518b87dc418cc67d8a5dc9e0f682a"
+checksum = "88ec94858b4e5d0ad02004347796ff3ed17817a2b6dc6c7adb3c60c67159676d"
 dependencies = [
  "pragma-common",
  "rdkafka 0.37.0",
