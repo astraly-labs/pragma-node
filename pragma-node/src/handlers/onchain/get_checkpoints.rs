@@ -1,8 +1,8 @@
 use axum::Json;
 use axum::extract::{Query, State};
 
-use pragma_common::types::Network;
-use pragma_common::types::pair::Pair;
+use pragma_common::Pair;
+use pragma_common::starknet::StarknetNetwork;
 use pragma_entities::CheckpointError;
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToResponse, ToSchema};
@@ -17,14 +17,14 @@ pub const MAX_LIMIT: u64 = 1000;
 
 #[derive(Debug, Deserialize, IntoParams, ToSchema)]
 pub struct GetOnchainCheckpointsParams {
-    pub network: Network,
+    pub network: StarknetNetwork,
     pub limit: Option<u64>,
 }
 
 impl Default for GetOnchainCheckpointsParams {
     fn default() -> Self {
         Self {
-            network: Network::default(),
+            network: StarknetNetwork::default(),
             limit: Some(DEFAULT_LIMIT),
         }
     }

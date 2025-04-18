@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use dashmap::DashMap;
 use dotenvy::dotenv;
 
 use pragma_entities::connection::{ENV_OFFCHAIN_DATABASE_URL, ENV_ONCHAIN_DATABASE_URL};
@@ -18,7 +17,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv().ok();
 
     let otel_endpoint = std::env::var("OTEL_EXPORTER_OTLP_ENDPOINT").ok();
-    pragma_common::telemetry::init_telemetry("pragma-node".into(), otel_endpoint)
+    pragma_common::telemetry::init_telemetry("pragma-node", otel_endpoint)
         .expect("Failed to initialize telemetry");
 
     // Init config from env variables
@@ -44,7 +43,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         caches: Arc::new(caches),
         pragma_signer,
         metrics: MetricsRegistry::new(),
-        publisher_sessions: Arc::new(DashMap::new()),
         rpc_clients: init_rpc_clients(),
     };
 

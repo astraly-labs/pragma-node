@@ -1,9 +1,9 @@
 use axum::Json;
 use axum::extract::{Query, State};
-use pragma_common::timestamp::TimestampError;
-use pragma_common::types::pair::Pair;
-use pragma_common::types::{Interval, Network};
-use pragma_entities::{EntryError, InfraError};
+use pragma_common::starknet::StarknetNetwork;
+use pragma_common::{Interval, Pair};
+use pragma_entities::models::entries::timestamp::TimestampRange;
+use pragma_entities::{EntryError, InfraError, TimestampError};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToResponse, ToSchema};
 
@@ -12,11 +12,10 @@ use crate::infra::repositories::onchain_repository::history::{
 };
 use crate::state::AppState;
 use crate::utils::{PathExtractor, big_decimal_price_to_hex};
-use pragma_common::types::timestamp::TimestampRange;
 
 #[derive(Debug, Deserialize, IntoParams, ToSchema)]
 pub struct GetOnchainHistoryParams {
-    pub network: Network,
+    pub network: StarknetNetwork,
     pub timestamp: TimestampRange,
     pub chunk_interval: Option<Interval>,
     pub routing: Option<bool>,

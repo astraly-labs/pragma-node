@@ -3,7 +3,7 @@ use deadpool_diesel::postgres::Pool;
 use diesel::sql_types::{Numeric, Timestamp, VarChar};
 use diesel::{Queryable, QueryableByName, RunQueryDsl};
 
-use pragma_common::types::Network;
+use pragma_common::starknet::StarknetNetwork;
 use pragma_entities::error::InfraError;
 
 use crate::handlers::onchain::get_checkpoints::Checkpoint;
@@ -35,14 +35,14 @@ impl RawCheckpoint {
 #[allow(clippy::cast_possible_wrap)]
 pub async fn get_checkpoints(
     pool: &Pool,
-    network: Network,
+    network: StarknetNetwork,
     pair_id: String,
     decimals: u32,
     limit: u64,
 ) -> Result<Vec<Checkpoint>, InfraError> {
     let table_name = match network {
-        Network::Mainnet => "mainnet_spot_checkpoints",
-        Network::Sepolia => "spot_checkpoints",
+        StarknetNetwork::Mainnet => "mainnet_spot_checkpoints",
+        StarknetNetwork::Sepolia => "spot_checkpoints",
     };
     let raw_sql = format!(
         r"

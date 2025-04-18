@@ -7,8 +7,7 @@ use diesel::{Queryable, QueryableByName, RunQueryDsl};
 use futures::future::try_join_all;
 use moka::future::Cache;
 
-use pragma_common::types::pair::Pair;
-use pragma_common::types::{DataType, Network};
+use pragma_common::{InstrumentType, Pair, starknet::StarknetNetwork};
 use pragma_entities::error::InfraError;
 
 use crate::handlers::onchain::get_publishers::{Publisher, PublisherEntry};
@@ -29,11 +28,11 @@ pub struct RawPublisher {
 
 pub async fn get_publishers(
     pool: &Pool,
-    network: Network,
+    network: StarknetNetwork,
 ) -> Result<Vec<RawPublisher>, InfraError> {
     let address_column = match network {
-        Network::Mainnet => "mainnet_address",
-        Network::Sepolia => "testnet_address",
+        StarknetNetwork::Mainnet => "mainnet_address",
+        StarknetNetwork::Sepolia => "testnet_address",
     };
     let raw_sql = format!(
         r"
@@ -77,8 +76,8 @@ pub struct RawLastPublisherEntryForPair {
 impl RawLastPublisherEntryForPair {
     pub async fn to_publisher_entry(
         &self,
-        network: Network,
-        decimals_cache: &Cache<Network, HashMap<String, u32>>,
+        network: StarknetNetwork,
+        decimals_cache: &Cache<StarknetNetwork, HashMap<String, u32>>,
         rpc_clients: &RpcClients,
     ) -> Result<PublisherEntry, InfraError> {
         let pair = Pair::from(self.pair_id.as_str());
@@ -164,11 +163,11 @@ async fn get_all_publishers_updates(
 
 async fn get_publisher_with_components(
     pool: &Pool,
-    network: Network,
+    network: StarknetNetwork,
     table_name: &str,
     publisher: &RawPublisher,
     publisher_updates: &RawPublisherUpdates,
-    decimals_cache: &Cache<Network, HashMap<String, u32>>,
+    decimals_cache: &Cache<StarknetNetwork, HashMap<String, u32>>,
     rpc_clients: &RpcClients,
 ) -> Result<Publisher, InfraError> {
     let raw_sql_entries = format!(
@@ -252,14 +251,14 @@ async fn get_publisher_with_components(
 #[allow(clippy::implicit_hasher)]
 pub async fn get_publishers_with_components(
     pool: &Pool,
-    network: Network,
-    data_type: DataType,
+    network: StarknetNetwork,
+    data_type: InstrumentType,
     publishers: Vec<RawPublisher>,
     publishers_updates_cache: &Cache<String, HashMap<String, RawPublisherUpdates>>,
-    decimals_cache: &Cache<Network, HashMap<String, u32>>,
+    decimals_cache: &Cache<StarknetNetwork, HashMap<String, u32>>,
     rpc_clients: &RpcClients,
 ) -> Result<Vec<Publisher>, InfraError> {
-    let table_name = get_onchain_table_name(network, data_type)?;
+    let table_name = get_onchain_table_name(network, data_type);
     let publisher_names = publishers.iter().map(|p| p.name.clone()).collect();
 
     let updates =

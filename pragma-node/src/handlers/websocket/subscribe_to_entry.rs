@@ -1,27 +1,27 @@
 use std::collections::HashMap;
 use std::net::SocketAddr;
-use std::str::FromStr;
+use std::str::FromStr as _;
 use std::sync::Arc;
 
 use axum::extract::ws::{WebSocket, WebSocketUpgrade};
 use axum::extract::{ConnectInfo, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
-use pragma_common::errors::ConversionError;
-use pragma_common::types::pair::Pair;
+use pragma_common::Pair;
+use pragma_common::starknet::ConversionError;
+use pragma_entities::models::entries::timestamp::UnixTimestamp;
 use serde::{Deserialize, Serialize};
 use starknet::signers::SigningKey;
 use utoipa::{ToResponse, ToSchema};
 
-use pragma_common::signing::sign_data;
-use pragma_common::signing::starkex::StarkexPrice;
-use pragma_common::types::timestamp::UnixTimestamp;
 use pragma_entities::EntryError;
 
 use crate::constants::starkex_ws::PRAGMA_ORACLE_NAME_FOR_STARKEX;
 use crate::handlers::websocket::SubscriptionState;
 use crate::infra::repositories::entry_repository::MedianEntry;
 use crate::state::AppState;
+use crate::utils::signing::sign_data;
+use crate::utils::starkex::StarkexPrice;
 use crate::utils::{ChannelHandler, Subscriber, SubscriptionType};
 use crate::utils::{hex_string_to_bigdecimal, only_existing_pairs};
 
@@ -188,7 +188,7 @@ impl ChannelHandler<SubscriptionState, SubscriptionRequest, EntryError> for WsEn
                 state.remove_spot_pairs(&existing_spot_pairs);
                 state.remove_perp_pairs(&existing_perp_pairs);
             }
-        };
+        }
         let subscribed_pairs = state.get_fmt_subscribed_pairs();
         drop(state);
         // We send an ack message to the client with the subscribed pairs (so

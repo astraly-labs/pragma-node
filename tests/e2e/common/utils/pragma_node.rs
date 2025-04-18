@@ -1,6 +1,6 @@
 //! Contains utils from the pragma-node repository.
 //! Since we can't import them here, we recreated them here.
-use pragma_common::types::Interval;
+use pragma_common::Interval;
 
 pub const fn get_window_size(interval: Interval) -> i64 {
     match interval {

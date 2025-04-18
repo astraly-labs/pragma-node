@@ -1,7 +1,7 @@
 use bigdecimal::{BigDecimal, FromPrimitive};
 use rstest::rstest;
 
-use pragma_common::types::{AggregationMode, Interval};
+use pragma_common::{AggregationMode, Interval};
 use serde::{Deserialize, Serialize};
 
 use crate::{

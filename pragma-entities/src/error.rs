@@ -1,14 +1,13 @@
 use deadpool_diesel::{InteractError, PoolError};
-use pragma_common::{
-    timestamp::TimestampError,
-    types::{AggregationMode, DataType, Interval, Network},
-};
+use pragma_common::{AggregationMode, InstrumentType, Interval, starknet::StarknetNetwork};
 use std::{
     fmt::{self, Debug},
     num::TryFromIntError,
 };
 use thiserror::Error;
 use utoipa::ToSchema;
+
+use crate::models::entries::timestamp::TimestampError;
 
 #[derive(Debug, Error, ToSchema)]
 pub enum WebSocketError {
@@ -32,31 +31,13 @@ pub enum PragmaNodeError {
     RedisConnection(String),
 }
 
-#[derive(Debug, thiserror::Error, ToSchema)]
-pub enum RedisError {
-    #[error("internal server error")]
-    InternalServerError,
-    #[error("could not establish a connection with Redis")]
-    Connection,
-    #[error("could not find option for instrument {1} at block {0}")]
-    OptionNotFound(u64, String),
-    #[error("merkle tree not found for block {0}")]
-    MerkleTreeNotFound(u64),
-    #[error("invalid option hash, could not convert to felt: {0}")]
-    InvalidOptionHash(String),
-    #[error("could not deserialize RawMerkleTree into MerkleTree")]
-    TreeDeserialization,
-    #[error("no merkle feeds published for network: {0}")]
-    NoBlocks(String),
-}
-
 #[derive(Debug, thiserror::Error)]
 pub enum InfraError {
     // Bad request (400)
     InvalidTimestamp(TimestampError),
     UnsupportedInterval(Interval, AggregationMode),
     UnsupportedOnchainInterval(Interval),
-    UnsupportedDataTypeForNetwork(Network, DataType),
+    UnsupportedDataTypeForNetwork(StarknetNetwork, InstrumentType),
     // Not Found error (404)
     RoutingError(String),
     EntryNotFound(String),
@@ -72,7 +53,7 @@ pub enum InfraError {
     DbPoolError(#[from] PoolError),
     DbInteractionError(#[from] InteractError),
     DbResultError(#[from] diesel::result::Error),
-    NoRpcAvailable(Network),
+    NoRpcAvailable(StarknetNetwork),
     // Unknown internal Server Error - should never be shown to the user
     InternalServerError,
     WebSocketError(#[from] WebSocketError),

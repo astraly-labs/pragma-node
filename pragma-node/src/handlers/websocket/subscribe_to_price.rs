@@ -1,18 +1,18 @@
 use std::collections::HashMap;
 use std::net::SocketAddr;
-use std::str::FromStr;
+use std::str::FromStr as _;
 use std::sync::Arc;
 
 use axum::extract::ws::{WebSocket, WebSocketUpgrade};
 use axum::extract::{ConnectInfo, State};
 use axum::response::IntoResponse;
-use pragma_common::types::pair::Pair;
+use pragma_common::Pair;
+use pragma_entities::models::entries::timestamp::UnixTimestamp;
 use serde::{Deserialize, Serialize};
 
 use crate::state::AppState;
 use crate::utils::only_existing_pairs;
 use crate::utils::ws::{ChannelHandler, Subscriber, SubscriptionType};
-use pragma_common::types::timestamp::UnixTimestamp;
 use pragma_entities::EntryError;
 use utoipa::{ToResponse, ToSchema};
 
@@ -112,7 +112,7 @@ impl ChannelHandler<SubscriptionState, SubscriptionRequest, EntryError> for WsEn
                 state.remove_spot_pairs(&existing_spot_pairs);
                 state.remove_perp_pairs(&existing_perp_pairs);
             }
-        };
+        }
         let subscribed_pairs = state.get_fmt_subscribed_pairs();
         drop(state);
         // We send an ack message to the client with the subscribed pairs (so

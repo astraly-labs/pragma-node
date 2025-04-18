@@ -1,15 +1,15 @@
 use axum::Json;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
-use pragma_common::signing::SignerError;
+use pragma_common::starknet::{SignerError, StarknetNetwork};
+use pragma_common::{AggregationMode, InstrumentType, Interval};
 use serde_json::json;
 use utoipa::ToSchema;
 
-use pragma_common::timestamp::TimestampError;
-use pragma_common::types::{AggregationMode, DataType, Interval, Network};
-
 use crate::PublisherError;
 use crate::error::{InfraError, WebSocketError};
+
+use super::timestamp::TimestampError;
 
 #[derive(Debug, thiserror::Error, ToSchema)]
 #[schema(example = json!({
@@ -37,7 +37,7 @@ pub enum EntryError {
     #[error("invalid login message: {0}")]
     InvalidLoginMessage(String),
     #[error("unsupported data_type {1:?} for network {0:?}")]
-    InvalidDataTypeForNetwork(Network, DataType),
+    InvalidDataTypeForNetwork(StarknetNetwork, InstrumentType),
 
     // 401 Error - Unauthorized
     #[error("unauthorized request: {0}")]

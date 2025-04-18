@@ -5,12 +5,12 @@ use chrono::{DateTime, NaiveDateTime};
 use deadpool_diesel::postgres::Pool;
 use diesel::{RunQueryDsl, prelude::QueryableByName};
 use moka::future::Cache;
-use pragma_common::timestamp::TimestampError;
+use pragma_entities::models::entries::timestamp::TimestampRange;
 use serde::Serialize;
 
-use pragma_common::types::pair::Pair;
-use pragma_common::types::timestamp::TimestampRange;
-use pragma_common::types::{DataType, Interval, Network};
+use pragma_common::starknet::StarknetNetwork;
+use pragma_common::{InstrumentType, Interval, Pair};
+use pragma_entities::TimestampError;
 use pragma_entities::error::InfraError;
 
 use super::entry::{get_existing_pairs, onchain_pair_exist};
@@ -24,11 +24,11 @@ use crate::utils::{convert_via_quote, normalize_to_decimals};
 #[allow(clippy::implicit_hasher)]
 pub async fn get_historical_entries_and_decimals(
     onchain_pool: &Pool,
-    network: Network,
+    network: StarknetNetwork,
     pair: &Pair,
     timestamp_range: &TimestampRange,
     chunk_interval: Interval,
-    decimals_cache: &Cache<Network, HashMap<String, u32>>,
+    decimals_cache: &Cache<StarknetNetwork, HashMap<String, u32>>,
     rpc_clients: &RpcClients,
 ) -> Result<(Vec<HistoricalEntryRaw>, u32), InfraError> {
     let raw_entries: Vec<HistoricalEntryRaw> = get_historical_aggregated_entries(
@@ -65,7 +65,7 @@ pub struct HistoricalEntryRaw {
 /// NOTE: Only works for `SpotEntry` at the moment, `DataType` is hard coded.
 async fn get_historical_aggregated_entries(
     pool: &Pool,
-    network: Network,
+    network: StarknetNetwork,
     pair: &Pair,
     timestamp: &TimestampRange,
     chunk_interval: Interval,
@@ -92,7 +92,7 @@ async fn get_historical_aggregated_entries(
             bucket ASC
         ",
         table_name =
-            get_onchain_aggregate_table_name(network, DataType::SpotEntry, chunk_interval)?,
+            get_onchain_aggregate_table_name(network, InstrumentType::Spot, chunk_interval)?,
     );
 
     let pair_id = pair.to_string();
@@ -123,11 +123,11 @@ async fn get_historical_aggregated_entries(
 #[allow(clippy::implicit_hasher)]
 pub async fn retry_with_routing(
     onchain_pool: &Pool,
-    network: Network,
+    network: StarknetNetwork,
     pair: &Pair,
     timestamp_range: &TimestampRange,
     chunk_interval: Interval,
-    decimals_cache: &Cache<Network, HashMap<String, u32>>,
+    decimals_cache: &Cache<StarknetNetwork, HashMap<String, u32>>,
     rpc_clients: &RpcClients,
 ) -> Result<(Vec<HistoricalEntryRaw>, u32), InfraError> {
     let existing_pairs = get_existing_pairs(onchain_pool, network).await?;

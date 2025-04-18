@@ -11,7 +11,7 @@ use serde::Deserialize;
 use tokio_stream::StreamExt;
 use utoipa::{IntoParams, ToSchema};
 
-use pragma_common::types::{AggregationMode, Interval, pair::Pair};
+use pragma_common::{AggregationMode, Interval, Pair};
 
 use crate::{
     handlers::{

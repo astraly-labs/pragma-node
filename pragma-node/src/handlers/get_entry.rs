@@ -1,13 +1,13 @@
 use axum::Json;
 use axum::extract::{Query, State};
 use chrono::{DateTime, NaiveDateTime, Utc};
+use pragma_entities::models::entries::timestamp::TimestampRangeError;
 use serde::{Deserialize, Serialize};
 use utoipa::{ToResponse, ToSchema};
 
-use pragma_common::timestamp::{TimestampError, TimestampRangeError};
-use pragma_common::types::pair::Pair;
-use pragma_common::types::{AggregationMode, DataType, Interval};
-use pragma_entities::EntryError;
+use pragma_common::Pair;
+use pragma_common::{AggregationMode, InstrumentType, Interval};
+use pragma_entities::{EntryError, TimestampError};
 
 use crate::constants::EIGHTEEN_DECIMALS;
 use crate::infra::repositories::entry_repository::{
@@ -24,7 +24,7 @@ pub struct EntryParams {
     pub interval: Interval,
     pub timestamp: i64,
     pub aggregation_mode: AggregationMode,
-    pub data_type: DataType,
+    pub data_type: InstrumentType,
     pub expiry: String,
     pub with_components: bool,
 }
@@ -53,7 +53,7 @@ impl TryFrom<GetEntryParams> for EntryParams {
         // Convert entry_type to DataType
         let data_type = params
             .entry_type
-            .map_or(DataType::SpotEntry, DataType::from);
+            .map_or(InstrumentType::Spot, InstrumentType::from);
 
         // Parse and format expiry date if provided
         let expiry = match params.expiry {

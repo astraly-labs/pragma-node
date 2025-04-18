@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use moka::future::Cache;
 
-use pragma_common::types::Network;
+use pragma_common::starknet::StarknetNetwork;
 use pragma_entities::dto::Publisher;
 
 use crate::constants::caches::{
@@ -19,7 +19,7 @@ use crate::infra::repositories::onchain_repository::publisher::RawPublisherUpdat
 #[derive(Clone, Debug)]
 pub struct CacheRegistry {
     onchain_publishers_updates: Cache<String, HashMap<String, RawPublisherUpdates>>,
-    onchain_decimals: Cache<Network, HashMap<String, u32>>,
+    onchain_decimals: Cache<StarknetNetwork, HashMap<String, u32>>,
     publishers: Cache<String, Publisher>,
 }
 
@@ -67,7 +67,7 @@ impl CacheRegistry {
         &self.onchain_publishers_updates
     }
 
-    pub const fn onchain_decimals(&self) -> &Cache<Network, HashMap<String, u32>> {
+    pub const fn onchain_decimals(&self) -> &Cache<StarknetNetwork, HashMap<String, u32>> {
         &self.onchain_decimals
     }
 

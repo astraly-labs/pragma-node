@@ -1,8 +1,8 @@
-use crate::errors::ConversionError;
 use bigdecimal::{BigDecimal, ToPrimitive};
+use pragma_common::starknet::ConversionError;
 use starknet::core::{crypto::pedersen_hash, types::Felt, utils::cairo_short_string_to_felt};
 
-use super::Signable;
+use super::signing::Signable;
 
 pub struct StarkexPrice {
     pub oracle_name: String,
