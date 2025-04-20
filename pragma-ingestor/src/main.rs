@@ -1,5 +1,5 @@
 use dotenvy::{dotenv, var};
-use futures_util::stream::{FuturesUnordered, StreamExt};
+use futures_util::stream::StreamExt;
 use rdkafka::Message as _;
 use tokio::sync::mpsc;
 use tokio::task::JoinSet;
@@ -114,11 +114,13 @@ async fn run_price_consumer(
                         Ok(entry) => {
                             let timestamp =
                                 chrono::DateTime::from_timestamp_millis(entry.timestamp_ms)
-                                    .map(|dt| dt.naive_utc())
-                                    .unwrap_or_else(|| {
-                                        error!("Invalid timestamp: {}", entry.timestamp_ms);
-                                        chrono::NaiveDateTime::default()
-                                    });
+                                    .map_or_else(
+                                        || {
+                                            error!("Invalid timestamp: {}", entry.timestamp_ms);
+                                            chrono::NaiveDateTime::default()
+                                        },
+                                        |dt| dt.naive_utc(),
+                                    );
 
                             match entry.instrument_type() {
                                 InstrumentType::Spot => {
@@ -185,11 +187,13 @@ async fn run_funding_rate_consumer(
                                 timestamp: chrono::DateTime::from_timestamp_millis(
                                     entry.timestamp_ms,
                                 )
-                                .map(|dt| dt.naive_utc())
-                                .unwrap_or_else(|| {
-                                    error!("Invalid timestamp: {}", entry.timestamp_ms);
-                                    chrono::NaiveDateTime::default()
-                                }),
+                                .map_or_else(
+                                    || {
+                                        error!("Invalid timestamp: {}", entry.timestamp_ms);
+                                        chrono::NaiveDateTime::default()
+                                    },
+                                    |dt| dt.naive_utc(),
+                                ),
                             };
                             if let Err(e) = funding_rate_tx.send(funding_rate_entry).await {
                                 error!("Failed to send funding rate entry: {}", e);
