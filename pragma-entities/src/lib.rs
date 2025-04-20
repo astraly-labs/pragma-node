@@ -15,6 +15,7 @@ pub use error::InfraError;
 pub use models::{
     checkpoint_error::CheckpointError,
     entry::{Entry, NewEntry},
+    funding_rate::{FundingRate, NewFundingRate},
     future_entry::{FutureEntry, NewFutureEntry},
     publisher::{NewPublisher, Publishers},
     publisher_error::PublisherError,

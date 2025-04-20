@@ -25,7 +25,7 @@ pub struct FutureEntry {
     // If expiration_timestamp is None, it means the entry is a perpetual future
     // else it is a regular future entry that will expire at the expiration_timestamp.
     pub expiration_timestamp: Option<NaiveDateTime>,
-    pub publisher_signature: String,
+    pub publisher_signature: Option<String>,
     pub price: BigDecimal,
 }
 

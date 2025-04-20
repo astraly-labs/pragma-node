@@ -1,21 +1,16 @@
-use serde::{Deserialize, Serialize};
+use clap::Parser;
 use std::sync::LazyLock;
 
-use crate::error::PragmaConsumerError;
+pub(crate) static CONFIG: LazyLock<Ingestor> = LazyLock::new(load_configuration);
 
-pub static CONFIG: LazyLock<Ingestor> = LazyLock::new(load_configuration);
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Ingestor {
-    pub num_consumers: usize,
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+pub(crate) struct Ingestor {
+    /// Number of consumers to run
+    #[arg(long, env = "NUM_CONSUMERS", default_value = "10")]
+    pub(crate) num_consumers: usize,
 }
 
-impl Ingestor {
-    pub fn from_env() -> Result<Self, PragmaConsumerError> {
-        envy::from_env::<Self>().map_err(PragmaConsumerError::LoadConfig)
-    }
-}
-
-pub fn load_configuration() -> Ingestor {
-    Ingestor::from_env().expect("cannot load configuration env")
+pub(crate) fn load_configuration() -> Ingestor {
+    Ingestor::parse()
 }
