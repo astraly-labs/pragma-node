@@ -1,5 +1,7 @@
 use deadpool_diesel::postgres::Pool;
-use pragma_entities::{Entry, FutureEntry, InfraError, NewEntry, NewFutureEntry};
+use pragma_entities::{
+    Entry, FundingRate, FutureEntry, InfraError, NewEntry, NewFundingRate, NewFutureEntry,
+};
 use tokio::sync::mpsc;
 use tokio::time::{Duration, interval};
 use tracing::debug;
@@ -86,6 +88,47 @@ pub async fn process_future_entries(pool: Pool, mut rx: mpsc::Receiver<NewFuture
     }
 }
 
+#[tracing::instrument(skip(pool, rx))]
+pub async fn process_funding_rate_entries(pool: Pool, mut rx: mpsc::Receiver<NewFundingRate>) {
+    const BUFFER_CAPACITY: usize = 100;
+    const FLUSH_TIMEOUT: Duration = Duration::from_millis(50);
+
+    let mut buffer = Vec::with_capacity(BUFFER_CAPACITY);
+    let mut flush_interval = interval(FLUSH_TIMEOUT);
+
+    loop {
+        tokio::select! {
+            Some(entry) = rx.recv() => {
+                buffer.push(entry);
+
+                if buffer.len() >= BUFFER_CAPACITY {
+                    if let Err(e) = insert_funding_rate_entries(&pool, std::mem::take(&mut buffer)).await {
+                        tracing::error!("❌ Failed to insert funding rate entries: {}", e);
+                    }
+                    buffer = Vec::with_capacity(BUFFER_CAPACITY);
+                }
+            }
+            _ = flush_interval.tick() => {
+                if !buffer.is_empty() {
+                    if let Err(e) = insert_funding_rate_entries(&pool, std::mem::take(&mut buffer)).await {
+                        tracing::error!("❌ Failed to flush funding rate entries: {}", e);
+                    }
+                    buffer = Vec::with_capacity(BUFFER_CAPACITY);
+                }
+            }
+            else => {
+                // Channel closed, flush remaining entries
+                if !buffer.is_empty() {
+                    if let Err(e) = insert_funding_rate_entries(&pool, buffer).await {
+                        tracing::error!("❌ Failed to flush final funding rate entries: {}", e);
+                    }
+                }
+                break;
+            }
+        }
+    }
+}
+
 #[tracing::instrument(skip(pool))]
 async fn insert_spot_entries(pool: &Pool, new_entries: Vec<NewEntry>) -> Result<(), InfraError> {
     let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
@@ -143,5 +186,27 @@ async fn insert_future_entries(
             entry.publisher, entry.pair_id, entry.price, entry.source
         );
     }
+    Ok(())
+}
+
+#[tracing::instrument(skip(pool))]
+async fn insert_funding_rate_entries(
+    pool: &Pool,
+    new_entries: Vec<NewFundingRate>,
+) -> Result<(), InfraError> {
+    let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
+    let entries = conn
+        .interact(move |conn| FundingRate::create_many(conn, new_entries))
+        .await
+        .map_err(InfraError::DbInteractionError)?
+        .map_err(InfraError::DbResultError)?;
+
+    for entry in &entries {
+        debug!(
+            "new funding rate entry created {} - {}({}) - {}",
+            entry.source, entry.pair, entry.annualized_rate, entry.timestamp
+        );
+    }
+
     Ok(())
 }

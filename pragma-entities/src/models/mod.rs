@@ -1,5 +1,6 @@
 pub mod checkpoint_error;
 pub mod entries;
+pub mod funding_rate;
 pub mod publisher;
 pub mod publisher_error;
 
