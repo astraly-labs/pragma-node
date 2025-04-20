@@ -1,4 +1,4 @@
-use dotenvy::{dotenv, var};
+use dotenvy::dotenv;
 use futures_util::stream::StreamExt;
 use rdkafka::Message as _;
 use tokio::sync::mpsc;
@@ -17,36 +17,35 @@ use pragma_entities::connection::ENV_OFFCHAIN_DATABASE_URL;
 use pragma_entities::{NewEntry, NewFundingRate, NewFutureEntry};
 
 use crate::config::CONFIG;
-use crate::db::{process_funding_rate_entries, process_future_entries, process_spot_entries};
+use crate::db::process::{
+    process_funding_rate_entries, process_future_entries, process_spot_entries,
+};
 
 mod config;
 mod db;
 mod error;
 
-const CHANNEL_CAPACITY: usize = 10_000;
-const PUBLISHER_NAME: &str = "PRAGMA";
-const KAFKA_GROUP_ID: &str = "pragma-ingestor";
-
 #[tokio::main]
+#[tracing::instrument]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize environment and telemetry
     dotenv().ok();
 
-    let otel_endpoint = var("OTEL_EXPORTER_OTLP_ENDPOINT").ok();
-    pragma_common::telemetry::init_telemetry("pragma-ingestor", otel_endpoint)?;
+    pragma_common::telemetry::init_telemetry("pragma-ingestor", CONFIG.otel_endpoint.clone())?;
 
     // Load Kafka configuration
     let config = FauConfig::new(FauconEnvironment::Development);
-    info!("Kafka configuration: hostname={:?}", config.broker_id);
+    info!("🌐 Kafka configuration: hostname={:?}", config.broker_id);
 
     // Initialize database connection pool
     let pool = pragma_entities::connection::init_pool("pragma-ingestor", ENV_OFFCHAIN_DATABASE_URL)
         .expect("Failed to connect to offchain database");
 
     // Set up channels for spot, future, and funding rate entries with backpressure
-    let (spot_tx, spot_rx) = mpsc::channel::<NewEntry>(CHANNEL_CAPACITY);
-    let (future_tx, future_rx) = mpsc::channel::<NewFutureEntry>(CHANNEL_CAPACITY);
-    let (funding_rate_tx, funding_rate_rx) = mpsc::channel::<NewFundingRate>(CHANNEL_CAPACITY);
+    let (spot_tx, spot_rx) = mpsc::channel::<NewEntry>(CONFIG.channel_capacity);
+    let (future_tx, future_rx) = mpsc::channel::<NewFutureEntry>(CONFIG.channel_capacity);
+    let (funding_rate_tx, funding_rate_rx) =
+        mpsc::channel::<NewFundingRate>(CONFIG.channel_capacity);
 
     // Spawn database worker tasks
     let task_group = TaskGroup::new()
@@ -60,18 +59,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             funding_rate_rx,
         )));
 
-    // Spawn price consumers
+    // Spawn consumers
     let mut join_set = JoinSet::new();
     for _ in 0..CONFIG.num_consumers {
         join_set.spawn(run_price_consumer(
             config.clone(),
-            KAFKA_GROUP_ID.to_string(),
+            CONFIG.kafka_group_id.clone(),
             spot_tx.clone(),
             future_tx.clone(),
         ));
         join_set.spawn(run_funding_rate_consumer(
             config.clone(),
-            KAFKA_GROUP_ID.to_string(),
+            CONFIG.kafka_group_id.clone(),
             funding_rate_tx.clone(),
         ));
     }
@@ -93,6 +92,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// Runs a Kafka consumer for price entries
+#[tracing::instrument(skip_all)]
 async fn run_price_consumer(
     config: FauConfig,
     group_id: String,
@@ -127,7 +127,7 @@ async fn run_price_consumer(
                                     let spot_entry = NewEntry {
                                         source: entry.source,
                                         pair_id: entry.pair.to_string(),
-                                        publisher: PUBLISHER_NAME.to_string(),
+                                        publisher: CONFIG.publisher_name.clone(),
                                         price: entry.price.into(),
                                         timestamp,
                                     };
@@ -138,7 +138,7 @@ async fn run_price_consumer(
                                 InstrumentType::Perp => {
                                     let future_entry = NewFutureEntry {
                                         pair_id: entry.pair.to_string(),
-                                        publisher: PUBLISHER_NAME.to_string(),
+                                        publisher: CONFIG.publisher_name.clone(),
                                         source: entry.source,
                                         price: entry.price.into(),
                                         timestamp,
@@ -162,6 +162,7 @@ async fn run_price_consumer(
 }
 
 /// Runs a Kafka consumer for funding rate entries
+#[tracing::instrument(skip_all)]
 async fn run_funding_rate_consumer(
     config: FauConfig,
     group_id: String,
