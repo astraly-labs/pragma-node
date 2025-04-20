@@ -98,8 +98,9 @@ nonzero_ext = { version = "0.3.0" }
 serde_json = { version = "1.0.122", features = ["arbitrary_precision"] }
 starknet = "0.14.0"
 starknet-crypto = "0.7.4"
+clap = { version = "4.4", features = ["derive", "env"] }
 reqwest = { version = "0.12.5", features = ["blocking"] }
-rdkafka = "0.36.2"
+rdkafka = "0.37.0"
 thiserror = "2.0.12"
 strum = { version = "0.26", features = ["derive"] }
 url = "2.5.0"

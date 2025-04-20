@@ -1788,7 +1788,7 @@ source = "sparse+https://registry.devnet.pragma.build/api/v1/crates/"
 checksum = "88ec94858b4e5d0ad02004347796ff3ed17817a2b6dc6c7adb3c60c67159676d"
 dependencies = [
  "pragma-common",
- "rdkafka 0.37.0",
+ "rdkafka",
  "thiserror 2.0.12",
 ]
 
@@ -3717,6 +3717,7 @@ name = "pragma-ingestor"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "clap",
  "deadpool-diesel",
  "dotenvy",
  "envy",
@@ -3725,7 +3726,7 @@ dependencies = [
  "lazy_static",
  "pragma-common",
  "pragma-entities",
- "rdkafka 0.36.2",
+ "rdkafka",
  "serde",
  "serde_json",
  "thiserror 2.0.12",
@@ -3803,7 +3804,7 @@ dependencies = [
  "pragma-entities",
  "pragma-monitoring",
  "ratatui",
- "rdkafka 0.36.2",
+ "rdkafka",
  "rstest",
  "serde",
  "serde_json",
@@ -4153,24 +4154,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "529468c1335c1c03919960dfefdb1b3648858c20d7ec2d0663e728e4a717efbc"
 dependencies = [
  "bitflags 2.8.0",
-]
-
-[[package]]
-name = "rdkafka"
-version = "0.36.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1beea247b9a7600a81d4cc33f659ce1a77e1988323d7d2809c7ed1c21f4c316d"
-dependencies = [
- "futures-channel",
- "futures-util",
- "libc",
- "log",
- "rdkafka-sys",
- "serde",
- "serde_derive",
- "serde_json",
- "slab",
- "tokio",
 ]
 
 [[package]]

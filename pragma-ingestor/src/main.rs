@@ -1,306 +1,149 @@
-pub mod config;
-mod error;
-
-use deadpool_diesel::postgres::Pool;
 use dotenvy::{dotenv, var};
-use futures_util::stream::StreamExt as _;
-use pragma_common::InstrumentType;
+use futures_util::stream::{FuturesUnordered, StreamExt};
+use rdkafka::Message as _;
+use rdkafka::message::OwnedMessage;
 use tokio::sync::mpsc;
-use tokio::time::{Duration, interval};
-use tracing::{debug, info};
+use tracing::{error, info};
 
-use faucon_rs::Message as _;
 use faucon_rs::config::{FauConfig, FauconEnvironment};
 use faucon_rs::consumer::FauConsumer;
 use faucon_rs::topics::FauconTopic;
-
-use pragma_common::{CapnpDeserialize, entries::PriceEntry, task_group::TaskGroup};
+use pragma_common::{CapnpDeserialize, InstrumentType, entries::PriceEntry, task_group::TaskGroup};
 use pragma_entities::connection::ENV_OFFCHAIN_DATABASE_URL;
-use pragma_entities::{Entry, FutureEntry, InfraError, NewEntry, NewFutureEntry};
+use pragma_entities::{NewEntry, NewFutureEntry};
 
-const CHANNEL_CAPACITY: usize = 10000;
+use crate::config::CONFIG;
+use crate::db::{process_future_entries, process_spot_entries};
+
+mod config;
+mod db;
+mod error;
+
+const CHANNEL_CAPACITY: usize = 10_000;
 const PUBLISHER_NAME: &str = "PRAGMA";
 const KAFKA_GROUP_ID: &str = "pragma-ingestor";
 
 #[tokio::main]
-#[tracing::instrument]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let _ = dotenv();
+    // Initialize environment and telemetry
+    dotenv().ok();
 
     let otel_endpoint = var("OTEL_EXPORTER_OTLP_ENDPOINT").ok();
     pragma_common::telemetry::init_telemetry("pragma-ingestor", otel_endpoint)?;
 
-    let faucon_config = FauConfig::new(FauconEnvironment::Development);
+    // Load Kafka configuration
+    let config = FauConfig::new(FauconEnvironment::Development);
+    info!("Kafka configuration: hostname={:?}", config.broker_id);
 
-    info!(
-        "kafka configuration : hostname={:?}",
-        faucon_config.broker_id
-    );
-
+    // Initialize database connection pool
     let pool = pragma_entities::connection::init_pool("pragma-ingestor", ENV_OFFCHAIN_DATABASE_URL)
-        .expect("cannot connect to offchain database");
+        .expect("Failed to connect to offchain database");
 
-    let num_consumers: usize = var("NUM_CONSUMERS")
-        .ok()
-        .map_or(1, |s| s.parse::<usize>().unwrap());
-
-    // Create channels for spot and future entries
+    // Set up channels for spot and future entries with backpressure
     let (spot_tx, spot_rx) = mpsc::channel::<NewEntry>(CHANNEL_CAPACITY);
     let (future_tx, future_rx) = mpsc::channel::<NewFutureEntry>(CHANNEL_CAPACITY);
 
     // Spawn database worker tasks
-    let spot_pool = pool.clone();
-    let db_spot_task = tokio::spawn(process_spot_entries(spot_pool, spot_rx));
-    let db_future_task = tokio::spawn(process_future_entries(pool, future_rx));
+    let task_group = TaskGroup::new()
+        .with_handle(tokio::spawn(process_spot_entries(pool.clone(), spot_rx)))
+        .with_handle(tokio::spawn(process_future_entries(pool, future_rx)));
 
-    // Initialize TaskGroup with database tasks
-    let mut task_group = TaskGroup::new()
-        .with_handle(db_spot_task)
-        .with_handle(db_future_task);
-
-    // Spawn configurable number of consumer tasks
-    for _ in 0..num_consumers {
-        let config = faucon_config.clone(); // Assuming FauConfig is Clone
-        let spot_tx_clone = spot_tx.clone();
-        let future_tx_clone = future_tx.clone();
-        let consumer_task = tokio::spawn(async move {
-            if let Err(e) = run_consumer(
-                config,
+    (0..CONFIG.num_consumers)
+        .map(|_| {
+            tokio::spawn(run_consumer(
+                config.clone(),
                 KAFKA_GROUP_ID.to_string(),
-                spot_tx_clone,
-                future_tx_clone,
-            )
-            .await
-            {
-                tracing::error!("Consumer error: {}", e);
-            }
-        });
-        task_group = task_group.with_handle(consumer_task);
-    }
+                spot_tx.clone(),
+                future_tx.clone(),
+            ))
+        })
+        .collect::<FuturesUnordered<_>>()
+        .for_each(|_| async { () })
+        .await;
 
-    // Drop original senders so channels close when all consumers are done
+    // Drop original senders to close channels when consumers finish
     drop(spot_tx);
     drop(future_tx);
 
-    // Await tasks; if one fails, all are aborted
+    // Await all tasks and abort if one fails
     task_group.abort_all_if_one_resolves().await;
-
     Ok(())
 }
 
+/// Runs a single Kafka consumer, processing messages and sending entries to channels.
 async fn run_consumer(
     config: FauConfig,
     group_id: String,
     spot_tx: mpsc::Sender<NewEntry>,
     future_tx: mpsc::Sender<NewFutureEntry>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    // Initialize and subscribe Kafka consumer
     let mut consumer = FauConsumer::new(config, &group_id)?;
     consumer.subscribe(FauconTopic::PRICES_V1)?;
     let mut stream = consumer.stream();
 
+    // Process messages from the Kafka stream
     while let Some(msg_result) = stream.next().await {
         match msg_result {
             Ok(msg) => {
-                if let Some(payload) = msg.payload() {
-                    match PriceEntry::from_capnp(payload) {
-                        Ok(entry) => {
-                            let ts = chrono::DateTime::from_timestamp_millis(entry.timestamp_ms)
-                                .map(|dt| dt.naive_utc())
-                                .unwrap();
-                            let source = entry.clone().source;
-                            let instrument_type = entry.instrument_type();
+                let owned_message = msg.detach();
+                process_message(&owned_message, &spot_tx, &future_tx).await;
+            }
+            Err(e) => error!("Consumer error: {}", e),
+        }
+    }
 
-                            match instrument_type {
-                                InstrumentType::Spot => {
-                                    let new_entry = NewEntry {
-                                        source,
-                                        pair_id: entry.pair.to_string(),
-                                        publisher: PUBLISHER_NAME.to_string(),
-                                        price: entry.price.into(),
-                                        timestamp: ts,
-                                    };
-                                    if let Err(e) = spot_tx.send(new_entry).await {
-                                        tracing::error!(
-                                            "Failed to send spot entry to channel: {}",
-                                            e
-                                        );
-                                    }
-                                }
-                                InstrumentType::Perp => {
-                                    let new_entry = NewFutureEntry {
-                                        pair_id: entry.pair.to_string(),
-                                        publisher: PUBLISHER_NAME.to_string(),
-                                        source,
-                                        price: entry.price.into(),
-                                        timestamp: ts,
-                                        expiration_timestamp: None,
-                                    };
-                                    if let Err(e) = future_tx.send(new_entry).await {
-                                        tracing::error!(
-                                            "Failed to send future entry to channel: {}",
-                                            e
-                                        );
-                                    }
-                                }
-                            }
-                        }
-                        Err(e) => {
-                            tracing::error!("❌ Failed to deserialize price entry: {}", e);
+    Ok(())
+}
+
+/// Processes a single Kafka message and routes it to the appropriate channel.
+async fn process_message(
+    msg: &OwnedMessage,
+    spot_tx: &mpsc::Sender<NewEntry>,
+    future_tx: &mpsc::Sender<NewFutureEntry>,
+) {
+    if let Some(payload) = msg.payload() {
+        match PriceEntry::from_capnp(payload) {
+            Ok(entry) => {
+                // Convert timestamp to NaiveDateTime
+                let timestamp = chrono::DateTime::from_timestamp_millis(entry.timestamp_ms)
+                    .map(|dt| dt.naive_utc())
+                    .unwrap_or_else(|| {
+                        error!("Invalid timestamp: {}", entry.timestamp_ms);
+                        chrono::NaiveDateTime::default()
+                    });
+
+                match entry.instrument_type() {
+                    InstrumentType::Spot => {
+                        let spot_entry = NewEntry {
+                            source: entry.source,
+                            pair_id: entry.pair.to_string(),
+                            publisher: PUBLISHER_NAME.to_string(),
+                            price: entry.price.into(),
+                            timestamp,
+                        };
+                        if let Err(e) = spot_tx.send(spot_entry).await {
+                            error!("Failed to send spot entry: {}", e);
                         }
                     }
-                } else {
-                    tracing::warn!("🧐 Received message with no payload");
+                    InstrumentType::Perp => {
+                        let future_entry = NewFutureEntry {
+                            pair_id: entry.pair.to_string(),
+                            publisher: PUBLISHER_NAME.to_string(),
+                            source: entry.source,
+                            price: entry.price.into(),
+                            timestamp,
+                            expiration_timestamp: None,
+                        };
+                        if let Err(e) = future_tx.send(future_entry).await {
+                            error!("Failed to send future entry: {}", e);
+                        }
+                    }
                 }
             }
-            Err(e) => {
-                tracing::error!("❌Consumer error: {}", e);
-            }
+            Err(e) => error!("Failed to deserialize price entry: {}", e),
         }
+    } else {
+        error!("Received message with no payload");
     }
-    Ok(())
-}
-
-#[tracing::instrument(skip(pool, rx))]
-async fn process_spot_entries(pool: Pool, mut rx: mpsc::Receiver<NewEntry>) {
-    const BUFFER_CAPACITY: usize = 100;
-    const FLUSH_TIMEOUT: Duration = Duration::from_millis(50);
-
-    let mut buffer = Vec::with_capacity(BUFFER_CAPACITY);
-    let mut flush_interval = interval(FLUSH_TIMEOUT);
-
-    loop {
-        tokio::select! {
-            Some(entry) = rx.recv() => {
-                buffer.push(entry);
-
-                if buffer.len() >= BUFFER_CAPACITY {
-                    if let Err(e) = insert_spot_entries(&pool, std::mem::take(&mut buffer)).await {
-                        tracing::error!("❌ Failed to insert spot entries: {}", e);
-                    }
-                    buffer = Vec::with_capacity(BUFFER_CAPACITY);
-                }
-            }
-            _ = flush_interval.tick() => {
-                if !buffer.is_empty() {
-                    if let Err(e) = insert_spot_entries(&pool, std::mem::take(&mut buffer)).await {
-                        tracing::error!("❌ Failed to flush spot entries: {}", e);
-                    }
-                    buffer = Vec::with_capacity(BUFFER_CAPACITY);
-                }
-            }
-            else => {
-                // Channel closed, flush remaining entries
-                if !buffer.is_empty() {
-                    if let Err(e) = insert_spot_entries(&pool, buffer).await {
-                        tracing::error!("❌ Failed to flush final spot entries: {}", e);
-                    }
-                }
-                break;
-            }
-        }
-    }
-}
-
-#[tracing::instrument(skip(pool, rx))]
-async fn process_future_entries(pool: Pool, mut rx: mpsc::Receiver<NewFutureEntry>) {
-    const BUFFER_CAPACITY: usize = 100;
-    const FLUSH_TIMEOUT: Duration = Duration::from_secs(30);
-
-    let mut buffer = Vec::with_capacity(BUFFER_CAPACITY);
-    let mut flush_interval = interval(FLUSH_TIMEOUT);
-
-    loop {
-        tokio::select! {
-            Some(entry) = rx.recv() => {
-                buffer.push(entry);
-
-                if buffer.len() >= BUFFER_CAPACITY {
-                    if let Err(e) = insert_future_entries(&pool, std::mem::take(&mut buffer)).await {
-                        tracing::error!("❌ Failed to insert future entries: {}", e);
-                    }
-                    buffer = Vec::with_capacity(BUFFER_CAPACITY);
-                }
-            }
-            _ = flush_interval.tick() => {
-                if !buffer.is_empty() {
-                    if let Err(e) = insert_future_entries(&pool, std::mem::take(&mut buffer)).await {
-                        tracing::error!("❌ Failed to flush future entries: {}", e);
-                    }
-                    buffer = Vec::with_capacity(BUFFER_CAPACITY);
-                }
-            }
-            else => {
-                // Channel closed, flush remaining entries
-                if !buffer.is_empty() {
-                    if let Err(e) = insert_future_entries(&pool, buffer).await {
-                        tracing::error!("❌ Failed to flush final future entries: {}", e);
-                    }
-                }
-                break;
-            }
-        }
-    }
-}
-
-#[tracing::instrument(skip(pool))]
-pub async fn insert_spot_entries(
-    pool: &Pool,
-    new_entries: Vec<NewEntry>,
-) -> Result<(), InfraError> {
-    let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
-    let entries = conn
-        .interact(move |conn| Entry::create_many(conn, new_entries))
-        .await
-        .map_err(InfraError::DbInteractionError)?
-        .map_err(InfraError::DbResultError)?;
-
-    for entry in &entries {
-        debug!(
-            "new entry created {} - {}({}) - {}",
-            entry.publisher, entry.pair_id, entry.price, entry.source
-        );
-    }
-
-    Ok(())
-}
-
-#[tracing::instrument(skip(pool))]
-pub async fn insert_future_entries(
-    pool: &Pool,
-    new_entries: Vec<NewFutureEntry>,
-) -> Result<(), InfraError> {
-    let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
-
-    let new_entries = new_entries
-        .into_iter()
-        .map(|mut entry| {
-            if let Some(expiration_timestamp) = entry.expiration_timestamp {
-                if expiration_timestamp.and_utc().timestamp() == 0 {
-                    entry.expiration_timestamp = None;
-                }
-            }
-            entry
-        })
-        .collect::<Vec<_>>();
-
-    debug!(
-        "[PERP] {} new entries available",
-        new_entries
-            .iter()
-            .filter(|entry| entry.expiration_timestamp.is_none())
-            .count()
-    );
-
-    let entries = conn
-        .interact(move |conn| FutureEntry::create_many(conn, new_entries))
-        .await
-        .map_err(InfraError::DbInteractionError)?
-        .map_err(InfraError::DbResultError)?;
-    for entry in &entries {
-        debug!(
-            "new perp entry created {} - {}({}) - {}",
-            entry.publisher, entry.pair_id, entry.price, entry.source
-        );
-    }
-    Ok(())
 }
