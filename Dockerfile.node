@@ -24,8 +24,7 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     libclang-dev \
     cmake \
     build-essential \
-    capnproto \
-    libcapnp-dev \
+    protobuf-compiler \
     && rm -rf /var/lib/apt/lists/*
 
 RUN cargo chef cook --profile release --recipe-path recipe.json
@@ -44,8 +43,7 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     bash \
     build-essential \
     pkg-config \
-    capnproto \
-    libcapnp-dev \
+    protobuf-compiler \
     && rm -rf /var/lib/apt/lists/*
 
 ARG APP_NAME=pragma-node
