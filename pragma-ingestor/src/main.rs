@@ -1,15 +1,13 @@
 use dotenvy::dotenv;
-use futures_util::stream::StreamExt;
-use rdkafka::Message as _;
+use faucon_rs::environment::FauconEnvironment;
 use tokio::sync::mpsc;
 use tokio::task::JoinSet;
-use tracing::{error, info};
+use tracing::error;
 
-use faucon_rs::config::{FauConfig, FauconEnvironment};
-use faucon_rs::consumer::FauConsumer;
+use faucon_rs::consumer::FauConsumerBuilder;
 use faucon_rs::topics::FauconTopic;
 use pragma_common::{
-    CapnpDeserialize, InstrumentType,
+    InstrumentType,
     entries::{FundingRateEntry, PriceEntry},
     task_group::TaskGroup,
 };
@@ -32,10 +30,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv().ok();
 
     pragma_common::telemetry::init_telemetry("pragma-ingestor", CONFIG.otel_endpoint.clone())?;
-
-    // Load Kafka configuration
-    let config = FauConfig::new(FauconEnvironment::Development);
-    info!("🌐 Kafka configuration: hostname={:?}", config.broker_id);
 
     // Initialize database connection pool
     let pool = pragma_entities::connection::init_pool("pragma-ingestor", ENV_OFFCHAIN_DATABASE_URL)
@@ -63,13 +57,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut join_set = JoinSet::new();
     for _ in 0..CONFIG.num_consumers {
         join_set.spawn(run_price_consumer(
-            config.clone(),
             CONFIG.kafka_group_id.clone(),
             spot_tx.clone(),
             future_tx.clone(),
         ));
         join_set.spawn(run_funding_rate_consumer(
-            config.clone(),
             CONFIG.kafka_group_id.clone(),
             funding_rate_tx.clone(),
         ));
@@ -94,69 +86,58 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// Runs a Kafka consumer for price entries
 #[tracing::instrument(skip_all)]
 async fn run_price_consumer(
-    config: FauConfig,
     group_id: String,
     spot_tx: mpsc::Sender<NewEntry>,
     future_tx: mpsc::Sender<NewFutureEntry>,
-) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let mut consumer = FauConsumer::new(config, &group_id)?;
-    consumer.subscribe(FauconTopic::PRICES_V1)?;
-    let mut stream = consumer.stream();
+) -> anyhow::Result<()> {
+    let mut consumer = FauConsumerBuilder::on_environment(FauconEnvironment::Development)
+        .group_id(&group_id)
+        .build()?;
+    consumer.subscribe(&[FauconTopic::PRICES_V1])?;
 
     tracing::info!("🚀 Starting price consumer");
 
-    while let Some(msg_result) = stream.next().await {
-        match msg_result {
-            Ok(msg) => {
-                let owned_message = msg.detach();
-                if let Some(payload) = owned_message.payload() {
-                    match PriceEntry::from_capnp(payload) {
-                        Ok(entry) => {
-                            let timestamp =
-                                chrono::DateTime::from_timestamp_millis(entry.timestamp_ms)
-                                    .map_or_else(
-                                        || {
-                                            error!("Invalid timestamp: {}", entry.timestamp_ms);
-                                            chrono::NaiveDateTime::default()
-                                        },
-                                        |dt| dt.naive_utc(),
-                                    );
+    consumer
+        .consume_with(async |entry: PriceEntry| {
+            let timestamp = chrono::DateTime::from_timestamp_millis(entry.timestamp_ms)
+                .map_or_else(
+                    || {
+                        error!("Invalid timestamp: {}", entry.timestamp_ms);
+                        chrono::NaiveDateTime::default()
+                    },
+                    |dt| dt.naive_utc(),
+                );
 
-                            match entry.instrument_type() {
-                                InstrumentType::Spot => {
-                                    let spot_entry = NewEntry {
-                                        source: entry.source,
-                                        pair_id: entry.pair.to_string(),
-                                        publisher: CONFIG.publisher_name.clone(),
-                                        price: entry.price.into(),
-                                        timestamp,
-                                    };
-                                    if let Err(e) = spot_tx.send(spot_entry).await {
-                                        error!("Failed to send spot entry: {}", e);
-                                    }
-                                }
-                                InstrumentType::Perp => {
-                                    let future_entry = NewFutureEntry {
-                                        pair_id: entry.pair.to_string(),
-                                        publisher: CONFIG.publisher_name.clone(),
-                                        source: entry.source,
-                                        price: entry.price.into(),
-                                        timestamp,
-                                        expiration_timestamp: None,
-                                    };
-                                    if let Err(e) = future_tx.send(future_entry).await {
-                                        error!("Failed to send future entry: {}", e);
-                                    }
-                                }
-                            }
-                        }
-                        Err(e) => error!("Failed to deserialize price entry: {}", e),
+            match entry.instrument_type() {
+                InstrumentType::Spot => {
+                    let spot_entry = NewEntry {
+                        source: entry.source,
+                        pair_id: entry.pair.to_string(),
+                        publisher: CONFIG.publisher_name.clone(),
+                        price: entry.price.into(),
+                        timestamp,
+                    };
+                    if let Err(e) = spot_tx.send(spot_entry).await {
+                        error!("Failed to send spot entry: {}", e);
+                    }
+                }
+                InstrumentType::Perp => {
+                    let future_entry = NewFutureEntry {
+                        pair_id: entry.pair.to_string(),
+                        publisher: CONFIG.publisher_name.clone(),
+                        source: entry.source,
+                        price: entry.price.into(),
+                        timestamp,
+                        expiration_timestamp: None,
+                    };
+                    if let Err(e) = future_tx.send(future_entry).await {
+                        error!("Failed to send future entry: {}", e);
                     }
                 }
             }
-            Err(e) => error!("Consumer error: {}", e),
-        }
-    }
+            anyhow::Ok(())
+        })
+        .await?;
 
     Ok(())
 }
@@ -164,49 +145,40 @@ async fn run_price_consumer(
 /// Runs a Kafka consumer for funding rate entries
 #[tracing::instrument(skip_all)]
 async fn run_funding_rate_consumer(
-    config: FauConfig,
     group_id: String,
     funding_rate_tx: mpsc::Sender<NewFundingRate>,
-) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let mut consumer = FauConsumer::new(config, &group_id)?;
-    consumer.subscribe(FauconTopic::FUNDING_RATES_V1)?;
-    let mut stream = consumer.stream();
+) -> anyhow::Result<()> {
+    let mut consumer = FauConsumerBuilder::on_environment(FauconEnvironment::Development)
+        .group_id(&group_id)
+        .build()?;
+    consumer.subscribe(&[FauconTopic::FUNDING_RATES_V1])?;
 
     tracing::info!("🚀 Starting funding rate consumer");
 
-    while let Some(msg_result) = stream.next().await {
-        match msg_result {
-            Ok(msg) => {
-                let owned_message = msg.detach();
-                if let Some(payload) = owned_message.payload() {
-                    match FundingRateEntry::from_capnp(payload) {
-                        Ok(entry) => {
-                            let funding_rate_entry = NewFundingRate {
-                                source: entry.source,
-                                pair: entry.pair.to_string(),
-                                annualized_rate: entry.annualized_rate,
-                                timestamp: chrono::DateTime::from_timestamp_millis(
-                                    entry.timestamp_ms,
-                                )
-                                .map_or_else(
-                                    || {
-                                        error!("Invalid timestamp: {}", entry.timestamp_ms);
-                                        chrono::NaiveDateTime::default()
-                                    },
-                                    |dt| dt.naive_utc(),
-                                ),
-                            };
-                            if let Err(e) = funding_rate_tx.send(funding_rate_entry).await {
-                                error!("Failed to send funding rate entry: {}", e);
-                            }
-                        }
-                        Err(e) => error!("Failed to deserialize funding rate entry: {}", e),
-                    }
-                }
-            }
-            Err(e) => error!("Consumer error: {}", e),
-        }
-    }
+    consumer
+        .consume_with(async |entry: FundingRateEntry| {
+            let timestamp = chrono::DateTime::from_timestamp_millis(entry.timestamp_ms)
+                .map_or_else(
+                    || {
+                        error!("Invalid timestamp: {}", entry.timestamp_ms);
+                        chrono::NaiveDateTime::default()
+                    },
+                    |dt| dt.naive_utc(),
+                );
 
+            let funding_rate_entry = NewFundingRate {
+                source: entry.source,
+                pair: entry.pair.to_string(),
+                annualized_rate: entry.annualized_rate,
+                timestamp,
+            };
+
+            if let Err(e) = funding_rate_tx.send(funding_rate_entry).await {
+                error!("Failed to send funding rate entry: {}", e);
+            }
+
+            anyhow::Ok(())
+        })
+        .await?;
     Ok(())
 }

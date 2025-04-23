@@ -47,19 +47,19 @@ redundant_pub_crate = "allow"
 missing_const_for_fn = "allow"
 
 [workspace.dependencies]
-pragma-common = { version = "0.2.12", features = [
-  "capnp",
+pragma-common = { version = "0.3.0", features = [
   "serde",
   "services",
   "task-group",
   "telemetry",
   "utoipa",
   "starknet",
+  "proto"
 ] }
 pragma-entities = { path = "./pragma-entities" }
 pragma-ingestor = { path = "./pragma-ingestor" }
 pragma-node = { path = "./pragma-node" }
-faucon-rs = { version = "0.1.5", registry = "pragma" }
+faucon-rs = { version = "0.2.0", registry = "pragma" }
 
 anyhow = "1.0.97"
 aws-config = { version = "1.5.1", features = ["behavior-version-latest"] }

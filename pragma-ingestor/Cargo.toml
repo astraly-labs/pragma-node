@@ -11,6 +11,7 @@ pragma-common = { workspace = true }
 pragma-entities = { workspace = true }
 faucon-rs = { workspace = true }
 
+anyhow = { workspace = true }
 chrono = { workspace = true }
 deadpool-diesel = { workspace = true, features = ["postgres"] }
 dotenvy = { workspace = true }
