@@ -1759,9 +1759,9 @@ checksum = "37909eebbb50d72f9059c3b6d82c0463f2ff062c9e95845c43a6c9c0355411be"
 
 [[package]]
 name = "faucon-rs"
-version = "0.2.2"
+version = "0.2.8"
 source = "sparse+https://registry.devnet.pragma.build/api/v1/crates/"
-checksum = "1bd6637d0c797e0976fa99deeb38c9f2226894fae08fa4ac449080cb5a703db8"
+checksum = "33569bec84f631b4b0a729544269176ad3a651dbfe58ef0982737d27c0a364f0"
 dependencies = [
  "futures-util",
  "pragma-common",
@@ -2803,15 +2803,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "itertools"
-version = "0.14.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b192c782037fadd9cfa75548310488aabdbf3d2da73885b31bd0abd03351285"
-dependencies = [
- "either",
-]
-
-[[package]]
 name = "itoa"
 version = "1.0.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3663,9 +3654,9 @@ dependencies = [
 
 [[package]]
 name = "pragma-common"
-version = "0.3.0"
+version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7a0f7f8493cff97d2b959017a14d269938cfcf4d23ec1f7699ec5377bc9bc047"
+checksum = "d0eee4e17d758b9dab9a8fc815501e789bd723cd485a6188bd41c7d174e33816"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3956,8 +3947,8 @@ version = "0.13.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "be769465445e8c1474e9c5dac2018218498557af32d9ed057325ec9a41ae81bf"
 dependencies = [
- "heck 0.5.0",
- "itertools 0.14.0",
+ "heck 0.4.1",
+ "itertools 0.11.0",
  "log",
  "multimap",
  "once_cell",
@@ -3977,7 +3968,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a56d757972c98b346a9b766e3f02746cde6dd1cd1d1d563472929fdd74bec4d"
 dependencies = [
  "anyhow",
- "itertools 0.14.0",
+ "itertools 0.11.0",
  "proc-macro2",
  "quote",
  "syn 2.0.98",
