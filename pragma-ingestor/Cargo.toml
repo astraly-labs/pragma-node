@@ -7,12 +7,13 @@ edition.workspace = true
 workspace = true
 
 [dependencies]
+faucon-rs = { workspace = true }
 pragma-common = { workspace = true }
 pragma-entities = { workspace = true }
-faucon-rs = { workspace = true }
 
 anyhow = { workspace = true }
 chrono = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
 deadpool-diesel = { workspace = true, features = ["postgres"] }
 dotenvy = { workspace = true }
 envy = { workspace = true }
@@ -24,4 +25,3 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 tracing = { workspace = true }
-clap = { workspace = true, features = ["derive"] }
