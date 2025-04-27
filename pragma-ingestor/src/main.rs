@@ -1,5 +1,5 @@
 use dotenvy::dotenv;
-use faucon_rs::environment::FauconEnvironment;
+use faucon_rs::{consumer::AutoOffsetReset, environment::FauconEnvironment};
 use tokio::sync::mpsc;
 use tokio::task::JoinSet;
 use tracing::error;
@@ -43,14 +43,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Spawn database worker tasks
     let task_group = TaskGroup::new()
-        .with_handle(tokio::spawn(process_spot_entries(pool.clone(), spot_rx)))
+        .with_handle(tokio::spawn(process_spot_entries(
+            pool.clone(),
+            spot_rx,
+            CONFIG.batch_size,
+        )))
         .with_handle(tokio::spawn(process_future_entries(
             pool.clone(),
             future_rx,
+            CONFIG.batch_size,
         )))
         .with_handle(tokio::spawn(process_funding_rate_entries(
             pool,
             funding_rate_rx,
+            CONFIG.batch_size,
         )));
 
     // Spawn consumers
@@ -92,8 +98,8 @@ async fn run_price_consumer(
 ) -> anyhow::Result<()> {
     let mut consumer = FauConsumerBuilder::on_environment(FauconEnvironment::Development)
         .group_id(&group_id)
-        .fetch_min_bytes(1)
-        .fetch_wait_max_ms(100)
+        .fetch_min_bytes(100_000)
+        .fetch_wait_max_ms(25)
         .session_timeout(6000)
         .max_poll_interval(30000)
         .auto_commit(true)
@@ -159,15 +165,16 @@ async fn run_funding_rate_consumer(
 ) -> anyhow::Result<()> {
     let mut consumer = FauConsumerBuilder::on_environment(FauconEnvironment::Development)
         .group_id(&group_id)
-        .fetch_min_bytes(1)
-        .fetch_wait_max_ms(100)
+        .fetch_min_bytes(100_000)
+        .fetch_wait_max_ms(25)
         .session_timeout(6000)
         .max_poll_interval(30000)
+        .auto_offset_reset(AutoOffsetReset::Latest)
         .auto_commit(true)
         .auto_commit_interval(1000)
         .max_partition_fetch_bytes(1_048_576)
-        .auto_offset_reset(faucon_rs::consumer::AutoOffsetReset::Latest)
         .build()?;
+
     consumer.subscribe(&[FauconTopic::FUNDING_RATES_V1])?;
 
     tracing::info!("🚀 Starting funding rate consumer");

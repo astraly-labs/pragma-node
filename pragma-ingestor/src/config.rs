@@ -19,12 +19,15 @@ pub(crate) struct Ingestor {
     pub(crate) publisher_name: String,
 
     /// Kafka consumer group ID
-    #[arg(long, env = "KAFKA_GROUP_ID", default_value = "pragma-ingestor")]
+    #[arg(long, env = "KAFKA_GROUP_ID", default_value = "pragma-ingestor-devnet")]
     pub(crate) kafka_group_id: String,
 
     /// OpenTelemetry endpoint for telemetry data
     #[arg(long, env = "OTEL_EXPORTER_OTLP_ENDPOINT")]
     pub(crate) otel_endpoint: Option<String>,
+
+    #[arg(long, env = "BATCH_SIZE", default_value = "2500")]
+    pub(crate) batch_size: usize,
 }
 
 pub(crate) fn load_configuration() -> Ingestor {

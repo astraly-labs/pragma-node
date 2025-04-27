@@ -4,22 +4,20 @@ use tokio::sync::mpsc;
 
 use crate::db::insert::{insert_funding_rate_entries, insert_future_entries, insert_spot_entries};
 
-const BATCH_SIZE: usize = 100;
-
 #[tracing::instrument(skip(pool, rx))]
-pub async fn process_spot_entries(pool: Pool, mut rx: mpsc::Receiver<NewEntry>) {
-    let mut buffer = Vec::with_capacity(BATCH_SIZE);
+pub async fn process_spot_entries(pool: Pool, mut rx: mpsc::Receiver<NewEntry>, batch_size: usize) {
+    let mut buffer = Vec::with_capacity(batch_size);
 
     loop {
         tokio::select! {
             Some(entry) = rx.recv() => {
                 buffer.push(entry);
 
-                if buffer.len() >= BATCH_SIZE {
+                if buffer.len() >= batch_size {
                     if let Err(e) = insert_spot_entries(&pool, std::mem::take(&mut buffer)).await {
                         tracing::error!("❌ Failed to insert spot entries: {}", e);
                     }
-                    buffer = Vec::with_capacity(BATCH_SIZE);
+                    buffer = Vec::with_capacity(batch_size);
                 }
             }
             else => {
@@ -36,19 +34,23 @@ pub async fn process_spot_entries(pool: Pool, mut rx: mpsc::Receiver<NewEntry>) 
 }
 
 #[tracing::instrument(skip(pool, rx))]
-pub async fn process_future_entries(pool: Pool, mut rx: mpsc::Receiver<NewFutureEntry>) {
-    let mut buffer = Vec::with_capacity(BATCH_SIZE);
+pub async fn process_future_entries(
+    pool: Pool,
+    mut rx: mpsc::Receiver<NewFutureEntry>,
+    batch_size: usize,
+) {
+    let mut buffer = Vec::with_capacity(batch_size);
 
     loop {
         tokio::select! {
             Some(entry) = rx.recv() => {
                 buffer.push(entry);
 
-                if buffer.len() >= BATCH_SIZE {
+                if buffer.len() >= batch_size {
                     if let Err(e) = insert_future_entries(&pool, std::mem::take(&mut buffer)).await {
                         tracing::error!("❌ Failed to insert future entries: {}", e);
                     }
-                    buffer = Vec::with_capacity(BATCH_SIZE);
+                    buffer = Vec::with_capacity(batch_size);
                 }
             }
             else => {
@@ -65,19 +67,24 @@ pub async fn process_future_entries(pool: Pool, mut rx: mpsc::Receiver<NewFuture
 }
 
 #[tracing::instrument(skip(pool, rx))]
-pub async fn process_funding_rate_entries(pool: Pool, mut rx: mpsc::Receiver<NewFundingRate>) {
-    let mut buffer = Vec::with_capacity(BATCH_SIZE);
+pub async fn process_funding_rate_entries(
+    pool: Pool,
+    mut rx: mpsc::Receiver<NewFundingRate>,
+    batch_size: usize,
+) {
+    let batch_size = batch_size / 10; // NOTE: We have way less messages in this topic.
+    let mut buffer = Vec::with_capacity(batch_size / 10);
 
     loop {
         tokio::select! {
             Some(entry) = rx.recv() => {
                 buffer.push(entry);
 
-                if buffer.len() >= BATCH_SIZE {
+                if buffer.len() >= batch_size {
                     if let Err(e) = insert_funding_rate_entries(&pool, std::mem::take(&mut buffer)).await {
                         tracing::error!("❌ Failed to insert funding rate entries: {}", e);
                     }
-                    buffer = Vec::with_capacity(BATCH_SIZE);
+                    buffer = Vec::with_capacity(batch_size);
                 }
             }
             else => {
