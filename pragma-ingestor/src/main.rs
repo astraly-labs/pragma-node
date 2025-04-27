@@ -92,6 +92,14 @@ async fn run_price_consumer(
 ) -> anyhow::Result<()> {
     let mut consumer = FauConsumerBuilder::on_environment(FauconEnvironment::Development)
         .group_id(&group_id)
+        .fetch_min_bytes(1)
+        .fetch_wait_max_ms(100)
+        .max_poll_interval(30000)
+        .session_timeout(5000)
+        .auto_commit(true)
+        .auto_commit_interval(1000)
+        .max_partition_fetch_bytes(1_048_576)
+        .auto_offset_reset(faucon_rs::consumer::AutoOffsetReset::Latest)
         .build()?;
     consumer.subscribe(&[FauconTopic::PRICES_V1])?;
 
@@ -150,6 +158,14 @@ async fn run_funding_rate_consumer(
 ) -> anyhow::Result<()> {
     let mut consumer = FauConsumerBuilder::on_environment(FauconEnvironment::Development)
         .group_id(&group_id)
+        .fetch_min_bytes(1)
+        .fetch_wait_max_ms(100)
+        .max_poll_interval(30000)
+        .session_timeout(5000)
+        .auto_commit(true)
+        .auto_commit_interval(1000)
+        .max_partition_fetch_bytes(1_048_576)
+        .auto_offset_reset(faucon_rs::consumer::AutoOffsetReset::Latest)
         .build()?;
     consumer.subscribe(&[FauconTopic::FUNDING_RATES_V1])?;
 
