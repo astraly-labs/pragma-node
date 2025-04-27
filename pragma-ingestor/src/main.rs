@@ -114,8 +114,6 @@ async fn run_price_consumer(
 
     consumer
         .consume_with(async |entry: PriceEntry| {
-            tracing::info!("Current: {}", entry.timestamp_ms);
-
             let timestamp = chrono::DateTime::from_timestamp_millis(entry.timestamp_ms)
                 .map_or_else(
                     || {
