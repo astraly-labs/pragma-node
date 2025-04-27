@@ -36,10 +36,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .expect("Failed to connect to offchain database");
 
     // Set up channels for spot, future, and funding rate entries with backpressure
-    let (spot_tx, spot_rx) = mpsc::channel::<NewEntry>(CONFIG.channel_capacity);
+    let (spot_tx, spot_rx) = mpsc::channel::<NewEntry>(CONFIG.channel_capacity * 2);
     let (future_tx, future_rx) = mpsc::channel::<NewFutureEntry>(CONFIG.channel_capacity);
     let (funding_rate_tx, funding_rate_rx) =
-        mpsc::channel::<NewFundingRate>(CONFIG.channel_capacity);
+        mpsc::channel::<NewFundingRate>(CONFIG.channel_capacity / 2);
 
     // Spawn database worker tasks
     let task_group = TaskGroup::new()
@@ -114,6 +114,8 @@ async fn run_price_consumer(
 
     consumer
         .consume_with(async |entry: PriceEntry| {
+            tracing::info!("Current: {}", entry.timestamp_ms);
+
             let timestamp = chrono::DateTime::from_timestamp_millis(entry.timestamp_ms)
                 .map_or_else(
                     || {
