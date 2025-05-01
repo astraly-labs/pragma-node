@@ -30,7 +30,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: astraly-labs/workflows/rust/test@v1.0.6
+      - uses: astraly-labs/workflows/rust/test@v1.0.10
         with:
           fail_ci: false
 
@@ -47,7 +47,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: Rust Lint
-        uses: astraly-labs/workflows/rust/lint@v1.0.6
+        uses: astraly-labs/workflows/rust/lint@v1.0.10
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -64,6 +64,6 @@ jobs:
         with:
           fetch-depth: 0
       - name: Rust Scanner
-        uses: astraly-labs/workflows/rust/scan@v1.0.6
+        uses: astraly-labs/workflows/rust/scan@v1.0.10
         with:
           codeql_upload: false
