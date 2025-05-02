@@ -43,20 +43,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Spawn database worker tasks
     let task_group = TaskGroup::new()
-        .with_handle(tokio::spawn(process_spot_entries(
-            pool.clone(),
-            spot_rx,
-            CONFIG.batch_size,
-        )))
+        .with_handle(tokio::spawn(process_spot_entries(pool.clone(), spot_rx)))
         .with_handle(tokio::spawn(process_future_entries(
             pool.clone(),
             future_rx,
-            CONFIG.batch_size,
         )))
         .with_handle(tokio::spawn(process_funding_rate_entries(
             pool,
             funding_rate_rx,
-            CONFIG.batch_size,
         )));
 
     // Spawn consumers
@@ -75,7 +69,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     while let Some(result) = join_set.join_next().await {
         if let Err(e) = result {
-            error!("Consumer error: {}", e);
+            error!("Consumer error: {e}");
         }
     }
 
@@ -133,7 +127,7 @@ async fn run_price_consumer(
                         timestamp,
                     };
                     if let Err(e) = spot_tx.send(spot_entry).await {
-                        error!("Failed to send spot entry: {}", e);
+                        error!("Failed to send spot entry: {e}");
                     }
                 }
                 InstrumentType::Perp => {
@@ -146,7 +140,7 @@ async fn run_price_consumer(
                         expiration_timestamp: None,
                     };
                     if let Err(e) = future_tx.send(future_entry).await {
-                        error!("Failed to send future entry: {}", e);
+                        error!("Failed to send future entry: {e}");
                     }
                 }
             }
@@ -198,7 +192,7 @@ async fn run_funding_rate_consumer(
             };
 
             if let Err(e) = funding_rate_tx.send(funding_rate_entry).await {
-                error!("Failed to send funding rate entry: {}", e);
+                error!("Failed to send funding rate entry: {e}");
             }
 
             anyhow::Ok(())

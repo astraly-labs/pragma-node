@@ -7,7 +7,7 @@ pub(crate) static CONFIG: LazyLock<Ingestor> = LazyLock::new(load_configuration)
 #[command(author, version, about, long_about = None)]
 pub(crate) struct Ingestor {
     /// Number of consumers to run
-    #[arg(long, env = "NUM_CONSUMERS", default_value = "10")]
+    #[arg(long, env = "NUM_CONSUMERS", default_value = "1")]
     pub(crate) num_consumers: usize,
 
     /// Channel capacity for message queues
@@ -25,9 +25,6 @@ pub(crate) struct Ingestor {
     /// OpenTelemetry endpoint for telemetry data
     #[arg(long, env = "OTEL_EXPORTER_OTLP_ENDPOINT")]
     pub(crate) otel_endpoint: Option<String>,
-
-    #[arg(long, env = "BATCH_SIZE", default_value = "2500")]
-    pub(crate) batch_size: usize,
 }
 
 pub(crate) fn load_configuration() -> Ingestor {

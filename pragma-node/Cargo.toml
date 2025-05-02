@@ -29,8 +29,8 @@ diesel = { workspace = true, features = [
 ] }
 dotenvy = { workspace = true }
 envy = { workspace = true }
-futures.workspace = true
 futures-util = { workspace = true }
+futures.workspace = true
 google-secretmanager1 = { workspace = true }
 governor = { workspace = true }
 lazy_static = { workspace = true }
