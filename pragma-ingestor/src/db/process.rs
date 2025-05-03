@@ -1,31 +1,30 @@
 use std::{collections::HashMap, time::Duration};
 
 use deadpool_diesel::postgres::Pool;
+use tokio::sync::mpsc;
+
 use pragma_entities::{NewEntry, NewFundingRate, NewFutureEntry};
-use tokio::{sync::mpsc, time::Instant};
 
 use crate::db::insert::{insert_funding_rate_entries, insert_future_entries, insert_spot_entries};
 
+const PUBLISHING_DELAY: Duration = Duration::from_millis(50);
+
 #[tracing::instrument(skip(pool, rx))]
 pub async fn process_spot_entries(pool: Pool, mut rx: mpsc::Receiver<NewEntry>) {
-    let mut batched_prices = HashMap::new();
-
-    let mut interval = tokio::time::interval_at(
-        Instant::now() + Duration::from_secs(1),
-        Duration::from_millis(100),
-    );
+    let mut batched_data = HashMap::new();
+    let mut interval = tokio::time::interval(PUBLISHING_DELAY);
 
     loop {
         tokio::select! {
             Some(entry) = rx.recv() => {
                 let key = (entry.source.clone(), entry.pair_id.clone());
-                batched_prices.insert(key, entry);
+                batched_data.insert(key, entry);
             },
             _ = interval.tick() => {
-                let batch = std::mem::take(&mut batched_prices);
+                let batch = std::mem::take(&mut batched_data);
                 let batch = batch.into_values().collect();
                 if let Err(e) = insert_spot_entries(&pool, batch).await {
-                    tracing::error!("❌ Failed to flush final spot entries: {}", e);
+                    tracing::error!("❌ Failed to insert spot entries: {e:?}");
                 }
             }
         }
@@ -34,24 +33,20 @@ pub async fn process_spot_entries(pool: Pool, mut rx: mpsc::Receiver<NewEntry>) 
 
 #[tracing::instrument(skip(pool, rx))]
 pub async fn process_future_entries(pool: Pool, mut rx: mpsc::Receiver<NewFutureEntry>) {
-    let mut batched_prices = HashMap::new();
-
-    let mut interval = tokio::time::interval_at(
-        Instant::now() + Duration::from_secs(1),
-        Duration::from_millis(100),
-    );
+    let mut batched_data = HashMap::new();
+    let mut interval = tokio::time::interval(PUBLISHING_DELAY);
 
     loop {
         tokio::select! {
             Some(entry) = rx.recv() => {
                 let key = (entry.source.clone(), entry.pair_id.clone());
-                batched_prices.insert(key, entry);
+                batched_data.insert(key, entry);
             },
             _ = interval.tick() => {
-                let batch = std::mem::take(&mut batched_prices);
+                let batch = std::mem::take(&mut batched_data);
                 let batch = batch.into_values().collect();
                 if let Err(e) = insert_future_entries(&pool, batch).await {
-                    tracing::error!("❌ Failed to flush final spot entries: {}", e);
+                    tracing::error!("❌ Failed to insert future entries: {e:?}");
                 }
             }
         }
@@ -60,24 +55,20 @@ pub async fn process_future_entries(pool: Pool, mut rx: mpsc::Receiver<NewFuture
 
 #[tracing::instrument(skip(pool, rx))]
 pub async fn process_funding_rate_entries(pool: Pool, mut rx: mpsc::Receiver<NewFundingRate>) {
-    let mut batched_prices = HashMap::new();
-
-    let mut interval = tokio::time::interval_at(
-        Instant::now() + Duration::from_secs(1),
-        Duration::from_millis(100),
-    );
+    let mut batched_data = HashMap::new();
+    let mut interval = tokio::time::interval(PUBLISHING_DELAY);
 
     loop {
         tokio::select! {
             Some(entry) = rx.recv() => {
                 let key = (entry.source.clone(), entry.pair.clone());
-                batched_prices.insert(key, entry);
+                batched_data.insert(key, entry);
             },
             _ = interval.tick() => {
-                let batch = std::mem::take(&mut batched_prices);
+                let batch = std::mem::take(&mut batched_data);
                 let batch = batch.into_values().collect();
                 if let Err(e) = insert_funding_rate_entries(&pool, batch).await {
-                    tracing::error!("❌ Failed to flush final funding rate entries: {}", e);
+                    tracing::error!("❌ Failed to insert funding rates: {e:?}");
                 }
             }
         }

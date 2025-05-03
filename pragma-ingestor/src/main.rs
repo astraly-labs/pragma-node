@@ -1,16 +1,16 @@
 use dotenvy::dotenv;
-use faucon_rs::{consumer::AutoOffsetReset, environment::FauconEnvironment};
-use tokio::sync::mpsc;
-use tokio::task::JoinSet;
-use tracing::error;
-
 use faucon_rs::consumer::FauConsumerBuilder;
 use faucon_rs::topics::FauconTopic;
+use faucon_rs::{consumer::AutoOffsetReset, environment::FauconEnvironment};
 use pragma_common::{
     InstrumentType,
     entries::{FundingRateEntry, PriceEntry},
     task_group::TaskGroup,
 };
+use tokio::sync::mpsc;
+use tokio::task::JoinSet;
+use tracing::error;
+
 use pragma_entities::connection::ENV_OFFCHAIN_DATABASE_URL;
 use pragma_entities::{NewEntry, NewFundingRate, NewFutureEntry};
 
@@ -26,12 +26,9 @@ mod error;
 #[tokio::main]
 #[tracing::instrument]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Initialize environment and telemetry
     dotenv().ok();
-
     pragma_common::telemetry::init_telemetry("pragma-ingestor", CONFIG.otel_endpoint.clone())?;
 
-    // Initialize database connection pool
     let pool = pragma_entities::connection::init_pool("pragma-ingestor", ENV_OFFCHAIN_DATABASE_URL)
         .expect("Failed to connect to offchain database");
 
@@ -90,7 +87,8 @@ async fn run_price_consumer(
     spot_tx: mpsc::Sender<NewEntry>,
     future_tx: mpsc::Sender<NewFutureEntry>,
 ) -> anyhow::Result<()> {
-    let mut consumer = FauConsumerBuilder::on_environment(FauconEnvironment::Development)
+    let kafka_environment = FauconEnvironment::Custom(CONFIG.kafka_broker_id.clone());
+    let mut consumer = FauConsumerBuilder::on_environment(kafka_environment)
         .group_id(&group_id)
         .fetch_min_bytes(100_000)
         .fetch_wait_max_ms(25)
@@ -157,7 +155,8 @@ async fn run_funding_rate_consumer(
     group_id: String,
     funding_rate_tx: mpsc::Sender<NewFundingRate>,
 ) -> anyhow::Result<()> {
-    let mut consumer = FauConsumerBuilder::on_environment(FauconEnvironment::Development)
+    let kafka_environment = FauconEnvironment::Custom(CONFIG.kafka_broker_id.clone());
+    let mut consumer = FauConsumerBuilder::on_environment(kafka_environment)
         .group_id(&group_id)
         .fetch_min_bytes(100_000)
         .fetch_wait_max_ms(25)
