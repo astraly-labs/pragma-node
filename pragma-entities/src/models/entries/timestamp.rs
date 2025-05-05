@@ -65,7 +65,7 @@ impl<'de> Deserialize<'de> for TimestampRange {
         D: Deserializer<'de>,
     {
         let s: String = Deserialize::deserialize(deserializer)?;
-
+        let s = s.replace(' ', "");
         let (start, end) = s
             .split_once(',')
             .ok_or_else(|| serde::de::Error::custom("Expected format: start,end"))?;

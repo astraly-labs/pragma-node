@@ -1,4 +1,6 @@
 pub mod get_entry;
+pub mod get_funding_rates;
+pub mod get_historical_funding_rates;
 pub mod get_ohlc;
 pub mod onchain;
 pub mod stream;
