@@ -35,4 +35,47 @@ impl FundingRate {
             .values(&new_entries)
             .get_results(conn)
     }
+
+    pub fn get_latest(
+        conn: &mut PgConnection,
+        pair: String,
+        source: String,
+    ) -> Result<Option<Self>, diesel::result::Error> {
+        funding_rates::table
+            .filter(funding_rates::pair.eq(&pair))
+            .filter(funding_rates::source.eq(&source))
+            .order(funding_rates::timestamp.desc())
+            .first(conn)
+            .optional()
+    }
+
+    pub fn get_at_or_before(
+        conn: &mut PgConnection,
+        pair: String,
+        source: String,
+        timestamp: NaiveDateTime,
+    ) -> Result<Option<Self>, diesel::result::Error> {
+        funding_rates::table
+            .filter(funding_rates::pair.eq(&pair))
+            .filter(funding_rates::source.eq(&source))
+            .filter(funding_rates::timestamp.le(timestamp))
+            .order(funding_rates::timestamp.desc())
+            .first(conn)
+            .optional()
+    }
+
+    pub fn get_in_range(
+        conn: &mut PgConnection,
+        pair: String,
+        source: String,
+        start: NaiveDateTime,
+        end: NaiveDateTime,
+    ) -> Result<Vec<Self>, diesel::result::Error> {
+        funding_rates::table
+            .filter(funding_rates::pair.eq(&pair))
+            .filter(funding_rates::source.eq(&source))
+            .filter(funding_rates::timestamp.between(start, end))
+            .order(funding_rates::timestamp.asc())
+            .load(conn)
+    }
 }
