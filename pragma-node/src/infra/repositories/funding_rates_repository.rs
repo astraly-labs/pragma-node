@@ -26,7 +26,7 @@ pub async fn get_at_timestamp(
     let funding_rate = conn
         .interact(move |conn| {
             if let Some(ts) = timestamp {
-                FundingRate::get_at_or_before(conn, pair, source, ts)
+                FundingRate::get_at(conn, pair, source, ts)
             } else {
                 FundingRate::get_latest(conn, pair, source)
             }

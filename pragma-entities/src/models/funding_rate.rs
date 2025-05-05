@@ -49,7 +49,7 @@ impl FundingRate {
             .optional()
     }
 
-    pub fn get_at_or_before(
+    pub fn get_at(
         conn: &mut PgConnection,
         pair: String,
         source: String,
