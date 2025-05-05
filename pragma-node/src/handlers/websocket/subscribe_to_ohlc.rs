@@ -17,7 +17,7 @@ use crate::utils::{ChannelHandler, Subscriber, SubscriptionType};
 use axum::extract::ws::{WebSocket, WebSocketUpgrade};
 
 #[derive(Debug, Default, Serialize, Deserialize, ToSchema, ToResponse)]
-pub struct GetOnchainOHLCResponse {
+pub struct GetoffchainOHLCResponse {
     pub pair_id: String,
     pub data: Vec<OHLCEntry>,
 }
@@ -95,7 +95,7 @@ impl ChannelHandler<SubscriptionState, SubscriptionRequest, InfraError> for WsOH
                 .await;
                 if !pair_exists {
                     subscriber
-                        .send_err("Pair does not exist in the onchain database.")
+                        .send_err("Pair does not exist in the offchain database.")
                         .await;
                     return Ok(());
                 }
@@ -142,7 +142,7 @@ impl ChannelHandler<SubscriptionState, SubscriptionRequest, InfraError> for WsOH
         let pair_id = state.subscribed_pair.clone().unwrap();
 
         let ohlc_data_res = entry_repository::get_spot_ohlc(
-            &subscriber.app_state.onchain_pool,
+            &subscriber.app_state.offchain_pool,
             pair_id.clone(),
             state.interval,
             ohlc_to_retrieve as i64,

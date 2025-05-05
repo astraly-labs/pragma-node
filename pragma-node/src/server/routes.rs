@@ -11,7 +11,7 @@ use crate::handlers::onchain::{
     subscribe_to_ohlc::subscribe_to_onchain_ohlc,
 };
 use crate::handlers::stream::stream_multi::stream_entry_multi_pair;
-use crate::handlers::websocket::{subscribe_to_entry, subscribe_to_price};
+use crate::handlers::websocket::{subscribe_to_entry, subscribe_to_ohlc, subscribe_to_price};
 use crate::handlers::{get_entry, get_ohlc};
 use crate::state::AppState;
 
@@ -44,6 +44,7 @@ fn data_routes(state: AppState) -> Router<AppState> {
         .route("/subscribe", get(subscribe_to_entry))
         .route("/price/subscribe", get(subscribe_to_price))
         .route("/multi/stream", get(stream_entry_multi_pair))
+        .route("/ohlc/subscribe" , get(subscribe_to_ohlc))
         .with_state(state)
 }
 
