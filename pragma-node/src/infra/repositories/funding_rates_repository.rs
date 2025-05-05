@@ -1,13 +1,14 @@
 use chrono::{DateTime, Utc};
 use deadpool_diesel::postgres::Pool;
 
+use pragma_common::Pair;
 use pragma_entities::{
     FundingRate, InfraError, TimestampError, models::entries::timestamp::TimestampRange,
 };
 
 pub async fn get_at_timestamp(
     pool: &Pool,
-    pair: String,
+    pair: Pair,
     source: String,
     timestamp: Option<i64>,
 ) -> Result<Option<FundingRate>, InfraError> {
@@ -27,9 +28,9 @@ pub async fn get_at_timestamp(
     let funding_rate = conn
         .interact(move |conn| {
             if let Some(ts) = timestamp {
-                FundingRate::get_at(conn, pair, source, ts)
+                FundingRate::get_at(conn, &pair, &source, ts)
             } else {
-                FundingRate::get_latest(conn, pair, source)
+                FundingRate::get_latest(conn, &pair, &source)
             }
         })
         .await
@@ -41,7 +42,7 @@ pub async fn get_at_timestamp(
 
 pub async fn get_history_in_range(
     pool: &Pool,
-    pair: String,
+    pair: Pair,
     source: String,
     range: TimestampRange,
 ) -> Result<Vec<FundingRate>, InfraError> {
@@ -60,7 +61,7 @@ pub async fn get_history_in_range(
         .naive_utc();
 
     let funding_rates = conn
-        .interact(move |conn| FundingRate::get_in_range(conn, pair, source, start, end))
+        .interact(move |conn| FundingRate::get_in_range(conn, &pair, &source, start, end))
         .await
         .map_err(InfraError::DbInteractionError)?
         .map_err(InfraError::DbResultError)?;

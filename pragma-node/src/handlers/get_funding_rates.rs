@@ -1,5 +1,6 @@
 use axum::Json;
 use axum::extract::{Path, Query, State};
+use pragma_common::Pair;
 use pragma_entities::EntryError;
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
@@ -19,7 +20,7 @@ pub struct GetLatestFundingRateParams {
 pub struct GetLatestFundingRateResponse {
     pub pair: String,
     pub source: String,
-    pub timestamp: u64,
+    pub timestamp_ms: u64,
     pub hourly_rate: f64,
 }
 
@@ -38,10 +39,10 @@ pub struct GetLatestFundingRateResponse {
 )]
 pub async fn get_latest_funding_rate(
     State(state): State<AppState>,
-    Path((base, quote)): Path<(String, String)>,
+    Path(pair): Path<(String, String)>,
     Query(params): Query<GetLatestFundingRateParams>,
 ) -> Result<Json<GetLatestFundingRateResponse>, EntryError> {
-    let pair = format!("{base}/{quote}");
+    let pair = Pair::from(pair);
     let source = params.source.to_ascii_uppercase();
 
     let funding_rate = funding_rates_repository::get_at_timestamp(
@@ -57,7 +58,7 @@ pub async fn get_latest_funding_rate(
     let response = GetLatestFundingRateResponse {
         pair: funding_rate.pair,
         source: funding_rate.source,
-        timestamp: funding_rate.timestamp.and_utc().timestamp() as u64,
+        timestamp_ms: funding_rate.timestamp.and_utc().timestamp_millis() as u64,
         hourly_rate: funding_rate.annualized_rate / HOURS_IN_ONE_YEAR,
     };
 

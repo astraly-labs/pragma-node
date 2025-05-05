@@ -1,5 +1,6 @@
 use axum::Json;
 use axum::extract::{Path, Query, State};
+use pragma_common::Pair;
 use pragma_entities::models::entries::timestamp::TimestampRange;
 use pragma_entities::{EntryError, TimestampError};
 use serde::{Deserialize, Serialize};
@@ -20,7 +21,7 @@ pub struct GetHistoricalFundingRateParams {
 pub struct FundingRateResponse {
     pub pair: String,
     pub source: String,
-    pub timestamp: u64,
+    pub timestamp_ms: u64,
     pub hourly_rate: f64,
 }
 
@@ -41,10 +42,10 @@ pub type GetHistoricalFundingRateResponse = Vec<FundingRateResponse>;
 )]
 pub async fn get_historical_funding_rates(
     State(state): State<AppState>,
-    Path((base, quote)): Path<(String, String)>,
+    Path(pair): Path<(String, String)>,
     Query(params): Query<GetHistoricalFundingRateParams>,
 ) -> Result<Json<GetHistoricalFundingRateResponse>, EntryError> {
-    let pair = format!("{base}/{quote}");
+    let pair = Pair::from(pair);
     let source = params.source.to_ascii_uppercase();
 
     let timestamp_range = params
@@ -66,7 +67,7 @@ pub async fn get_historical_funding_rates(
         .map(|fr| FundingRateResponse {
             pair: fr.pair,
             source: fr.source,
-            timestamp: fr.timestamp.and_utc().timestamp() as u64,
+            timestamp_ms: fr.timestamp.and_utc().timestamp_millis() as u64,
             hourly_rate: fr.annualized_rate / HOURS_IN_ONE_YEAR,
         })
         .collect();
