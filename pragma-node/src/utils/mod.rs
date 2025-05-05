@@ -71,8 +71,8 @@ pub(crate) async fn is_onchain_existing_pair(
 }
 
 // Given a pair_id, check if it exists on the offchain db
-pub(crate) async fn is_existing_pair(pool: &Pool, pair_id: &String) -> bool {
-    let pair_id_owned = pair_id.clone();
+pub(crate) async fn is_existing_pair(pool: &Pool, pair_id: &str) -> bool {
+    let pair_id_owned = pair_id.to_owned();
     let conn = pool.get().await.expect("Couldn't connect to the database.");
     conn.interact(move |conn| EntityEntry::exists(conn, pair_id_owned))
         .await
