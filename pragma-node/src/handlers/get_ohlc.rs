@@ -121,6 +121,7 @@ pub async fn get_ohlc(
         pair.to_pair_id(),
         interval,
         timestamp,
+        None,
     )
     .await
     .map_err(EntryError::from)?;

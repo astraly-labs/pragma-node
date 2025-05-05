@@ -13,8 +13,10 @@ use crate::{
 use super::get_entry::EntryParams;
 
 pub mod subscribe_to_entry;
+pub mod subscribe_to_ohlc;
 pub mod subscribe_to_price;
 pub use subscribe_to_entry::subscribe_to_entry;
+pub use subscribe_to_ohlc::subscribe_to_ohlc;
 pub use subscribe_to_price::subscribe_to_price;
 
 #[derive(Debug, Serialize, Deserialize)]
