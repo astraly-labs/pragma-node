@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use deadpool_diesel::postgres::Pool;
+
 use pragma_entities::{
     FundingRate, InfraError, TimestampError, models::entries::timestamp::TimestampRange,
 };

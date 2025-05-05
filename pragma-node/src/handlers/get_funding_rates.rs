@@ -25,7 +25,7 @@ pub struct GetLatestFundingRateResponse {
 
 #[utoipa::path(
     get,
-    path = "/node/v1/funding_rates/latest/{base}/{quote}",
+    path = "/node/v1/funding_rates/{base}/{quote}",
     tag = "Funding Rates",
     responses(
         (status = 200, description = "Successfully retrieved funding rate", body = [GetLatestFundingRateResponse]),

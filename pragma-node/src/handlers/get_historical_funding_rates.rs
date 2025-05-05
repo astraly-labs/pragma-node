@@ -29,7 +29,7 @@ pub type GetHistoricalFundingRateResponse = Vec<FundingRateResponse>;
 #[utoipa::path(
     get,
     path = "/node/v1/funding_rates/history/{base}/{quote}",
-    tag = "Funding Rates",
+    tag = "Historical Funding Rates",
     responses(
         (status = 200, description = "Successfully retrieved historical funding rates", body = [FundingRateResponse]),
     ),
