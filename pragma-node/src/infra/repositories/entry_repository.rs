@@ -783,8 +783,11 @@ pub async fn get_spot_ohlc(
     pair_id: String,
     interval: Interval,
     time: i64,
+    candles_to_get: Option<i64>,
 ) -> Result<Vec<OHLCEntry>, InfraError> {
     let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
+
+    let limit = candles_to_get.unwrap_or(10000);
 
     let raw_sql = format!(
         r"
@@ -803,7 +806,7 @@ pub async fn get_spot_ohlc(
             ohlc_bucket <= $2
         ORDER BY
             time DESC
-        LIMIT 10000;
+        LIMIT $3;
     ",
         get_interval_specifier(interval, false)?
     );
@@ -817,6 +820,7 @@ pub async fn get_spot_ohlc(
             diesel::sql_query(raw_sql)
                 .bind::<diesel::sql_types::Text, _>(pair_id)
                 .bind::<diesel::sql_types::Timestamptz, _>(date_time)
+                .bind::<diesel::sql_types::BigInt, _>(limit)
                 .load::<OHLCEntryRaw>(conn)
         })
         .await
