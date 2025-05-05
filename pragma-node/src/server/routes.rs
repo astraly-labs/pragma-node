@@ -44,7 +44,7 @@ fn data_routes(state: AppState) -> Router<AppState> {
         .route("/subscribe", get(subscribe_to_entry))
         .route("/price/subscribe", get(subscribe_to_price))
         .route("/multi/stream", get(stream_entry_multi_pair))
-        .route("/ohlc/subscribe" , get(subscribe_to_ohlc))
+        .route("/ohlc/subscribe", get(subscribe_to_ohlc))
         .with_state(state)
 }
 

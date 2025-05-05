@@ -133,6 +133,8 @@ impl ChannelHandler<SubscriptionState, SubscriptionRequest, InfraError> for WsOH
             return Ok(());
         }
 
+        let now = chrono::Utc::now().timestamp();
+
         let ohlc_to_retrieve = if state.is_first_update {
             state.is_first_update = false;
             state.candles_to_get
@@ -145,7 +147,8 @@ impl ChannelHandler<SubscriptionState, SubscriptionRequest, InfraError> for WsOH
             &subscriber.app_state.offchain_pool,
             pair_id.clone(),
             state.interval,
-            ohlc_to_retrieve as i64,
+            now,
+            Some(ohlc_to_retrieve),
         )
         .await;
         drop(state);
@@ -189,7 +192,7 @@ struct SubscriptionState {
     subscribed_pair: Option<String>,
     interval: Interval,
     is_first_update: bool,
-    candles_to_get: u64,
+    candles_to_get: i64,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -197,7 +200,7 @@ struct SubscriptionRequest {
     msg_type: SubscriptionType,
     pair: String,
     interval: Interval,
-    candles_to_get: Option<u64>,
+    candles_to_get: Option<i64>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
