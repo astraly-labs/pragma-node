@@ -1,30 +1,30 @@
-use axum::extract::{Query, State};
 use axum::Json;
+use axum::extract::{Query, State};
 
-use pragma_common::types::pair::Pair;
-use pragma_common::types::Network;
+use pragma_common::Pair;
+use pragma_common::starknet::StarknetNetwork;
 use pragma_entities::CheckpointError;
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToResponse, ToSchema};
 
-use crate::infra::repositories::entry_repository::get_decimals;
 use crate::infra::repositories::onchain_repository::checkpoint::get_checkpoints;
+use crate::infra::repositories::onchain_repository::get_onchain_decimals;
+use crate::state::AppState;
 use crate::utils::PathExtractor;
-use crate::AppState;
 
 pub const DEFAULT_LIMIT: u64 = 100;
 pub const MAX_LIMIT: u64 = 1000;
 
 #[derive(Debug, Deserialize, IntoParams, ToSchema)]
 pub struct GetOnchainCheckpointsParams {
-    pub network: Network,
+    pub network: StarknetNetwork,
     pub limit: Option<u64>,
 }
 
 impl Default for GetOnchainCheckpointsParams {
     fn default() -> Self {
         Self {
-            network: Network::default(),
+            network: StarknetNetwork::default(),
             limit: Some(DEFAULT_LIMIT),
         }
     }
@@ -66,14 +66,19 @@ pub async fn get_onchain_checkpoints(
         return Err(CheckpointError::InvalidLimit(limit));
     }
 
-    let decimals = get_decimals(&state.offchain_pool, &pair)
-        .await
-        .map_err(CheckpointError::from)?;
+    let decimals = get_onchain_decimals(
+        state.caches.onchain_decimals(),
+        &state.rpc_clients,
+        params.network,
+        &pair,
+    )
+    .await
+    .map_err(CheckpointError::from)?;
 
     let checkpoints = get_checkpoints(
         &state.onchain_pool,
         params.network,
-        pair.into(),
+        pair.clone().into(),
         decimals,
         limit,
     )
@@ -81,7 +86,7 @@ pub async fn get_onchain_checkpoints(
     .map_err(CheckpointError::from)?;
 
     if checkpoints.is_empty() {
-        return Err(CheckpointError::NotFound);
+        return Err(CheckpointError::CheckpointNotFound(pair.to_pair_id()));
     }
     Ok(Json(GetOnchainCheckpointsResponse(checkpoints)))
 }

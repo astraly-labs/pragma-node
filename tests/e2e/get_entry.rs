@@ -1,14 +1,14 @@
 use bigdecimal::{BigDecimal, FromPrimitive};
 use rstest::rstest;
 
-use pragma_common::types::{AggregationMode, Interval};
+use pragma_common::{AggregationMode, Interval};
 use serde::{Deserialize, Serialize};
 
 use crate::{
     assert_hex_prices_within_threshold,
     common::{
-        constants::VARIATION_PERCENTAGE,
-        setup::{setup_containers, TestHelper},
+        constants::{EIGHTEEN_DECIMALS, VARIATION_PERCENTAGE},
+        setup::{TestHelper, setup_containers},
         utils::populate::get_pair_price,
     },
 };
@@ -93,14 +93,16 @@ pub struct GetEntryResponse {
 }
 
 #[rstest]
-#[case::one_second(Interval::OneSecond)]
-#[case::five_seconds(Interval::FiveSeconds)]
-#[case::one_minute(Interval::OneMinute)]
-#[case::fifteen_minutes(Interval::FifteenMinutes)]
-#[case::one_hour(Interval::OneHour)]
-#[case::two_hours(Interval::TwoHours)]
-#[case::one_day(Interval::OneDay)]
-#[case::one_week(Interval::OneWeek)]
+#[case(Interval::OneHundredMillisecond)]
+#[case(Interval::OneSecond)]
+#[case(Interval::FiveSeconds)]
+#[case(Interval::TenSeconds)]
+#[case(Interval::OneMinute)]
+#[case(Interval::FifteenMinutes)]
+#[case(Interval::OneHour)]
+#[case(Interval::TwoHours)]
+#[case(Interval::OneDay)]
+#[case(Interval::OneWeek)]
 #[serial_test::serial]
 #[tokio::test]
 async fn get_entry_median_ok_many(
@@ -113,7 +115,7 @@ async fn get_entry_median_ok_many(
     let pair_id = "ETH/USD";
     let current_timestamp: u64 = chrono::Utc::now().timestamp() as u64;
     let price: u128 = populate::get_pair_price(pair_id);
-    let sql_many = populate::generate_entries(vec!["ETH/USD"], 1000, current_timestamp);
+    let sql_many = populate::generate_entries(vec!["ETH/USD"], 100, current_timestamp);
 
     hlpr.execute_sql_many(&hlpr.offchain_pool, sql_many).await;
 
@@ -137,7 +139,6 @@ async fn get_entry_median_ok_many(
             .with_routing(false)
             .with_aggregation(queried_aggregation),
     );
-    tracing::info!("with endpoint: {endpoint}");
 
     let response = reqwest::get(hlpr.endpoint(&endpoint))
         .await
@@ -173,7 +174,7 @@ async fn get_entry_twap_many_ok(
     let pair_id = "ETH/USD";
     let current_timestamp: u64 = chrono::Utc::now().timestamp() as u64;
     let price: u128 = populate::get_pair_price(pair_id);
-    let sql_many = populate::generate_entries(vec!["ETH/USD"], 1000, current_timestamp);
+    let sql_many = populate::generate_entries(vec!["ETH/USD"], 100, current_timestamp);
 
     hlpr.execute_sql_many(&hlpr.offchain_pool, sql_many).await;
 
@@ -197,7 +198,6 @@ async fn get_entry_twap_many_ok(
             .with_routing(false)
             .with_aggregation(queried_aggregation),
     );
-    tracing::info!("with endpoint: {endpoint}");
 
     let response = reqwest::get(hlpr.endpoint(&endpoint))
         .await
@@ -229,13 +229,11 @@ async fn get_entry_twap_strk_eth_ok(
 ) {
     let mut hlpr = setup_containers.await;
 
-    hlpr.push_strk(&hlpr.offchain_pool).await;
-
     // 1. Insert one entry
     let pair_id = "STRK/USD";
     let current_timestamp: u64 = chrono::Utc::now().timestamp() as u64;
     let price: u128 = populate::get_pair_price(pair_id);
-    let sql_many = populate::generate_entries(vec!["ETH/USD", "STRK/USD"], 1000, current_timestamp);
+    let sql_many = populate::generate_entries(vec!["ETH/USD", "STRK/USD"], 100, current_timestamp);
 
     hlpr.execute_sql_many(&hlpr.offchain_pool, sql_many).await;
 
@@ -259,7 +257,6 @@ async fn get_entry_twap_strk_eth_ok(
             .with_routing(true)
             .with_aggregation(queried_aggregation),
     );
-    tracing::info!("with endpoint: {endpoint}");
 
     let response = reqwest::get(hlpr.endpoint(&endpoint))
         .await
@@ -274,7 +271,7 @@ async fn get_entry_twap_strk_eth_ok(
 
     // 4. Assert
     let strk_eth_price = price as f64 / get_pair_price("ETH/USD") as f64;
-    let strk_eth_price = strk_eth_price * 10.0_f64.powi(8);
+    let strk_eth_price = strk_eth_price * 10.0_f64.powi(EIGHTEEN_DECIMALS);
     let expected_price_hex = format!("0x{:x}", strk_eth_price as u128);
 
     let threshold = BigDecimal::from_f64(VARIATION_PERCENTAGE).unwrap();

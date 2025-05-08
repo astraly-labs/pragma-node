@@ -1,25 +1,25 @@
 // @generated automatically by Diesel CLI.
 
 diesel::table! {
-    currencies (id) {
+    entries (id, timestamp) {
         id -> Uuid,
-        name -> Varchar,
-        decimals -> Numeric,
-        #[sql_name = "abstract"]
-        abstract_ -> Bool,
-        ethereum_address -> Nullable<Varchar>,
+        pair_id -> Varchar,
+        price -> Numeric,
+        timestamp -> Timestamptz,
+        publisher -> Text,
+        publisher_signature -> Nullable<Text>,
+        source -> Varchar,
     }
 }
 
 diesel::table! {
-    entries (id, timestamp) {
+    funding_rates (id, timestamp) {
         id -> Uuid,
-        pair_id -> Varchar,
-        publisher -> Text,
-        timestamp -> Timestamptz,
-        price -> Numeric,
         source -> Varchar,
-        publisher_signature -> Nullable<Varchar>,
+        pair -> Varchar,
+        annualized_rate -> Float8,
+        timestamp -> Timestamptz,
+        created_at -> Timestamptz,
     }
 }
 
@@ -31,7 +31,7 @@ diesel::table! {
         timestamp -> Timestamptz,
         expiration_timestamp -> Nullable<Timestamptz>,
         publisher -> Text,
-        publisher_signature -> Text,
+        publisher_signature -> Nullable<Text>,
         source -> Varchar,
     }
 }
@@ -42,9 +42,9 @@ diesel::table! {
         name -> Varchar,
         master_key -> Varchar,
         active_key -> Varchar,
-        active -> Bool,
         account_address -> Varchar,
+        active -> Bool,
     }
 }
 
-diesel::allow_tables_to_appear_in_same_query!(currencies, entries, future_entries, publishers,);
+diesel::allow_tables_to_appear_in_same_query!(entries, funding_rates, future_entries, publishers,);

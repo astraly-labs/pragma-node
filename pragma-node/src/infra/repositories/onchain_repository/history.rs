@@ -1,30 +1,35 @@
+use std::collections::HashMap;
+
 use bigdecimal::BigDecimal;
 use chrono::{DateTime, NaiveDateTime};
 use deadpool_diesel::postgres::Pool;
-use diesel::{prelude::QueryableByName, RunQueryDsl};
-
-use pragma_common::types::pair::Pair;
-use pragma_common::types::{DataType, Interval, Network};
-use pragma_entities::error::{adapt_infra_error, InfraError};
-use pragma_entities::Currency;
+use diesel::{RunQueryDsl, prelude::QueryableByName};
+use moka::future::Cache;
+use pragma_entities::models::entries::timestamp::TimestampRange;
 use serde::Serialize;
 
-use crate::infra::repositories::entry_repository::get_decimals;
-use crate::utils::{convert_via_quote, normalize_to_decimals};
-use pragma_common::types::timestamp::TimestampRange;
+use pragma_common::starknet::StarknetNetwork;
+use pragma_common::{InstrumentType, Interval, Pair};
+use pragma_entities::TimestampError;
+use pragma_entities::error::InfraError;
 
 use super::entry::{get_existing_pairs, onchain_pair_exist};
-use super::get_onchain_aggregate_table_name;
+use super::{get_onchain_aggregate_table_name, get_onchain_decimals};
+use crate::constants::currencies::ABSTRACT_CURRENCIES;
+use crate::infra::rpc::RpcClients;
+use crate::utils::{convert_via_quote, normalize_to_decimals};
 
 /// Query the onchain database for historical entries and if entries
 /// are found, query the offchain database to get the pair decimals.
+#[allow(clippy::implicit_hasher)]
 pub async fn get_historical_entries_and_decimals(
     onchain_pool: &Pool,
-    offchain_pool: &Pool,
-    network: Network,
+    network: StarknetNetwork,
     pair: &Pair,
     timestamp_range: &TimestampRange,
     chunk_interval: Interval,
+    decimals_cache: &Cache<StarknetNetwork, HashMap<String, u32>>,
+    rpc_clients: &RpcClients,
 ) -> Result<(Vec<HistoricalEntryRaw>, u32), InfraError> {
     let raw_entries: Vec<HistoricalEntryRaw> = get_historical_aggregated_entries(
         onchain_pool,
@@ -36,10 +41,11 @@ pub async fn get_historical_entries_and_decimals(
     .await?;
 
     if raw_entries.is_empty() {
-        return Err(InfraError::NotFound);
+        return Err(InfraError::EntryNotFound(pair.to_pair_id()));
     }
 
-    let decimals = get_decimals(offchain_pool, pair).await?;
+    let decimals = get_onchain_decimals(decimals_cache, rpc_clients, network, pair).await?;
+
     Ok((raw_entries, decimals))
 }
 
@@ -59,7 +65,7 @@ pub struct HistoricalEntryRaw {
 /// NOTE: Only works for `SpotEntry` at the moment, `DataType` is hard coded.
 async fn get_historical_aggregated_entries(
     pool: &Pool,
-    network: Network,
+    network: StarknetNetwork,
     pair: &Pair,
     timestamp: &TimestampRange,
     chunk_interval: Interval,
@@ -70,7 +76,7 @@ async fn get_historical_aggregated_entries(
     };
 
     let raw_sql = format!(
-        r#"
+        r"
         SELECT
             pair_id,
             bucket AS timestamp,
@@ -84,14 +90,14 @@ async fn get_historical_aggregated_entries(
             AND bucket <= to_timestamp($3)
         ORDER BY
             bucket ASC
-        "#,
+        ",
         table_name =
-            get_onchain_aggregate_table_name(network, DataType::SpotEntry, chunk_interval)?,
+            get_onchain_aggregate_table_name(network, InstrumentType::Spot, chunk_interval)?,
     );
 
     let pair_id = pair.to_string();
 
-    let conn = pool.get().await.map_err(adapt_infra_error)?;
+    let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
     let raw_entries = conn
         .interact(move |conn| {
             diesel::sql_query(raw_sql)
@@ -101,8 +107,8 @@ async fn get_historical_aggregated_entries(
                 .load::<HistoricalEntryRaw>(conn)
         })
         .await
-        .map_err(adapt_infra_error)?
-        .map_err(adapt_infra_error)?;
+        .map_err(InfraError::DbInteractionError)?
+        .map_err(InfraError::DbResultError)?;
 
     Ok(raw_entries)
 }
@@ -114,58 +120,99 @@ async fn get_historical_aggregated_entries(
 ///       once we have proper E2E tests, we should try to merge the code.
 /// NOTE: We let the possibility to try 1min intervals but they rarely works.
 /// Entries rarely align perfectly, causing insufficient data for routing.
+#[allow(clippy::implicit_hasher)]
 pub async fn retry_with_routing(
     onchain_pool: &Pool,
-    offchain_pool: &Pool,
-    network: Network,
+    network: StarknetNetwork,
     pair: &Pair,
     timestamp_range: &TimestampRange,
     chunk_interval: Interval,
+    decimals_cache: &Cache<StarknetNetwork, HashMap<String, u32>>,
+    rpc_clients: &RpcClients,
 ) -> Result<(Vec<HistoricalEntryRaw>, u32), InfraError> {
-    let offchain_conn = offchain_pool.get().await.map_err(adapt_infra_error)?;
-    let alternative_currencies = offchain_conn
-        .interact(Currency::get_abstract_all)
-        .await
-        .map_err(adapt_infra_error)?
-        .map_err(adapt_infra_error)?;
-
     let existing_pairs = get_existing_pairs(onchain_pool, network).await?;
+    let mut routing_attempts = Vec::new();
 
-    for alt_currency in alternative_currencies {
-        let base_alt_pair = Pair::from((pair.base.clone(), alt_currency.clone()));
-        let alt_quote_pair = Pair::from((pair.quote.clone(), alt_currency.clone()));
+    for alt_currency in ABSTRACT_CURRENCIES {
+        let base_alt_pair = Pair::from((pair.base.clone(), alt_currency.to_string()));
+        let alt_quote_pair = Pair::from((pair.quote.clone(), alt_currency.to_string()));
+        let base_alt_pair_str = base_alt_pair.to_string();
+        let alt_quote_pair_str = alt_quote_pair.to_string();
 
-        if onchain_pair_exist(&existing_pairs, &base_alt_pair.to_string())
-            && onchain_pair_exist(&existing_pairs, &alt_quote_pair.to_string())
-        {
-            let base_alt_result = get_historical_entries_and_decimals(
-                onchain_pool,
-                offchain_pool,
-                network,
-                &base_alt_pair,
-                timestamp_range,
-                chunk_interval,
-            )
-            .await?;
-            let alt_quote_result = get_historical_entries_and_decimals(
-                onchain_pool,
-                offchain_pool,
-                network,
-                &alt_quote_pair,
-                timestamp_range,
-                chunk_interval,
-            )
-            .await?;
+        // Check if both required pairs exist
+        let base_alt_exists = onchain_pair_exist(&existing_pairs, &base_alt_pair_str);
+        let alt_quote_exists = onchain_pair_exist(&existing_pairs, &alt_quote_pair_str);
 
-            if base_alt_result.0.len() != alt_quote_result.0.len() {
-                continue;
-            }
-
-            return calculate_rebased_prices(base_alt_result, alt_quote_result);
+        if !base_alt_exists || !alt_quote_exists {
+            routing_attempts.push(format!(
+                "Route via {alt_currency}: base pair '{base_alt_pair_str}' exists: {base_alt_exists}, quote pair '{alt_quote_pair_str}' exists: {alt_quote_exists}",                
+            ));
+            continue;
         }
+
+        // Both pairs exist, try to get their historical entries
+        let base_alt_result = get_historical_entries_and_decimals(
+            onchain_pool,
+            network,
+            &base_alt_pair,
+            timestamp_range,
+            chunk_interval,
+            decimals_cache,
+            rpc_clients,
+        )
+        .await;
+
+        if let Err(e) = &base_alt_result {
+            routing_attempts.push(format!(
+                "Route via {alt_currency}: failed to get history for '{base_alt_pair_str}': {e}",
+            ));
+            continue;
+        }
+
+        let alt_quote_result = get_historical_entries_and_decimals(
+            onchain_pool,
+            network,
+            &alt_quote_pair,
+            timestamp_range,
+            chunk_interval,
+            decimals_cache,
+            rpc_clients,
+        )
+        .await;
+
+        if let Err(e) = &alt_quote_result {
+            routing_attempts.push(format!(
+                "Route via {alt_currency}: failed to get history for '{alt_quote_pair_str}': {e}",
+            ));
+            continue;
+        }
+
+        let base_alt_result = base_alt_result.unwrap();
+        let alt_quote_result = alt_quote_result.unwrap();
+
+        if base_alt_result.0.len() != alt_quote_result.0.len() {
+            routing_attempts.push(format!(
+                "Route via {alt_currency}: mismatched entries count: {} vs {}",
+                base_alt_result.0.len(),
+                alt_quote_result.0.len()
+            ));
+            continue;
+        }
+
+        return calculate_rebased_prices(base_alt_result, alt_quote_result);
     }
 
-    Err(InfraError::RoutingError)
+    // Construct detailed error message
+    let attempts_info = if routing_attempts.is_empty() {
+        "No routing pairs found".to_string()
+    } else {
+        format!("Attempted routes:\n- {}", routing_attempts.join("\n- "))
+    };
+
+    Err(InfraError::RoutingError(format!(
+        "{}; {attempts_info}",
+        pair.to_pair_id(),
+    )))
 }
 
 /// Given two vector of entries, compute a new vector containing the routed prices.
@@ -249,9 +296,9 @@ fn combine_entries(
         quote_entry.nb_sources_aggregated,
     );
     let new_timestamp = DateTime::from_timestamp(max_timestamp, 0)
-        .ok_or(InfraError::InvalidTimestamp(format!(
-            "Cannot convert to DateTime: {max_timestamp}"
-        )))?
+        .ok_or(InfraError::InvalidTimestamp(
+            TimestampError::ToDatetimeErrorI64(max_timestamp),
+        ))?
         .naive_utc();
 
     let base_pair = Pair::from(base_entry.pair_id.clone());
