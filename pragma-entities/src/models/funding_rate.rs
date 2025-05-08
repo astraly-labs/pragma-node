@@ -1,5 +1,5 @@
 use chrono::NaiveDateTime;
-use diesel::prelude::*;
+use diesel::{prelude::*, sql_types::VarChar};
 use pragma_common::Pair;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;

@@ -5,17 +5,18 @@ use axum::routing::get;
 use utoipa::OpenApi as OpenApiT;
 use utoipa_swagger_ui::SwaggerUi;
 
+use crate::handlers::funding_rates::{
+    get_historical_funding_rates, get_latest_funding_rate, get_supported_instruments,
+};
 use crate::handlers::onchain::{
     get_checkpoints::get_onchain_checkpoints, get_entry::get_onchain_entry,
     get_history::get_onchain_history, get_publishers::get_onchain_publishers,
     subscribe_to_ohlc::subscribe_to_onchain_ohlc,
 };
 use crate::handlers::stream::stream_multi::stream_entry_multi_pair;
-use crate::handlers::websocket::{subscribe_to_entry, subscribe_to_price, subscribe_to_ohlc};
-use crate::handlers::{
-    get_entry, get_funding_rates::get_latest_funding_rate,
-    get_historical_funding_rates::get_historical_funding_rates, get_ohlc,
-};
+use crate::handlers::websocket::{subscribe_to_entry, subscribe_to_ohlc, subscribe_to_price};
+use crate::handlers::{get_entry, get_ohlc};
+
 use crate::state::AppState;
 
 #[allow(clippy::extra_unused_type_parameters)]
@@ -72,5 +73,6 @@ fn funding_rates_routes(state: AppState) -> Router<AppState> {
     Router::new()
         .route("/{base}/{quote}", get(get_latest_funding_rate))
         .route("/history/{base}/{quote}", get(get_historical_funding_rates))
+        .route("/instruments", get(get_supported_instruments))
         .with_state(state)
 }
