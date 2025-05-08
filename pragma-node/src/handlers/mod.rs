@@ -1,5 +1,5 @@
-pub mod get_entry;
 pub mod funding_rates;
+pub mod get_entry;
 pub mod get_ohlc;
 pub mod onchain;
 pub mod stream;
