@@ -1,6 +1,12 @@
 [workspace]
 resolver = "2"
-members = ["pragma-node", "pragma-ingestor", "pragma-entities", "tests"]
+members = [
+    "pragma-node",
+    "pragma-historical",
+    "pragma-ingestor",
+    "pragma-entities",
+    "tests",
+]
 
 [workspace.package]
 version = "0.1.0"
@@ -43,14 +49,15 @@ missing_const_for_fn = "allow"
 
 [workspace.dependencies]
 pragma-common = { version = "0.3.0", features = [
-  "serde",
-  "services",
-  "task-group",
-  "telemetry",
-  "utoipa",
-  "starknet",
-  "proto",
+    "serde",
+    "services",
+    "task-group",
+    "telemetry",
+    "utoipa",
+    "starknet",
+    "proto",
 ] }
+pragma-historical = { path = "./pragma-historical" }
 pragma-entities = { path = "./pragma-entities" }
 pragma-ingestor = { path = "./pragma-ingestor" }
 pragma-node = { path = "./pragma-node" }
@@ -65,14 +72,14 @@ axum-extra = { version = "0.10.0", features = ["typed-header", "query"] }
 axum-macros = "0.5"
 async-trait = "0.1.86"
 cainome = { git = "https://github.com/cartridge-gg/cainome", tag = "v0.4.5", features = [
-  "abigen-rs",
+    "abigen-rs",
 ] }
 dashmap = "6.1.0"
 diesel = { version = "2.1", features = [
-  "postgres",
-  "extras",
-  "postgres_backend",
-  "serde_json",
+    "postgres",
+    "extras",
+    "postgres_backend",
+    "serde_json",
 ] }
 diesel-async = { version = "0.4.1", features = ["postgres"] }
 bigdecimal = { version = "0.4.1", features = ["serde"] }
@@ -114,17 +121,17 @@ opentelemetry = { version = "0.26.0", features = ["metrics", "logs"] }
 opentelemetry_sdk = { version = "0.26.0", features = ["rt-tokio", "logs"] }
 opentelemetry-stdout = { version = "0.26.0" }
 opentelemetry-otlp = { version = "0.26.0", features = [
-  "tonic",
-  "metrics",
-  "logs",
+    "tonic",
+    "metrics",
+    "logs",
 ] }
 opentelemetry-semantic-conventions = { version = "0.26.0" }
 opentelemetry-appender-tracing = { version = "0.26.0", default-features = false }
 tracing-core = { version = "0.1.32", default-features = false }
 tracing-subscriber = { version = "0.3.18", features = [
-  "env-filter",
-  "registry",
-  "std",
+    "env-filter",
+    "registry",
+    "std",
 ] }
 tracing-opentelemetry = "0.27.0"
 
@@ -136,10 +143,10 @@ serial_test = "3.2.0"
 testcontainers = { version = "0.21.1" }
 tracing-test = "0.2.5"
 testcontainers-modules = { version = "0.9.0", features = [
-  "postgres",
-  "kafka",
-  "zookeeper",
-  "http_wait",
+    "postgres",
+    "kafka",
+    "zookeeper",
+    "http_wait",
 ] }
 pretty_assertions = "1.4.0"
 rand = "0.9.0"
