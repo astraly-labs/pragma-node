@@ -3778,6 +3778,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "pragma-historical"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "clap",
+ "deadpool-diesel",
+ "diesel",
+ "dotenvy",
+ "envy",
+ "futures-util",
+ "lazy_static",
+ "pragma-common",
+ "pragma-entities",
+ "rdkafka",
+ "reqwest 0.12.12",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.12",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "pragma-ingestor"
 version = "0.1.0"
 dependencies = [
