@@ -26,7 +26,7 @@ impl Paradex {
         end: i64,
         client: &Client,
     ) -> Result<Vec<ParadexFundingRateEntry>> {
-        const PAGE_SIZE: i32 = 100;
+        const PAGE_SIZE: i32 = 5000;
         let mut all_results = Vec::new();
         let mut cursor: Option<String> = None;
 
@@ -62,8 +62,6 @@ impl Paradex {
             if cursor.is_none() {
                 break;
             }
-
-            println!("{cursor:?}");
         }
 
         Ok(all_results)
@@ -79,7 +77,7 @@ mod tests {
         let client = Client::new();
         let market = "BTC-USD-PERP";
         let start = 1_746_057_600_000;
-        let end = 1_748_736_000_000;
+        let end = start + 86_400_000; // One day later
 
         let result = Paradex::fetch_historical_fundings(market, start, end, &client)
             .await

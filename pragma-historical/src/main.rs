@@ -239,7 +239,7 @@ fn write_to_csv(entries: &[NewFundingRate], output_path: &str) -> anyhow::Result
 fn format_pair_for_exchange(source: &str, pair: &str) -> String {
     match source {
         "hyperliquid" => pair.split('/').next().unwrap_or(pair).to_uppercase(),
-        "paradex" => pair.replace('/', "-").to_uppercase(),
+        "paradex" => format!("{}-PERP", pair.replace('/', "-").to_uppercase()),
         other => panic!("Source '{other}' not implemented"),
     }
 }
