@@ -1,6 +1,7 @@
 use deadpool_diesel::postgres::Pool;
 use pragma_entities::{
     Entry, FundingRate, FutureEntry, InfraError, NewEntry, NewFundingRate, NewFutureEntry,
+    NewOpenInterest,
 };
 use tracing::debug;
 
@@ -68,6 +69,28 @@ pub(crate) async fn insert_funding_rate_entries(
         debug!(
             "new funding rate entry created {} - {}({}) - {}",
             entry.source, entry.pair, entry.annualized_rate, entry.timestamp
+        );
+    }
+
+    Ok(())
+}
+
+#[tracing::instrument(skip_all, fields(num_entries = new_entries.len()))]
+pub(crate) async fn insert_open_interest_entries(
+    pool: &Pool,
+    new_entries: Vec<NewOpenInterest>,
+) -> Result<(), InfraError> {
+    let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
+    let entries = conn
+        .interact(move |conn| OpenInterest::create_many(conn, new_entries))
+        .await
+        .map_err(InfraError::DbInteractionError)?
+        .map_err(InfraError::DbResultError)?;
+
+    for entry in &entries {
+        debug!(
+            "new open interest entry created {} - {}({}) - {}",
+            entry.source, entry.pair, entry.open_interest_value, entry.timestamp
         );
     }
 

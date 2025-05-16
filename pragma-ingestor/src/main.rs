@@ -4,7 +4,7 @@ use faucon_rs::topics::FauconTopic;
 use faucon_rs::{consumer::AutoOffsetReset, environment::FauconEnvironment};
 use pragma_common::{
     InstrumentType,
-    entries::{FundingRateEntry, PriceEntry},
+    entries::{FundingRateEntry, PriceEntry, open_interest::OpenInterestEntry},
     task_group::TaskGroup,
 };
 use tokio::sync::mpsc;
@@ -12,11 +12,12 @@ use tokio::task::JoinSet;
 use tracing::error;
 
 use pragma_entities::connection::ENV_OFFCHAIN_DATABASE_URL;
-use pragma_entities::{NewEntry, NewFundingRate, NewFutureEntry};
+use pragma_entities::{NewEntry, NewFundingRate, NewFutureEntry, NewOpenInterest};
 
 use crate::config::CONFIG;
 use crate::db::process::{
-    process_funding_rate_entries, process_future_entries, process_spot_entries,
+    process_funding_rate_entries, process_future_entries, process_open_interest_entries,
+    process_spot_entries,
 };
 
 mod config;
@@ -37,6 +38,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (future_tx, future_rx) = mpsc::channel::<NewFutureEntry>(CONFIG.channel_capacity);
     let (funding_rate_tx, funding_rate_rx) =
         mpsc::channel::<NewFundingRate>(CONFIG.channel_capacity / 2);
+    let (open_interest_tx, open_interest_rx) =
+        mpsc::channel::<NewOpenInterest>(CONFIG.channel_capacity / 2);
 
     // Spawn database worker tasks
     let task_group = TaskGroup::new()
@@ -48,6 +51,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_handle(tokio::spawn(process_funding_rate_entries(
             pool,
             funding_rate_rx,
+        )))
+        .with_handle(tokio::spawn(process_open_interest_entries(
+            pool,
+            open_interest_rx,
         )));
 
     // Spawn consumers
@@ -62,6 +69,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             CONFIG.kafka_group_id.clone(),
             funding_rate_tx.clone(),
         ));
+        join_set.spawn(run_open_interest_consumer(
+            CONFIG.kafka_group_id.clone(),
+            open_interest_tx.clone(),
+        ));
     }
 
     while let Some(result) = join_set.join_next().await {
@@ -74,6 +85,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     drop(spot_tx);
     drop(future_tx);
     drop(funding_rate_tx);
+    drop(open_interest_tx);
 
     // Await all tasks and abort if one fails
     task_group.abort_all_if_one_resolves().await;
@@ -192,6 +204,57 @@ async fn run_funding_rate_consumer(
 
             if let Err(e) = funding_rate_tx.send(funding_rate_entry).await {
                 error!("Failed to send funding rate entry: {e}");
+            }
+
+            anyhow::Ok(())
+        })
+        .await?;
+    Ok(())
+}
+
+/// Runs a Kafka consumer for open interest entries
+#[tracing::instrument(skip_all)]
+async fn run_open_interest_consumer(
+    group_id: String,
+    open_interest_tx: mpsc::Sender<NewOpenInterest>,
+) -> anyhow::Result<()> {
+    let kafka_environment = FauconEnvironment::Custom(CONFIG.kafka_broker_id.clone());
+    let mut consumer = FauConsumerBuilder::on_environment(kafka_environment)
+        .group_id(&group_id)
+        .fetch_min_bytes(100_000)
+        .fetch_wait_max_ms(25)
+        .session_timeout(6000)
+        .max_poll_interval(30000)
+        .auto_offset_reset(AutoOffsetReset::Latest)
+        .auto_commit(true)
+        .auto_commit_interval(1000)
+        .max_partition_fetch_bytes(1_048_576)
+        .build()?;
+
+    consumer.subscribe(&[FauconTopic::OPEN_INTEREST_V1])?;
+
+    tracing::info!("🚀 Starting open interest consumer");
+
+    consumer
+        .consume_with(async |entry: OpenInterestEntry| {
+            let timestamp = chrono::DateTime::from_timestamp_millis(entry.timestamp_ms)
+                .map_or_else(
+                    || {
+                        error!("Invalid timestamp: {}", entry.timestamp_ms);
+                        chrono::NaiveDateTime::default()
+                    },
+                    |dt| dt.naive_utc(),
+                );
+
+            let open_interest_entry = NewOpenInterest {
+                source: entry.source,
+                pair: entry.pair.to_string(),
+                open_interest_value: entry.open_interest,
+                timestamp,
+            };
+
+            if let Err(e) = open_interest_tx.send(open_interest_entry).await {
+                error!("Failed to send open interest entry: {e}");
             }
 
             anyhow::Ok(())

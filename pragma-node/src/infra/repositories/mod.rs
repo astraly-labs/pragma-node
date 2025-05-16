@@ -3,3 +3,4 @@ pub mod funding_rates_repository;
 pub mod onchain_repository;
 pub mod publisher_repository;
 pub mod utils;
+pub mod open_interest_repository;

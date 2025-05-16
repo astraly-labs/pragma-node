@@ -3,6 +3,7 @@ pub mod entries;
 pub mod funding_rate;
 pub mod publisher;
 pub mod publisher_error;
+pub mod open_interest;
 
 pub use entries::{entry, entry_error, future_entry};
 

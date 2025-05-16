@@ -4,6 +4,7 @@ pub mod get_ohlc;
 pub mod onchain;
 pub mod stream;
 pub mod websocket;
+pub mod open_interest;
 
 pub use get_entry::get_entry;
 pub use get_ohlc::get_ohlc;
