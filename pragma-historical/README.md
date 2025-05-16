@@ -23,11 +23,11 @@ Fetches historical funding rates from Hyperliquid or Paradex and stores them in 
 Run the program with the following command:
 
 ```bash
-cargo run --bin pragma-historical -- --source hyperliquid --range 1753987200000,1756665600000 --csv-output funding_rates.csv --connection postgres://postgres:test-password@0.0.0.0:5432/pragma
+cargo run --bin pragma-historical -- --source hyperliquid --range 1746057600000,1748736000000 --csv-output funding_rates.csv --connection postgres://postgres:test-password@0.0.0.0:5432/pragma
 ```
 
 - `--source`: Data source (`hyperliquid` or `paradex`)
-- `--range`: Time range in Unix milliseconds (start,end; last month: Oct 1, 2025 - Oct 31, 2025)
+- `--range`: Time range in Unix milliseconds (start,end; last month: Apr 1, 2025 - Apr 30, 2025)
 - `--csv-output`: Output CSV file path
 - `--connection`: PostgreSQL connection string
 

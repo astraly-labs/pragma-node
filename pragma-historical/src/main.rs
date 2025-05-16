@@ -7,7 +7,6 @@ use chrono::{DateTime, NaiveDateTime, Utc};
 use clap::Parser;
 use csv::Writer;
 use reqwest::Client;
-use std::io;
 
 use pragma_entities::models::funding_rate::NewFundingRate;
 use sources::{hyperliquid::Hyperliquid, paradex::Paradex};
@@ -98,7 +97,7 @@ async fn main() -> anyhow::Result<()> {
     let client = Client::builder().timeout(Duration::from_secs(30)).build()?;
 
     // Define coins to fetch
-    let pairs = vec!["BTC/USD", "ETH/USD"];
+    let pairs = ALL_PAIRS;
 
     // Fetch and process funding rates for each coin
     let mut all_entries = Vec::new();
@@ -109,9 +108,13 @@ async fn main() -> anyhow::Result<()> {
             timestamp_from_millis(end)?
         );
 
-        let formatted_pair = format_pair_for_exchange(&cli.source, &pair);
-        let entries =
-            fetch_funding_rates(&cli.source, &pair, &formatted_pair, start, end, &client).await?;
+        let formatted_pair = format_pair_for_exchange(&cli.source, pair);
+        let entries = fetch_funding_rates(&cli.source, pair, &formatted_pair, start, end, &client)
+            .await
+            .unwrap_or_else(|e| {
+                eprintln!("Error fetching funding rates for {pair}: {e}");
+                vec![]
+            });
         all_entries.extend(entries);
     }
 
@@ -125,14 +128,12 @@ async fn main() -> anyhow::Result<()> {
 }
 
 fn check_timescaledb_parallel_copy() -> anyhow::Result<()> {
-    if let Err(_) = Command::new("timescaledb-parallel-copy")
+    Command::new("timescaledb-parallel-copy")
         .arg("--help")
         .output()
-    {
-        return Err(anyhow!(
+        .map_err(|_| anyhow!(
             "timescaledb-parallel-copy not installed. Please check the instructions at https://github.com/timescale/timescaledb-parallel-copy"
-        ));
-    }
+        ))?;
     Ok(())
 }
 
@@ -149,11 +150,11 @@ fn import_to_timescaledb(connection: &str, csv_path: &str) -> anyhow::Result<()>
         .context("Failed to execute timescaledb-parallel-copy")?;
 
     if output.status.success() {
-        println!("Imported {} to TimescaleDB", csv_path);
+        println!("Imported {csv_path} to TimescaleDB");
         Ok(())
     } else {
         let error = String::from_utf8_lossy(&output.stderr);
-        Err(anyhow!("Failed to import CSV: {}", error))
+        Err(anyhow!("Failed to import CSV: {error}"))
     }
 }
 
@@ -168,9 +169,8 @@ async fn fetch_funding_rates(
     let mut entries = Vec::new();
     match source {
         "hyperliquid" => {
-            let rows = Hyperliquid::fetch_historical_fundings(formatted_pair, start, end, client)
-                .await
-                .context("Failed to fetch hyperliquid funding rates")?;
+            let rows =
+                Hyperliquid::fetch_historical_fundings(formatted_pair, start, end, client).await?;
             for r in rows {
                 let ts = timestamp_from_millis(r.time)?;
                 let hourly_rate: f64 = r.funding_rate.parse()?;
@@ -184,9 +184,8 @@ async fn fetch_funding_rates(
             }
         }
         "paradex" => {
-            let rows = Paradex::fetch_historical_fundings(formatted_pair, start, end, client)
-                .await
-                .context("Failed to fetch paradex funding rates")?;
+            let rows =
+                Paradex::fetch_historical_fundings(formatted_pair, start, end, client).await?;
             for r in rows {
                 let ts = timestamp_from_millis(r.created_at)?;
                 let rate: f64 = r.funding_rate.parse()?;
@@ -240,8 +239,8 @@ fn write_to_csv(entries: &[NewFundingRate], output_path: &str) -> anyhow::Result
 fn format_pair_for_exchange(source: &str, pair: &str) -> String {
     match source {
         "hyperliquid" => pair.split('/').next().unwrap_or(pair).to_uppercase(),
-        "paradex" => pair.replace("/", "-").to_uppercase(),
-        other => panic!("Source '{}' not implemented", other),
+        "paradex" => pair.replace('/', "-").to_uppercase(),
+        other => panic!("Source '{other}' not implemented"),
     }
 }
 
