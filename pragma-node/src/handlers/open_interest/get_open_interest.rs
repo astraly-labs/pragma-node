@@ -19,6 +19,8 @@ pub struct GetLatestOpenInterestResponse {
     pub pair: String,
     pub source: String,
     pub timestamp_ms: u64,
+
+    /// Open interest value quoted in the base asset
     pub open_interest: f64,
 }
 
