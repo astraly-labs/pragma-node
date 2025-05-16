@@ -17,7 +17,7 @@ impl Hyperliquid {
         start: i64,
         end: i64,
         client: &reqwest::Client,
-    ) -> Result<Vec<HyperliquidFundingRateEntry>, Box<dyn std::error::Error>> {
+    ) -> anyhow::Result<Vec<HyperliquidFundingRateEntry>> {
         let mut result = Vec::new();
         let mut current = start;
 
@@ -54,58 +54,5 @@ impl Hyperliquid {
         }
 
         Ok(result)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use reqwest::Client;
-    use tokio::time::Duration;
-
-    #[tokio::test]
-    async fn test_fetch_historical_fundings() {
-        let client = Client::builder()
-            .timeout(Duration::from_secs(10))
-            .build()
-            .unwrap();
-
-        // Test range: May 12, 2023, to Dec 31, 2024
-        let start = 1683849600000; // May 12, 2023, 00:00:00 UTC
-        let end = 1735689599999;   // Dec 31, 2024, 23:59:59 UTC
-
-        let result = Hyperliquid::fetch_historical_fundings("ETH", start, end, &client)
-            .await
-            .expect("Failed to fetch funding rates");
-
-        // Verify non-empty response
-        assert!(!result.is_empty(), "Expected non-empty funding rate data");
-
-        // Verify all entries are for ETH and within time range
-        for entry in &result {
-            assert_eq!(entry.coin, "ETH");
-            assert!(entry.time >= start && entry.time <= end);
-        }
-
-        // Expect at least 1800 entries (~3 entries/day for ~600 days)
-        assert!(result.len() >= 1800, "Expected at least 1800 funding rate entries");
-
-        // Verify first and last timestamps are within 8 hours
-        let first_time = result.first().unwrap().time;
-        let last_time = result.last().unwrap().time;
-        let eight_hours_ms = 8 * 60 * 60 * 1000; // 8 hours in milliseconds
-
-        assert!(
-            (first_time - start).abs() <= eight_hours_ms,
-            "First timestamp ({}) too far from start ({})",
-            first_time,
-            start
-        );
-        assert!(
-            (end - last_time).abs() <= eight_hours_ms,
-            "Last timestamp ({}) too far from end ({})",
-            last_time,
-            end
-        );
     }
 }

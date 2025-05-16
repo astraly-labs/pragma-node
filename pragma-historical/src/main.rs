@@ -2,6 +2,7 @@ pub mod sources;
 
 use std::{process::Command, time::Duration};
 
+use anyhow::{Context, anyhow};
 use chrono::{DateTime, NaiveDateTime, Utc};
 use clap::Parser;
 use csv::Writer;
@@ -87,7 +88,7 @@ struct Cli {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> anyhow::Result<()> {
     check_timescaledb_parallel_copy()?;
 
     let cli = Cli::parse();
@@ -123,27 +124,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn check_timescaledb_parallel_copy() -> io::Result<()> {
-    if let Err(err) = Command::new("timescaledb-parallel-copy")
+fn check_timescaledb_parallel_copy() -> anyhow::Result<()> {
+    if let Err(_) = Command::new("timescaledb-parallel-copy")
         .arg("--help")
         .output()
     {
-        if err.kind() == io::ErrorKind::NotFound {
-            return Err(io::Error::new(
-                io::ErrorKind::NotFound,
-                "timescaledb-parallel-copy not installed.",
-            ));
-        }
+        return Err(anyhow!(
+            "timescaledb-parallel-copy not installed. Please check the instructions at https://github.com/timescale/timescaledb-parallel-copy"
+        ));
     }
     Ok(())
 }
 
-fn import_to_timescaledb(
-    connection: &str,
-    csv_path: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
+fn import_to_timescaledb(connection: &str, csv_path: &str) -> anyhow::Result<()> {
     let table = "funding_rates";
-
     let output = Command::new("timescaledb-parallel-copy")
         .arg("--connection")
         .arg(connection)
@@ -151,14 +145,15 @@ fn import_to_timescaledb(
         .arg(table)
         .arg("--file")
         .arg(csv_path)
-        .output()?;
+        .output()
+        .context("Failed to execute timescaledb-parallel-copy")?;
 
     if output.status.success() {
         println!("Imported {} to TimescaleDB", csv_path);
         Ok(())
     } else {
         let error = String::from_utf8_lossy(&output.stderr);
-        Err(format!("Failed to import CSV: {}", error).into())
+        Err(anyhow!("Failed to import CSV: {}", error))
     }
 }
 
@@ -169,12 +164,13 @@ async fn fetch_funding_rates(
     start: i64,
     end: i64,
     client: &Client,
-) -> Result<Vec<NewFundingRate>, Box<dyn std::error::Error>> {
+) -> anyhow::Result<Vec<NewFundingRate>> {
     let mut entries = Vec::new();
     match source {
         "hyperliquid" => {
-            let rows =
-                Hyperliquid::fetch_historical_fundings(formatted_pair, start, end, client).await?;
+            let rows = Hyperliquid::fetch_historical_fundings(formatted_pair, start, end, client)
+                .await
+                .context("Failed to fetch hyperliquid funding rates")?;
             for r in rows {
                 let ts = timestamp_from_millis(r.time)?;
                 let hourly_rate: f64 = r.funding_rate.parse()?;
@@ -188,8 +184,9 @@ async fn fetch_funding_rates(
             }
         }
         "paradex" => {
-            let rows =
-                Paradex::fetch_historical_fundings(formatted_pair, start, end, client).await?;
+            let rows = Paradex::fetch_historical_fundings(formatted_pair, start, end, client)
+                .await
+                .context("Failed to fetch paradex funding rates")?;
             for r in rows {
                 let ts = timestamp_from_millis(r.created_at)?;
                 let rate: f64 = r.funding_rate.parse()?;
@@ -201,39 +198,35 @@ async fn fetch_funding_rates(
                 });
             }
         }
-        other => return Err(format!("Source '{}' not implemented", other).into()),
+        other => return Err(anyhow!("Source '{}' not implemented", other)),
     }
     Ok(entries)
 }
 
-fn parse_time_range(range: &str) -> Result<(i64, i64), Box<dyn std::error::Error>> {
+fn parse_time_range(range: &str) -> anyhow::Result<(i64, i64)> {
     let parts: Vec<&str> = range.split(',').collect();
     if parts.len() != 2 {
-        return Err(format!(
+        return Err(anyhow!(
             "Invalid range format; expected start,end but got '{}'",
             range
-        )
-        .into());
+        ));
     }
     let start: i64 = parts[0]
         .parse()
-        .map_err(|e| format!("Invalid start timestamp '{}': {}", parts[0], e))?;
+        .context(format!("Invalid start timestamp '{}'", parts[0]))?;
     let end: i64 = parts[1]
         .parse()
-        .map_err(|e| format!("Invalid end timestamp '{}': {}", parts[1], e))?;
+        .context(format!("Invalid end timestamp '{}'", parts[1]))?;
     Ok((start, end))
 }
 
-fn write_to_csv(
-    entries: &[NewFundingRate],
-    output_path: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
+fn write_to_csv(entries: &[NewFundingRate], output_path: &str) -> anyhow::Result<()> {
     let mut writer = Writer::from_path(output_path)?;
     for entry in entries {
         writer.write_record(&[
             Uuid::new_v4().to_string(),
             entry.source.to_uppercase().clone(),
-            entry.pair.clone(), // /USD
+            entry.pair.clone(),
             entry.annualized_rate.to_string(),
             entry.timestamp.to_string(),
             Utc::now().to_string(),
@@ -246,17 +239,14 @@ fn write_to_csv(
 
 fn format_pair_for_exchange(source: &str, pair: &str) -> String {
     match source {
-        "hyperliquid" => {
-            let base = pair.split('/').next().unwrap_or(pair);
-            base.to_uppercase()
-        }
+        "hyperliquid" => pair.split('/').next().unwrap_or(pair).to_uppercase(),
         "paradex" => pair.replace("/", "-").to_uppercase(),
         other => panic!("Source '{}' not implemented", other),
     }
 }
 
-fn timestamp_from_millis(millis: i64) -> Result<NaiveDateTime, String> {
+fn timestamp_from_millis(millis: i64) -> anyhow::Result<NaiveDateTime> {
     DateTime::<Utc>::from_timestamp_millis(millis)
-        .ok_or_else(|| format!("Invalid timestamp: {}", millis))
+        .ok_or_else(|| anyhow!("Invalid timestamp: {}", millis))
         .map(|dt| dt.naive_utc())
 }

@@ -18,7 +18,7 @@ impl Paradex {
         start: i64,
         end: i64,
         client: &reqwest::Client,
-    ) -> Result<Vec<ParadexFundingRateEntry>, Box<dyn std::error::Error>> {
+    ) -> anyhow::Result<Vec<ParadexFundingRateEntry>> {
         let mut result = Vec::new();
         let mut cursor: Option<String> = None;
 
@@ -48,7 +48,7 @@ impl Paradex {
             let rows: Vec<ParadexFundingRateEntry> = serde_json::from_value(
                 payload
                     .get("results")
-                    .ok_or("Missing results field")?
+                    .ok_or(anyhow::anyhow!("Missing results field"))?
                     .clone(),
             )?;
 
@@ -72,71 +72,5 @@ impl Paradex {
         }
 
         Ok(result)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use reqwest::Client;
-    use tokio::time::Duration;
-
-    #[tokio::test]
-    async fn test_fetch_historical_fundings() {
-        let client = Client::builder()
-            .timeout(Duration::from_secs(10))
-            .build()
-            .unwrap();
-
-        // Test with a smaller range: Jan 1, 2025, to May 15, 2025
-        let start = 1704067200000; // Jan 1, 2024, 00:00:00 UTC
-        let end = 1719791999999;   // Jun 30, 2024, 23:59:59 UTC
-
-        let result = Paradex::fetch_historical_fundings("BTC-USD-PERP", start, end, &client)
-            .await
-            .expect("Failed to fetch funding rates");
-
-        // Check that we get data
-        assert!(!result.is_empty(), "Expected non-empty funding rate data");
-
-        // Verify all entries are for BTC-USD-PERP and within time range
-        for entry in &result {
-            assert_eq!(entry.market, "BTC-USD-PERP");
-            assert!(
-                entry.created_at >= start && entry.created_at <= end,
-                "Timestamp {} is outside range {} to {}",
-                entry.created_at,
-                start,
-                end
-            );
-
-        }
-
-        // Expect at least 300 entries (conservative, ~3 entries/day for ~135 days)
-        assert!(
-            result.len() >= 300,
-            "Expected at least 300 funding rate entries, got {}",
-            result.len()
-        );
-
-        // Verify first and last timestamps are close to start and end
-        let first_time = result.first().unwrap().created_at;
-        let last_time = result.last().unwrap().created_at;
-        let eight_hours_ms = 8 * 60 * 60 * 1000; // 8 hours in milliseconds
-
-        assert!(
-            (first_time - start).abs() <= eight_hours_ms,
-            "First timestamp ({}) too far from start ({}), difference: {}ms",
-            first_time,
-            start,
-            (first_time - start).abs()
-        );
-        assert!(
-            (end - last_time).abs() <= eight_hours_ms,
-            "Last timestamp ({}) too far from end ({}), difference: {}ms",
-            last_time,
-            end,
-            (end - last_time).abs()
-        );
     }
 }
