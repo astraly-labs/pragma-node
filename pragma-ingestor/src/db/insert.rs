@@ -1,7 +1,7 @@
 use deadpool_diesel::postgres::Pool;
 use pragma_entities::{
     Entry, FundingRate, FutureEntry, InfraError, NewEntry, NewFundingRate, NewFutureEntry,
-    NewOpenInterest,
+    NewOpenInterest, OpenInterest,
 };
 use tracing::debug;
 

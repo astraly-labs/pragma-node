@@ -49,7 +49,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             future_rx,
         )))
         .with_handle(tokio::spawn(process_funding_rate_entries(
-            pool,
+            pool.clone(),
             funding_rate_rx,
         )))
         .with_handle(tokio::spawn(process_open_interest_entries(
