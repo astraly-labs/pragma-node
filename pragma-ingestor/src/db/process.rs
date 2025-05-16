@@ -5,7 +5,10 @@ use tokio::sync::mpsc;
 
 use pragma_entities::{NewEntry, NewFundingRate, NewFutureEntry, NewOpenInterest};
 
-use crate::db::insert::{insert_funding_rate_entries, insert_future_entries, insert_spot_entries, insert_open_interest_entries};
+use crate::db::insert::{
+    insert_funding_rate_entries, insert_future_entries, insert_open_interest_entries,
+    insert_spot_entries,
+};
 
 const PUBLISHING_DELAY: Duration = Duration::from_millis(50);
 

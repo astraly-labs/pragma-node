@@ -2,9 +2,9 @@ pub mod funding_rates;
 pub mod get_entry;
 pub mod get_ohlc;
 pub mod onchain;
+pub mod open_interest;
 pub mod stream;
 pub mod websocket;
-pub mod open_interest;
 
 pub use get_entry::get_entry;
 pub use get_ohlc::get_ohlc;

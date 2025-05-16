@@ -1,13 +1,13 @@
 use chrono::{DateTime, Utc};
 use deadpool_diesel::postgres::Pool;
 use diesel::RunQueryDsl as _;
+use diesel::sql_types::{Timestamp, VarChar};
 use pragma_common::Pair;
 use pragma_entities::{
     InfraError, TimestampError, models::entries::timestamp::TimestampRange,
     models::open_interest::OpenInterest,
 };
 use serde::Serialize;
-use diesel::sql_types::{Timestamp, VarChar};
 
 pub async fn get_at_timestamp(
     pool: &Pool,
@@ -120,4 +120,4 @@ pub async fn get_supported_instruments(pool: &Pool) -> Result<Vec<InstrumentInfo
             last_timestamp_ms: r.last_ts.and_utc().timestamp_millis() as u64,
         })
         .collect())
-} 
+}

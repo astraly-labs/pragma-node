@@ -71,4 +71,4 @@ pub async fn get_historical_open_interest(
         .collect();
 
     Ok(Json(response))
-} 
+}

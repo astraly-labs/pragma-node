@@ -83,4 +83,4 @@ impl OpenInterest {
             .order(open_interest::timestamp.asc())
             .load(conn)
     }
-} 
+}

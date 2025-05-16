@@ -61,4 +61,4 @@ pub async fn get_latest_open_interest(
     };
 
     Ok(Json(response))
-} 
+}

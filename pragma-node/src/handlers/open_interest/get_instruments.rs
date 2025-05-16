@@ -53,4 +53,4 @@ pub async fn get_supported_instruments(
     }
 
     Ok(Json(SupportedInstrumentsResponse { data }))
-} 
+}
