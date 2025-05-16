@@ -56,7 +56,6 @@ impl Paradex {
                 break;
             }
 
-
             result.extend(rows);
             cursor = payload
                 .get("next")

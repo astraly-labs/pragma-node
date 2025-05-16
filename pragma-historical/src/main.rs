@@ -1,29 +1,29 @@
 pub mod sources;
 
-use std::time::Duration;
+use std::{process::Command, time::Duration};
 
 use chrono::{DateTime, NaiveDateTime, Utc};
 use clap::Parser;
 use csv::Writer;
-use deadpool_diesel::postgres::{Manager, Pool};
 use reqwest::Client;
 
 use pragma_entities::models::funding_rate::NewFundingRate;
 use sources::{hyperliquid::Hyperliquid, paradex::Paradex};
 use uuid::Uuid;
 
+pub const ALL_PAIRS: &[&str] = &[
+    "AAVE/USD", "APT/USD", "ARB/USD", "ATOM/USD", "AVAX/USD", "BCH/USD", "BNB/USD", "BONK/USD",
+    "BTC/USD", "CRV/USD", "DOG/USD", "DOGE/USD", "DOT/USD", "ETC/USD", "ETH/USD", "EUR/USD",
+    "FIL/USD", "GOAT/USD", "HYPE/USD", "INJ/USD", "JLP/USD", "JTO/USD", "JUP/USD", "LDO/USD",
+    "LINK/USD", "LTC/USD", "MKR/USD", "MOODENG/USD", "MOV/USD", "NEAR/USD", "OKB/USD", "ONDO/USD",
+    "OP/USD", "PENDLE/USD", "POL/USD", "POPCAT/USD", "S/USD", "SEI/USD", "SHIB/USD", "SOL/USD",
+    "STRK/USD", "SUI/USD", "TIA/USD", "TON/USD", "TRUMP/USD", "TRX/USD", "USDC/USD", "USDT/USD",
+    "WIF/USD", "WLD/USD", "XRP/USD"
+];
+
 #[derive(Parser, Debug)]
 #[command(name = "pragma-historical")]
 struct Cli {
-    /// Database URL for offchain database
-    #[arg(long)]
-    db_url: String,
-
-    /// Type of data to ingest (e.g. funding_rate)
-    // TODO: Clean enum
-    // #[arg(long)]
-    // data_type: String,
-
     /// Source of historical data (e.g. hyperliquid, paradex)
     #[arg(long)]
     source: String,
@@ -35,6 +35,10 @@ struct Cli {
     /// Output CSV file path
     #[arg(long, default_value = "funding_rates.csv")]
     csv_output: String,
+
+    /// Database connection string (e.g., postgres://user:pass@host:port/dbname)
+    #[arg(long)]
+    connection: String,
 }
 
 #[tokio::main]
@@ -43,62 +47,63 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let (start, end) = parse_time_range(&cli.range)?;
 
-    // let manager = Manager::new(
-    //     format!("{}?application_name=pragma_historical", cli.db_url),
-    //     deadpool_diesel::Runtime::Tokio1,
-    // );
-
-    // let pool = Pool::builder(manager)
-    //     .build()
-    //     .expect("Could not build a connection to the DB");
-
-    // if cli.data_type != "funding_rate" {
-    //     return Err(format!(
-    //         "Unsupported data type '{}' - only 'funding_rate' is supported",
-    //         cli.data_type
-    //     )
-    //     .into());
-    // }
-
     let client = Client::builder().timeout(Duration::from_secs(30)).build()?;
 
     // Define coins to fetch
-    let coins = vec!["BTC/USD", "ETH/USD"];
+    let pairs = vec!["BTC/USD", "ETH/USD"];
 
     // Fetch and process funding rates for each coin
     let mut all_entries = Vec::new();
-    for coin in coins {
+    for pair in pairs {
         println!(
-            "Fetch {coin} - from: {} to: {}",
+            "Fetch {pair} - from: {} to: {}",
             timestamp_from_millis(start)?,
             timestamp_from_millis(end)?
         );
 
-        let formatted_coin = format_coin_for_exchange(&cli.source, &coin);
+        let formatted_pair = format_pair_for_exchange(&cli.source, &pair);
         let entries =
-            fetch_funding_rates(&cli.source, &coin, &formatted_coin, start, end, &client).await?;
+            fetch_funding_rates(&cli.source, &pair, &formatted_pair, start, end, &client).await?;
         all_entries.extend(entries);
     }
 
     // Write to CSV
     write_to_csv(&all_entries, &cli.csv_output)?;
 
-    // Insert into DB
-    // TODO: Insert everything into a csv & batch insert to TS db
-    // let conn = pool.get().await?;
-    // let inserted: Vec<FundingRate> = conn
-    //     .interact(move |conn| FundingRate::create_many(conn, entries))
-    //     .await?
-    //     .map_err(InfraError::from)?;
-    // println!("Inserted {} entries", inserted.len());
+    // Import CSV to TimescaleDB
+    import_to_timescaledb(&cli.connection, &cli.csv_output)?;
 
     Ok(())
 }
 
+fn import_to_timescaledb(
+    connection: &str,
+    csv_path: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let table = "funding_rates";
+
+    let output = Command::new("timescaledb-parallel-copy")
+        .arg("--connection")
+        .arg(connection)
+        .arg("--table")
+        .arg(table)
+        .arg("--file")
+        .arg(csv_path)
+        .output()?;
+
+    if output.status.success() {
+        println!("Imported {} to TimescaleDB", csv_path);
+        Ok(())
+    } else {
+        let error = String::from_utf8_lossy(&output.stderr);
+        Err(format!("Failed to import CSV: {}", error).into())
+    }
+}
+
 async fn fetch_funding_rates(
     source: &str,
-    original_coin: &str,
-    formatted_coin: &str,
+    orginal_pair: &str,
+    formatted_pair: &str,
     start: i64,
     end: i64,
     client: &Client,
@@ -106,27 +111,29 @@ async fn fetch_funding_rates(
     let mut entries = Vec::new();
     match source {
         "hyperliquid" => {
-            let rows = Hyperliquid::fetch_historical_fundings(formatted_coin, start, end, client).await?;
+            let rows =
+                Hyperliquid::fetch_historical_fundings(formatted_pair, start, end, client).await?;
             for r in rows {
                 let ts = timestamp_from_millis(r.time)?;
                 let hourly_rate: f64 = r.funding_rate.parse()?;
                 let annualized_rate = hourly_rate * 24.0 * 365.0;
                 entries.push(NewFundingRate {
                     source: "hyperliquid".to_string(),
-                    pair: original_coin.to_string(),
+                    pair: orginal_pair.to_string(),
                     annualized_rate,
                     timestamp: ts,
                 });
             }
         }
         "paradex" => {
-            let rows = Paradex::fetch_historical_fundings(formatted_coin, start, end, client).await?;
+            let rows =
+                Paradex::fetch_historical_fundings(formatted_pair, start, end, client).await?;
             for r in rows {
                 let ts = timestamp_from_millis(r.created_at)?;
                 let rate: f64 = r.funding_rate.parse()?;
                 entries.push(NewFundingRate {
                     source: "paradex".to_string(),
-                    pair: original_coin.to_string(),
+                    pair: orginal_pair.to_string(),
                     annualized_rate: rate,
                     timestamp: ts,
                 });
@@ -175,13 +182,13 @@ fn write_to_csv(
     Ok(())
 }
 
-fn format_coin_for_exchange(source: &str, coin: &str) -> String {
+fn format_pair_for_exchange(source: &str, pair: &str) -> String {
     match source {
         "hyperliquid" => {
-            let base = coin.split('/').next().unwrap_or(coin);
+            let base = pair.split('/').next().unwrap_or(pair);
             base.to_uppercase()
         }
-        "paradex" => coin.replace("/", "-").to_uppercase(),
+        "paradex" => pair.replace("/", "-").to_uppercase(),
         other => panic!("Source '{}' not implemented", other),
     }
 }
