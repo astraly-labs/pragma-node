@@ -6,19 +6,64 @@ use chrono::{DateTime, NaiveDateTime, Utc};
 use clap::Parser;
 use csv::Writer;
 use reqwest::Client;
+use std::io;
 
 use pragma_entities::models::funding_rate::NewFundingRate;
 use sources::{hyperliquid::Hyperliquid, paradex::Paradex};
 use uuid::Uuid;
 
 pub const ALL_PAIRS: &[&str] = &[
-    "AAVE/USD", "APT/USD", "ARB/USD", "ATOM/USD", "AVAX/USD", "BCH/USD", "BNB/USD", "BONK/USD",
-    "BTC/USD", "CRV/USD", "DOG/USD", "DOGE/USD", "DOT/USD", "ETC/USD", "ETH/USD", "EUR/USD",
-    "FIL/USD", "GOAT/USD", "HYPE/USD", "INJ/USD", "JLP/USD", "JTO/USD", "JUP/USD", "LDO/USD",
-    "LINK/USD", "LTC/USD", "MKR/USD", "MOODENG/USD", "MOV/USD", "NEAR/USD", "OKB/USD", "ONDO/USD",
-    "OP/USD", "PENDLE/USD", "POL/USD", "POPCAT/USD", "S/USD", "SEI/USD", "SHIB/USD", "SOL/USD",
-    "STRK/USD", "SUI/USD", "TIA/USD", "TON/USD", "TRUMP/USD", "TRX/USD", "USDC/USD", "USDT/USD",
-    "WIF/USD", "WLD/USD", "XRP/USD"
+    "AAVE/USD",
+    "APT/USD",
+    "ARB/USD",
+    "ATOM/USD",
+    "AVAX/USD",
+    "BCH/USD",
+    "BNB/USD",
+    "BONK/USD",
+    "BTC/USD",
+    "CRV/USD",
+    "DOG/USD",
+    "DOGE/USD",
+    "DOT/USD",
+    "ETC/USD",
+    "ETH/USD",
+    "EUR/USD",
+    "FIL/USD",
+    "GOAT/USD",
+    "HYPE/USD",
+    "INJ/USD",
+    "JLP/USD",
+    "JTO/USD",
+    "JUP/USD",
+    "LDO/USD",
+    "LINK/USD",
+    "LTC/USD",
+    "MKR/USD",
+    "MOODENG/USD",
+    "MOV/USD",
+    "NEAR/USD",
+    "OKB/USD",
+    "ONDO/USD",
+    "OP/USD",
+    "PENDLE/USD",
+    "POL/USD",
+    "POPCAT/USD",
+    "S/USD",
+    "SEI/USD",
+    "SHIB/USD",
+    "SOL/USD",
+    "STRK/USD",
+    "SUI/USD",
+    "TIA/USD",
+    "TON/USD",
+    "TRUMP/USD",
+    "TRX/USD",
+    "USDC/USD",
+    "USDT/USD",
+    "WIF/USD",
+    "WLD/USD",
+    "XRP/USD",
 ];
 
 #[derive(Parser, Debug)]
@@ -43,6 +88,8 @@ struct Cli {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    check_timescaledb_parallel_copy()?;
+
     let cli = Cli::parse();
 
     let (start, end) = parse_time_range(&cli.range)?;
@@ -73,6 +120,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Import CSV to TimescaleDB
     import_to_timescaledb(&cli.connection, &cli.csv_output)?;
 
+    Ok(())
+}
+
+fn check_timescaledb_parallel_copy() -> io::Result<()> {
+    if let Err(err) = Command::new("timescaledb-parallel-copy")
+        .arg("--help")
+        .output()
+    {
+        if err.kind() == io::ErrorKind::NotFound {
+            return Err(io::Error::new(
+                io::ErrorKind::NotFound,
+                "timescaledb-parallel-copy not installed.",
+            ));
+        }
+    }
     Ok(())
 }
 
