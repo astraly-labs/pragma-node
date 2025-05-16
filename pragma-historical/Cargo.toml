@@ -26,3 +26,5 @@ thiserror = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 tracing = { workspace = true }
 reqwest = { workspace = true }
+csv = { workspace = true }
+uuid = { workspace = true }
