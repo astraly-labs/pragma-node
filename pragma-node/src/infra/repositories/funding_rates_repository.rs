@@ -97,7 +97,7 @@ struct InstrumentDTO {
 }
 
 pub async fn get_supported_instruments(pool: &Pool) -> Result<Vec<InstrumentInfo>, InfraError> {
-    let sql = r#"
+    let sql = r"
         SELECT
             pair,
             source,
@@ -106,7 +106,7 @@ pub async fn get_supported_instruments(pool: &Pool) -> Result<Vec<InstrumentInfo
         FROM funding_rates
         GROUP BY pair, source
         ORDER BY pair, source;
-    "#;
+    ";
 
     let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
     let rows: Vec<InstrumentDTO> = conn
