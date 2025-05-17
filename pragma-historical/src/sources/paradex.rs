@@ -43,7 +43,7 @@ impl Paradex {
             }
 
             let response = client
-                .get("https://api.testnet.paradex.trade/v1/funding/data")
+                .get("https://api.prod.paradex.trade/v1/funding/data")
                 .query(&params)
                 .header("Accept", "application/json")
                 .send()
