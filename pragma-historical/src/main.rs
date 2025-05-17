@@ -84,6 +84,10 @@ struct Cli {
     /// Database connection string (e.g., postgres://user:pass@host:port/dbname)
     #[arg(long)]
     connection: String,
+
+    /// Optional input CSV file path. If specified, skips data download.
+    #[arg(long)]
+    csv_input: Option<String>,
 }
 
 #[tokio::main]
@@ -92,37 +96,44 @@ async fn main() -> anyhow::Result<()> {
 
     let cli = Cli::parse();
 
-    let (start, end) = parse_time_range(&cli.range)?;
+    let csv_path = if let Some(input_path) = cli.csv_input {
+        // If CSV input is provided, use it directly
+        println!("Using existing CSV file: {}", input_path);
+        input_path
+    } else {
+        // Otherwise, fetch and generate new data
+        let (start, end) = parse_time_range(&cli.range)?;
+        let client = Client::builder().timeout(Duration::from_secs(30)).build()?;
 
-    let client = Client::builder().timeout(Duration::from_secs(30)).build()?;
+        // Define coins to fetch
+        let pairs = ALL_PAIRS;
 
-    // Define coins to fetch
-    let pairs = ALL_PAIRS;
+        // Fetch and process funding rates for each coin
+        let mut all_entries = Vec::new();
+        for pair in pairs {
+            println!(
+                "Fetch {pair} - from: {} to: {}",
+                timestamp_from_millis(start)?,
+                timestamp_from_millis(end)?
+            );
 
-    // Fetch and process funding rates for each coin
-    let mut all_entries = Vec::new();
-    for pair in pairs {
-        println!(
-            "Fetch {pair} - from: {} to: {}",
-            timestamp_from_millis(start)?,
-            timestamp_from_millis(end)?
-        );
+            let formatted_pair = format_pair_for_exchange(&cli.source, pair);
+            let entries = fetch_funding_rates(&cli.source, pair, &formatted_pair, start, end, &client)
+                .await
+                .unwrap_or_else(|e| {
+                    eprintln!("Error fetching funding rates for {pair}: {e}");
+                    vec![]
+                });
+            all_entries.extend(entries);
+        }
 
-        let formatted_pair = format_pair_for_exchange(&cli.source, pair);
-        let entries = fetch_funding_rates(&cli.source, pair, &formatted_pair, start, end, &client)
-            .await
-            .unwrap_or_else(|e| {
-                eprintln!("Error fetching funding rates for {pair}: {e}");
-                vec![]
-            });
-        all_entries.extend(entries);
-    }
-
-    // Write to CSV
-    write_to_csv(&all_entries, &cli.csv_output)?;
+        // Write to CSV
+        write_to_csv(&all_entries, &cli.csv_output)?;
+        cli.csv_output
+    };
 
     // Import CSV to TimescaleDB
-    import_to_timescaledb(&cli.connection, &cli.csv_output)?;
+    import_to_timescaledb(&cli.connection, &csv_path)?;
 
     Ok(())
 }
