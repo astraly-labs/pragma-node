@@ -1,16 +1,17 @@
 pub mod sources;
 
-use std::{process::Command, time::Duration};
+use std::{process::Command, time::Duration, sync::Arc};
 
 use anyhow::{Context, anyhow};
 use chrono::{DateTime, NaiveDateTime, Utc};
 use clap::Parser;
 use csv::Writer;
 use reqwest::Client;
+use tokio::sync::Mutex;
+use uuid::Uuid;
 
 use pragma_entities::models::funding_rate::NewFundingRate;
 use sources::{hyperliquid::Hyperliquid, paradex::Paradex};
-use uuid::Uuid;
 
 pub const ALL_PAIRS: &[&str] = &[
     "AAVE/USD",
@@ -107,27 +108,50 @@ async fn main() -> anyhow::Result<()> {
 
         // Define coins to fetch
         let pairs = ALL_PAIRS;
+        let all_entries = Arc::new(Mutex::new(Vec::new()));
 
-        // Fetch and process funding rates for each coin
-        let mut all_entries = Vec::new();
-        for pair in pairs {
-            println!(
-                "Fetch {pair} - from: {} to: {}",
-                timestamp_from_millis(start)?,
-                timestamp_from_millis(end)?
-            );
+        // Process pairs concurrently in chunks to avoid overwhelming the API
+        let chunk_size = 5;
+        let mut tasks = Vec::new();
 
-            let formatted_pair = format_pair_for_exchange(&cli.source, pair);
-            let entries = fetch_funding_rates(&cli.source, pair, &formatted_pair, start, end, &client)
-                .await
-                .unwrap_or_else(|e| {
-                    eprintln!("Error fetching funding rates for {pair}: {e}");
-                    vec![]
-                });
-            all_entries.extend(entries);
+        for pairs_chunk in pairs.chunks(chunk_size) {
+            let pairs_chunk = pairs_chunk.to_vec();
+            let client = client.clone();
+            let source = cli.source.clone();
+            let all_entries = all_entries.clone();
+
+            let task = tokio::spawn(async move {
+                for pair in pairs_chunk {
+                    println!(
+                        "Fetch {pair} - from: {} to: {}",
+                        timestamp_from_millis(start)?,
+                        timestamp_from_millis(end)?
+                    );
+
+                    let formatted_pair = format_pair_for_exchange(&source, pair);
+                    match fetch_funding_rates(&source, pair, &formatted_pair, start, end, &client).await {
+                        Ok(entries) => {
+                            let mut all_entries = all_entries.lock().await;
+                            all_entries.extend(entries);
+                        }
+                        Err(e) => eprintln!("Error fetching funding rates for {pair}: {e}"),
+                    }
+                }
+                Ok::<_, anyhow::Error>(())
+            });
+
+            tasks.push(task);
+        }
+
+        // Wait for all tasks to complete
+        for task in tasks {
+            if let Err(e) = task.await? {
+                eprintln!("Task error: {}", e);
+            }
         }
 
         // Write to CSV
+        let all_entries = all_entries.lock().await;
         write_to_csv(&all_entries, &cli.csv_output)?;
         cli.csv_output
     };
