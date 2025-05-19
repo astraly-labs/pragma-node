@@ -15,12 +15,3 @@ SELECT create_hypertable('open_interest', 'timestamp', chunk_time_interval => IN
 
 -- Create an index for efficient querying by pair
 CREATE INDEX idx_open_interest_pair ON open_interest(pair);
-
--- Enable compression
-ALTER TABLE open_interest SET (
-    timescaledb.compress,
-    timescaledb.compress_segmentby = 'source,pair'
-);
-
--- Add compression policy to compress chunks older than 7 days
-SELECT add_compression_policy('open_interest', INTERVAL '7 days');
