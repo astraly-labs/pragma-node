@@ -1,21 +1,21 @@
-use axum::extract::{Query, State};
 use axum::Json;
-use pragma_common::types::pair::Pair;
-use pragma_common::types::{Interval, Network};
-use pragma_entities::{EntryError, InfraError};
+use axum::extract::{Query, State};
+use pragma_common::starknet::StarknetNetwork;
+use pragma_common::{Interval, Pair};
+use pragma_entities::models::entries::timestamp::TimestampRange;
+use pragma_entities::{EntryError, InfraError, TimestampError};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToResponse, ToSchema};
 
 use crate::infra::repositories::onchain_repository::history::{
-    get_historical_entries_and_decimals, retry_with_routing, HistoricalEntryRaw,
+    HistoricalEntryRaw, get_historical_entries_and_decimals, retry_with_routing,
 };
-use crate::utils::{big_decimal_price_to_hex, PathExtractor};
-use crate::AppState;
-use pragma_common::types::timestamp::TimestampRange;
+use crate::state::AppState;
+use crate::utils::{PathExtractor, big_decimal_price_to_hex};
 
 #[derive(Debug, Deserialize, IntoParams, ToSchema)]
 pub struct GetOnchainHistoryParams {
-    pub network: Network,
+    pub network: StarknetNetwork,
     pub timestamp: TimestampRange,
     pub chunk_interval: Option<Interval>,
     pub routing: Option<bool>,
@@ -57,18 +57,20 @@ pub async fn get_onchain_history(
     let timestamp_range = params
         .timestamp
         .assert_time_is_valid()
-        .map_err(EntryError::InvalidTimestamp)?;
+        .map_err(|e| EntryError::InvalidTimestamp(TimestampError::RangeError(e)))?;
+
     let chunk_interval = params.chunk_interval.unwrap_or_default();
     let with_routing = params.routing.unwrap_or(false);
 
     // We first try to get the historical entries for the selected pair
     let query_result = get_historical_entries_and_decimals(
         &state.onchain_pool,
-        &state.offchain_pool,
         network,
         &pair,
         &timestamp_range,
         chunk_interval,
+        state.caches.onchain_decimals(),
+        &state.rpc_clients,
     )
     .await;
 
@@ -80,20 +82,21 @@ pub async fn get_onchain_history(
         Err(_) if with_routing => {
             retry_with_routing(
                 &state.onchain_pool,
-                &state.offchain_pool,
                 network,
                 &pair,
                 &timestamp_range,
                 chunk_interval,
+                state.caches.onchain_decimals(),
+                &state.rpc_clients,
             )
             .await?
         }
         Err(e) => {
             // We early returns an empty array if no history is found
-            if matches!(e, InfraError::NotFound) {
+            if matches!(e, InfraError::RoutingError(_)) {
                 return Ok(Json(GetOnchainHistoryResponse(vec![])));
             }
-            return Err(e.to_entry_error(&pair.to_pair_id()));
+            return Err(e.into());
         }
     };
 

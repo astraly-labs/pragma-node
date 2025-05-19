@@ -1,18 +1,17 @@
-use lazy_static::lazy_static;
 use rdkafka::config::ClientConfig;
 use rdkafka::producer::future_producer::OwnedDeliveryResult;
 use rdkafka::producer::{FutureProducer, FutureRecord};
+use std::sync::LazyLock;
 
-lazy_static! {
-    static ref KAFKA_PRODUCER: FutureProducer = {
-        let brokers =
-            std::env::var("KAFKA_BROKERS").expect("can't load kafka brokers list from env");
-        ClientConfig::new()
-            .set("bootstrap.servers", &brokers)
-            .create()
-            .expect("can't create kafka producer")
-    };
-}
+pub static KAFKA_PRODUCER: LazyLock<FutureProducer> = LazyLock::new(|| {
+    let brokers = std::env::var("KAFKA_BROKERS").expect("can't load kafka brokers");
+    let producer: FutureProducer = ClientConfig::new()
+        .set("bootstrap.servers", &brokers)
+        .set("message.timeout.ms", "5000")
+        .create()
+        .expect("Producer creation error");
+    producer
+});
 
 pub async fn send_message(topic: &str, message: &[u8], key: &str) -> OwnedDeliveryResult {
     let delivery_status = KAFKA_PRODUCER.send(

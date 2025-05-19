@@ -1,8 +1,9 @@
 [package]
 name = "tests"
 version = "0.1.0"
-edition = "2021"
+edition.workspace = true
 license = "MIT"
+publish = false
 
 [[test]]
 name = "node-tests"
@@ -10,6 +11,7 @@ path = "e2e/main.rs"
 
 [dev-dependencies]
 pragma-common = { workspace = true }
+pragma-node = { workspace = true }
 
 diesel = { workspace = true, features = [
   "postgres",

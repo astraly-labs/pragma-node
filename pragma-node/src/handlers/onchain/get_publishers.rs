@@ -1,21 +1,20 @@
-use axum::extract::{Query, State};
 use axum::Json;
+use axum::extract::{Query, State};
 
-use pragma_common::types::{DataType, Network};
+use pragma_common::{InstrumentType, starknet::StarknetNetwork};
 use pragma_entities::EntryError;
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToResponse, ToSchema};
 
-use crate::infra::repositories::entry_repository::get_all_currencies_decimals;
 use crate::infra::repositories::onchain_repository::publisher::{
     get_publishers, get_publishers_with_components,
 };
-use crate::AppState;
+use crate::state::AppState;
 
 #[derive(Debug, Default, Deserialize, IntoParams, ToSchema)]
 pub struct GetOnchainPublishersParams {
-    pub network: Network,
-    pub data_type: DataType,
+    pub network: StarknetNetwork,
+    pub data_type: InstrumentType,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
@@ -32,7 +31,7 @@ pub struct PublisherEntry {
 pub struct Publisher {
     pub publisher: String,
     pub website_url: String,
-    pub last_updated_timestamp: u64,
+    pub last_updated_timestamp: Option<u64>,
     pub r#type: u32,
     pub nb_feeds: u32,
     pub daily_updates: u32,
@@ -62,17 +61,14 @@ pub async fn get_onchain_publishers(
         .await
         .map_err(EntryError::from)?;
 
-    let currencies_decimals = get_all_currencies_decimals(&state.offchain_pool)
-        .await
-        .map_err(EntryError::from)?;
-
     let publishers_with_components = get_publishers_with_components(
         &state.onchain_pool,
         params.network,
         params.data_type,
-        currencies_decimals,
         publishers,
-        state.caches.onchain_publishers_updates().clone(),
+        state.caches.onchain_publishers_updates(),
+        state.caches.onchain_decimals(),
+        &state.rpc_clients,
     )
     .await
     .map_err(EntryError::from)?;

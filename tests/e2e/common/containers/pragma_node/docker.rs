@@ -1,9 +1,9 @@
 use std::{borrow::Cow, collections::HashMap, env::current_dir, path::PathBuf, time::Duration};
 
 use testcontainers::{
-    core::{wait::HttpWaitStrategy, ContainerPort, IntoContainerPort, WaitFor},
-    runners::AsyncRunner,
     ContainerAsync, Image, ImageExt,
+    core::{ContainerPort, IntoContainerPort, WaitFor, wait::HttpWaitStrategy},
+    runners::AsyncRunner,
 };
 
 use crate::common::containers::pragma_node::DB_PORT;
@@ -92,6 +92,20 @@ impl PragmaNode {
             .insert("ONCHAIN_DATABASE_URL".to_owned(), db_url.to_owned());
         self
     }
+
+    /// Sets the mainnet URL.
+    pub fn with_mainnet_rpc_url(mut self, db_url: &str) -> Self {
+        self.env_vars
+            .insert("MAINNET_RPC_URL".to_owned(), db_url.to_owned());
+        self
+    }
+
+    /// Sets the sepolia URL.
+    pub fn with_sepolia_rpc_url(mut self, db_url: &str) -> Self {
+        self.env_vars
+            .insert("SEPOLIA_RPC_URL".to_owned(), db_url.to_owned());
+        self
+    }
 }
 
 impl Image for PragmaNode {
@@ -126,7 +140,14 @@ impl Default for PragmaNode {
         env_vars.insert("KAFKA_BROKERS".to_owned(), "pragma-data".to_owned());
         env_vars.insert("PORT".to_owned(), "3000".to_owned());
         env_vars.insert("METRICS_PORT".to_owned(), "8080".to_owned());
-
+        env_vars.insert(
+            "MAINNET_RPC_URL".to_owned(),
+            "https://free-rpc.nethermind.io/mainnet-juno".to_owned(),
+        );
+        env_vars.insert(
+            "SEPOLIA_RPC_URL".to_owned(),
+            "https://free-rpc.nethermind.io/sepolia-juno".to_owned(),
+        );
         Self { env_vars }
     }
 }
@@ -135,12 +156,7 @@ impl Default for PragmaNode {
 
 // Returns the path of the Pragma node dockerfile.
 fn pragma_node_dockerfile_path() -> PathBuf {
-    current_dir()
-        .unwrap()
-        .join("..")
-        .join("infra")
-        .join("pragma-node")
-        .join("Dockerfile")
+    current_dir().unwrap().join("..").join("Dockerfile.node")
 }
 
 // Builds a connection URL from an host & db port.
