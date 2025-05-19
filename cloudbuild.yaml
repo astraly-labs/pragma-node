@@ -5,6 +5,7 @@ steps:
     id: docker-build-ingestor
     args: [ 'build',
             '--tag=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/pragma-ingestor:latest',
+            '--tag=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/pragma-ingestor:$SHORT_SHA',
             '--file=Dockerfile.ingestor',
             '.' ]
 
@@ -12,6 +13,7 @@ steps:
     id: docker-build-node
     args: [ 'build',
             '--tag=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/pragma-node:latest',
+            '--tag=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/pragma-node:$SHORT_SHA',
             '--file=Dockerfile.node',
             '.' ]
 
@@ -21,8 +23,18 @@ steps:
     waitFor: ['docker-build-ingestor']
 
   - name: 'gcr.io/cloud-builders/docker'
+    id: docker-push-ingestor-short-sha
+    args: ['push', '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/pragma-ingestor:$SHORT_SHA']
+    waitFor: ['docker-build-ingestor']
+
+  - name: 'gcr.io/cloud-builders/docker'
     id: docker-push-node
     args: ['push', '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/pragma-node:latest']
+    waitFor: ['docker-build-node']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    id: docker-push-node-short-sha
+    args: ['push', '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/pragma-node:$SHORT_SHA']
     waitFor: ['docker-build-node']
 
 options:
