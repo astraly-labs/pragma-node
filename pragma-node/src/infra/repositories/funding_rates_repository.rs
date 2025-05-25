@@ -97,16 +97,15 @@ struct InstrumentDTO {
 }
 
 pub async fn get_supported_instruments(pool: &Pool) -> Result<Vec<InstrumentInfo>, InfraError> {
-    let sql = r"
+    let sql = r#"
         SELECT
             pair,
             source,
-            MIN(timestamp) AS first_ts,
-            MAX(timestamp) AS last_ts
-        FROM funding_rates
-        GROUP BY pair, source
+            first_ts,
+            last_ts
+        FROM funding_rates_instruments_summary
         ORDER BY pair, source;
-    ";
+    "#;
 
     let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
     let rows: Vec<InstrumentDTO> = conn
