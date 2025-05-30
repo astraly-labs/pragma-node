@@ -1,6 +1,6 @@
 pub mod sources;
 
-use std::{process::Command, time::Duration, sync::Arc};
+use std::{process::Command, sync::Arc, time::Duration};
 
 use anyhow::{Context, anyhow};
 use chrono::{DateTime, NaiveDateTime, Utc};
@@ -129,7 +129,9 @@ async fn main() -> anyhow::Result<()> {
                     );
 
                     let formatted_pair = format_pair_for_exchange(&source, pair);
-                    match fetch_funding_rates(&source, pair, &formatted_pair, start, end, &client).await {
+                    match fetch_funding_rates(&source, pair, &formatted_pair, start, end, &client)
+                        .await
+                    {
                         Ok(entries) => {
                             let mut all_entries = all_entries.lock().await;
                             all_entries.extend(entries);

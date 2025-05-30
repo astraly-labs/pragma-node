@@ -42,7 +42,7 @@ diesel::table! {
         source -> Varchar,
         pair -> Varchar,
         #[sql_name = "open_interest"]
-        open_interest_value -> Float8, 
+        open_interest_value -> Float8,
         timestamp -> Timestamptz,
         created_at -> Timestamptz,
     }

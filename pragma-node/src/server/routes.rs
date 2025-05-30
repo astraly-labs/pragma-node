@@ -14,7 +14,8 @@ use crate::handlers::onchain::{
     subscribe_to_ohlc::subscribe_to_onchain_ohlc,
 };
 use crate::handlers::open_interest::{
-    get_historical_open_interest, get_latest_open_interest, get_supported_instruments as get_oi_supported_instruments,
+    get_historical_open_interest, get_latest_open_interest,
+    get_supported_instruments as get_oi_supported_instruments,
 };
 use crate::handlers::stream::stream_multi::stream_entry_multi_pair;
 use crate::handlers::websocket::{subscribe_to_entry, subscribe_to_ohlc, subscribe_to_price};
@@ -31,7 +32,10 @@ pub fn app_router<T: OpenApiT>(state: AppState) -> Router<AppState> {
         .nest("/node/v1/data", entry_routes(state.clone()))
         .nest("/node/v1/onchain", onchain_routes(state.clone()))
         .nest("/node/v1/aggregation", aggregation_routes(state.clone()))
-        .nest("/node/v1/funding_rates", funding_rates_routes(state.clone()))
+        .nest(
+            "/node/v1/funding_rates",
+            funding_rates_routes(state.clone()),
+        )
         .nest("/node/v1/open_interest", open_interest_routes(state))
         .fallback(handler_404)
 }

@@ -11,6 +11,8 @@ use pragma_entities::{
 };
 use serde::Serialize;
 
+use crate::handlers::funding_rates::get_historical_funding_rates::Frequency;
+
 pub async fn get_at_timestamp(
     pool: &Pool,
     pair: Pair,
@@ -50,6 +52,7 @@ pub async fn get_history_in_range(
     pair: Pair,
     source: String,
     range: TimestampRange,
+    frequency: Frequency,
 ) -> Result<Vec<FundingRate>, InfraError> {
     let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
 
@@ -66,7 +69,15 @@ pub async fn get_history_in_range(
         .naive_utc();
 
     let funding_rates = conn
-        .interact(move |conn| FundingRate::get_in_range(conn, &pair, &source, start, end))
+        .interact(move |conn| match frequency {
+            Frequency::All => FundingRate::get_in_range(conn, &pair, &source, start, end),
+            Frequency::Minute => {
+                FundingRate::get_in_range_aggregated(conn, &pair, &source, start, end, "funding_rates_1_min")
+            }
+            Frequency::Hour => {
+                FundingRate::get_in_range_aggregated(conn, &pair, &source, start, end, "funding_rates_1_hour")
+            }
+        })
         .await
         .map_err(InfraError::DbInteractionError)?
         .map_err(InfraError::DbResultError)?;
@@ -97,7 +108,7 @@ struct InstrumentDTO {
 }
 
 pub async fn get_supported_instruments(pool: &Pool) -> Result<Vec<InstrumentInfo>, InfraError> {
-    let sql = r#"
+    let sql = r"
         SELECT
             pair,
             source,
@@ -105,7 +116,7 @@ pub async fn get_supported_instruments(pool: &Pool) -> Result<Vec<InstrumentInfo
             last_ts
         FROM funding_rates_instruments_summary
         ORDER BY pair, source;
-    "#;
+    ";
 
     let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
     let rows: Vec<InstrumentDTO> = conn

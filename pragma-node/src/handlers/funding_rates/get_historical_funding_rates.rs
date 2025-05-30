@@ -4,6 +4,7 @@ use pragma_common::Pair;
 use pragma_entities::models::entries::timestamp::TimestampRange;
 use pragma_entities::{EntryError, TimestampError};
 use serde::{Deserialize, Serialize};
+use strum::{Display, EnumString};
 use utoipa::{IntoParams, ToSchema};
 
 use crate::infra::repositories::funding_rates_repository;
@@ -11,10 +12,30 @@ use crate::state::AppState;
 
 use super::get_funding_rates::HOURS_IN_ONE_YEAR;
 
+#[derive(Debug, Clone, Serialize, Deserialize, Display, EnumString, ToSchema)]
+#[strum(serialize_all = "lowercase")]
+pub enum Frequency {
+    /// Return all data points
+    All,
+    /// Return data aggregated by minute (every minute)
+    Minute,
+    /// Return data aggregated by hour (every hour)
+    Hour,
+}
+
+impl Default for Frequency {
+    fn default() -> Self {
+        Self::All
+    }
+}
+
 #[derive(Debug, Deserialize, IntoParams)]
 pub struct GetHistoricalFundingRateParams {
     pub source: String,
     pub timestamp: TimestampRange,
+    /// Frequency of data points (all, minute, hour). Defaults to 'all'
+    #[serde(default)]
+    pub frequency: Frequency,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -32,7 +53,7 @@ pub type GetHistoricalFundingRateResponse = Vec<FundingRateResponse>;
     path = "/node/v1/funding_rates/history/{base}/{quote}",
     tag = "Historical Funding Rates",
     responses(
-        (status = 200, description = "Successfully retrieved historical funding rates", body = [FundingRateResponse]),
+        (status = 200, description = "Successfully retrieved historical funding rates with specified frequency", body = [FundingRateResponse]),
     ),
     params(
         ("base" = String, Path, description = "Base asset symbol (e.g., BTC)"),
@@ -58,6 +79,7 @@ pub async fn get_historical_funding_rates(
         pair.clone(),
         source,
         timestamp_range,
+        params.frequency,
     )
     .await
     .map_err(EntryError::from)?;
