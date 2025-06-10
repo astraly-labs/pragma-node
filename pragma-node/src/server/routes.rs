@@ -13,6 +13,10 @@ use crate::handlers::onchain::{
     get_history::get_onchain_history, get_publishers::get_onchain_publishers,
     subscribe_to_ohlc::subscribe_to_onchain_ohlc,
 };
+use crate::handlers::open_interest::{
+    get_historical_open_interest, get_latest_open_interest,
+    get_supported_instruments as get_oi_supported_instruments,
+};
 use crate::handlers::stream::stream_multi::stream_entry_multi_pair;
 use crate::handlers::websocket::{subscribe_to_entry, subscribe_to_ohlc, subscribe_to_price};
 use crate::handlers::{get_entry, get_ohlc};
@@ -28,7 +32,11 @@ pub fn app_router<T: OpenApiT>(state: AppState) -> Router<AppState> {
         .nest("/node/v1/data", entry_routes(state.clone()))
         .nest("/node/v1/onchain", onchain_routes(state.clone()))
         .nest("/node/v1/aggregation", aggregation_routes(state.clone()))
-        .nest("/node/v1/funding_rates", funding_rates_routes(state))
+        .nest(
+            "/node/v1/funding_rates",
+            funding_rates_routes(state.clone()),
+        )
+        .nest("/node/v1/open_interest", open_interest_routes(state))
         .fallback(handler_404)
 }
 
@@ -74,5 +82,13 @@ fn funding_rates_routes(state: AppState) -> Router<AppState> {
         .route("/{base}/{quote}", get(get_latest_funding_rate))
         .route("/history/{base}/{quote}", get(get_historical_funding_rates))
         .route("/instruments", get(get_supported_instruments))
+        .with_state(state)
+}
+
+fn open_interest_routes(state: AppState) -> Router<AppState> {
+    Router::new()
+        .route("/{base}/{quote}", get(get_latest_open_interest))
+        .route("/history/{base}/{quote}", get(get_historical_open_interest))
+        .route("/instruments", get(get_oi_supported_instruments))
         .with_state(state)
 }

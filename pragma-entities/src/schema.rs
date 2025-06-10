@@ -37,6 +37,18 @@ diesel::table! {
 }
 
 diesel::table! {
+    open_interest (id, timestamp) {
+        id -> Uuid,
+        source -> Varchar,
+        pair -> Varchar,
+        #[sql_name = "open_interest"]
+        open_interest_value -> Float8,
+        timestamp -> Timestamptz,
+        created_at -> Timestamptz,
+    }
+}
+
+diesel::table! {
     publishers (id) {
         id -> Uuid,
         name -> Varchar,
@@ -47,4 +59,10 @@ diesel::table! {
     }
 }
 
-diesel::allow_tables_to_appear_in_same_query!(entries, funding_rates, future_entries, publishers,);
+diesel::allow_tables_to_appear_in_same_query!(
+    entries,
+    funding_rates,
+    future_entries,
+    open_interest,
+    publishers,
+);

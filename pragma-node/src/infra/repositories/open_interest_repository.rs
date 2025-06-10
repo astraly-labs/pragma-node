@@ -1,24 +1,20 @@
 use chrono::{DateTime, Utc};
 use deadpool_diesel::postgres::Pool;
-
-use diesel::{
-    RunQueryDsl as _,
-    sql_types::{Timestamp, VarChar},
-};
+use diesel::RunQueryDsl as _;
+use diesel::sql_types::{Timestamp, VarChar};
 use pragma_common::Pair;
 use pragma_entities::{
-    FundingRate, InfraError, TimestampError, models::entries::timestamp::TimestampRange,
+    InfraError, TimestampError, models::entries::timestamp::TimestampRange,
+    models::open_interest::OpenInterest,
 };
 use serde::Serialize;
-
-use crate::handlers::funding_rates::get_historical_funding_rates::Frequency;
 
 pub async fn get_at_timestamp(
     pool: &Pool,
     pair: Pair,
     source: String,
     timestamp: Option<i64>,
-) -> Result<Option<FundingRate>, InfraError> {
+) -> Result<Option<OpenInterest>, InfraError> {
     let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
 
     let timestamp = match timestamp {
@@ -32,19 +28,19 @@ pub async fn get_at_timestamp(
         None => None,
     };
 
-    let funding_rate = conn
+    let open_interest = conn
         .interact(move |conn| {
             if let Some(ts) = timestamp {
-                FundingRate::get_at(conn, &pair, &source, ts)
+                OpenInterest::get_at(conn, &pair, &source, ts)
             } else {
-                FundingRate::get_latest(conn, &pair, &source)
+                OpenInterest::get_latest(conn, &pair, &source)
             }
         })
         .await
         .map_err(InfraError::DbInteractionError)?
         .map_err(InfraError::DbResultError)?;
 
-    Ok(funding_rate)
+    Ok(open_interest)
 }
 
 pub async fn get_history_in_range(
@@ -52,8 +48,7 @@ pub async fn get_history_in_range(
     pair: Pair,
     source: String,
     range: TimestampRange,
-    frequency: Frequency,
-) -> Result<Vec<FundingRate>, InfraError> {
+) -> Result<Vec<OpenInterest>, InfraError> {
     let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
 
     let start = DateTime::<Utc>::from_timestamp(*range.0.start(), 0)
@@ -68,30 +63,20 @@ pub async fn get_history_in_range(
         })?
         .naive_utc();
 
-    let funding_rates = conn
-        .interact(move |conn| match frequency {
-            Frequency::All => FundingRate::get_in_range(conn, &pair, &source, start, end),
-            Frequency::Minute => {
-                FundingRate::get_in_range_aggregated(conn, &pair, &source, start, end, "funding_rates_1_min")
-            }
-            Frequency::Hour => {
-                FundingRate::get_in_range_aggregated(conn, &pair, &source, start, end, "funding_rates_1_hour")
-            }
-        })
+    let open_interests = conn
+        .interact(move |conn| OpenInterest::get_in_range(conn, &pair, &source, start, end))
         .await
         .map_err(InfraError::DbInteractionError)?
         .map_err(InfraError::DbResultError)?;
 
-    Ok(funding_rates)
+    Ok(open_interests)
 }
 
 #[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct InstrumentInfo {
     pub pair: String,
     pub source: String,
-    /// premier timestamp disponible (ms Unix)
     pub first_timestamp_ms: u64,
-    /// dernier timestamp disponible (ms Unix)
     pub last_timestamp_ms: u64,
 }
 
@@ -112,9 +97,10 @@ pub async fn get_supported_instruments(pool: &Pool) -> Result<Vec<InstrumentInfo
         SELECT
             pair,
             source,
-            first_ts,
-            last_ts
-        FROM funding_rates_instruments_summary
+            MIN(timestamp) AS first_ts,
+            MAX(timestamp) AS last_ts
+        FROM open_interest
+        GROUP BY pair, source
         ORDER BY pair, source;
     ";
 

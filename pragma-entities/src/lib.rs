@@ -17,6 +17,7 @@ pub use models::{
     entry::{Entry, NewEntry},
     funding_rate::{FundingRate, NewFundingRate},
     future_entry::{FutureEntry, NewFutureEntry},
+    open_interest::{NewOpenInterest, OpenInterest},
     publisher::{NewPublisher, Publishers},
     publisher_error::PublisherError,
 };

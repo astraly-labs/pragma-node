@@ -1,5 +1,6 @@
 use crate::error::PragmaNodeError;
 use deadpool_diesel::postgres::{Manager, Pool};
+use std::time::Duration;
 
 pub const ENV_ONCHAIN_DATABASE_URL: &str = "ONCHAIN_DATABASE_URL";
 pub const ENV_OFFCHAIN_DATABASE_URL: &str = "OFFCHAIN_DATABASE_URL";
@@ -29,7 +30,11 @@ pub fn init_pool(app_name: &str, database_url_env: &str) -> Result<Pool, PragmaN
     );
 
     Pool::builder(manager)
+        .runtime(deadpool_diesel::Runtime::Tokio1)
         .max_size(database_max_conn)
+        .wait_timeout(Some(Duration::from_secs(30)))
+        .create_timeout(Some(Duration::from_secs(30)))
+        .recycle_timeout(Some(Duration::from_secs(30)))
         .build()
         .map_err(|e| PragmaNodeError::PoolDatabase(e.to_string()))
 }
