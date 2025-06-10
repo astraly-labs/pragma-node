@@ -13,6 +13,7 @@ keywords = ["pragma", "sdk", "consumer", "data", "feeds"]
 workspace = true
 
 [dependencies]
+async-trait = { workspace = true }
 axum = { workspace = true }
 bigdecimal = { workspace = true, features = ["serde"] }
 cainome = { workspace = true }
@@ -36,6 +37,7 @@ tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-opentelemetry = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
+url = { workspace = true }
 utoipa = { workspace = true }
 uuid = { workspace = true }
 

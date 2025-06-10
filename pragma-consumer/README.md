@@ -158,6 +158,35 @@ let block = BlockId::Tag(BlockTag::Latest);
 let block = BlockId::Tag(BlockTag::Pending);
 ```
 
+### Using FallbackProvider for Reliable RPC Connections
+
+When interacting with Starknet, you can use the `FallbackProvider` from `pragma-common` for improved reliability:
+
+```rust
+use pragma_common::FallbackProvider;
+use starknet::accounts::{Account, ExecutionEncoding, SingleOwnerAccount};
+use starknet::signers::{LocalWallet, SigningKey};
+
+// Use FallbackProvider for automatic failover between RPC endpoints
+let provider = FallbackProvider::sepolia().unwrap(); // or FallbackProvider::mainnet()
+
+let signer = LocalWallet::from(SigningKey::from_secret_scalar(private_key));
+let account = SingleOwnerAccount::new(provider, signer, address, chain_id, ExecutionEncoding::New);
+
+// The account will automatically retry with different RPC endpoints if one fails
+```
+
+The `FallbackProvider` automatically handles RPC endpoint failures by:
+- Trying multiple predefined, reliable RPC endpoints in order of priority
+- Automatically switching to the next endpoint if one fails
+- Maintaining the last successful endpoint as the primary choice
+- Including timeout handling for each request
+
+Available methods:
+- `FallbackProvider::mainnet()` - Uses predefined mainnet RPC URLs
+- `FallbackProvider::sepolia()` - Uses predefined Sepolia testnet RPC URLs
+- `FallbackProvider::new(urls)` - Create with custom RPC URLs
+
 ### Error Handling
 
 The SDK uses the `thiserror` crate for error handling. The two main errors types are:

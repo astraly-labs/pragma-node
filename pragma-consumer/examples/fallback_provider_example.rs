@@ -10,6 +10,9 @@ use starknet::signers::{LocalWallet, SigningKey};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Initialize telemetry
+    tracing_subscriber::fmt::init();
+
     let api_config = ApiConfig {
         base_url: PragmaBaseUrl::Dev,
         api_key: String::new(),
@@ -34,9 +37,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Use the calldata with the pragma-oracle contract...
     let calldata = result.as_calldata().unwrap();
 
-    // Use FallbackProvider for better reliability - automatically falls back to
-    // alternative RPC endpoints if the primary one fails, avoiding RPC errors
-    let provider = FallbackProvider::sepolia().unwrap();
+    // Create a FallbackProvider for Sepolia testnet with multiple RPC endpoints
+    let provider = FallbackProvider::sepolia()?;
+    
+    println!("Created FallbackProvider with {} providers", provider.provider_count());
+    println!("Current active provider index: {}", provider.current_provider_index());
 
     let signer = LocalWallet::from(SigningKey::from_secret_scalar(
         Felt::from_hex("<YOUR_PRIVATE_KEY_HERE>").unwrap(),
@@ -57,6 +62,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         starknet::core::types::BlockTag::Pending,
     ));
 
+    // The account will now automatically use the fallback provider
+    // If the first RPC fails, it will automatically try the next one
     let result = account
         .execute_v1(vec![Call {
             to: summary_stats_address,
@@ -64,9 +71,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             calldata,
         }])
         .send()
-        .await?;
+        .await;
 
-    println!("Transaction hash: {:#064x}", result.transaction_hash);
+    match result {
+        Ok(tx_result) => {
+            println!("Transaction hash: {:#064x}", tx_result.transaction_hash);
+        }
+        Err(e) => {
+            println!("Transaction failed: {:?}", e);
+            println!("All {} fallback providers were tried", account.provider().provider_count());
+        }
+    }
 
     Ok(())
 }
