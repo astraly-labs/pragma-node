@@ -9,7 +9,10 @@ use csv::Writer;
 use reqwest::Client;
 
 use pragma_entities::models::funding_rate::NewFundingRate;
-use sources::{hyperliquid::Hyperliquid, paradex::Paradex};
+use sources::{
+    bybit::Bybit, extended::Extended, hyperliquid::Hyperliquid, kraken::Kraken, paradex::Paradex,
+};
+use std::collections::HashMap;
 use uuid::Uuid;
 
 pub const ALL_PAIRS: &[&str] = &[
@@ -197,6 +200,50 @@ async fn fetch_funding_rates(
                 });
             }
         }
+        "extended" => {
+            let rows =
+                Extended::fetch_historical_fundings(formatted_pair, start, end, client).await?;
+            for r in rows {
+                let ts = timestamp_from_millis(r.created_at)?;
+                let hourly_rate: f64 = r.funding_rate.parse()?;
+                let annualized_rate = hourly_rate * 24.0 * 365.0;
+                entries.push(NewFundingRate {
+                    source: "extended".to_string(),
+                    pair: orginal_pair.to_string(),
+                    annualized_rate,
+                    timestamp: ts,
+                });
+            }
+        }
+        "kraken" => {
+            let rows =
+                Kraken::fetch_historical_fundings(formatted_pair, start, end, client).await?;
+            for r in rows {
+                let ts = DateTime::parse_from_rfc3339(&r.timestamp)?.naive_utc();
+                let four_hour_rate = r.funding_rate * 100.0;
+                let annualized_rate = four_hour_rate * 6.0 * 365.0;
+                entries.push(NewFundingRate {
+                    source: "kraken".to_string(),
+                    pair: orginal_pair.to_string(),
+                    annualized_rate,
+                    timestamp: ts,
+                });
+            }
+        }
+        "bybit" => {
+            let rows = Bybit::fetch_historical_fundings(formatted_pair, start, end, client).await?;
+            for r in rows {
+                let ts = timestamp_from_millis(r.timestamp.parse()?)?;
+                let hourly_rate: f64 = r.funding_rate.parse()?;
+                let annualized_rate = hourly_rate * 24.0 * 365.0 * 100.0;
+                entries.push(NewFundingRate {
+                    source: "bybit".to_string(),
+                    pair: orginal_pair.to_string(),
+                    annualized_rate,
+                    timestamp: ts,
+                });
+            }
+        }
         other => return Err(anyhow!("Source '{}' not implemented", other)),
     }
     Ok(entries)
@@ -220,8 +267,23 @@ fn parse_time_range(range: &str) -> anyhow::Result<(i64, i64)> {
 }
 
 fn write_to_csv(entries: &[NewFundingRate], output_path: &str) -> anyhow::Result<()> {
-    let mut writer = Writer::from_path(output_path)?;
+    // Group by source + pair + timestamp in minutes
+    let mut entries_per_minute = HashMap::new();
+
     for entry in entries {
+        let key = (
+            entry.source.clone(),
+            entry.pair.clone(),
+            entry.timestamp.and_utc().timestamp_millis() / (60 * 1000), // Convert ms to minutes
+        );
+
+        if !entries_per_minute.contains_key(&key) {
+            entries_per_minute.insert(key, entry);
+        }
+    }
+
+    let mut writer = Writer::from_path(output_path)?;
+    for entry in entries_per_minute.values() {
         writer.write_record(&[
             Uuid::new_v4().to_string(),
             entry.source.to_uppercase().clone(),
@@ -232,7 +294,11 @@ fn write_to_csv(entries: &[NewFundingRate], output_path: &str) -> anyhow::Result
         ])?;
     }
     writer.flush()?;
-    println!("Wrote {} entries to {}", entries.len(), output_path);
+    println!(
+        "Wrote {} entries to {}",
+        entries_per_minute.len(),
+        output_path
+    );
     Ok(())
 }
 
@@ -240,6 +306,14 @@ fn format_pair_for_exchange(source: &str, pair: &str) -> String {
     match source {
         "hyperliquid" => pair.split('/').next().unwrap_or(pair).to_uppercase(),
         "paradex" => format!("{}-PERP", pair.replace('/', "-").to_uppercase()),
+        "extended" => pair.replace('/', "-").to_uppercase(),
+        "kraken" => {
+            let base = pair.split('/').next().unwrap_or(pair);
+            let quote = pair.split('/').nth(1).unwrap_or("");
+            let base = if base == "BTC" { "XBT" } else { base };
+            format!("PF_{}{}", base, quote).to_uppercase()
+        },
+        "bybit" => pair.split('/').next().unwrap_or(pair).to_uppercase(),
         other => panic!("Source '{other}' not implemented"),
     }
 }
