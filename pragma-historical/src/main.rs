@@ -1,12 +1,13 @@
 pub mod sources;
 
-use std::{process::Command, time::Duration};
+use std::{process::Command, sync::Arc, time::Duration};
 
 use anyhow::{Context, anyhow};
 use chrono::{DateTime, NaiveDateTime, Utc};
 use clap::Parser;
 use csv::Writer;
 use reqwest::Client;
+use tokio::sync::Mutex;
 
 use pragma_entities::models::funding_rate::NewFundingRate;
 use sources::{
@@ -87,6 +88,10 @@ struct Cli {
     /// Database connection string (e.g., postgres://user:pass@host:port/dbname)
     #[arg(long)]
     connection: String,
+
+    /// Optional input CSV file path. If specified, skips data download.
+    #[arg(long)]
+    csv_input: Option<String>,
 }
 
 #[tokio::main]
@@ -95,37 +100,69 @@ async fn main() -> anyhow::Result<()> {
 
     let cli = Cli::parse();
 
-    let (start, end) = parse_time_range(&cli.range)?;
+    let csv_path = if let Some(input_path) = cli.csv_input {
+        // If CSV input is provided, use it directly
+        println!("Using existing CSV file: {input_path}");
+        input_path
+    } else {
+        // Otherwise, fetch and generate new data
+        let (start, end) = parse_time_range(&cli.range)?;
+        let client = Client::builder().timeout(Duration::from_secs(30)).build()?;
 
-    let client = Client::builder().timeout(Duration::from_secs(30)).build()?;
+        // Define coins to fetch
+        let pairs = ALL_PAIRS;
+        let all_entries = Arc::new(Mutex::new(Vec::new()));
 
-    // Define coins to fetch
-    let pairs = ALL_PAIRS;
+        // Process pairs concurrently in chunks to avoid overwhelming the API
+        let chunk_size = 5;
+        let mut tasks = Vec::new();
 
-    // Fetch and process funding rates for each coin
-    let mut all_entries = Vec::new();
-    for pair in pairs {
-        println!(
-            "Fetch {pair} - from: {} to: {}",
-            timestamp_from_millis(start)?,
-            timestamp_from_millis(end)?
-        );
+        for pairs_chunk in pairs.chunks(chunk_size) {
+            let pairs_chunk = pairs_chunk.to_vec();
+            let client = client.clone();
+            let source = cli.source.clone();
+            let all_entries = all_entries.clone();
 
-        let formatted_pair = format_pair_for_exchange(&cli.source, pair);
-        let entries = fetch_funding_rates(&cli.source, pair, &formatted_pair, start, end, &client)
-            .await
-            .unwrap_or_else(|e| {
-                eprintln!("Error fetching funding rates for {pair}: {e}");
-                vec![]
+            let task = tokio::spawn(async move {
+                for pair in pairs_chunk {
+                    println!(
+                        "Fetch {pair} - from: {} to: {}",
+                        timestamp_from_millis(start)?,
+                        timestamp_from_millis(end)?
+                    );
+
+                    let formatted_pair = format_pair_for_exchange(&source, pair);
+                    match fetch_funding_rates(&source, pair, &formatted_pair, start, end, &client)
+                        .await
+                    {
+                        Ok(entries) => {
+                            let mut all_entries = all_entries.lock().await;
+                            all_entries.extend(entries);
+                        }
+                        Err(e) => eprintln!("Error fetching funding rates for {pair}: {e}"),
+                    }
+                }
+                Ok::<_, anyhow::Error>(())
             });
-        all_entries.extend(entries);
-    }
 
-    // Write to CSV
-    write_to_csv(&all_entries, &cli.csv_output)?;
+            tasks.push(task);
+        }
+
+        // Wait for all tasks to complete
+        for task in tasks {
+            if let Err(e) = task.await? {
+                eprintln!("Task error: {e}");
+            }
+        }
+
+        // Write to CSV
+        let all_entries = all_entries.lock().await;
+        write_to_csv(&all_entries, &cli.csv_output)?;
+        cli.csv_output
+    };
 
     // Import CSV to TimescaleDB
-    import_to_timescaledb(&cli.connection, &cli.csv_output)?;
+    import_to_timescaledb(&cli.connection, &csv_path)?;
 
     Ok(())
 }
@@ -277,9 +314,7 @@ fn write_to_csv(entries: &[NewFundingRate], output_path: &str) -> anyhow::Result
             entry.timestamp.and_utc().timestamp_millis() / (60 * 1000), // Convert ms to minutes
         );
 
-        if !entries_per_minute.contains_key(&key) {
-            entries_per_minute.insert(key, entry);
-        }
+        entries_per_minute.entry(key).or_insert(entry);
     }
 
     let mut writer = Writer::from_path(output_path)?;
@@ -304,16 +339,15 @@ fn write_to_csv(entries: &[NewFundingRate], output_path: &str) -> anyhow::Result
 
 fn format_pair_for_exchange(source: &str, pair: &str) -> String {
     match source {
-        "hyperliquid" => pair.split('/').next().unwrap_or(pair).to_uppercase(),
+        "bybit" | "hyperliquid" => pair.split('/').next().unwrap_or(pair).to_uppercase(),
         "paradex" => format!("{}-PERP", pair.replace('/', "-").to_uppercase()),
         "extended" => pair.replace('/', "-").to_uppercase(),
         "kraken" => {
             let base = pair.split('/').next().unwrap_or(pair);
             let quote = pair.split('/').nth(1).unwrap_or("");
             let base = if base == "BTC" { "XBT" } else { base };
-            format!("PF_{}{}", base, quote).to_uppercase()
-        },
-        "bybit" => pair.split('/').next().unwrap_or(pair).to_uppercase(),
+            format!("PF_{base}{quote}").to_uppercase()
+        }
         other => panic!("Source '{other}' not implemented"),
     }
 }

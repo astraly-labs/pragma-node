@@ -2,6 +2,8 @@ use anyhow::{Result, anyhow};
 use reqwest::Client;
 use serde::Deserialize;
 
+const LIMIT: i32 = 200; // Maximum limit allowed by Bybit
+
 pub struct Bybit;
 
 #[derive(Debug, Deserialize)]
@@ -35,15 +37,16 @@ impl Bybit {
         client: &Client,
     ) -> Result<Vec<BybitFundingRateEntry>> {
         // First try with PERP suffix
-        let perp_market = format!("{}PERP", market);
-        let perp_result = Self::fetch_historical_fundings_for_symbol(&perp_market, start, end, client).await;
-        
+        let perp_market = format!("{market}PERP");
+        let perp_result =
+            Self::fetch_historical_fundings_for_symbol(&perp_market, start, end, client).await;
+
         if perp_result.is_ok() {
             return perp_result;
         }
 
         // If PERP fails, try with USDT suffix
-        let usdt_market = format!("{}USDT", market);
+        let usdt_market = format!("{market}USDT");
         Self::fetch_historical_fundings_for_symbol(&usdt_market, start, end, client).await
     }
 
@@ -55,7 +58,6 @@ impl Bybit {
     ) -> Result<Vec<BybitFundingRateEntry>> {
         let mut all_results = Vec::new();
         let mut current_start = start;
-        const LIMIT: i32 = 200; // Maximum limit allowed by Bybit
 
         while current_start < end {
             let response = client
@@ -135,10 +137,7 @@ mod tests {
             let ts = entry.timestamp.parse::<i64>().unwrap();
             assert!(
                 ts >= start && ts <= end,
-                "Timestamp {} outside range [{}, {}]",
-                ts,
-                start,
-                end
+                "Timestamp {ts} outside range [{start}, {end}]"
             );
         }
     }

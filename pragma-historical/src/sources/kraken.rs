@@ -40,12 +40,10 @@ impl Kraken {
             .rates
             .into_iter()
             .filter(|r| {
-                if let Ok(ts) = chrono::DateTime::parse_from_rfc3339(&r.timestamp) {
+                chrono::DateTime::parse_from_rfc3339(&r.timestamp).is_ok_and(|ts| {
                     let ts_millis = ts.timestamp_millis();
                     ts_millis >= start && ts_millis <= end
-                } else {
-                    false
-                }
+                })
             })
             .collect();
 

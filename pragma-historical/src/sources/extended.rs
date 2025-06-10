@@ -2,6 +2,8 @@ use anyhow::{Context, Result};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
+const LIMIT: i64 = 1000;
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ExtendedFundingRateEntry {
     #[serde(rename = "m")]
@@ -48,7 +50,6 @@ impl Extended {
     ) -> Result<Vec<ExtendedFundingRateEntry>> {
         let mut all_results = Vec::new();
         let mut cursor: Option<i64> = None;
-        const LIMIT: i64 = 1000;
 
         loop {
             let query_params = vec![
@@ -58,10 +59,7 @@ impl Extended {
                 ("cursor", cursor.unwrap_or(0).to_string()),
             ];
 
-            let url = format!(
-                "https://api.extended.exchange/api/v1/info/{}/funding",
-                market
-            );
+            let url = format!("https://api.extended.exchange/api/v1/info/{market}/funding");
 
             let response = client
                 .get(&url)
@@ -85,14 +83,13 @@ impl Extended {
                         error.error.code,
                         error.error.message
                     );
-                } else {
-                    // Handle non-JSON (e.g., HTML) response
-                    anyhow::bail!(
-                        "Non-JSON error response (status {}): {}",
-                        status,
-                        error_body
-                    );
                 }
+                // Handle non-JSON (e.g., HTML) response
+                anyhow::bail!(
+                    "Non-JSON error response (status {}): {}",
+                    status,
+                    error_body
+                );
             }
 
             let response: ExtendedResponse = response

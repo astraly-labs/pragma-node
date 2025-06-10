@@ -71,12 +71,22 @@ pub async fn get_history_in_range(
     let funding_rates = conn
         .interact(move |conn| match frequency {
             Frequency::All => FundingRate::get_in_range(conn, &pair, &source, start, end),
-            Frequency::Minute => {
-                FundingRate::get_in_range_aggregated(conn, &pair, &source, start, end, "funding_rates_1_min")
-            }
-            Frequency::Hour => {
-                FundingRate::get_in_range_aggregated(conn, &pair, &source, start, end, "funding_rates_1_hour")
-            }
+            Frequency::Minute => FundingRate::get_in_range_aggregated(
+                conn,
+                &pair,
+                &source,
+                start,
+                end,
+                "funding_rates_1_min",
+            ),
+            Frequency::Hour => FundingRate::get_in_range_aggregated(
+                conn,
+                &pair,
+                &source,
+                start,
+                end,
+                "funding_rates_1_hour",
+            ),
         })
         .await
         .map_err(InfraError::DbInteractionError)?
