@@ -5,7 +5,6 @@ members = [
   "pragma-ingestor",
   "pragma-entities",
   "pragma-common",
-  "pragma-consumer",
   "tests",
 ]
 
