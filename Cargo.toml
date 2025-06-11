@@ -48,7 +48,7 @@ redundant_pub_crate = "allow"
 missing_const_for_fn = "allow"
 
 [workspace.dependencies]
-pragma-common = { version = "0.3.3", features = [
+pragma-common = { version = "0.3.11", features = [
   "serde",
   "services",
   "task-group",
