@@ -73,6 +73,8 @@ USER appuser
 
 WORKDIR /app
 
+EXPOSE 8081
+
 ENV RUST_LOG=info
 
 CMD ["/bin/server"]
