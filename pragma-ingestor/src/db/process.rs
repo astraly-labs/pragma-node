@@ -11,6 +11,7 @@ use crate::db::insert::{
 };
 
 const PUBLISHING_DELAY: Duration = Duration::from_millis(50);
+const MINUTE_PUBLISHING_DELAY: Duration = Duration::from_secs(60);
 
 #[tracing::instrument(skip(pool, rx))]
 pub async fn process_spot_entries(pool: Pool, mut rx: mpsc::Receiver<NewEntry>) {
@@ -59,13 +60,18 @@ pub async fn process_future_entries(pool: Pool, mut rx: mpsc::Receiver<NewFuture
 #[tracing::instrument(skip(pool, rx))]
 pub async fn process_funding_rate_entries(pool: Pool, mut rx: mpsc::Receiver<NewFundingRate>) {
     let mut batched_data = HashMap::new();
-    let mut interval = tokio::time::interval(PUBLISHING_DELAY);
+    let mut interval = tokio::time::interval(MINUTE_PUBLISHING_DELAY);
 
     loop {
         tokio::select! {
             Some(entry) = rx.recv() => {
-                let key = (entry.source.clone(), entry.pair.clone());
-                batched_data.insert(key, entry);
+                let key = (
+                    entry.source.clone(),
+                    entry.pair.clone(),
+                    entry.timestamp.and_utc().timestamp_millis() / (60 * 1000) // Convert ms to minutes
+                );
+                // Only insert if we don't have an entry for this minute yet
+                batched_data.entry(key).or_insert(entry);
             },
             _ = interval.tick() => {
                 let batch = std::mem::take(&mut batched_data);
@@ -81,13 +87,18 @@ pub async fn process_funding_rate_entries(pool: Pool, mut rx: mpsc::Receiver<New
 #[tracing::instrument(skip(pool, rx))]
 pub async fn process_open_interest_entries(pool: Pool, mut rx: mpsc::Receiver<NewOpenInterest>) {
     let mut batched_data = HashMap::new();
-    let mut interval = tokio::time::interval(PUBLISHING_DELAY);
+    let mut interval = tokio::time::interval(MINUTE_PUBLISHING_DELAY);
 
     loop {
         tokio::select! {
             Some(entry) = rx.recv() => {
-                let key = (entry.source.clone(), entry.pair.clone());
-                batched_data.insert(key, entry);
+                let key = (
+                    entry.source.clone(),
+                    entry.pair.clone(),
+                    entry.timestamp.and_utc().timestamp_millis() / (60 * 1000) // Convert ms to minutes
+                );
+                // Only insert if we don't have an entry for this minute yet
+                batched_data.entry(key).or_insert(entry);
             },
             _ = interval.tick() => {
                 let batch = std::mem::take(&mut batched_data);

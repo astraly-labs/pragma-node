@@ -1,6 +1,6 @@
 # Pragma Historical Funding Rates
 
-Fetches historical funding rates from Hyperliquid or Paradex and stores them in a CSV file and TimescaleDB.
+Fetches historical funding rates from Hyperliquid, Paradex, Bybit, Kraken or Extended and stores them in a CSV file and TimescaleDB.
 
 ## Prerequisites
 - Rust (latest stable)
@@ -26,7 +26,7 @@ Run the program with the following command:
 cargo run --bin pragma-historical -- --source hyperliquid --range 1746057600000,1748736000000 --csv-output funding_rates.csv --connection postgres://postgres:test-password@0.0.0.0:5432/pragma
 ```
 
-- `--source`: Data source (`hyperliquid` or `paradex`)
+- `--source`: Data source (`hyperliquid`, `paradex`, `bybit`, `kraken` or `extended`)
 - `--range`: Time range in Unix milliseconds (start,end; last month: Apr 1, 2025 - Apr 30, 2025)
 - `--csv-output`: Output CSV file path
 - `--connection`: PostgreSQL connection string
