@@ -1,9 +1,9 @@
 use crate::dto::entry as dto;
 use crate::models::DieselResult;
 use bigdecimal::BigDecimal;
+use diesel::BoolExpressionMethods;
 use diesel::dsl::sql;
 use diesel::internal::derives::multiconnection::chrono::NaiveDateTime;
-use diesel::BoolExpressionMethods;
 use diesel::{
     AsChangeset, ExpressionMethods, Insertable, PgConnection, PgTextExpressionMethods, QueryDsl,
     Queryable, RunQueryDsl, Selectable, SelectableHelper,
@@ -25,7 +25,7 @@ pub struct FutureEntry {
     // If expiration_timestamp is None, it means the entry is a perpetual future
     // else it is a regular future entry that will expire at the expiration_timestamp.
     pub expiration_timestamp: Option<NaiveDateTime>,
-    pub publisher_signature: String,
+    pub publisher_signature: Option<String>,
     pub price: BigDecimal,
 }
 
@@ -37,7 +37,6 @@ pub struct NewFutureEntry {
     pub source: String,
     pub timestamp: NaiveDateTime,
     pub expiration_timestamp: Option<NaiveDateTime>,
-    pub publisher_signature: String,
     pub price: BigDecimal,
 }
 

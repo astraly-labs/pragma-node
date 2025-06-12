@@ -1,0 +1,8 @@
+-- Drop all funding rates continuous aggregates
+
+DROP MATERIALIZED VIEW IF EXISTS funding_rates_1_day CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS funding_rates_4_hour CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS funding_rates_1_hour CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS funding_rates_15_min CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS funding_rates_5_min CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS funding_rates_1_min CASCADE;

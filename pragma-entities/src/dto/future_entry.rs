@@ -27,7 +27,7 @@ impl From<crate::FutureEntry> for FutureEntry {
             source: future_entry.source,
             timestamp: future_entry.timestamp.and_utc().timestamp_millis() as u64,
             expiration_timestamp,
-            publisher_signature: future_entry.publisher_signature,
+            publisher_signature: future_entry.publisher_signature.unwrap_or_default(),
             price: future_entry.price.to_u128().unwrap_or(0), // change default value ?
         }
     }

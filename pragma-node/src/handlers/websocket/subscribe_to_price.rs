@@ -1,0 +1,251 @@
+use std::collections::HashMap;
+use std::net::SocketAddr;
+use std::str::FromStr as _;
+use std::sync::Arc;
+
+use axum::extract::ws::{WebSocket, WebSocketUpgrade};
+use axum::extract::{ConnectInfo, State};
+use axum::response::IntoResponse;
+use pragma_common::Pair;
+use pragma_entities::models::entries::timestamp::UnixTimestamp;
+use serde::{Deserialize, Serialize};
+
+use crate::state::AppState;
+use crate::utils::only_existing_pairs;
+use crate::utils::ws::{ChannelHandler, Subscriber, SubscriptionType};
+use pragma_entities::EntryError;
+use utoipa::{ToResponse, ToSchema};
+
+use super::{
+    SubscriptionAck, SubscriptionRequest, SubscriptionState, get_latest_entries_multi_pair,
+    get_params_for_websocket,
+};
+
+#[derive(Debug, Default, Serialize, Deserialize, ToResponse, ToSchema)]
+pub struct AssetOraclePrice {
+    num_sources_aggregated: usize,
+    pair_id: String,
+    price: String,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize, ToResponse, ToSchema)]
+pub struct SubscribeToPriceResponse {
+    pub oracle_prices: Vec<AssetOraclePrice>,
+    #[schema(value_type = i64)]
+    pub timestamp: UnixTimestamp,
+}
+
+#[tracing::instrument(skip(state, ws), fields(endpoint_name = "subscribe_to_price"))]
+pub async fn subscribe_to_price(
+    ws: WebSocketUpgrade,
+    State(state): State<AppState>,
+    ConnectInfo(client_addr): ConnectInfo<SocketAddr>,
+) -> impl IntoResponse {
+    ws.on_upgrade(move |socket| create_new_subscriber(socket, state, client_addr))
+}
+
+/// Interval in milliseconds that the channel will update the client with the latest prices.
+const CHANNEL_UPDATE_INTERVAL_IN_MS: u64 = 500;
+
+#[tracing::instrument(
+    skip(socket, app_state),
+    fields(
+        subscriber_id,
+        client_ip = %client_addr.ip()
+    )
+)]
+async fn create_new_subscriber(socket: WebSocket, app_state: AppState, client_addr: SocketAddr) {
+    let mut subscriber = match Subscriber::<SubscriptionState>::new(
+        "subscribe_to_price".into(),
+        socket,
+        client_addr.ip(),
+        Arc::new(app_state),
+        None,
+        CHANNEL_UPDATE_INTERVAL_IN_MS,
+        None,
+    ) {
+        Ok(subscriber) => subscriber,
+        Err(e) => {
+            tracing::error!("Failed to register subscriber: {}", e);
+            return;
+        }
+    };
+
+    // Main event loop for the subscriber
+    let handler = WsEntriesHandler;
+    let status = subscriber.listen(handler).await;
+    if let Err(e) = status {
+        tracing::error!(
+            "[{}] Error occurred while listening to the subscriber: {:?}",
+            subscriber.id,
+            e
+        );
+    }
+}
+
+struct WsEntriesHandler;
+
+#[async_trait::async_trait]
+impl ChannelHandler<SubscriptionState, SubscriptionRequest, EntryError> for WsEntriesHandler {
+    #[tracing::instrument(
+        skip(self, subscriber),
+        fields(
+            subscriber_id = %subscriber.id,
+            request_type = ?request.msg_type,
+            pairs_count = request.pairs.len()
+        )
+    )]
+    async fn handle_client_msg(
+        &mut self,
+        subscriber: &mut Subscriber<SubscriptionState>,
+        request: SubscriptionRequest,
+    ) -> Result<(), EntryError> {
+        let (existing_spot_pairs, existing_perp_pairs) =
+            only_existing_pairs(&subscriber.app_state.offchain_pool, request.pairs).await;
+        let mut state = subscriber.state.write().await;
+        match request.msg_type {
+            SubscriptionType::Subscribe => {
+                state.add_spot_pairs(existing_spot_pairs);
+                state.add_perp_pairs(existing_perp_pairs);
+            }
+            SubscriptionType::Unsubscribe => {
+                state.remove_spot_pairs(&existing_spot_pairs);
+                state.remove_perp_pairs(&existing_perp_pairs);
+            }
+        }
+        let subscribed_pairs = state.get_fmt_subscribed_pairs();
+        drop(state);
+        // We send an ack message to the client with the subscribed pairs (so
+        // the client knows which pairs are successfully subscribed).
+        let ack = SubscriptionAck {
+            msg_type: request.msg_type,
+            pairs: subscribed_pairs,
+        };
+        if let Err(e) = subscriber.send_msg(ack).await {
+            let error_msg = format!("Message received but could not send ack message: {e}");
+            subscriber.send_err(&error_msg).await;
+        }
+        Ok(())
+    }
+
+    #[tracing::instrument(
+        skip(self, subscriber),
+        fields(
+            subscriber_id = %subscriber.id
+        )
+    )]
+    async fn periodic_interval(
+        &mut self,
+        subscriber: &mut Subscriber<SubscriptionState>,
+    ) -> Result<(), EntryError> {
+        let subscription = subscriber.state.read().await;
+        if subscription.is_empty() {
+            return Ok(());
+        }
+        let response = match self
+            .get_subscribed_pairs_medians(&subscriber.app_state, &subscription)
+            .await
+        {
+            Ok(response) => response,
+            Err(e) => {
+                drop(subscription);
+                subscriber.send_err(&e.to_string()).await;
+                return Err(e);
+            }
+        };
+        drop(subscription);
+        if let Err(e) = subscriber.send_msg(response).await {
+            subscriber
+                .send_err(&format!("Could not send prices: {e}"))
+                .await;
+        }
+        Ok(())
+    }
+}
+
+impl WsEntriesHandler {
+    /// Get the current median entries for the subscribed pairs and sign them as Pragma.
+    #[tracing::instrument(
+        skip(self, state, subscription),
+        fields(
+            spot_pairs_count = ?subscription.get_subscribed_spot_pairs().len(),
+            perp_pairs_count = ?subscription.get_subscribed_perp_pairs().len()
+        )
+    )]
+    async fn get_subscribed_pairs_medians(
+        &self,
+        state: &AppState,
+        subscription: &SubscriptionState,
+    ) -> Result<SubscribeToPriceResponse, EntryError> {
+        // safe to unwrap, cannot fail
+        let spot_pairs: Vec<Pair> = subscription
+            .get_subscribed_spot_pairs()
+            .iter()
+            .map(|s| Pair::from_str(s).unwrap())
+            .collect();
+        let perp_pairs: Vec<Pair> = subscription
+            .get_subscribed_perp_pairs()
+            .iter()
+            .map(|s| Pair::from_str(s).unwrap())
+            .collect();
+        let number_of_spot_pairs = spot_pairs.len();
+        let number_of_perp_pairs = perp_pairs.len();
+
+        // Get spot prices
+        let mut median_entries = if number_of_spot_pairs == 0 {
+            HashMap::new()
+        } else {
+            let params = get_params_for_websocket(false);
+            let entries = get_latest_entries_multi_pair(state, &spot_pairs, false, &params)
+                .await
+                .map_err(|e| {
+                    EntryError::DatabaseError(format!("Failed to fetch spot price data: {e}"))
+                })?;
+            // Check if we got entries for all requested spot pairs
+            if entries.len() < number_of_spot_pairs {
+                tracing::debug!(
+                    "Missing spot prices for some pairs. Found {} of {} requested pairs.",
+                    entries.len(),
+                    number_of_spot_pairs
+                );
+            }
+            entries
+        };
+
+        // Get perp prices and extend the HashMap
+        if number_of_perp_pairs != 0 {
+            let params = get_params_for_websocket(true);
+            let perp_entries = get_latest_entries_multi_pair(state, &perp_pairs, false, &params)
+                .await
+                .map_err(|e| {
+                    EntryError::DatabaseError(format!("Failed to fetch perp price data: {e}"))
+                })?;
+            // Check if we got entries for all requested perp pairs
+            if perp_entries.len() < number_of_perp_pairs {
+                tracing::debug!(
+                    "Missing perp prices for some pairs. Found {} of {} requested pairs.",
+                    perp_entries.len(),
+                    number_of_perp_pairs
+                );
+            }
+
+            // Add perp entries to the result
+            median_entries.extend(perp_entries);
+        }
+
+        // Convert HashMap entries to the expected response format
+        let oracle_prices = median_entries
+            .into_iter()
+            .map(|(pair_id, entry)| AssetOraclePrice {
+                num_sources_aggregated: entry.num_sources as usize,
+                pair_id,
+                price: entry.median_price.to_string(),
+            })
+            .collect();
+
+        Ok(SubscribeToPriceResponse {
+            timestamp: chrono::Utc::now().timestamp_millis(),
+            oracle_prices,
+        })
+    }
+}

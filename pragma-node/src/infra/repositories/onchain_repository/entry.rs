@@ -4,30 +4,30 @@ use bigdecimal::{BigDecimal, ToPrimitive, Zero};
 use deadpool_diesel::postgres::Pool;
 use diesel::sql_types::{Numeric, Text, Timestamp, VarChar};
 use diesel::{Queryable, QueryableByName, RunQueryDsl};
+use moka::future::Cache;
 
-use pragma_common::types::pair::Pair;
-use pragma_common::types::{AggregationMode, DataType, Interval, Network};
-use pragma_entities::error::{adapt_infra_error, InfraError};
-use pragma_entities::Currency;
+use pragma_common::Pair;
+use pragma_common::{AggregationMode, InstrumentType, Interval, starknet::StarknetNetwork};
+use pragma_entities::error::InfraError;
 use pragma_monitoring::models::SpotEntry;
 
+use crate::constants::currencies::ABSTRACT_CURRENCIES;
 use crate::handlers::onchain::get_entry::OnchainEntry;
+use crate::infra::rpc::RpcClients;
 use crate::utils::{
     big_decimal_price_to_hex, convert_via_quote, get_mid_price, normalize_to_decimals,
 };
 
-use super::{get_onchain_ohlc_table_name, get_onchain_table_name};
-
-use crate::infra::repositories::entry_repository::get_decimals;
+use super::{get_onchain_decimals, get_onchain_ohlc_table_name, get_onchain_table_name};
 
 // Means that we only consider the entries for the last hour when computing the aggregation &
 // retrieving the sources.
 pub const ENTRIES_BACKWARD_INTERVAL: &str = "1 hour";
 
 #[derive(Debug)]
-pub struct OnchainRoutingArguments {
+pub struct OnchainEntryArguments {
     pub pair_id: String,
-    pub network: Network,
+    pub network: StarknetNetwork,
     pub timestamp: u64,
     pub aggregation_mode: AggregationMode,
     pub is_routing: bool,
@@ -72,10 +72,12 @@ impl From<&SpotEntryWithAggregatedPrice> for OnchainEntry {
     }
 }
 
+#[allow(clippy::implicit_hasher)]
 pub async fn routing(
     onchain_pool: &Pool,
-    offchain_pool: &Pool,
-    routing_args: OnchainRoutingArguments,
+    routing_args: OnchainEntryArguments,
+    rpc_clients: &RpcClients,
+    decimals_cache: &Cache<StarknetNetwork, HashMap<String, u32>>,
 ) -> Result<Vec<RawOnchainData>, InfraError> {
     let pair_id = routing_args.pair_id;
     let is_routing = routing_args.is_routing;
@@ -94,7 +96,9 @@ pub async fn routing(
         .await?;
         if !prices_and_entries.is_empty() {
             let pair = Pair::from(pair_id.clone());
-            let decimal = get_decimals(offchain_pool, &pair).await?;
+            let decimal =
+                get_onchain_decimals(decimals_cache, rpc_clients, routing_args.network, &pair)
+                    .await?;
             for row in prices_and_entries {
                 result.push(RawOnchainData {
                     price: row.aggregated_price,
@@ -107,21 +111,13 @@ pub async fn routing(
         }
     }
     if !is_routing {
-        return Err(InfraError::NotFound);
+        return Err(InfraError::EntryNotFound(pair_id));
     }
-
-    let offchain_conn = offchain_pool.get().await.map_err(adapt_infra_error)?;
-
-    let alternative_currencies = offchain_conn
-        .interact(Currency::get_abstract_all)
-        .await
-        .map_err(adapt_infra_error)?
-        .map_err(adapt_infra_error)?;
 
     // safe unwrap since we construct the pairs string in calling function
     let (base, quote) = pair_id.split_once('/').unwrap();
 
-    for alt_currency in alternative_currencies {
+    for alt_currency in ABSTRACT_CURRENCIES {
         let base_alt_pair = format!("{base}/{alt_currency}");
         let alt_quote_pair = format!("{quote}/{alt_currency}");
 
@@ -136,8 +132,13 @@ pub async fn routing(
                 routing_args.aggregation_mode,
             )
             .await?;
-            let base_alt_decimal =
-                get_decimals(offchain_pool, &Pair::from(base_alt_pair.clone())).await?;
+            let base_alt_decimal = get_onchain_decimals(
+                decimals_cache,
+                rpc_clients,
+                routing_args.network,
+                &Pair::from(base_alt_pair.clone()),
+            )
+            .await?;
             let quote_alt_result = get_sources_and_aggregate(
                 onchain_pool,
                 routing_args.network,
@@ -146,8 +147,17 @@ pub async fn routing(
                 routing_args.aggregation_mode,
             )
             .await?;
-            let quote_alt_decimal =
-                get_decimals(offchain_pool, &Pair::from(alt_quote_pair.clone())).await?;
+            let quote_alt_decimal = get_onchain_decimals(
+                decimals_cache,
+                rpc_clients,
+                routing_args.network,
+                &Pair::from(alt_quote_pair.clone()),
+            )
+            .await?;
+
+            if quote_alt_result.len() != base_alt_result.len() {
+                return Err(InfraError::RoutingError(pair_id));
+            }
 
             let result = compute_multiple_rebased_price(
                 &mut base_alt_result,
@@ -160,20 +170,20 @@ pub async fn routing(
             return result;
         }
     }
-    Err(InfraError::NotFound)
+    Err(InfraError::RoutingError(pair_id))
 }
 
 fn build_sql_query(
-    network: Network,
+    network: StarknetNetwork,
     aggregation_mode: AggregationMode,
     timestamp: u64,
 ) -> Result<String, InfraError> {
-    let table_name = get_onchain_table_name(network, DataType::SpotEntry)?;
+    let table_name = get_onchain_table_name(network, InstrumentType::Spot);
 
     let complete_sql_query = {
         let aggregation_query = get_aggregation_subquery(aggregation_mode)?;
         format!(
-            r#"
+            r"
                 WITH RankedEntries AS (
                     SELECT 
                         *,
@@ -201,7 +211,7 @@ fn build_sql_query(
                     AggregatedPrice AP
                 ORDER BY 
                     FE.timestamp DESC;
-            "#,
+            ",
         )
     };
     Ok(complete_sql_query)
@@ -209,7 +219,6 @@ fn build_sql_query(
 
 fn get_aggregation_subquery(aggregation_mode: AggregationMode) -> Result<&'static str, InfraError> {
     let query = match aggregation_mode {
-        AggregationMode::Mean => "AVG(price) AS aggregated_price",
         AggregationMode::Median => {
             "(
                 SELECT AVG(price)
@@ -266,14 +275,14 @@ pub struct AggPriceAndEntries {
 // TODO(akhercha): Only works for Spot entries
 pub async fn get_sources_and_aggregate(
     pool: &Pool,
-    network: Network,
+    network: StarknetNetwork,
     pair_id: String,
     timestamp: u64,
     aggregation_mode: AggregationMode,
 ) -> Result<Vec<AggPriceAndEntries>, InfraError> {
     let raw_sql = build_sql_query(network, aggregation_mode, timestamp)?;
 
-    let conn = pool.get().await.map_err(adapt_infra_error)?;
+    let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
     let raw_entries = conn
         .interact(move |conn| {
             diesel::sql_query(raw_sql)
@@ -281,8 +290,8 @@ pub async fn get_sources_and_aggregate(
                 .load::<SpotEntryWithAggregatedPrice>(conn)
         })
         .await
-        .map_err(adapt_infra_error)?
-        .map_err(adapt_infra_error)?;
+        .map_err(InfraError::DbInteractionError)?
+        .map_err(InfraError::DbResultError)?;
 
     Ok(group_entries_per_aggprice(raw_entries))
 }
@@ -319,10 +328,6 @@ fn compute_multiple_rebased_price(
     base_alt_decimal: u32,
     quote_alt_decimal: u32,
 ) -> Result<Vec<RawOnchainData>, InfraError> {
-    if quote_alt_result.len() != base_alt_result.len() {
-        return Err(InfraError::RoutingError);
-    }
-
     let mut result: Vec<RawOnchainData> = Vec::new();
 
     for (i, base) in base_alt_result.iter_mut().enumerate() {
@@ -351,12 +356,12 @@ struct EntryTimestamp {
 
 pub async fn get_last_updated_timestamp(
     pool: &Pool,
-    network: Network,
+    network: StarknetNetwork,
     pairs: Vec<String>,
 ) -> Result<u64, InfraError> {
     let pair_list = format!("('{}')", pairs.join("','"));
     let raw_sql = format!(
-        r#"
+        r"
         SELECT
             timestamp
         FROM
@@ -365,18 +370,21 @@ pub async fn get_last_updated_timestamp(
             pair_id IN {}
         ORDER BY timestamp DESC
         LIMIT 1;
-    "#,
-        get_onchain_table_name(network, DataType::SpotEntry)?,
+    ",
+        get_onchain_table_name(network, InstrumentType::Spot),
         pair_list,
     );
-    let conn = pool.get().await.map_err(adapt_infra_error)?;
+    let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
     let raw_entry = conn
         .interact(move |conn| diesel::sql_query(raw_sql).load::<EntryTimestamp>(conn))
         .await
-        .map_err(adapt_infra_error)?
-        .map_err(adapt_infra_error)?;
+        .map_err(InfraError::DbInteractionError)?
+        .map_err(InfraError::DbResultError)?;
 
-    let most_recent_entry = raw_entry.first().ok_or(InfraError::NotFound)?;
+    let most_recent_entry = raw_entry
+        .first()
+        .ok_or(InfraError::EntryNotFound(pair_list))?;
+
     Ok(most_recent_entry.timestamp.and_utc().timestamp() as u64)
 }
 
@@ -390,7 +398,7 @@ struct VariationEntry {
 
 pub async fn get_variations(
     pool: &Pool,
-    network: Network,
+    network: StarknetNetwork,
     pair_id: String,
 ) -> Result<HashMap<Interval, f32>, InfraError> {
     let intervals = vec![Interval::OneHour, Interval::OneDay, Interval::OneWeek];
@@ -398,9 +406,9 @@ pub async fn get_variations(
     let mut variations = HashMap::new();
 
     for interval in intervals {
-        let ohlc_table_name = get_onchain_ohlc_table_name(network, DataType::SpotEntry, interval)?;
+        let ohlc_table_name = get_onchain_ohlc_table_name(network, InstrumentType::Spot, interval)?;
         let raw_sql = format!(
-            r#"
+            r"
             WITH recent_entries AS (
                 SELECT
                     ohlc_bucket AS time,
@@ -424,16 +432,16 @@ pub async fn get_variations(
                 rn IN (1, 2)
             ORDER BY
                 rn ASC;
-            "#,
+            ",
         );
 
-        let conn = pool.get().await.map_err(adapt_infra_error)?;
+        let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
         let p = pair_id.clone();
         let raw_entries: Vec<VariationEntry> = conn
             .interact(move |conn| diesel::sql_query(raw_sql).bind::<Text, _>(p).load(conn))
             .await
-            .map_err(adapt_infra_error)?
-            .map_err(adapt_infra_error)?;
+            .map_err(InfraError::DbInteractionError)?
+            .map_err(InfraError::DbResultError)?;
 
         if raw_entries.len() == 2 {
             let current_open = get_mid_price(&raw_entries[0].open, &raw_entries[0].close);
@@ -476,24 +484,24 @@ pub fn onchain_pair_exist(existing_pair_list: &[EntryPairId], pair_id: &str) -> 
 // TODO(0xevolve): Only works for Spot entries
 pub async fn get_existing_pairs(
     pool: &Pool,
-    network: Network,
+    network: StarknetNetwork,
 ) -> Result<Vec<EntryPairId>, InfraError> {
     let raw_sql = format!(
-        r#"
+        r"
         SELECT DISTINCT
             pair_id
         FROM
             {table_name};
-    "#,
-        table_name = get_onchain_table_name(network, DataType::SpotEntry)?
+    ",
+        table_name = get_onchain_table_name(network, InstrumentType::Spot)
     );
 
-    let conn = pool.get().await.map_err(adapt_infra_error)?;
+    let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
     let raw_entries = conn
         .interact(move |conn| diesel::sql_query(raw_sql).load::<EntryPairId>(conn))
         .await
-        .map_err(adapt_infra_error)?
-        .map_err(adapt_infra_error)?;
+        .map_err(InfraError::DbInteractionError)?
+        .map_err(InfraError::DbResultError)?;
 
     Ok(raw_entries)
 }

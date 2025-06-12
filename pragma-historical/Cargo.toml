@@ -1,0 +1,30 @@
+[package]
+name = "pragma-historical"
+version = "0.1.0"
+edition.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+pragma-common = { workspace = true }
+pragma-entities = { workspace = true }
+
+anyhow = { workspace = true }
+chrono = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
+csv = { workspace = true }
+deadpool-diesel = { workspace = true, features = ["postgres"] }
+diesel = { workspace = true }
+dotenvy = { workspace = true }
+envy = { workspace = true }
+futures-util = { workspace = true }
+lazy_static = { workspace = true }
+rdkafka = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
+tracing = { workspace = true }
+uuid = { workspace = true }

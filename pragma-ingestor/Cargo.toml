@@ -1,18 +1,23 @@
 [package]
 name = "pragma-ingestor"
 version = "0.1.0"
-edition = "2021"
+edition.workspace = true
 
 [lints]
 workspace = true
 
 [dependencies]
+faucon-rs = { workspace = true }
 pragma-common = { workspace = true }
 pragma-entities = { workspace = true }
 
+anyhow = { workspace = true }
+chrono = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
 deadpool-diesel = { workspace = true, features = ["postgres"] }
 dotenvy = { workspace = true }
 envy = { workspace = true }
+futures-util = { workspace = true }
 lazy_static = { workspace = true }
 rdkafka = { workspace = true }
 serde = { workspace = true }
