@@ -8,10 +8,15 @@ use clap::Parser;
 use csv::Writer;
 use reqwest::Client;
 use tokio::sync::Mutex;
-use uuid::Uuid;
 
 use pragma_entities::models::funding_rate::NewFundingRate;
-use sources::{hyperliquid::Hyperliquid, paradex::Paradex};
+use sources::{
+    bybit::Bybit, extended::Extended, hyperliquid::Hyperliquid, kraken::Kraken, paradex::Paradex,
+};
+use std::collections::HashMap;
+use uuid::Uuid;
+
+const NUMBER_OF_MINUTES_IN_ONE_YEAR: f64 = 525_600.0;
 
 pub const ALL_PAIRS: &[&str] = &[
     "AAVE/USD",
@@ -99,7 +104,7 @@ async fn main() -> anyhow::Result<()> {
 
     let csv_path = if let Some(input_path) = cli.csv_input {
         // If CSV input is provided, use it directly
-        println!("Using existing CSV file: {}", input_path);
+        println!("Using existing CSV file: {input_path}");
         input_path
     } else {
         // Otherwise, fetch and generate new data
@@ -148,7 +153,7 @@ async fn main() -> anyhow::Result<()> {
         // Wait for all tasks to complete
         for task in tasks {
             if let Err(e) = task.await? {
-                eprintln!("Task error: {}", e);
+                eprintln!("Task error: {e}");
             }
         }
 
@@ -197,7 +202,7 @@ fn import_to_timescaledb(connection: &str, csv_path: &str) -> anyhow::Result<()>
 
 async fn fetch_funding_rates(
     source: &str,
-    orginal_pair: &str,
+    original_pair: &str,
     formatted_pair: &str,
     start: i64,
     end: i64,
@@ -210,11 +215,11 @@ async fn fetch_funding_rates(
                 Hyperliquid::fetch_historical_fundings(formatted_pair, start, end, client).await?;
             for r in rows {
                 let ts = timestamp_from_millis(r.time)?;
-                let hourly_rate: f64 = r.funding_rate.parse()?;
-                let annualized_rate = hourly_rate * 24.0 * 365.0;
+                let funding_rate: f64 = r.funding_rate.parse()?;
+                let annualized_rate = funding_rate * 24.0 * 365.0;
                 entries.push(NewFundingRate {
                     source: "hyperliquid".to_string(),
-                    pair: orginal_pair.to_string(),
+                    pair: original_pair.to_string(),
                     annualized_rate,
                     timestamp: ts,
                 });
@@ -225,11 +230,65 @@ async fn fetch_funding_rates(
                 Paradex::fetch_historical_fundings(formatted_pair, start, end, client).await?;
             for r in rows {
                 let ts = timestamp_from_millis(r.created_at)?;
-                let rate: f64 = r.funding_rate.parse()?;
+                let funding_rate: f64 = r.funding_rate.parse()?;
+                let annualized_rate = funding_rate * 3.0 * 365.0;
                 entries.push(NewFundingRate {
                     source: "paradex".to_string(),
-                    pair: orginal_pair.to_string(),
-                    annualized_rate: rate,
+                    pair: original_pair.to_string(),
+                    annualized_rate,
+                    timestamp: ts,
+                });
+            }
+        }
+        "extended" => {
+            let rows =
+                Extended::fetch_historical_fundings(formatted_pair, start, end, client).await?;
+            for r in rows {
+                let ts = timestamp_from_millis(r.created_at)?;
+                let funding_rate: f64 = r.funding_rate.parse()?;
+                let annualized_rate = funding_rate * 24.0 * 365.0;
+                entries.push(NewFundingRate {
+                    source: "extended".to_string(),
+                    pair: original_pair.to_string(),
+                    annualized_rate,
+                    timestamp: ts,
+                });
+            }
+        }
+        "kraken" => {
+            let rows =
+                Kraken::fetch_historical_fundings(formatted_pair, start, end, client).await?;
+            for r in rows {
+                let ts = DateTime::parse_from_rfc3339(&r.timestamp)?.naive_utc();
+                let annualized_rate = r.relative_funding_rate * 24.0 * 365.0;
+                entries.push(NewFundingRate {
+                    source: "kraken".to_string(),
+                    pair: original_pair.to_string(),
+                    annualized_rate,
+                    timestamp: ts,
+                });
+            }
+        }
+        "bybit" => {
+            let rows = Bybit::fetch_historical_fundings(formatted_pair, start, end, client).await?;
+            for r in rows {
+                let ts = timestamp_from_millis(r.timestamp.parse()?)?;
+                let funding_rate: f64 = r.funding_rate.parse()?;
+                // Convert from percentage to decimal?
+                // let funding_rate = funding_rate / 100.0;
+                let base_coin = if formatted_pair.ends_with("PERP") {
+                    formatted_pair.trim_end_matches("PERP")
+                } else {
+                    formatted_pair.trim_end_matches("USDT")
+                };
+                let funding_interval = Bybit::get_funding_interval(base_coin)?;
+                // Calculate periods per year based on funding interval in minutes
+                let periods_per_year = NUMBER_OF_MINUTES_IN_ONE_YEAR / funding_interval as f64;
+                let annualized_rate = funding_rate * periods_per_year;
+                entries.push(NewFundingRate {
+                    source: "bybit".to_string(),
+                    pair: original_pair.to_string(),
+                    annualized_rate,
                     timestamp: ts,
                 });
             }
@@ -257,8 +316,21 @@ fn parse_time_range(range: &str) -> anyhow::Result<(i64, i64)> {
 }
 
 fn write_to_csv(entries: &[NewFundingRate], output_path: &str) -> anyhow::Result<()> {
-    let mut writer = Writer::from_path(output_path)?;
+    // Group by source + pair + timestamp in minutes
+    let mut entries_per_minute = HashMap::new();
+
     for entry in entries {
+        let key = (
+            entry.source.clone(),
+            entry.pair.clone(),
+            entry.timestamp.and_utc().timestamp_millis() / (60 * 1000), // Convert ms to minutes
+        );
+
+        entries_per_minute.entry(key).or_insert(entry);
+    }
+
+    let mut writer = Writer::from_path(output_path)?;
+    for entry in entries_per_minute.values() {
         writer.write_record(&[
             Uuid::new_v4().to_string(),
             entry.source.to_uppercase().clone(),
@@ -269,14 +341,25 @@ fn write_to_csv(entries: &[NewFundingRate], output_path: &str) -> anyhow::Result
         ])?;
     }
     writer.flush()?;
-    println!("Wrote {} entries to {}", entries.len(), output_path);
+    println!(
+        "Wrote {} entries to {}",
+        entries_per_minute.len(),
+        output_path
+    );
     Ok(())
 }
 
 fn format_pair_for_exchange(source: &str, pair: &str) -> String {
     match source {
-        "hyperliquid" => pair.split('/').next().unwrap_or(pair).to_uppercase(),
+        "bybit" | "hyperliquid" => pair.split('/').next().unwrap_or(pair).to_uppercase(),
         "paradex" => format!("{}-PERP", pair.replace('/', "-").to_uppercase()),
+        "extended" => pair.replace('/', "-").to_uppercase(),
+        "kraken" => {
+            let base = pair.split('/').next().unwrap_or(pair);
+            let quote = pair.split('/').nth(1).unwrap_or("");
+            let base = if base == "BTC" { "XBT" } else { base };
+            format!("PF_{base}{quote}").to_uppercase()
+        }
         other => panic!("Source '{other}' not implemented"),
     }
 }
