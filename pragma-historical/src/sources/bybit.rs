@@ -1,8 +1,12 @@
 use anyhow::{Result, anyhow};
 use reqwest::Client;
 use serde::Deserialize;
+use std::collections::HashMap;
+use std::sync::OnceLock;
 
 const LIMIT: i32 = 200; // Maximum limit allowed by Bybit
+
+static FUNDING_INTERVALS: OnceLock<HashMap<String, u64>> = OnceLock::new();
 
 pub struct Bybit;
 
@@ -29,13 +33,51 @@ pub struct BybitResult {
     pub list: Vec<BybitFundingRateEntry>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct InstrumentsInfoResponse {
+    #[serde(rename = "retCode")]
+    pub ret_code: i32,
+    #[serde(rename = "retMsg")]
+    pub ret_msg: String,
+    pub result: InstrumentsInfoResult,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct InstrumentsInfoResult {
+    pub list: Vec<InstrumentInfo>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct InstrumentInfo {
+    pub symbol: String,
+    #[serde(rename = "baseCoin")]
+    pub base_coin: String,
+    #[serde(rename = "fundingInterval")]
+    pub funding_interval: u64,
+}
+
 impl Bybit {
+    pub fn get_funding_interval(base_coin: &str) -> Result<u64> {
+        FUNDING_INTERVALS
+            .get()
+            .ok_or_else(|| anyhow!("Funding intervals not initialized"))?
+            .get(base_coin)
+            .copied()
+            .ok_or_else(|| anyhow!("No funding interval found for {}", base_coin))
+    }
+
     pub async fn fetch_historical_fundings(
         market: &str,
         start: i64,
         end: i64,
         client: &Client,
     ) -> Result<Vec<BybitFundingRateEntry>> {
+        // Initialize funding intervals if not already done
+        if FUNDING_INTERVALS.get().is_none() {
+            let intervals = Self::fetch_funding_intervals(client).await?;
+            FUNDING_INTERVALS.set(intervals).map_err(|_| anyhow!("Failed to set funding intervals"))?;
+        }
+
         // First try with PERP suffix
         let perp_market = format!("{market}PERP");
         let perp_result =
@@ -48,6 +90,29 @@ impl Bybit {
         // If PERP fails, try with USDT suffix
         let usdt_market = format!("{market}USDT");
         Self::fetch_historical_fundings_for_symbol(&usdt_market, start, end, client).await
+    }
+
+    async fn fetch_funding_intervals(client: &Client) -> Result<HashMap<String, u64>> {
+        let url = "https://api.bybit.com/v5/market/instruments-info?category=linear";
+        let response = client.get(url).send().await?.error_for_status()?;
+        let info: InstrumentsInfoResponse = response.json().await?;
+
+        if info.ret_code != 0 {
+            return Err(anyhow!("Bybit API error: {}", info.ret_msg));
+        }
+
+        let mut intervals = HashMap::new();
+        for instrument in info.result.list {
+            let ticker = instrument.base_coin;
+            let symbol = instrument.symbol;
+            let usd_format = format!("{ticker}USDT");
+            if symbol == usd_format {
+                println!("Found funding interval for {}: {} minutes", ticker, instrument.funding_interval);
+                intervals.insert(ticker, instrument.funding_interval);
+            }
+        }
+
+        Ok(intervals)
     }
 
     async fn fetch_historical_fundings_for_symbol(

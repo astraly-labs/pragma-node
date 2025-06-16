@@ -16,6 +16,8 @@ use sources::{
 use std::collections::HashMap;
 use uuid::Uuid;
 
+const NUMBER_OF_MINUTES_IN_ONE_YEAR: f64 = 525_600.0;
+
 pub const ALL_PAIRS: &[&str] = &[
     "AAVE/USD",
     "APT/USD",
@@ -200,7 +202,7 @@ fn import_to_timescaledb(connection: &str, csv_path: &str) -> anyhow::Result<()>
 
 async fn fetch_funding_rates(
     source: &str,
-    orginal_pair: &str,
+    original_pair: &str,
     formatted_pair: &str,
     start: i64,
     end: i64,
@@ -213,11 +215,11 @@ async fn fetch_funding_rates(
                 Hyperliquid::fetch_historical_fundings(formatted_pair, start, end, client).await?;
             for r in rows {
                 let ts = timestamp_from_millis(r.time)?;
-                let hourly_rate: f64 = r.funding_rate.parse()?;
-                let annualized_rate = hourly_rate * 24.0 * 365.0;
+                let funding_rate: f64 = r.funding_rate.parse()?;
+                let annualized_rate = funding_rate * 24.0 * 365.0;
                 entries.push(NewFundingRate {
                     source: "hyperliquid".to_string(),
-                    pair: orginal_pair.to_string(),
+                    pair: original_pair.to_string(),
                     annualized_rate,
                     timestamp: ts,
                 });
@@ -228,11 +230,12 @@ async fn fetch_funding_rates(
                 Paradex::fetch_historical_fundings(formatted_pair, start, end, client).await?;
             for r in rows {
                 let ts = timestamp_from_millis(r.created_at)?;
-                let rate: f64 = r.funding_rate.parse()?;
+                let funding_rate: f64 = r.funding_rate.parse()?;
+                let annualized_rate = funding_rate * 3.0 * 365.0;
                 entries.push(NewFundingRate {
                     source: "paradex".to_string(),
-                    pair: orginal_pair.to_string(),
-                    annualized_rate: rate,
+                    pair: original_pair.to_string(),
+                    annualized_rate,
                     timestamp: ts,
                 });
             }
@@ -242,11 +245,11 @@ async fn fetch_funding_rates(
                 Extended::fetch_historical_fundings(formatted_pair, start, end, client).await?;
             for r in rows {
                 let ts = timestamp_from_millis(r.created_at)?;
-                let hourly_rate: f64 = r.funding_rate.parse()?;
-                let annualized_rate = hourly_rate * 24.0 * 365.0;
+                let funding_rate: f64 = r.funding_rate.parse()?;
+                let annualized_rate = funding_rate * 24.0 * 365.0;
                 entries.push(NewFundingRate {
                     source: "extended".to_string(),
-                    pair: orginal_pair.to_string(),
+                    pair: original_pair.to_string(),
                     annualized_rate,
                     timestamp: ts,
                 });
@@ -257,11 +260,10 @@ async fn fetch_funding_rates(
                 Kraken::fetch_historical_fundings(formatted_pair, start, end, client).await?;
             for r in rows {
                 let ts = DateTime::parse_from_rfc3339(&r.timestamp)?.naive_utc();
-                let four_hour_rate = r.funding_rate * 100.0;
-                let annualized_rate = four_hour_rate * 6.0 * 365.0;
+                let annualized_rate = r.relative_funding_rate * 24.0 * 365.0;
                 entries.push(NewFundingRate {
                     source: "kraken".to_string(),
-                    pair: orginal_pair.to_string(),
+                    pair: original_pair.to_string(),
                     annualized_rate,
                     timestamp: ts,
                 });
@@ -271,11 +273,21 @@ async fn fetch_funding_rates(
             let rows = Bybit::fetch_historical_fundings(formatted_pair, start, end, client).await?;
             for r in rows {
                 let ts = timestamp_from_millis(r.timestamp.parse()?)?;
-                let hourly_rate: f64 = r.funding_rate.parse()?;
-                let annualized_rate = hourly_rate * 24.0 * 365.0 * 100.0;
+                let funding_rate: f64 = r.funding_rate.parse()?;
+                // Convert from percentage to decimal?
+                // let funding_rate = funding_rate / 100.0;
+                let base_coin = if formatted_pair.ends_with("PERP") {
+                    formatted_pair.trim_end_matches("PERP")
+                } else {
+                    formatted_pair.trim_end_matches("USDT")
+                };
+                let funding_interval = Bybit::get_funding_interval(base_coin)?;
+                // Calculate periods per year based on funding interval in minutes
+                let periods_per_year = NUMBER_OF_MINUTES_IN_ONE_YEAR / funding_interval as f64;
+                let annualized_rate = funding_rate * periods_per_year;
                 entries.push(NewFundingRate {
                     source: "bybit".to_string(),
-                    pair: orginal_pair.to_string(),
+                    pair: original_pair.to_string(),
                     annualized_rate,
                     timestamp: ts,
                 });

@@ -8,6 +8,8 @@ pub struct Kraken;
 pub struct KrakenFundingRateEntry {
     #[serde(rename = "fundingRate")]
     pub funding_rate: f64,
+    #[serde(rename = "relativeFundingRate")]
+    pub relative_funding_rate: f64,
     pub timestamp: String,
 }
 
