@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
 use deadpool_diesel::postgres::Pool;
 
+use diesel::Connection;
 use diesel::{
     RunQueryDsl as _,
     sql_types::{Timestamp, VarChar},
@@ -35,9 +36,9 @@ pub async fn get_at_timestamp(
     let funding_rate = conn
         .interact(move |conn| {
             if let Some(ts) = timestamp {
-                FundingRate::get_at(conn, &pair, &source, ts)
+                FundingRate::get_at_transactional(conn, &pair, &source, ts)
             } else {
-                FundingRate::get_latest(conn, &pair, &source)
+                FundingRate::get_latest_transactional(conn, &pair, &source)
             }
         })
         .await
@@ -70,8 +71,10 @@ pub async fn get_history_in_range(
 
     let funding_rates = conn
         .interact(move |conn| match frequency {
-            Frequency::All => FundingRate::get_in_range(conn, &pair, &source, start, end),
-            Frequency::Minute => FundingRate::get_in_range_aggregated(
+            Frequency::All => {
+                FundingRate::get_in_range_transactional(conn, &pair, &source, start, end)
+            }
+            Frequency::Minute => FundingRate::get_in_range_aggregated_transactional(
                 conn,
                 &pair,
                 &source,
@@ -79,7 +82,7 @@ pub async fn get_history_in_range(
                 end,
                 "funding_rates_1_min",
             ),
-            Frequency::Hour => FundingRate::get_in_range_aggregated(
+            Frequency::Hour => FundingRate::get_in_range_aggregated_transactional(
                 conn,
                 &pair,
                 &source,
@@ -130,7 +133,7 @@ pub async fn get_supported_instruments(pool: &Pool) -> Result<Vec<InstrumentInfo
 
     let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
     let rows: Vec<InstrumentDTO> = conn
-        .interact(move |c| diesel::sql_query(sql).load::<InstrumentDTO>(c))
+        .interact(move |c| c.transaction(|conn| diesel::sql_query(sql).load::<InstrumentDTO>(conn)))
         .await
         .map_err(InfraError::DbInteractionError)?
         .map_err(InfraError::DbResultError)?;

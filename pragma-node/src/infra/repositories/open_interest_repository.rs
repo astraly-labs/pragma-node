@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use deadpool_diesel::postgres::Pool;
+use diesel::Connection;
 use diesel::RunQueryDsl as _;
 use diesel::sql_types::{Timestamp, VarChar};
 use pragma_common::Pair;
@@ -31,9 +32,9 @@ pub async fn get_at_timestamp(
     let open_interest = conn
         .interact(move |conn| {
             if let Some(ts) = timestamp {
-                OpenInterest::get_at(conn, &pair, &source, ts)
+                OpenInterest::get_at_transactional(conn, &pair, &source, ts)
             } else {
-                OpenInterest::get_latest(conn, &pair, &source)
+                OpenInterest::get_latest_transactional(conn, &pair, &source)
             }
         })
         .await
@@ -64,7 +65,9 @@ pub async fn get_history_in_range(
         .naive_utc();
 
     let open_interests = conn
-        .interact(move |conn| OpenInterest::get_in_range(conn, &pair, &source, start, end))
+        .interact(move |conn| {
+            OpenInterest::get_in_range_transactional(conn, &pair, &source, start, end)
+        })
         .await
         .map_err(InfraError::DbInteractionError)?
         .map_err(InfraError::DbResultError)?;
@@ -106,7 +109,7 @@ pub async fn get_supported_instruments(pool: &Pool) -> Result<Vec<InstrumentInfo
 
     let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
     let rows: Vec<InstrumentDTO> = conn
-        .interact(move |c| diesel::sql_query(sql).load::<InstrumentDTO>(c))
+        .interact(move |c| c.transaction(|conn| diesel::sql_query(sql).load::<InstrumentDTO>(conn)))
         .await
         .map_err(InfraError::DbInteractionError)?
         .map_err(InfraError::DbResultError)?;

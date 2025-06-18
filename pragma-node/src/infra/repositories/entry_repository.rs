@@ -17,6 +17,7 @@ use crate::constants::others::ROUTING_FRESHNESS_THRESHOLD;
 use crate::handlers::get_entry::EntryParams;
 use crate::utils::convert_via_quote;
 use crate::utils::sql::{get_interval_specifier, get_table_suffix};
+use diesel::Connection;
 
 use super::utils::HexFormat;
 
@@ -167,7 +168,7 @@ async fn pair_id_exist(
 
     let pair_str = pair.to_string();
     let res = conn
-        .interact(move |conn| Entry::exists(conn, pair_str))
+        .interact(move |conn| Entry::exists_transactional(conn, pair_str))
         .await
         .map_err(InfraError::DbInteractionError)?
         .map_err(InfraError::DbResultError)?;
@@ -233,18 +234,20 @@ pub async fn get_twap_price_without_components(
     )?;
 
     let p = pair_id.clone();
-    let raw_entry = conn
+    let raw_entries = conn
         .interact(move |conn| {
-            diesel::sql_query(&sql_request)
-                .bind::<diesel::sql_types::Text, _>(p)
-                .bind::<diesel::sql_types::Timestamptz, _>(date_time)
-                .load::<MedianEntryRawBase>(conn)
+            conn.transaction(|conn| {
+                diesel::sql_query(&sql_request)
+                    .bind::<diesel::sql_types::Text, _>(p)
+                    .bind::<diesel::sql_types::Timestamptz, _>(date_time)
+                    .load::<MedianEntryRawBase>(conn)
+            })
         })
         .await
         .map_err(InfraError::DbInteractionError)?
         .map_err(InfraError::DbResultError)?;
 
-    let raw_entry = raw_entry
+    let raw_entry = raw_entries
         .first()
         .ok_or(InfraError::EntryNotFound(pair_id))?;
 
@@ -292,18 +295,20 @@ pub async fn get_twap_price_with_components(
     )?;
 
     let p = pair_id.clone();
-    let raw_entry = conn
+    let raw_entries = conn
         .interact(move |conn| {
-            diesel::sql_query(&sql_request)
-                .bind::<diesel::sql_types::Text, _>(p)
-                .bind::<diesel::sql_types::Timestamptz, _>(date_time)
-                .load::<MedianEntryRawWithComponents>(conn)
+            conn.transaction(|conn| {
+                diesel::sql_query(&sql_request)
+                    .bind::<diesel::sql_types::Text, _>(p)
+                    .bind::<diesel::sql_types::Timestamptz, _>(date_time)
+                    .load::<MedianEntryRawWithComponents>(conn)
+            })
         })
         .await
         .map_err(InfraError::DbInteractionError)?
         .map_err(InfraError::DbResultError)?;
 
-    let raw_entry = raw_entry
+    let raw_entry = raw_entries
         .first()
         .ok_or(InfraError::EntryNotFound(pair_id))?;
 
@@ -371,18 +376,20 @@ pub async fn get_median_price_without_components(
     )?;
 
     let p = pair_id.clone();
-    let raw_entry = conn
+    let raw_entries = conn
         .interact(move |conn| {
-            diesel::sql_query(&sql_request)
-                .bind::<diesel::sql_types::Text, _>(p)
-                .bind::<diesel::sql_types::Timestamptz, _>(date_time)
-                .load::<MedianEntryRawBase>(conn)
+            conn.transaction(|conn| {
+                diesel::sql_query(&sql_request)
+                    .bind::<diesel::sql_types::Text, _>(p)
+                    .bind::<diesel::sql_types::Timestamptz, _>(date_time)
+                    .load::<MedianEntryRawBase>(conn)
+            })
         })
         .await
         .map_err(InfraError::DbInteractionError)?
         .map_err(InfraError::DbResultError)?;
 
-    let raw_entry = raw_entry
+    let raw_entry = raw_entries
         .first()
         .ok_or(InfraError::EntryNotFound(pair_id))?;
 
@@ -429,18 +436,20 @@ pub async fn get_median_price_with_components(
     )?;
 
     let p = pair_id.clone();
-    let raw_entry = conn
+    let raw_entries = conn
         .interact(move |conn| {
-            diesel::sql_query(&sql_request)
-                .bind::<diesel::sql_types::Text, _>(p)
-                .bind::<diesel::sql_types::Timestamptz, _>(date_time)
-                .load::<MedianEntryRawWithComponents>(conn)
+            conn.transaction(|conn| {
+                diesel::sql_query(&sql_request)
+                    .bind::<diesel::sql_types::Text, _>(p)
+                    .bind::<diesel::sql_types::Timestamptz, _>(date_time)
+                    .load::<MedianEntryRawWithComponents>(conn)
+            })
         })
         .await
         .map_err(InfraError::DbInteractionError)?
         .map_err(InfraError::DbResultError)?;
 
-    let raw_entry = raw_entry
+    let raw_entry = raw_entries
         .first()
         .ok_or(InfraError::EntryNotFound(pair_id))?;
 
@@ -493,11 +502,13 @@ pub async fn get_spot_median_entries_1_min_between(
 
     let raw_entries = conn
         .interact(move |conn| {
-            diesel::sql_query(raw_sql)
-                .bind::<diesel::sql_types::Text, _>(pair_id)
-                .bind::<diesel::sql_types::Timestamptz, _>(start_datetime)
-                .bind::<diesel::sql_types::Timestamptz, _>(end_datetime)
-                .load::<MedianEntryRawBase>(conn)
+            conn.transaction(|conn| {
+                diesel::sql_query(raw_sql)
+                    .bind::<diesel::sql_types::Text, _>(pair_id)
+                    .bind::<diesel::sql_types::Timestamptz, _>(start_datetime)
+                    .bind::<diesel::sql_types::Timestamptz, _>(end_datetime)
+                    .load::<MedianEntryRawBase>(conn)
+            })
         })
         .await
         .map_err(InfraError::DbInteractionError)?
@@ -556,11 +567,13 @@ pub async fn get_median_prices_between(
 
     let raw_entries = conn
         .interact(move |conn| {
-            diesel::sql_query(&sql_request)
-                .bind::<diesel::sql_types::Text, _>(pair_id)
-                .bind::<diesel::sql_types::Timestamptz, _>(start_datetime)
-                .bind::<diesel::sql_types::Timestamptz, _>(end_datetime)
-                .load::<MedianEntryRawWithComponents>(conn)
+            conn.transaction(|conn| {
+                diesel::sql_query(&sql_request)
+                    .bind::<diesel::sql_types::Text, _>(pair_id)
+                    .bind::<diesel::sql_types::Timestamptz, _>(start_datetime)
+                    .bind::<diesel::sql_types::Timestamptz, _>(end_datetime)
+                    .load::<MedianEntryRawWithComponents>(conn)
+            })
         })
         .await
         .map_err(InfraError::DbInteractionError)?
@@ -630,11 +643,13 @@ pub async fn get_twap_prices_between(
 
     let raw_entries = conn
         .interact(move |conn| {
-            diesel::sql_query(&sql_request)
-                .bind::<diesel::sql_types::Text, _>(pair_id)
-                .bind::<diesel::sql_types::Timestamptz, _>(start_datetime)
-                .bind::<diesel::sql_types::Timestamptz, _>(end_datetime)
-                .load::<MedianEntryRawWithComponents>(conn)
+            conn.transaction(|conn| {
+                diesel::sql_query(&sql_request)
+                    .bind::<diesel::sql_types::Text, _>(pair_id)
+                    .bind::<diesel::sql_types::Timestamptz, _>(start_datetime)
+                    .bind::<diesel::sql_types::Timestamptz, _>(end_datetime)
+                    .load::<MedianEntryRawWithComponents>(conn)
+            })
         })
         .await
         .map_err(InfraError::DbInteractionError)?
@@ -727,10 +742,12 @@ pub async fn get_last_updated_timestamp(
     max_timestamp: i64,
 ) -> Result<Option<NaiveDateTime>, InfraError> {
     let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
-    conn.interact(move |conn| Entry::get_last_updated_timestamp(conn, pair_id, max_timestamp))
-        .await
-        .map_err(InfraError::DbInteractionError)?
-        .map_err(InfraError::DbResultError)
+    conn.interact(move |conn| {
+        Entry::get_last_updated_timestamp_transactional(conn, pair_id, max_timestamp)
+    })
+    .await
+    .map_err(InfraError::DbInteractionError)?
+    .map_err(InfraError::DbResultError)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Queryable, ToSchema)]
@@ -817,11 +834,13 @@ pub async fn get_spot_ohlc(
 
     let raw_entries = conn
         .interact(move |conn| {
-            diesel::sql_query(raw_sql)
-                .bind::<diesel::sql_types::Text, _>(pair_id)
-                .bind::<diesel::sql_types::Timestamptz, _>(date_time)
-                .bind::<diesel::sql_types::BigInt, _>(limit)
-                .load::<OHLCEntryRaw>(conn)
+            conn.transaction(|conn| {
+                diesel::sql_query(raw_sql)
+                    .bind::<diesel::sql_types::Text, _>(pair_id)
+                    .bind::<diesel::sql_types::Timestamptz, _>(date_time)
+                    .bind::<diesel::sql_types::BigInt, _>(limit)
+                    .load::<OHLCEntryRaw>(conn)
+            })
         })
         .await
         .map_err(InfraError::DbInteractionError)?
@@ -857,9 +876,11 @@ pub async fn get_expiries_list(
 
     let raw_exp = conn
         .interact(move |conn| {
-            diesel::sql_query(&sql_request)
-                .bind::<diesel::sql_types::Text, _>(pair_id)
-                .load::<ExpiriesListRaw>(conn)
+            conn.transaction(|conn| {
+                diesel::sql_query(&sql_request)
+                    .bind::<diesel::sql_types::Text, _>(pair_id)
+                    .load::<ExpiriesListRaw>(conn)
+            })
         })
         .await
         .map_err(InfraError::DbInteractionError)?
