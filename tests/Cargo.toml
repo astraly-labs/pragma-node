@@ -12,6 +12,7 @@ path = "e2e/main.rs"
 [dev-dependencies]
 pragma-common = { workspace = true }
 pragma-node = { workspace = true }
+pragma-entities = { workspace = true }
 
 diesel = { workspace = true, features = [
   "postgres",
