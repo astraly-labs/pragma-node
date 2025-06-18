@@ -83,4 +83,51 @@ impl OpenInterest {
             .order(open_interest::timestamp.asc())
             .load(conn)
     }
+
+    // Transactional versions of the above methods
+
+    pub fn create_many_transactional(
+        conn: &mut PgConnection,
+        new_entries: Vec<NewOpenInterest>,
+    ) -> Result<Vec<Self>, diesel::result::Error> {
+        conn.transaction(|conn| Self::create_many(conn, new_entries))
+    }
+
+    pub fn get_latest_transactional(
+        conn: &mut PgConnection,
+        pair: &Pair,
+        source: &str,
+    ) -> Result<Option<Self>, diesel::result::Error> {
+        conn.transaction(|conn| Self::get_latest(conn, pair, source))
+    }
+
+    pub fn get_at_transactional(
+        conn: &mut PgConnection,
+        pair: &Pair,
+        source: &str,
+        timestamp: NaiveDateTime,
+    ) -> Result<Option<Self>, diesel::result::Error> {
+        conn.transaction(|conn| Self::get_at(conn, pair, source, timestamp))
+    }
+
+    pub fn get_in_range_transactional(
+        conn: &mut PgConnection,
+        pair: &Pair,
+        source: &str,
+        start: NaiveDateTime,
+        end: NaiveDateTime,
+    ) -> Result<Vec<Self>, diesel::result::Error> {
+        conn.transaction(|conn| Self::get_in_range(conn, pair, source, start, end))
+    }
+
+    // Batch operations with transactions
+    pub fn batch_operations_transactional<F, T>(
+        conn: &mut PgConnection,
+        operations: F,
+    ) -> Result<T, diesel::result::Error>
+    where
+        F: FnOnce(&mut PgConnection) -> Result<T, diesel::result::Error>,
+    {
+        conn.transaction(operations)
+    }
 }

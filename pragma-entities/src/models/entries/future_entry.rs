@@ -1,7 +1,9 @@
 use crate::dto::entry as dto;
 use crate::models::DieselResult;
+use crate::schema::future_entries;
 use bigdecimal::BigDecimal;
 use diesel::BoolExpressionMethods;
+use diesel::Connection;
 use diesel::dsl::sql;
 use diesel::internal::derives::multiconnection::chrono::NaiveDateTime;
 use diesel::{
@@ -10,8 +12,6 @@ use diesel::{
 };
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-
-use crate::schema::future_entries;
 
 #[derive(Serialize, Queryable, Selectable)]
 #[diesel(table_name = future_entries)]
@@ -124,5 +124,62 @@ impl FutureEntry {
             .select(future_entries::pair_id)
             .distinct()
             .load::<String>(conn)
+    }
+
+    pub fn create_one_transactional(
+        conn: &mut PgConnection,
+        data: NewFutureEntry,
+    ) -> DieselResult<Self> {
+        conn.transaction(|conn| Self::create_one(conn, data))
+    }
+
+    pub fn create_many_transactional(
+        conn: &mut PgConnection,
+        data: Vec<NewFutureEntry>,
+    ) -> DieselResult<Vec<Self>> {
+        conn.transaction(|conn| Self::create_many(conn, data))
+    }
+
+    pub fn exists_transactional(conn: &mut PgConnection, pair_id: String) -> DieselResult<bool> {
+        conn.transaction(|conn| Self::exists(conn, pair_id))
+    }
+
+    pub fn get_by_pair_id_transactional(
+        conn: &mut PgConnection,
+        pair_id: String,
+    ) -> DieselResult<Self> {
+        conn.transaction(|conn| Self::get_by_pair_id(conn, pair_id))
+    }
+
+    pub fn with_filters_transactional(
+        conn: &mut PgConnection,
+        filters: dto::EntriesFilter,
+    ) -> DieselResult<Vec<Self>> {
+        conn.transaction(|conn| Self::with_filters(conn, filters))
+    }
+
+    pub fn get_existing_pairs_transactional(
+        conn: &mut PgConnection,
+        searched_pairs: Vec<String>,
+    ) -> DieselResult<Vec<String>> {
+        conn.transaction(|conn| Self::get_existing_pairs(conn, searched_pairs))
+    }
+
+    pub fn get_existing_perp_pairs_transactional(
+        conn: &mut PgConnection,
+        searched_pairs: Vec<String>,
+    ) -> DieselResult<Vec<String>> {
+        conn.transaction(|conn| Self::get_existing_perp_pairs(conn, searched_pairs))
+    }
+
+    // Batch operations with transactions
+    pub fn batch_operations_transactional<F, T>(
+        conn: &mut PgConnection,
+        operations: F,
+    ) -> DieselResult<T>
+    where
+        F: FnOnce(&mut PgConnection) -> DieselResult<T>,
+    {
+        conn.transaction(operations)
     }
 }

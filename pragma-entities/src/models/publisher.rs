@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use crate::dto::publisher as dto;
 use crate::models::DieselResult;
 use crate::schema::publishers;
+use diesel::Connection;
 
 #[derive(Serialize, Queryable, Selectable)]
 #[diesel(table_name = publishers)]
@@ -62,5 +63,34 @@ impl Publishers {
             .filter(publishers::name.eq(name))
             .select(publishers::account_address)
             .get_result(conn)
+    }
+
+    pub fn get_by_name_transactional(conn: &mut PgConnection, name: String) -> DieselResult<Self> {
+        conn.transaction(|conn| Self::get_by_name(conn, name))
+    }
+
+    pub fn with_filters_transactional(
+        conn: &mut PgConnection,
+        filters: dto::PublishersFilter,
+    ) -> DieselResult<Vec<Self>> {
+        conn.transaction(|conn| Self::with_filters(conn, filters))
+    }
+
+    pub fn get_account_address_by_name_transactional(
+        conn: &mut PgConnection,
+        name: String,
+    ) -> DieselResult<String> {
+        conn.transaction(|conn| Self::get_account_address_by_name(conn, name))
+    }
+
+    // Batch operations with transactions
+    pub fn batch_operations_transactional<F, T>(
+        conn: &mut PgConnection,
+        operations: F,
+    ) -> DieselResult<T>
+    where
+        F: FnOnce(&mut PgConnection) -> DieselResult<T>,
+    {
+        conn.transaction(operations)
     }
 }
