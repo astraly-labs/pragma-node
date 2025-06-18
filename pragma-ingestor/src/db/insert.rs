@@ -11,7 +11,7 @@ pub(crate) async fn insert_spot_entries(
     new_entries: Vec<NewEntry>,
 ) -> Result<(), InfraError> {
     let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
-    conn.interact(move |conn| Entry::create_many(conn, new_entries))
+    conn.interact(move |conn| Entry::create_many_transactional(conn, new_entries))
         .await
         .map_err(InfraError::DbInteractionError)?
         .map_err(InfraError::DbResultError)?;
@@ -46,7 +46,7 @@ pub(crate) async fn insert_future_entries(
             .count()
     );
 
-    conn.interact(move |conn| FutureEntry::create_many(conn, new_entries))
+    conn.interact(move |conn| FutureEntry::create_many_transactional(conn, new_entries))
         .await
         .map_err(InfraError::DbInteractionError)?
         .map_err(InfraError::DbResultError)?;
@@ -60,7 +60,7 @@ pub(crate) async fn insert_funding_rate_entries(
 ) -> Result<(), InfraError> {
     let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
     let entries = conn
-        .interact(move |conn| FundingRate::create_many(conn, new_entries))
+        .interact(move |conn| FundingRate::create_many_transactional(conn, new_entries))
         .await
         .map_err(InfraError::DbInteractionError)?
         .map_err(InfraError::DbResultError)?;
@@ -82,7 +82,7 @@ pub(crate) async fn insert_open_interest_entries(
 ) -> Result<(), InfraError> {
     let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
     let entries = conn
-        .interact(move |conn| OpenInterest::create_many(conn, new_entries))
+        .interact(move |conn| OpenInterest::create_many_transactional(conn, new_entries))
         .await
         .map_err(InfraError::DbInteractionError)?
         .map_err(InfraError::DbResultError)?;
