@@ -5,6 +5,7 @@ pub mod error;
 pub mod macros;
 pub mod models;
 pub mod schema;
+pub mod transaction;
 
 pub use models::entries::entry_error::EntryError;
 pub use models::entries::timestamp::TimestampError;
