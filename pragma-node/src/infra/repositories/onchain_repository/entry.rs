@@ -17,6 +17,7 @@ use crate::infra::rpc::RpcClients;
 use crate::utils::{
     big_decimal_price_to_hex, convert_via_quote, get_mid_price, normalize_to_decimals,
 };
+use diesel::Connection;
 
 use super::{get_onchain_decimals, get_onchain_ohlc_table_name, get_onchain_table_name};
 
@@ -285,9 +286,11 @@ pub async fn get_sources_and_aggregate(
     let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
     let raw_entries = conn
         .interact(move |conn| {
-            diesel::sql_query(raw_sql)
-                .bind::<Text, _>(pair_id)
-                .load::<SpotEntryWithAggregatedPrice>(conn)
+            conn.transaction(|conn| {
+                diesel::sql_query(raw_sql)
+                    .bind::<Text, _>(pair_id)
+                    .load::<SpotEntryWithAggregatedPrice>(conn)
+            })
         })
         .await
         .map_err(InfraError::DbInteractionError)?
@@ -376,7 +379,9 @@ pub async fn get_last_updated_timestamp(
     );
     let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
     let raw_entry = conn
-        .interact(move |conn| diesel::sql_query(raw_sql).load::<EntryTimestamp>(conn))
+        .interact(move |conn| {
+            conn.transaction(|conn| diesel::sql_query(raw_sql).load::<EntryTimestamp>(conn))
+        })
         .await
         .map_err(InfraError::DbInteractionError)?
         .map_err(InfraError::DbResultError)?;
@@ -438,7 +443,9 @@ pub async fn get_variations(
         let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
         let p = pair_id.clone();
         let raw_entries: Vec<VariationEntry> = conn
-            .interact(move |conn| diesel::sql_query(raw_sql).bind::<Text, _>(p).load(conn))
+            .interact(move |conn| {
+                conn.transaction(|conn| diesel::sql_query(raw_sql).bind::<Text, _>(p).load(conn))
+            })
             .await
             .map_err(InfraError::DbInteractionError)?
             .map_err(InfraError::DbResultError)?;
@@ -498,7 +505,9 @@ pub async fn get_existing_pairs(
 
     let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
     let raw_entries = conn
-        .interact(move |conn| diesel::sql_query(raw_sql).load::<EntryPairId>(conn))
+        .interact(move |conn| {
+            conn.transaction(|conn| diesel::sql_query(raw_sql).load::<EntryPairId>(conn))
+        })
         .await
         .map_err(InfraError::DbInteractionError)?
         .map_err(InfraError::DbResultError)?;

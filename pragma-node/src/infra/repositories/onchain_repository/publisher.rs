@@ -13,6 +13,7 @@ use pragma_entities::error::InfraError;
 use crate::handlers::onchain::get_publishers::{Publisher, PublisherEntry};
 use crate::infra::rpc::RpcClients;
 use crate::utils::big_decimal_price_to_hex;
+use diesel::Connection;
 
 use super::{get_onchain_decimals, get_onchain_table_name};
 
@@ -51,7 +52,9 @@ pub async fn get_publishers(
 
     let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
     let raw_publishers = conn
-        .interact(move |conn| diesel::sql_query(raw_sql).load::<RawPublisher>(conn))
+        .interact(move |conn| {
+            conn.transaction(|conn| diesel::sql_query(raw_sql).load::<RawPublisher>(conn))
+        })
         .await
         .map_err(InfraError::DbInteractionError)?
         .map_err(InfraError::DbResultError)?;
@@ -143,7 +146,9 @@ async fn get_all_publishers_updates(
 
     let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
     let updates = conn
-        .interact(move |conn| diesel::sql_query(raw_sql).load::<RawPublisherUpdates>(conn))
+        .interact(move |conn| {
+            conn.transaction(|conn| diesel::sql_query(raw_sql).load::<RawPublisherUpdates>(conn))
+        })
         .await
         .map_err(InfraError::DbInteractionError)?
         .map_err(InfraError::DbResultError)?;
@@ -216,7 +221,9 @@ async fn get_publisher_with_components(
 
     let raw_components = conn
         .interact(move |conn| {
-            diesel::sql_query(raw_sql_entries).load::<RawLastPublisherEntryForPair>(conn)
+            conn.transaction(|conn| {
+                diesel::sql_query(raw_sql_entries).load::<RawLastPublisherEntryForPair>(conn)
+            })
         })
         .await
         .map_err(InfraError::DbInteractionError)?

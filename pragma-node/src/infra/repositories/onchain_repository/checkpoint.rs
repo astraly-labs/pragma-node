@@ -3,6 +3,7 @@ use deadpool_diesel::postgres::Pool;
 use diesel::sql_types::{Numeric, Timestamp, VarChar};
 use diesel::{Queryable, QueryableByName, RunQueryDsl};
 
+use diesel::Connection;
 use pragma_common::starknet::StarknetNetwork;
 use pragma_entities::error::InfraError;
 
@@ -63,10 +64,12 @@ pub async fn get_checkpoints(
     let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
     let raw_checkpoints = conn
         .interact(move |conn| {
-            diesel::sql_query(raw_sql)
-                .bind::<diesel::sql_types::Text, _>(pair_id)
-                .bind::<diesel::sql_types::BigInt, _>(limit as i64)
-                .load::<RawCheckpoint>(conn)
+            conn.transaction(|conn| {
+                diesel::sql_query(raw_sql)
+                    .bind::<diesel::sql_types::Text, _>(pair_id)
+                    .bind::<diesel::sql_types::BigInt, _>(limit as i64)
+                    .load::<RawCheckpoint>(conn)
+            })
         })
         .await
         .map_err(InfraError::DbInteractionError)?

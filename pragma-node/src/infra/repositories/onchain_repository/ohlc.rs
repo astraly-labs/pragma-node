@@ -1,6 +1,7 @@
 use deadpool_diesel::postgres::Pool;
 use diesel::RunQueryDsl;
 
+use diesel::Connection;
 use pragma_common::{InstrumentType, Interval, starknet::StarknetNetwork};
 use pragma_entities::error::InfraError;
 
@@ -38,9 +39,11 @@ pub async fn get_ohlc(
     let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
     let raw_entries = conn
         .interact(move |conn| {
-            diesel::sql_query(raw_sql)
-                .bind::<diesel::sql_types::Text, _>(pair_id)
-                .load::<OHLCEntryRaw>(conn)
+            conn.transaction(|conn| {
+                diesel::sql_query(raw_sql)
+                    .bind::<diesel::sql_types::Text, _>(pair_id)
+                    .load::<OHLCEntryRaw>(conn)
+            })
         })
         .await
         .map_err(InfraError::DbInteractionError)?

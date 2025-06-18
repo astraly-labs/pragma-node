@@ -8,6 +8,7 @@ use moka::future::Cache;
 use pragma_entities::models::entries::timestamp::TimestampRange;
 use serde::Serialize;
 
+use diesel::Connection;
 use pragma_common::starknet::StarknetNetwork;
 use pragma_common::{InstrumentType, Interval, Pair};
 use pragma_entities::TimestampError;
@@ -100,11 +101,13 @@ async fn get_historical_aggregated_entries(
     let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
     let raw_entries = conn
         .interact(move |conn| {
-            diesel::sql_query(raw_sql)
-                .bind::<diesel::sql_types::Text, _>(&pair_id)
-                .bind::<diesel::sql_types::BigInt, _>(start_timestamp)
-                .bind::<diesel::sql_types::BigInt, _>(end_timestamp)
-                .load::<HistoricalEntryRaw>(conn)
+            conn.transaction(|conn| {
+                diesel::sql_query(raw_sql)
+                    .bind::<diesel::sql_types::Text, _>(&pair_id)
+                    .bind::<diesel::sql_types::BigInt, _>(start_timestamp)
+                    .bind::<diesel::sql_types::BigInt, _>(end_timestamp)
+                    .load::<HistoricalEntryRaw>(conn)
+            })
         })
         .await
         .map_err(InfraError::DbInteractionError)?
