@@ -75,7 +75,9 @@ impl Bybit {
         // Initialize funding intervals if not already done
         if FUNDING_INTERVALS.get().is_none() {
             let intervals = Self::fetch_funding_intervals(client).await?;
-            FUNDING_INTERVALS.set(intervals).map_err(|_| anyhow!("Failed to set funding intervals"))?;
+            FUNDING_INTERVALS
+                .set(intervals)
+                .map_err(|_| anyhow!("Failed to set funding intervals"))?;
         }
 
         // First try with PERP suffix
@@ -107,7 +109,10 @@ impl Bybit {
             let symbol = instrument.symbol;
             let usd_format = format!("{ticker}USDT");
             if symbol == usd_format {
-                println!("Found funding interval for {}: {} minutes", ticker, instrument.funding_interval);
+                println!(
+                    "Found funding interval for {}: {} minutes",
+                    ticker, instrument.funding_interval
+                );
                 intervals.insert(ticker, instrument.funding_interval);
             }
         }
