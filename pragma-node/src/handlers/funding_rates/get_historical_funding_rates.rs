@@ -7,10 +7,12 @@ use serde::{Deserialize, Serialize};
 use strum::{Display, EnumString};
 use utoipa::{IntoParams, ToSchema};
 
+use crate::constants::others::HOURS_IN_ONE_YEAR;
 use crate::infra::repositories::funding_rates_repository;
 use crate::state::AppState;
 
-use super::get_funding_rates::HOURS_IN_ONE_YEAR;
+const DEFAULT_PAGE: i64 = 1;
+const MAX_PAGE_SIZE: i64 = 1000;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Display, EnumString, ToSchema)]
 #[strum(serialize_all = "lowercase")]
@@ -38,18 +40,18 @@ pub struct GetHistoricalFundingRateParams {
     pub frequency: Frequency,
     /// Page number (1-based). Defaults to 1
     #[serde(default = "default_page")]
-    pub page: u64,
-    /// Number of items per page. Defaults to 1000, max 10000
-    #[serde(default = "default_page_size")]
-    pub page_size: u64,
+    pub page: i64,
+    /// Number of items per page. Defaults to 1000, max 1000
+    #[serde(default = "max_page_size")]
+    pub page_size: i64,
 }
 
-fn default_page() -> u64 {
-    1
+fn default_page() -> i64 {
+    DEFAULT_PAGE
 }
 
-fn default_page_size() -> u64 {
-    1000
+fn max_page_size() -> i64 {
+    MAX_PAGE_SIZE
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -63,8 +65,8 @@ pub struct FundingRateResponse {
 #[derive(Debug, Serialize, ToSchema)]
 pub struct GetHistoricalFundingRateResponse {
     pub data: Vec<FundingRateResponse>,
-    pub page: u64,
-    pub page_size: u64,
+    pub page: i64,
+    pub page_size: i64,
     pub has_next_page: bool,
 }
 
@@ -78,6 +80,11 @@ pub struct GetHistoricalFundingRateResponse {
     params(
         ("base" = String, Path, description = "Base asset symbol (e.g., BTC)"),
         ("quote" = String, Path, description = "Quote asset symbol (e.g., USD)"),
+        ("source" = String, Query, description = "Source of the funding rates (e.g., bybit, hyperliquid, paradex)"),
+        ("timestamp" = TimestampRange, Query, description = "Timestamp range (e.g., 1718745600000,1718832000000)"),
+        ("frequency" = Frequency, Query, description = "Frequency of the data points (all, minute, hour)"),
+        ("page" = i64, Query, description = "Page number (1-based)"),
+        ("page_size" = i64, Query, description = "Number of items per page (1-1000)"),
         GetHistoricalFundingRateParams
     )
 )]
@@ -90,8 +97,8 @@ pub async fn get_historical_funding_rates(
     let source = params.source.to_ascii_uppercase();
 
     // Validate pagination parameters
-    let page = if params.page == 0 { 1 } else { params.page };
-    let page_size = params.page_size.min(10000).max(1); // Clamp between 1 and 10000
+    let page = if params.page <= 0 { DEFAULT_PAGE } else { params.page };
+    let page_size = params.page_size.clamp(1, MAX_PAGE_SIZE);
 
     let timestamp_range = params
         .timestamp

@@ -1,6 +1,6 @@
 use chrono::NaiveDateTime;
 use diesel::prelude::*;
-use diesel::sql_types::{Double, Timestamp, VarChar, BigInt};
+use diesel::sql_types::{BigInt, Double, Timestamp, VarChar};
 use pragma_common::Pair;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -158,6 +158,7 @@ impl FundingRate {
         Ok(funding_rates)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn get_in_range_aggregated_paginated(
         conn: &mut PgConnection,
         pair: &Pair,

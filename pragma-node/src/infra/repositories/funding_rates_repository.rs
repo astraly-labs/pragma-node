@@ -101,8 +101,8 @@ pub async fn get_history_in_range_paginated(
     source: String,
     range: TimestampRange,
     frequency: Frequency,
-    limit: u64,
-    offset: u64,
+    limit: i64,
+    offset: i64,
 ) -> Result<Vec<FundingRate>, InfraError> {
     let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
 
@@ -120,7 +120,9 @@ pub async fn get_history_in_range_paginated(
 
     let funding_rates = conn
         .interact(move |conn| match frequency {
-            Frequency::All => FundingRate::get_in_range_paginated(conn, &pair, &source, start, end, limit as i64, offset as i64),
+            Frequency::All => {
+                FundingRate::get_in_range_paginated(conn, &pair, &source, start, end, limit, offset)
+            }
             Frequency::Minute => FundingRate::get_in_range_aggregated_paginated(
                 conn,
                 &pair,
@@ -128,8 +130,8 @@ pub async fn get_history_in_range_paginated(
                 start,
                 end,
                 "funding_rates_1_min",
-                limit as i64,
-                offset as i64,
+                limit,
+                offset,
             ),
             Frequency::Hour => FundingRate::get_in_range_aggregated_paginated(
                 conn,
@@ -138,8 +140,8 @@ pub async fn get_history_in_range_paginated(
                 start,
                 end,
                 "funding_rates_1_hour",
-                limit as i64,
-                offset as i64,
+                limit,
+                offset,
             ),
         })
         .await

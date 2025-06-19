@@ -6,3 +6,7 @@
 /// `ROUTING_FRESHNESS_THRESHOLD` seconds ago.
 /// Otherwise, we return the price by routing through USD pairs.
 pub const ROUTING_FRESHNESS_THRESHOLD: i64 = 60; // 1 minute
+
+/// Number of hours in one year (365 * 24).
+/// Used for converting annualized funding rates to hourly rates.
+pub const HOURS_IN_ONE_YEAR: f64 = 8760.0;

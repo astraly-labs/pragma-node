@@ -5,10 +5,9 @@ use pragma_entities::EntryError;
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 
+use crate::constants::others::HOURS_IN_ONE_YEAR;
 use crate::infra::repositories::funding_rates_repository;
 use crate::state::AppState;
-
-pub const HOURS_IN_ONE_YEAR: f64 = 8760.0;
 
 #[derive(Debug, Deserialize, IntoParams)]
 pub struct GetLatestFundingRateParams {

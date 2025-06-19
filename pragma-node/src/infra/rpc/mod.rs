@@ -36,7 +36,7 @@ pub static ORACLE_ADDRESS_PER_NETWORK: LazyLock<HashMap<StarknetNetwork, Felt>> 
         addresses
     });
 
-/// The list of all the starknet rpcs that the FallbackProvider may use.
+/// The list of all the starknet rpcs that the `FallbackProvider` may use.
 /// They're sorted by priority (so we sorted them by reliability here).
 pub const MAINNET_STARKNET_RPC_URLS: [&str; 10] = [
     "https://api.cartridge.gg/x/starknet/mainnet",
