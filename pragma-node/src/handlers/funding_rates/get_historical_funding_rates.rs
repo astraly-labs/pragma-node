@@ -97,7 +97,11 @@ pub async fn get_historical_funding_rates(
     let source = params.source.to_ascii_uppercase();
 
     // Validate pagination parameters
-    let page = if params.page <= 0 { DEFAULT_PAGE } else { params.page };
+    let page = if params.page <= 0 {
+        DEFAULT_PAGE
+    } else {
+        params.page
+    };
     let page_size = params.page_size.clamp(1, MAX_PAGE_SIZE);
 
     let timestamp_range = params
