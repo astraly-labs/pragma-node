@@ -70,8 +70,8 @@ pub struct GetHistoricalFundingRateResponse {
         ("source" = String, Query, description = "Source of the funding rates (e.g., bybit, hyperliquid, paradex)"),
         ("timestamp" = TimestampRange, Query, description = "Timestamp range (e.g., 1718745600000,1718832000000)"),
         ("frequency" = Frequency, Query, description = "Frequency of the data points (all, minute, hour)"),
-        ("page" = Option<i64>, Query, description = "Page number (1-based)"),
-        ("page_size" = Option<i64>, Query, description = "Number of items per page (1-1000)"),
+        ("page" = i64, Query, description = "Page number (1-based)"),
+        ("page_size" = i64, Query, description = "Number of items per page (1-1000)"),
         GetHistoricalFundingRateParams
     )
 )]

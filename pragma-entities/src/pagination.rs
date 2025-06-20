@@ -1,6 +1,9 @@
 use serde::{Deserialize, Deserializer};
 use utoipa::{IntoParams, ToSchema};
 
+const DEFAULT_PAGE: i64 = 1;
+const DEFAULT_PAGE_SIZE: i64 = 1000;
+
 /// Common pagination parameters that can be used across different endpoints
 #[derive(Debug, Clone, Deserialize, IntoParams, ToSchema)]
 pub struct PaginationParams {
@@ -19,11 +22,11 @@ pub struct PaginationParams {
 }
 
 fn default_page() -> i64 {
-    1
+    DEFAULT_PAGE
 }
 
 fn default_page_size() -> i64 {
-    1000
+    DEFAULT_PAGE_SIZE
 }
 
 impl Default for PaginationParams {
@@ -40,7 +43,11 @@ impl PaginationParams {
 
     /// Gets validated `page`
     pub fn page(&self) -> i64 {
-        if self.page <= 0 { 1 } else { self.page }
+        if self.page <= 0 {
+            DEFAULT_PAGE
+        } else {
+            self.page
+        }
     }
 
     /// Gets validated `page_size`
