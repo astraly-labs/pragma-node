@@ -7,7 +7,8 @@ use diesel::{
 };
 use pragma_common::Pair;
 use pragma_entities::{
-    FundingRate, InfraError, TimestampError, models::entries::timestamp::TimestampRange,
+    FundingRate, InfraError, PaginationParams, TimestampError,
+    models::entries::timestamp::TimestampRange,
 };
 use serde::Serialize;
 
@@ -86,6 +87,59 @@ pub async fn get_history_in_range(
                 start,
                 end,
                 "funding_rates_1_hour",
+            ),
+        })
+        .await
+        .map_err(InfraError::DbInteractionError)?
+        .map_err(InfraError::DbResultError)?;
+
+    Ok(funding_rates)
+}
+
+pub async fn get_history_in_range_paginated(
+    pool: &Pool,
+    pair: Pair,
+    source: String,
+    range: TimestampRange,
+    frequency: Frequency,
+    pagination: PaginationParams,
+) -> Result<Vec<FundingRate>, InfraError> {
+    let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
+
+    let start = DateTime::<Utc>::from_timestamp(*range.0.start(), 0)
+        .ok_or_else(|| {
+            InfraError::InvalidTimestamp(TimestampError::ToDatetimeErrorI64(*range.0.start()))
+        })?
+        .naive_utc();
+
+    let end = DateTime::<Utc>::from_timestamp(*range.0.end(), 0)
+        .ok_or_else(|| {
+            InfraError::InvalidTimestamp(TimestampError::ToDatetimeErrorI64(*range.0.end()))
+        })?
+        .naive_utc();
+
+    let funding_rates = conn
+        .interact(move |conn| match frequency {
+            Frequency::All => {
+                FundingRate::get_in_range_paginated(conn, &pair, &source, start, end, &pagination)
+            }
+            Frequency::Minute => FundingRate::get_in_range_aggregated_paginated(
+                conn,
+                &pair,
+                &source,
+                start,
+                end,
+                "funding_rates_1_min",
+                &pagination,
+            ),
+            Frequency::Hour => FundingRate::get_in_range_aggregated_paginated(
+                conn,
+                &pair,
+                &source,
+                start,
+                end,
+                "funding_rates_1_hour",
+                &pagination,
             ),
         })
         .await
