@@ -5,6 +5,7 @@ use pragma_common::Pair;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::pagination::PaginationParams;
 use crate::schema::funding_rates;
 
 #[derive(Debug, Clone, Queryable, Serialize, Deserialize)]
@@ -87,16 +88,15 @@ impl FundingRate {
         source: &str,
         start: NaiveDateTime,
         end: NaiveDateTime,
-        limit: i64,
-        offset: i64,
+        pagination: &PaginationParams,
     ) -> Result<Vec<Self>, diesel::result::Error> {
         funding_rates::table
             .filter(funding_rates::pair.eq(&pair.to_pair_id()))
             .filter(funding_rates::source.eq(&source))
             .filter(funding_rates::timestamp.between(start, end))
             .order(funding_rates::timestamp.asc())
-            .limit(limit)
-            .offset(offset)
+            .limit(pagination.limit_with_lookahead())
+            .offset(pagination.offset())
             .load(conn)
     }
 
@@ -158,7 +158,6 @@ impl FundingRate {
         Ok(funding_rates)
     }
 
-    #[allow(clippy::too_many_arguments)]
     pub fn get_in_range_aggregated_paginated(
         conn: &mut PgConnection,
         pair: &Pair,
@@ -166,8 +165,7 @@ impl FundingRate {
         start: NaiveDateTime,
         end: NaiveDateTime,
         aggregate_table: &str,
-        limit: i64,
-        offset: i64,
+        pagination: &PaginationParams,
     ) -> Result<Vec<Self>, diesel::result::Error> {
         #[derive(diesel::QueryableByName)]
         struct AggregatedFundingRate {
@@ -203,8 +201,8 @@ impl FundingRate {
             .bind::<VarChar, _>(source)
             .bind::<Timestamp, _>(start)
             .bind::<Timestamp, _>(end)
-            .bind::<BigInt, _>(limit)
-            .bind::<BigInt, _>(offset)
+            .bind::<BigInt, _>(pagination.limit_with_lookahead())
+            .bind::<BigInt, _>(pagination.offset())
             .load(conn)?;
 
         let funding_rates = results

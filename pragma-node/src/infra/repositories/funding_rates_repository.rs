@@ -7,7 +7,8 @@ use diesel::{
 };
 use pragma_common::Pair;
 use pragma_entities::{
-    FundingRate, InfraError, TimestampError, models::entries::timestamp::TimestampRange,
+    FundingRate, InfraError, PaginationParams, TimestampError,
+    models::entries::timestamp::TimestampRange,
 };
 use serde::Serialize;
 
@@ -101,8 +102,7 @@ pub async fn get_history_in_range_paginated(
     source: String,
     range: TimestampRange,
     frequency: Frequency,
-    limit: i64,
-    offset: i64,
+    pagination: PaginationParams,
 ) -> Result<Vec<FundingRate>, InfraError> {
     let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
 
@@ -121,7 +121,7 @@ pub async fn get_history_in_range_paginated(
     let funding_rates = conn
         .interact(move |conn| match frequency {
             Frequency::All => {
-                FundingRate::get_in_range_paginated(conn, &pair, &source, start, end, limit, offset)
+                FundingRate::get_in_range_paginated(conn, &pair, &source, start, end, &pagination)
             }
             Frequency::Minute => FundingRate::get_in_range_aggregated_paginated(
                 conn,
@@ -130,8 +130,7 @@ pub async fn get_history_in_range_paginated(
                 start,
                 end,
                 "funding_rates_1_min",
-                limit,
-                offset,
+                &pagination,
             ),
             Frequency::Hour => FundingRate::get_in_range_aggregated_paginated(
                 conn,
@@ -140,8 +139,7 @@ pub async fn get_history_in_range_paginated(
                 start,
                 end,
                 "funding_rates_1_hour",
-                limit,
-                offset,
+                &pagination,
             ),
         })
         .await
