@@ -72,7 +72,6 @@ pub struct GetHistoricalFundingRateResponse {
         ("frequency" = Frequency, Query, description = "Frequency of the data points (all, minute, hour)"),
         ("page" = i64, Query, description = "Page number (1-based)"),
         ("page_size" = i64, Query, description = "Number of items per page (1-1000)"),
-        GetHistoricalFundingRateParams
     )
 )]
 pub async fn get_historical_funding_rates(
