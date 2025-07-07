@@ -68,7 +68,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let offchain_pool =
         pragma_entities::connection::init_pool("pragma-node-api", ENV_OFFCHAIN_DATABASE_URL)
             .expect("can't init offchain database pool");
-    pragma_entities::db::run_migrations(&offchain_pool).await;
     let onchain_pool =
         pragma_entities::connection::init_pool("pragma-node-api", ENV_ONCHAIN_DATABASE_URL)
             .expect("can't init onchain database pool");

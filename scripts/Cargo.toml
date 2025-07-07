@@ -1,0 +1,13 @@
+[package]
+name = "pragma-migrations"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "migrate"
+path = "migrate.rs"
+
+[dependencies]
+dotenvy = "0.15"
+pragma-entities = { path = "../pragma-entities" }
+tokio = { version = "1.0", features = ["full"] } 
