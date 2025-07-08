@@ -1,8 +1,7 @@
 pub mod checkpoint_error;
-pub mod currency;
 pub mod entries;
-pub mod merkle_feed_error;
-pub mod optimistic_oracle_error;
+pub mod funding_rate;
+pub mod open_interest;
 pub mod publisher;
 pub mod publisher_error;
 

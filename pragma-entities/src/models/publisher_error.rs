@@ -1,6 +1,6 @@
+use axum::Json;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
-use axum::Json;
 use serde_json::json;
 use utoipa::ToSchema;
 
@@ -8,22 +8,27 @@ use crate::error::InfraError;
 
 #[derive(Debug, thiserror::Error, ToSchema)]
 pub enum PublisherError {
-    #[error("internal server error")]
-    InternalServerError,
+    // 404 errors - Bad request
     #[error("invalid key : {0}")]
     InvalidKey(String),
     #[error("invalid address : {0}")]
     InvalidAddress(String),
     #[error("inactive publisher : {0}")]
     InactivePublisher(String),
+
+    // 404 errors - Not found
     #[error("no publishers found")]
     NotFound,
+
+    // 500 error - Internal
+    #[error("internal server error")]
+    InternalServerError,
 }
 
 impl From<InfraError> for PublisherError {
     fn from(error: InfraError) -> Self {
         match error {
-            InfraError::NotFound => Self::NotFound,
+            InfraError::PublishersNotFound => Self::NotFound,
             _ => Self::InternalServerError,
         }
     }

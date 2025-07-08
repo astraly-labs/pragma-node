@@ -3,8 +3,8 @@ use deadpool_diesel::postgres::Pool;
 use diesel::sql_types::{Numeric, Timestamp, VarChar};
 use diesel::{Queryable, QueryableByName, RunQueryDsl};
 
-use pragma_common::types::Network;
-use pragma_entities::error::{adapt_infra_error, InfraError};
+use pragma_common::starknet::StarknetNetwork;
+use pragma_entities::error::InfraError;
 
 use crate::handlers::onchain::get_checkpoints::Checkpoint;
 use crate::utils::format_bigdecimal_price;
@@ -35,17 +35,17 @@ impl RawCheckpoint {
 #[allow(clippy::cast_possible_wrap)]
 pub async fn get_checkpoints(
     pool: &Pool,
-    network: Network,
+    network: StarknetNetwork,
     pair_id: String,
     decimals: u32,
     limit: u64,
 ) -> Result<Vec<Checkpoint>, InfraError> {
     let table_name = match network {
-        Network::Mainnet => "mainnet_spot_checkpoints",
-        Network::Sepolia => "spot_checkpoints",
+        StarknetNetwork::Mainnet => "mainnet_spot_checkpoints",
+        StarknetNetwork::Sepolia => "spot_checkpoints",
     };
     let raw_sql = format!(
-        r#"
+        r"
         SELECT
             transaction_hash,
             price,
@@ -57,10 +57,10 @@ pub async fn get_checkpoints(
             pair_id = $1
         ORDER BY timestamp DESC
         LIMIT $2;
-    "#,
+    ",
     );
 
-    let conn = pool.get().await.map_err(adapt_infra_error)?;
+    let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
     let raw_checkpoints = conn
         .interact(move |conn| {
             diesel::sql_query(raw_sql)
@@ -69,8 +69,8 @@ pub async fn get_checkpoints(
                 .load::<RawCheckpoint>(conn)
         })
         .await
-        .map_err(adapt_infra_error)?
-        .map_err(adapt_infra_error)?;
+        .map_err(InfraError::DbInteractionError)?
+        .map_err(InfraError::DbResultError)?;
 
     let checkpoints: Vec<Checkpoint> = raw_checkpoints
         .into_iter()

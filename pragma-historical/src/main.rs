@@ -1,0 +1,371 @@
+pub mod sources;
+
+use std::{process::Command, sync::Arc, time::Duration};
+
+use anyhow::{Context, anyhow};
+use chrono::{DateTime, NaiveDateTime, Utc};
+use clap::Parser;
+use csv::Writer;
+use reqwest::Client;
+use tokio::sync::Mutex;
+
+use pragma_entities::models::funding_rate::NewFundingRate;
+use sources::{
+    bybit::Bybit, extended::Extended, hyperliquid::Hyperliquid, kraken::Kraken, paradex::Paradex,
+};
+use std::collections::HashMap;
+use uuid::Uuid;
+
+const NUMBER_OF_MINUTES_IN_ONE_YEAR: f64 = 525_600.0;
+
+pub const ALL_PAIRS: &[&str] = &[
+    "AAVE/USD",
+    "APT/USD",
+    "ARB/USD",
+    "ATOM/USD",
+    "AVAX/USD",
+    "BCH/USD",
+    "BNB/USD",
+    "BONK/USD",
+    "BTC/USD",
+    "CRV/USD",
+    "DOG/USD",
+    "DOGE/USD",
+    "DOT/USD",
+    "ETC/USD",
+    "ETH/USD",
+    "EUR/USD",
+    "FIL/USD",
+    "GOAT/USD",
+    "HYPE/USD",
+    "INJ/USD",
+    "JLP/USD",
+    "JTO/USD",
+    "JUP/USD",
+    "LDO/USD",
+    "LINK/USD",
+    "LTC/USD",
+    "MKR/USD",
+    "MOODENG/USD",
+    "MOV/USD",
+    "NEAR/USD",
+    "OKB/USD",
+    "ONDO/USD",
+    "OP/USD",
+    "PENDLE/USD",
+    "POL/USD",
+    "POPCAT/USD",
+    "S/USD",
+    "SEI/USD",
+    "SHIB/USD",
+    "SOL/USD",
+    "STRK/USD",
+    "SUI/USD",
+    "TIA/USD",
+    "TON/USD",
+    "TRUMP/USD",
+    "TRX/USD",
+    "USDC/USD",
+    "USDT/USD",
+    "WIF/USD",
+    "WLD/USD",
+    "XRP/USD",
+];
+
+#[derive(Parser, Debug)]
+#[command(name = "pragma-historical")]
+struct Cli {
+    /// Source of historical data (e.g. hyperliquid, paradex)
+    #[arg(long)]
+    source: String,
+
+    /// Range in unix milliseconds as start,end
+    #[arg(long)]
+    range: String,
+
+    /// Output CSV file path
+    #[arg(long, default_value = "funding_rates.csv")]
+    csv_output: String,
+
+    /// Database connection string (e.g., postgres://user:pass@host:port/dbname)
+    #[arg(long)]
+    connection: String,
+
+    /// Optional input CSV file path. If specified, skips data download.
+    #[arg(long)]
+    csv_input: Option<String>,
+}
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    check_timescaledb_parallel_copy()?;
+
+    let cli = Cli::parse();
+
+    let csv_path = if let Some(input_path) = cli.csv_input {
+        // If CSV input is provided, use it directly
+        println!("Using existing CSV file: {input_path}");
+        input_path
+    } else {
+        // Otherwise, fetch and generate new data
+        let (start, end) = parse_time_range(&cli.range)?;
+        let client = Client::builder().timeout(Duration::from_secs(30)).build()?;
+
+        // Define coins to fetch
+        let pairs = ALL_PAIRS;
+        let all_entries = Arc::new(Mutex::new(Vec::new()));
+
+        // Process pairs concurrently in chunks to avoid overwhelming the API
+        let chunk_size = 5;
+        let mut tasks = Vec::new();
+
+        for pairs_chunk in pairs.chunks(chunk_size) {
+            let pairs_chunk = pairs_chunk.to_vec();
+            let client = client.clone();
+            let source = cli.source.clone();
+            let all_entries = all_entries.clone();
+
+            let task = tokio::spawn(async move {
+                for pair in pairs_chunk {
+                    println!(
+                        "Fetch {pair} - from: {} to: {}",
+                        timestamp_from_millis(start)?,
+                        timestamp_from_millis(end)?
+                    );
+
+                    let formatted_pair = format_pair_for_exchange(&source, pair);
+                    match fetch_funding_rates(&source, pair, &formatted_pair, start, end, &client)
+                        .await
+                    {
+                        Ok(entries) => {
+                            let mut all_entries = all_entries.lock().await;
+                            all_entries.extend(entries);
+                        }
+                        Err(e) => eprintln!("Error fetching funding rates for {pair}: {e}"),
+                    }
+                }
+                Ok::<_, anyhow::Error>(())
+            });
+
+            tasks.push(task);
+        }
+
+        // Wait for all tasks to complete
+        for task in tasks {
+            if let Err(e) = task.await? {
+                eprintln!("Task error: {e}");
+            }
+        }
+
+        // Write to CSV
+        let all_entries = all_entries.lock().await;
+        write_to_csv(&all_entries, &cli.csv_output)?;
+        cli.csv_output
+    };
+
+    // Import CSV to TimescaleDB
+    import_to_timescaledb(&cli.connection, &csv_path)?;
+
+    Ok(())
+}
+
+fn check_timescaledb_parallel_copy() -> anyhow::Result<()> {
+    Command::new("timescaledb-parallel-copy")
+        .arg("--help")
+        .output()
+        .map_err(|_| anyhow!(
+            "timescaledb-parallel-copy not installed. Please check the instructions at https://github.com/timescale/timescaledb-parallel-copy"
+        ))?;
+    Ok(())
+}
+
+fn import_to_timescaledb(connection: &str, csv_path: &str) -> anyhow::Result<()> {
+    let table = "funding_rates";
+    let output = Command::new("timescaledb-parallel-copy")
+        .arg("--connection")
+        .arg(connection)
+        .arg("--table")
+        .arg(table)
+        .arg("--file")
+        .arg(csv_path)
+        .output()
+        .context("Failed to execute timescaledb-parallel-copy")?;
+
+    if output.status.success() {
+        println!("Imported {csv_path} to TimescaleDB");
+        Ok(())
+    } else {
+        let error = String::from_utf8_lossy(&output.stderr);
+        Err(anyhow!("Failed to import CSV: {error}"))
+    }
+}
+
+async fn fetch_funding_rates(
+    source: &str,
+    original_pair: &str,
+    formatted_pair: &str,
+    start: i64,
+    end: i64,
+    client: &Client,
+) -> anyhow::Result<Vec<NewFundingRate>> {
+    let mut entries = Vec::new();
+    match source {
+        "hyperliquid" => {
+            let rows =
+                Hyperliquid::fetch_historical_fundings(formatted_pair, start, end, client).await?;
+            for r in rows {
+                let ts = timestamp_from_millis(r.time)?;
+                let funding_rate: f64 = r.funding_rate.parse()?;
+                let annualized_rate = funding_rate * 24.0 * 365.0;
+                entries.push(NewFundingRate {
+                    source: "hyperliquid".to_string(),
+                    pair: original_pair.to_string(),
+                    annualized_rate,
+                    timestamp: ts,
+                });
+            }
+        }
+        "paradex" => {
+            let rows =
+                Paradex::fetch_historical_fundings(formatted_pair, start, end, client).await?;
+            for r in rows {
+                let ts = timestamp_from_millis(r.created_at)?;
+                let funding_rate: f64 = r.funding_rate.parse()?;
+                let annualized_rate = funding_rate * 3.0 * 365.0;
+                entries.push(NewFundingRate {
+                    source: "paradex".to_string(),
+                    pair: original_pair.to_string(),
+                    annualized_rate,
+                    timestamp: ts,
+                });
+            }
+        }
+        "extended" => {
+            let rows =
+                Extended::fetch_historical_fundings(formatted_pair, start, end, client).await?;
+            for r in rows {
+                let ts = timestamp_from_millis(r.created_at)?;
+                let funding_rate: f64 = r.funding_rate.parse()?;
+                let annualized_rate = funding_rate * 24.0 * 365.0;
+                entries.push(NewFundingRate {
+                    source: "extended".to_string(),
+                    pair: original_pair.to_string(),
+                    annualized_rate,
+                    timestamp: ts,
+                });
+            }
+        }
+        "kraken" => {
+            let rows =
+                Kraken::fetch_historical_fundings(formatted_pair, start, end, client).await?;
+            for r in rows {
+                let ts = DateTime::parse_from_rfc3339(&r.timestamp)?.naive_utc();
+                let annualized_rate = r.relative_funding_rate * 24.0 * 365.0;
+                entries.push(NewFundingRate {
+                    source: "kraken".to_string(),
+                    pair: original_pair.to_string(),
+                    annualized_rate,
+                    timestamp: ts,
+                });
+            }
+        }
+        "bybit" => {
+            let rows = Bybit::fetch_historical_fundings(formatted_pair, start, end, client).await?;
+            for r in rows {
+                let ts = timestamp_from_millis(r.timestamp.parse()?)?;
+                let funding_rate: f64 = r.funding_rate.parse()?;
+                // Convert from percentage to decimal?
+                // let funding_rate = funding_rate / 100.0;
+                let base_coin = if formatted_pair.ends_with("PERP") {
+                    formatted_pair.trim_end_matches("PERP")
+                } else {
+                    formatted_pair.trim_end_matches("USDT")
+                };
+                let funding_interval = Bybit::get_funding_interval(base_coin)?;
+                // Calculate periods per year based on funding interval in minutes
+                let periods_per_year = NUMBER_OF_MINUTES_IN_ONE_YEAR / funding_interval as f64;
+                let annualized_rate = funding_rate * periods_per_year;
+                entries.push(NewFundingRate {
+                    source: "bybit".to_string(),
+                    pair: original_pair.to_string(),
+                    annualized_rate,
+                    timestamp: ts,
+                });
+            }
+        }
+        other => return Err(anyhow!("Source '{}' not implemented", other)),
+    }
+    Ok(entries)
+}
+
+fn parse_time_range(range: &str) -> anyhow::Result<(i64, i64)> {
+    let parts: Vec<&str> = range.split(',').collect();
+    if parts.len() != 2 {
+        return Err(anyhow!(
+            "Invalid range format; expected start,end but got '{}'",
+            range
+        ));
+    }
+    let start: i64 = parts[0]
+        .parse()
+        .context(format!("Invalid start timestamp '{}'", parts[0]))?;
+    let end: i64 = parts[1]
+        .parse()
+        .context(format!("Invalid end timestamp '{}'", parts[1]))?;
+    Ok((start, end))
+}
+
+fn write_to_csv(entries: &[NewFundingRate], output_path: &str) -> anyhow::Result<()> {
+    // Group by source + pair + timestamp in minutes
+    let mut entries_per_minute = HashMap::new();
+
+    for entry in entries {
+        let key = (
+            entry.source.clone(),
+            entry.pair.clone(),
+            entry.timestamp.and_utc().timestamp_millis() / (60 * 1000), // Convert ms to minutes
+        );
+
+        entries_per_minute.entry(key).or_insert(entry);
+    }
+
+    let mut writer = Writer::from_path(output_path)?;
+    for entry in entries_per_minute.values() {
+        writer.write_record(&[
+            Uuid::new_v4().to_string(),
+            entry.source.to_uppercase().clone(),
+            entry.pair.clone(),
+            entry.annualized_rate.to_string(),
+            entry.timestamp.to_string(),
+            Utc::now().to_string(),
+        ])?;
+    }
+    writer.flush()?;
+    println!(
+        "Wrote {} entries to {}",
+        entries_per_minute.len(),
+        output_path
+    );
+    Ok(())
+}
+
+fn format_pair_for_exchange(source: &str, pair: &str) -> String {
+    match source {
+        "bybit" | "hyperliquid" => pair.split('/').next().unwrap_or(pair).to_uppercase(),
+        "paradex" => format!("{}-PERP", pair.replace('/', "-").to_uppercase()),
+        "extended" => pair.replace('/', "-").to_uppercase(),
+        "kraken" => {
+            let base = pair.split('/').next().unwrap_or(pair);
+            let quote = pair.split('/').nth(1).unwrap_or("");
+            let base = if base == "BTC" { "XBT" } else { base };
+            format!("PF_{base}{quote}").to_uppercase()
+        }
+        other => panic!("Source '{other}' not implemented"),
+    }
+}
+
+fn timestamp_from_millis(millis: i64) -> anyhow::Result<NaiveDateTime> {
+    DateTime::<Utc>::from_timestamp_millis(millis)
+        .ok_or_else(|| anyhow!("Invalid timestamp: {}", millis))
+        .map(|dt| dt.naive_utc())
+}

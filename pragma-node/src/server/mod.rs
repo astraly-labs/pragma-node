@@ -5,17 +5,17 @@ use axum_tracing_opentelemetry::middleware::{OtelAxumLayer, OtelInResponseLayer}
 use std::net::SocketAddr;
 use tower_http::cors::CorsLayer;
 use utoipa::{
-    openapi::{
-        security::{ApiKey, ApiKeyValue, SecurityScheme},
-        ServerBuilder, ServerVariableBuilder,
-    },
     Modify, OpenApi,
+    openapi::{
+        ServerBuilder, ServerVariableBuilder,
+        security::{ApiKey, ApiKeyValue, SecurityScheme},
+    },
 };
 use utoipauto::utoipauto;
 
 use crate::errors::internal_error;
 use crate::server::middlewares::TimingLayer;
-use crate::{config::Config, server::routes::app_router, AppState};
+use crate::{config::Config, server::routes::app_router, state::AppState};
 
 struct SecurityAddon;
 
@@ -34,22 +34,23 @@ struct ServerAddon;
 
 impl Modify for ServerAddon {
     fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
+        // TODO: Add back enum_values with api.mainnet when we have production environment
         let server_variable = ServerVariableBuilder::new()
-            .default_value("api.dev")
-            .enum_values(Some(vec!["api.dev", "api.prod"]))
+            .default_value("api.devnet")
+            // .enum_values(Some(vec!["api.devnet", "api.mainnet"]))
             .build();
-        openapi.servers = Some(vec![ServerBuilder::new()
-            .url("https://{environment}.pragma.build")
-            .parameter("environment", server_variable)
-            .build()]);
+        openapi.servers = Some(vec![
+            ServerBuilder::new()
+                .url("https://{environment}.pragma.build")
+                .parameter("environment", server_variable)
+                .build(),
+        ]);
     }
 }
 
 #[tracing::instrument(skip(state))]
 pub async fn run_api_server(config: &Config, state: AppState) {
-    #[utoipauto(
-        paths = "./pragma-node/src, ./pragma-common/src from pragma_common, ./pragma-entities/src from pragma_entities"
-    )]
+    #[utoipauto(paths = "./pragma-node/src, ./pragma-entities/src from pragma_entities")]
     #[derive(OpenApi)]
     #[openapi(
         modifiers(&SecurityAddon, &ServerAddon),
@@ -61,8 +62,8 @@ pub async fn run_api_server(config: &Config, state: AppState) {
 
     // Uncomment to generate openapi.json
     // TODO: move to a separate bin
-    // let json = ApiDoc::openapi().to_json().unwrap();
-    // std::fs::write("openapi.json", json).unwrap();
+    let json = ApiDoc::openapi().to_json().unwrap();
+    std::fs::write("openapi.json", json).unwrap();
 
     let app = app_router::<ApiDoc>(state.clone())
         .with_state(state)

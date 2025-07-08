@@ -1,76 +1,102 @@
-use crate::error::InfraError;
-use crate::models::publisher_error::PublisherError;
+use axum::Json;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
-use axum::Json;
-use pragma_common::signing::SignerError;
-use pragma_common::timestamp::TimestampRangeError;
-use pragma_common::types::{AggregationMode, Interval};
+use pragma_common::starknet::{SignerError, StarknetNetwork};
+use pragma_common::{AggregationMode, InstrumentType, Interval};
 use serde_json::json;
-use starknet::core::crypto::EcdsaVerifyError;
 use utoipa::ToSchema;
 
-#[derive(Debug, thiserror::Error, ToSchema)]
-pub enum VolatilityError {
-    #[error("invalid timestamps range: {0} > {1}")]
-    InvalidTimestampsRange(u64, u64),
-}
+use crate::PublisherError;
+use crate::error::{InfraError, WebSocketError};
+
+use super::timestamp::TimestampError;
 
 #[derive(Debug, thiserror::Error, ToSchema)]
+#[schema(example = json!({
+    "code": "UNAUTHORIZED",
+    "message": "Unauthorized request: Invalid API key",
+    "timestamp": "2024-03-20T10:30:00Z"
+}))]
 pub enum EntryError {
-    #[error("internal server error")]
-    InternalServerError,
-    #[error("bad request")]
-    BadRequest,
-    #[error("entry not found: {0}")]
-    NotFound(String),
-    #[error("infra error: {0}")]
-    InfraError(InfraError),
-    #[error("invalid signature")]
-    #[schema(value_type = String)]
-    InvalidSignature(EcdsaVerifyError),
-    #[error("could not sign price")]
-    InvalidSigner,
-    #[error("unauthorized request: {0}")]
-    Unauthorized(String),
+    // 400 Error - Bad Requests
+    #[schema(example = "invalid signature")]
+    #[error("invalid signature: {0}")]
+    InvalidSignature(#[from] SignerError),
+    #[schema(example = "invalid timestamp")]
     #[error("invalid timestamp: {0}")]
-    InvalidTimestamp(#[from] TimestampRangeError),
+    InvalidTimestamp(#[from] TimestampError),
+    #[schema(example = "invalid expiry")]
     #[error("invalid expiry")]
     InvalidExpiry,
+    #[schema(example = "unsupported interval 1s for aggregation median")]
+    #[error("unsupported interval {0:?} for aggregation {1:?}")]
+    InvalidInterval(Interval, AggregationMode),
+    #[schema(example = "unsupported interval 1s for onchain data")]
+    #[error("unsupported interval {0:?} for onchain data")]
+    InvalidOnchainInterval(Interval),
+    #[error("invalid login message: {0}")]
+    InvalidLoginMessage(String),
+    #[error("unsupported data_type {1:?} for network {0:?}")]
+    InvalidDataTypeForNetwork(StarknetNetwork, InstrumentType),
+
+    // 401 Error - Unauthorized
+    #[error("unauthorized request: {0}")]
+    Unauthorized(String),
+
+    // 404 errors
+    #[error("pair not found: {0}")]
+    PairNotFound(String),
+    #[error("entry not found: {0}")]
+    EntryNotFound(String),
+    #[error("publisher not found: {0}")]
+    PublisherNotFound(String),
     #[error("missing data for routing on pair: {0}")]
-    MissingData(String),
-    #[error("publisher error: {0}")]
+    RouteNotFound(String),
+    #[error("history not found")]
+    HistoryNotFound,
+
+    // ??? publishing...
+    #[error("can't publish data: {0}")]
     PublisherError(#[from] PublisherError),
-    #[error("pair id invalid: {0}")]
-    UnknownPairId(String),
-    #[error("volatility error: {0}")]
-    VolatilityError(#[from] VolatilityError),
     #[error("can't publish data: {0}")]
     PublishData(String),
     #[error("can't build publish message: {0}")]
     BuildPublish(String),
-    #[error(transparent)]
-    SignerError(#[from] SignerError),
-    #[error("invalid login message: {0}")]
-    InvalidLoginMessage(String),
-    #[error("unsupported interval {0:?} for aggregation {1:?}")]
-    UnsupportedInterval(Interval, AggregationMode),
+
+    // Internal shit
+    #[error("could not sign price")]
+    InvalidSigner,
+
+    // Onchain db error
+    #[error("could not fetch price from onchain db: {0}")]
+    DatabaseError(String),
+
+    // 500 Error - Internal server error
+    #[error("internal server error: {0}")]
+    InternalServerError(String),
+
+    #[error("websocket error: {0}")]
+    WebSocketError(#[from] WebSocketError),
 }
 
 impl From<InfraError> for EntryError {
     fn from(error: InfraError) -> Self {
         match error {
-            InfraError::NotFound => Self::NotFound("Unknown".to_string()),
-            InfraError::RoutingError => Self::MissingData("Not enough data".to_string()),
-            InfraError::InvalidTimestamp(e) => {
-                Self::InvalidTimestamp(TimestampRangeError::Other(e))
+            InfraError::InvalidTimestamp(err) => Self::InvalidTimestamp(err),
+            InfraError::UnsupportedInterval(interval, mode) => {
+                Self::InvalidInterval(interval, mode)
             }
-            InfraError::UnsupportedInterval(i, a) => Self::UnsupportedInterval(i, a),
-            InfraError::InternalServerError
-            | InfraError::DisputerNotSet
-            | InfraError::SettlerNotSet
-            | InfraError::NonZeroU32Conversion(_)
-            | InfraError::AxumError(_) => Self::InternalServerError,
+            InfraError::UnsupportedOnchainInterval(interval) => {
+                Self::InvalidOnchainInterval(interval)
+            }
+            InfraError::UnsupportedDataTypeForNetwork(network, data_type) => {
+                Self::InvalidDataTypeForNetwork(network, data_type)
+            }
+            InfraError::RoutingError(err_msg) => Self::RouteNotFound(err_msg),
+            InfraError::EntryNotFound(entry_id) => Self::EntryNotFound(entry_id),
+            InfraError::PairNotFound(pair_id) => Self::PairNotFound(pair_id),
+            // Those errors should never proc for Entry
+            e => Self::InternalServerError(e.to_string()),
         }
     }
 }
@@ -78,57 +104,84 @@ impl From<InfraError> for EntryError {
 impl IntoResponse for EntryError {
     fn into_response(self) -> axum::response::Response {
         let (status, err_msg) = match self {
-            Self::NotFound(pair_id) => (
-                StatusCode::NOT_FOUND,
-                format!("EntryModel with pair id {pair_id} has not been found"),
-            ),
-            Self::MissingData(pair_id) => (
-                StatusCode::NOT_FOUND,
-                format!("Not enough data on pair {pair_id} to perform routing"),
-            ),
-            Self::InfraError(db_error) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Internal server error: {db_error}"),
-            ),
             Self::InvalidSignature(err) => {
                 (StatusCode::BAD_REQUEST, format!("Invalid signature: {err}"))
             }
-            Self::Unauthorized(reason) => (
-                StatusCode::UNAUTHORIZED,
-                format!("Unauthorized publisher: {reason}"),
-            ),
             Self::InvalidTimestamp(reason) => (
                 StatusCode::BAD_REQUEST,
                 format!("Invalid timestamp: {reason}"),
             ),
             Self::InvalidExpiry => (StatusCode::BAD_REQUEST, "Invalid expiry".to_string()),
-            Self::PublisherError(err) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Publisher error: {err}"),
+            Self::InvalidInterval(interval, mode) => (
+                StatusCode::BAD_REQUEST,
+                format!("Unsupported interval {interval:?} for aggregation {mode:?}"),
+            ),
+            Self::InvalidOnchainInterval(interval) => (
+                StatusCode::BAD_REQUEST,
+                format!("Unsupported interval {interval:?} for onchain data"),
+            ),
+            Self::InvalidDataTypeForNetwork(network, data_type) => (
+                StatusCode::BAD_REQUEST,
+                format!("Unsupported data type {data_type:?} for aggregation {network:?}"),
+            ),
+            Self::InvalidLoginMessage(msg) => (
+                StatusCode::BAD_REQUEST,
+                format!("Invalid login message: {msg}"),
+            ),
+            Self::Unauthorized(reason) => (
+                StatusCode::UNAUTHORIZED,
+                format!("Unauthorized request: {reason}"),
+            ),
+            Self::PairNotFound(pair_id) => {
+                (StatusCode::NOT_FOUND, format!("Pair not found: {pair_id}"))
+            }
+            Self::HistoryNotFound => (StatusCode::NOT_FOUND, String::from("History not found")),
+            Self::EntryNotFound(entry_id) => (
+                StatusCode::NOT_FOUND,
+                format!("Entry not found: {entry_id}"),
+            ),
+            Self::RouteNotFound(pair_id) => (
+                StatusCode::NOT_FOUND,
+                format!("Missing data for routing on pair: {pair_id}"),
+            ),
+            Self::PublisherNotFound(publisher) => (
+                StatusCode::NOT_FOUND,
+                format!("Publisher not found: {publisher}"),
             ),
             Self::PublishData(err) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Unable to publish data: {err}"),
+                format!("Can't publish data: {err}"),
+            ),
+            Self::PublisherError(err) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Can't publish data: {err}"),
             ),
             Self::BuildPublish(err) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Unable to build publish message: {err}"),
+                format!("Can't build publish message: {err}"),
             ),
-            Self::BadRequest => (StatusCode::BAD_REQUEST, "Bad request".to_string()),
-            Self::UnknownPairId(pair_id) => {
-                (StatusCode::NOT_FOUND, format!("Unknown pair id: {pair_id}"))
-            }
-            Self::SignerError(err) => (StatusCode::BAD_REQUEST, format!("Invalid message: {err}")),
-            _ => (
+            Self::DatabaseError(reason) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                String::from("Internal server error"),
+                format!("Failed to fetch price data: {reason}"),
+            ),
+            Self::InvalidSigner => (StatusCode::BAD_REQUEST, "Could not sign price".to_string()),
+            Self::InternalServerError(reason) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Interval server error: {reason}"),
+            ),
+            Self::WebSocketError(err) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("WebSocket error: {err}"),
             ),
         };
+
         (
             status,
-            Json(
-                json!({"resource":"EntryModel", "message": err_msg, "happened_at" : chrono::Utc::now() }),
-            ),
+            Json(json!({
+                "resource": "EntryModel",
+                "message": err_msg,
+                "happened_at": chrono::Utc::now()
+            })),
         )
             .into_response()
     }

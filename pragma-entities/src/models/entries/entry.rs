@@ -1,11 +1,11 @@
+use crate::EntryError;
+use crate::TimestampError;
 use crate::convert_timestamp_to_datetime;
 use crate::dto::entry as dto;
 use crate::models::DieselResult;
 use crate::schema::entries;
-use crate::EntryError;
 use bigdecimal::BigDecimal;
 use diesel::internal::derives::multiconnection::chrono::NaiveDateTime;
-use diesel::upsert::excluded;
 use diesel::{
     AsChangeset, ExpressionMethods, Insertable, OptionalExtension, PgConnection,
     PgTextExpressionMethods, QueryDsl, Queryable, RunQueryDsl, Selectable, SelectableHelper,
@@ -33,7 +33,6 @@ pub struct NewEntry {
     pub publisher: String,
     pub source: String,
     pub timestamp: NaiveDateTime,
-    pub publisher_signature: String,
     pub price: BigDecimal,
 }
 
@@ -50,15 +49,7 @@ impl Entry {
             .values(data)
             .returning(Self::as_returning())
             .on_conflict((entries::pair_id, entries::source, entries::timestamp))
-            .do_update()
-            .set((
-                entries::pair_id.eq(excluded(entries::pair_id)),
-                entries::publisher.eq(excluded(entries::publisher)),
-                entries::source.eq(excluded(entries::source)),
-                entries::publisher_signature.eq(excluded(entries::publisher_signature)),
-                entries::timestamp.eq(excluded(entries::timestamp)),
-                entries::price.eq(excluded(entries::price)),
-            ))
+            .do_nothing()
             .get_results(conn)
     }
 

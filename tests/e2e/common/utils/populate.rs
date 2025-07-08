@@ -1,7 +1,7 @@
 use rand::Rng;
 use std::ops::Range;
 
-use crate::common::constants::{EMPTY_SIGNATURE, SOURCES, VARIATION_PERCENTAGE};
+use crate::common::constants::{EIGHTEEN_DECIMALS, EMPTY_SIGNATURE, SOURCES, VARIATION_PERCENTAGE};
 
 pub fn get_pair_price(pair: &str) -> u128 {
     let price = match pair {
@@ -13,7 +13,7 @@ pub fn get_pair_price(pair: &str) -> u128 {
         _ => panic!("Pair not found, add it to the const PAIRS"),
     };
 
-    (price * 10.0_f64.powi(8)) as u128
+    (price * 10.0_f64.powi(EIGHTEEN_DECIMALS)) as u128
 }
 
 pub fn generate_entries(pairs: Vec<&str>, num_entries: u32, timestamp: u64) -> Vec<String> {
@@ -55,7 +55,7 @@ pub fn generate_entry(pair: &str, source: &str, timestamp: u64) -> String {
 
 pub fn entry_from(pair: &str, timestamp: u64, price: u128, source: &str) -> String {
     format!(
-        r#"
+        r"
         INSERT INTO entries (
             pair_id,
             publisher,
@@ -71,6 +71,6 @@ pub fn entry_from(pair: &str, timestamp: u64, price: u128, source: &str) -> Stri
             '{source}',
             '{EMPTY_SIGNATURE}'
         );
-    "#
+    "
     )
 }

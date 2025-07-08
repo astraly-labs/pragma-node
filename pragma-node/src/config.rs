@@ -1,7 +1,7 @@
 use serde::Deserialize;
 use tokio::sync::OnceCell;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct ServerConfig {
     host: String,
     port: u16,
@@ -16,7 +16,7 @@ impl Default for ServerConfig {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct KafkaConfig {
     pub topic: String,
 }
@@ -29,22 +29,7 @@ impl Default for KafkaConfig {
     }
 }
 
-#[derive(Debug, Deserialize)]
-pub struct RedisConfig {
-    redis_host: String,
-    redis_port: u16,
-}
-
-impl Default for RedisConfig {
-    fn default() -> Self {
-        Self {
-            redis_host: "0.0.0.0".to_string(),
-            redis_port: 6379,
-        }
-    }
-}
-
-#[derive(Default, Debug, Deserialize, PartialEq, Eq)]
+#[derive(Default, Debug, Deserialize, PartialEq, Eq, Clone)]
 #[serde(rename_all = "lowercase")]
 pub enum Mode {
     Dev,
@@ -52,22 +37,34 @@ pub enum Mode {
     Production,
 }
 
-#[derive(Default, Debug, Deserialize)]
-pub struct ModeConfig {
-    mode: Mode,
+#[derive(Default, Debug, Deserialize, PartialEq, Eq, Clone)]
+#[serde(rename_all = "lowercase")]
+pub enum CloudEnv {
+    Aws,
+    #[default]
+    Gcp,
 }
 
-#[derive(Default, Debug, Deserialize)]
+#[derive(Default, Debug, Deserialize, Clone)]
+pub struct ModeConfig {
+    mode: Mode,
+    cloud_env: Option<CloudEnv>,
+}
+
+#[derive(Default, Debug, Deserialize, Clone)]
 pub struct Config {
     mode: ModeConfig,
     server: ServerConfig,
     kafka: KafkaConfig,
-    redis: RedisConfig,
 }
 
 impl Config {
     pub fn is_production_mode(&self) -> bool {
         self.mode.mode == Mode::Production
+    }
+
+    pub fn cloud_env(&self) -> CloudEnv {
+        self.mode.cloud_env.clone().unwrap_or_default()
     }
 
     pub fn server_host(&self) -> &str {
@@ -81,14 +78,6 @@ impl Config {
     pub fn kafka_topic(&self) -> &str {
         &self.kafka.topic
     }
-
-    pub fn redis_host(&self) -> &str {
-        &self.redis.redis_host
-    }
-
-    pub const fn redis_port(&self) -> u16 {
-        self.redis.redis_port
-    }
 }
 
 pub static CONFIG: OnceCell<Config> = OnceCell::const_new();
@@ -96,13 +85,11 @@ pub static CONFIG: OnceCell<Config> = OnceCell::const_new();
 async fn init_config() -> Config {
     let server_config = envy::from_env::<ServerConfig>().unwrap_or_default();
     let kafka_config = envy::from_env::<KafkaConfig>().unwrap_or_default();
-    let redis_config = envy::from_env::<RedisConfig>().unwrap_or_default();
     let mode_config = envy::from_env::<ModeConfig>().unwrap_or_default();
 
     Config {
         server: server_config,
         kafka: kafka_config,
-        redis: redis_config,
         mode: mode_config,
     }
 }

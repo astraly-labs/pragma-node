@@ -1,0 +1,82 @@
+# syntax=docker/dockerfile-upstream:master
+
+FROM lukemathwalker/cargo-chef:latest-rust-slim-bullseye AS cargo-chef
+WORKDIR /app
+
+FROM cargo-chef AS planner
+COPY . .
+
+RUN apt-get update && apt-get install -y curl
+RUN cargo chef prepare --recipe-path recipe.json
+
+FROM cargo-chef AS builder
+
+COPY --from=planner /app/recipe.json recipe.json
+
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    libpq-dev \
+    pkg-config \
+    libssl-dev \
+    bash \
+    ca-certificates \
+    curl \
+    wget \
+    libclang-dev \
+    cmake \
+    build-essential \
+    protobuf-compiler \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN cargo chef cook --profile release --recipe-path recipe.json
+
+COPY . .
+
+RUN cargo build --locked --release --workspace --exclude tests
+
+FROM debian:bullseye-slim AS final
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    libpq-dev \
+    libssl1.1 \
+    procps \
+    libclang-dev \
+    cmake \
+    bash \
+    build-essential \
+    pkg-config \
+    protobuf-compiler \
+    && rm -rf /var/lib/apt/lists/*
+
+ARG APP_NAME=pragma-node
+ENV APP_NAME $APP_NAME
+
+# Create app directory
+RUN mkdir /app
+
+# Copy the binary
+COPY --from=builder /app/target/release/${APP_NAME} /bin/server
+
+# Copy the certificates
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+
+RUN adduser \
+    --disabled-password \
+    --gecos "" \
+    --home "/nonexistent" \
+    --shell "/sbin/nologin" \
+    --no-create-home \
+    --uid 10001 \
+    appuser
+
+# Set permissions for all required directories
+RUN chown -R appuser:appuser /app && \
+    chmod -R 755 /app
+
+USER appuser
+
+WORKDIR /app
+
+EXPOSE 3000
+
+ENV RUST_LOG=info
+
+CMD ["/bin/server"]

@@ -1,78 +1,40 @@
-use lazy_static::lazy_static;
-use serde::{Deserialize, Serialize};
+use clap::Parser;
+use std::sync::LazyLock;
 
-use crate::error::ErrorKind;
+pub(crate) static CONFIG: LazyLock<Ingestor> = LazyLock::new(load_configuration);
 
-lazy_static! {
-    #[derive(Debug)]
-    pub static ref CONFIG: Ingestor = load_configuration();
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+pub(crate) struct Ingestor {
+    /// Kafka broker ID
+    #[arg(
+        long,
+        env = "KAFKA_BROKER_ID",
+        default_value = "kafka.devnet.pragma.build:9092"
+    )]
+    pub(crate) kafka_broker_id: String,
+
+    /// Kafka consumer group ID
+    #[arg(long, env = "KAFKA_GROUP_ID", default_value = "pragma-ingestor")]
+    pub(crate) kafka_group_id: String,
+
+    /// Number of consumers to run
+    #[arg(long, env = "NUM_CONSUMERS", default_value = "1")]
+    pub(crate) num_consumers: usize,
+
+    /// Channel capacity for message queues
+    #[arg(long, env = "CHANNEL_CAPACITY", default_value = "1000000")]
+    pub(crate) channel_capacity: usize,
+
+    /// Publisher name for entries
+    #[arg(long, env = "PUBLISHER_NAME", default_value = "PRAGMA")]
+    pub(crate) publisher_name: String,
+
+    /// OpenTelemetry endpoint for telemetry data
+    #[arg(long, env = "OTEL_EXPORTER_OTLP_ENDPOINT")]
+    pub(crate) otel_endpoint: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Ingestor {
-    pub brokers: Vec<String>,
-    pub topic: String,
-    pub group_id: String,
-}
-
-impl Ingestor {
-    pub fn from_env() -> Result<Self, ErrorKind> {
-        envy::from_env::<Self>().map_err(ErrorKind::LoadConfig)
-    }
-}
-
-pub fn load_configuration() -> Ingestor {
-    Ingestor::from_env().expect("cannot load configuration env")
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::env;
-
-    #[test]
-    fn test_ingestor_init() {
-        let brokers = vec!["localhost:9092".to_string()];
-        let ingestor = Ingestor {
-            brokers: brokers.clone(),
-            topic: "test_topic".to_string(),
-            group_id: "test_group".to_string(),
-        };
-
-        assert_eq!(ingestor.brokers, brokers);
-        assert_eq!(ingestor.topic, "test_topic");
-        assert_eq!(ingestor.group_id, "test_group");
-    }
-
-    #[test]
-    fn test_load_from_env() {
-        unsafe {
-            env::set_var("BROKERS", "localhost:9092");
-            env::set_var("TOPIC", "test_topic");
-            env::set_var("GROUP_ID", "test_group");
-        }
-
-        let ingestor = Ingestor::from_env().unwrap();
-
-        assert_eq!(ingestor.brokers, vec!["localhost:9092".to_string()]);
-        assert_eq!(ingestor.topic, "test_topic");
-        assert_eq!(ingestor.group_id, "test_group");
-        unsafe {
-            env::remove_var("BROKERS");
-            env::remove_var("TOPIC");
-            env::remove_var("GROUP_ID");
-        }
-    }
-
-    #[test]
-    fn test_env_error_handling() {
-        unsafe {
-            env::remove_var("BROKERS");
-            env::remove_var("TOPIC");
-            env::remove_var("GROUP_ID");
-        }
-
-        let result = Ingestor::from_env();
-        assert!(result.is_err());
-    }
+pub(crate) fn load_configuration() -> Ingestor {
+    Ingestor::parse()
 }

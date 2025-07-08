@@ -1,43 +1,42 @@
+use axum::Router;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
-use axum::routing::{get, post};
-use axum::Router;
+use axum::routing::get;
 use utoipa::OpenApi as OpenApiT;
-// use utoipa_swagger_ui::SwaggerUi;
+use utoipa_swagger_ui::SwaggerUi;
 
-use crate::handlers::merkle_feeds::{
-    get_merkle_proof::get_merkle_feeds_proof, get_option::get_merkle_feeds_option,
+use crate::handlers::funding_rates::{
+    get_historical_funding_rates, get_latest_funding_rate, get_supported_instruments,
 };
 use crate::handlers::onchain::{
     get_checkpoints::get_onchain_checkpoints, get_entry::get_onchain_entry,
     get_history::get_onchain_history, get_publishers::get_onchain_publishers,
     subscribe_to_ohlc::subscribe_to_onchain_ohlc,
 };
-use crate::handlers::optimistic_oracle::{
-    get_assertion_details::get_assertion_details, get_assertions::get_assertions,
-    get_disputed_assertions::get_disputed_assertions,
-    get_resolved_assertions::get_resolved_assertions,
+use crate::handlers::open_interest::{
+    get_historical_open_interest, get_latest_open_interest,
+    get_supported_instruments as get_oi_supported_instruments,
 };
-use crate::handlers::stream_entry::stream_entry;
-use crate::handlers::{
-    create_entries, create_future_entries, get_entry, get_expiries, get_ohlc, get_volatility,
-    publish_entry, subscribe_to_entry, subscribe_to_price,
-};
-use crate::AppState;
+use crate::handlers::stream::stream_multi::stream_entry_multi_pair;
+use crate::handlers::websocket::{subscribe_to_entry, subscribe_to_ohlc, subscribe_to_price};
+use crate::handlers::{get_entry, get_ohlc};
+
+use crate::state::AppState;
 
 #[allow(clippy::extra_unused_type_parameters)]
 pub fn app_router<T: OpenApiT>(state: AppState) -> Router<AppState> {
-    // let open_api = T::openapi();
-    // TODO: Add swagger ui
+    let open_api = T::openapi();
     Router::new()
-        // .merge(SwaggerUi::new("/node/swagger-ui").url("/node/api-docs/openapi.json", open_api))
+        .merge(SwaggerUi::new("/node/v1/docs").url("/node/v1/docs/openapi.json", open_api))
         .route("/node", get(root))
-        .nest("/node/v1/data", data_routes(state.clone()))
+        .nest("/node/v1/data", entry_routes(state.clone()))
         .nest("/node/v1/onchain", onchain_routes(state.clone()))
         .nest("/node/v1/aggregation", aggregation_routes(state.clone()))
-        .nest("/node/v1/volatility", volatility_routes(state.clone()))
-        .nest("/node/v1/merkle_feeds", merkle_feeds_routes(state.clone()))
-        .nest("/node/v1/optimistic", optimistic_oracle_routes(state))
+        .nest(
+            "/node/v1/funding_rates",
+            funding_rates_routes(state.clone()),
+        )
+        .nest("/node/v1/open_interest", open_interest_routes(state))
         .fallback(handler_404)
 }
 
@@ -52,16 +51,13 @@ async fn handler_404() -> impl IntoResponse {
     )
 }
 
-fn data_routes(state: AppState) -> Router<AppState> {
+fn entry_routes(state: AppState) -> Router<AppState> {
     Router::new()
-        .route("/publish", post(create_entries))
-        .route("/publish_future", post(create_future_entries))
-        .route("/publish_ws", get(publish_entry))
         .route("/{base}/{quote}", get(get_entry))
-        .route("/{base}/{quote}/future_expiries", get(get_expiries))
         .route("/subscribe", get(subscribe_to_entry))
         .route("/price/subscribe", get(subscribe_to_price))
-        .route("/{base}/{quote}/stream", get(stream_entry))
+        .route("/multi/stream", get(stream_entry_multi_pair))
+        .route("/ohlc/subscribe", get(subscribe_to_ohlc))
         .with_state(state)
 }
 
@@ -75,30 +71,24 @@ fn onchain_routes(state: AppState) -> Router<AppState> {
         .with_state(state)
 }
 
-fn volatility_routes(state: AppState) -> Router<AppState> {
-    Router::new()
-        .route("/{base}/{quote}", get(get_volatility))
-        .with_state(state)
-}
-
 fn aggregation_routes(state: AppState) -> Router<AppState> {
     Router::new()
         .route("/candlestick/{base}/{quote}", get(get_ohlc))
         .with_state(state)
 }
 
-fn merkle_feeds_routes(state: AppState) -> Router<AppState> {
+fn funding_rates_routes(state: AppState) -> Router<AppState> {
     Router::new()
-        .route("/proof/{option_hash}", get(get_merkle_feeds_proof))
-        .route("/options/{instrument}", get(get_merkle_feeds_option))
+        .route("/{base}/{quote}", get(get_latest_funding_rate))
+        .route("/history/{base}/{quote}", get(get_historical_funding_rates))
+        .route("/instruments", get(get_supported_instruments))
         .with_state(state)
 }
 
-fn optimistic_oracle_routes(state: AppState) -> Router<AppState> {
+fn open_interest_routes(state: AppState) -> Router<AppState> {
     Router::new()
-        .route("/assertions/{assertion_id}", get(get_assertion_details))
-        .route("/assertions", get(get_assertions))
-        .route("/disputed-assertions", get(get_disputed_assertions))
-        .route("/resolved-assertions", get(get_resolved_assertions))
+        .route("/{base}/{quote}", get(get_latest_open_interest))
+        .route("/history/{base}/{quote}", get(get_historical_open_interest))
+        .route("/instruments", get(get_oi_supported_instruments))
         .with_state(state)
 }

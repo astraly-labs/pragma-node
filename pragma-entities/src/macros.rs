@@ -1,44 +1,36 @@
-/// Convert entry to database format
+/// Convert timestamp to datetime
 ///
 /// Arguments:
-/// * `entry`: Entry to convert
-/// * `signature`: Signature to use
+/// * `timestamp`: Timestamp to convert
 ///
 /// Returns:
-/// * `NewEntry`: New entry
+/// * `Result<chrono::DateTime<chrono::Utc>, EntryError>`: Datetime
 #[macro_export]
 macro_rules! convert_timestamp_to_datetime {
     ($timestamp:expr) => {{
         if $timestamp > (i64::MAX as u64).try_into().unwrap() {
-            Err(EntryError::InvalidTimestamp(
-                pragma_common::timestamp::TimestampRangeError::Other(format!(
-                    "Timestamp {} is too large",
-                    $timestamp
-                )),
-            ))
+            Err(EntryError::InvalidTimestamp(TimestampError::Other(
+                format!("Timestamp {} is too large", $timestamp),
+            )))
         } else if $timestamp.to_string().len() >= 13 {
             #[allow(clippy::cast_possible_wrap)]
             chrono::DateTime::<chrono::Utc>::from_timestamp_millis($timestamp as i64)
                 .map(|dt| dt.naive_utc())
                 .ok_or_else(|| {
-                    EntryError::InvalidTimestamp(
-                        pragma_common::timestamp::TimestampRangeError::Other(format!(
-                            "Could not convert {} to DateTime (millis)",
-                            $timestamp
-                        )),
-                    )
+                    EntryError::InvalidTimestamp(TimestampError::Other(format!(
+                        "Could not convert {} to DateTime (millis)",
+                        $timestamp
+                    )))
                 })
         } else {
             #[allow(clippy::cast_possible_wrap)]
             chrono::DateTime::<chrono::Utc>::from_timestamp($timestamp as i64, 0)
                 .map(|dt| dt.naive_utc())
                 .ok_or_else(|| {
-                    EntryError::InvalidTimestamp(
-                        pragma_common::timestamp::TimestampRangeError::Other(format!(
-                            "Could not convert {} to DateTime (seconds)",
-                            $timestamp
-                        )),
-                    )
+                    EntryError::InvalidTimestamp(TimestampError::Other(format!(
+                        "Could not convert {} to DateTime (seconds)",
+                        $timestamp
+                    )))
                 })
         }
     }};
@@ -49,6 +41,7 @@ macro_rules! convert_timestamp_to_datetime {
 mod tests {
 
     use crate::EntryError;
+    use crate::TimestampError;
     use chrono::TimeZone;
     use chrono::Utc;
 

@@ -1,32 +1,34 @@
+use axum::Json;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
-use axum::Json;
 use serde_json::json;
 
 use crate::error::InfraError;
 
 #[derive(Debug, thiserror::Error)]
 pub enum CheckpointError {
-    #[error("internal server error")]
-    InternalServerError,
+    // 400
     #[error("invalid limit : {0}")]
     InvalidLimit(u64),
-    #[error("no checkpoints found for requested pair")]
-    NotFound,
+    // 404
+    #[error("no checkpoints found for pair {0}")]
+    CheckpointNotFound(String),
+    // 500
+    #[error("internal server error{0}")]
+    InternalServerError(String),
 }
 
 impl From<InfraError> for CheckpointError {
     fn from(error: InfraError) -> Self {
         match error {
-            InfraError::NotFound => Self::NotFound,
-            InfraError::InternalServerError
-            | InfraError::UnsupportedInterval(_, _)
-            | InfraError::RoutingError
-            | InfraError::DisputerNotSet
-            | InfraError::SettlerNotSet
-            | InfraError::InvalidTimestamp(_)
-            | InfraError::NonZeroU32Conversion(_)
-            | InfraError::AxumError(_) => Self::InternalServerError,
+            // 404
+            InfraError::CheckpointNotFound(pair_id) => Self::CheckpointNotFound(pair_id),
+            // 500
+            InfraError::NoRpcAvailable(network) => {
+                Self::InternalServerError(format!(": no RPC available for network {network}"))
+            }
+            // Those errors should never proc for the Checkpoints.
+            _ => Self::InternalServerError(String::default()),
         }
     }
 }
@@ -37,13 +39,13 @@ impl IntoResponse for CheckpointError {
             Self::InvalidLimit(limit) => {
                 (StatusCode::BAD_REQUEST, format!("Invalid Limit {limit}"))
             }
-            Self::NotFound => (
+            Self::CheckpointNotFound(pair_id) => (
                 StatusCode::NOT_FOUND,
-                String::from("No checkpoints found for requested pair"),
+                format!("No checkpoints found for pair {pair_id}"),
             ),
-            Self::InternalServerError => (
+            Self::InternalServerError(details) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                String::from("Internal server error"),
+                format!("Internal server error{details}"),
             ),
         };
         (
