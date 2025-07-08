@@ -142,7 +142,7 @@ pub async fn get_latest_entries_multi_pair(
 
 pub fn get_params_for_websocket(is_perp: bool) -> EntryParams {
     EntryParams {
-        interval: Interval::OneHundredMillisecond,
+        interval: Interval::FiveSeconds,
         timestamp: chrono::Utc::now().timestamp_millis(),
         aggregation_mode: AggregationMode::Median,
         data_type: if is_perp {
