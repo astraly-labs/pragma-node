@@ -16,6 +16,7 @@ use tracing::{error, warn};
 pub(crate) struct IngestorMetricsRegistry {
     pub db_operations: Counter<u64>,
     pub data_staleness: Gauge<f64>,
+    pub consumer_lag: Gauge<i64>,
 }
 
 impl IngestorMetricsRegistry {
@@ -34,9 +35,16 @@ impl IngestorMetricsRegistry {
             .with_unit("s")
             .init();
 
+        let consumer_lag = meter
+            .i64_gauge("ingestor_consumer_lag_total")
+            .with_description("Total lag of Kafka consumers")
+            .with_unit("count")
+            .init();
+
         Arc::new(Self {
             db_operations,
             data_staleness,
+            consumer_lag,
         })
     }
 
@@ -53,6 +61,13 @@ impl IngestorMetricsRegistry {
     pub(crate) fn update_data_staleness(&self, staleness_seconds: f64) {
         self.data_staleness.record(staleness_seconds, &[]);
     }
+
+    pub(crate) fn record_consumer_lag(&self, consumer_type: ConsumerType, lag: i64) {
+        self.consumer_lag.record(
+            lag,
+            &[KeyValue::new("consumer_type", consumer_type.to_string())],
+        );
+    }
 }
 
 #[derive(Display, Clone, Debug)]
@@ -61,6 +76,13 @@ pub(crate) enum DbOperation {
     InsertFutureEntries,
     InsertFundingRates,
     InsertOpenInterest,
+}
+
+#[derive(Display, Clone, Debug)]
+pub(crate) enum ConsumerType {
+    Price,
+    FundingRate,
+    OpenInterest,
 }
 
 #[derive(Display, Clone, Debug)]
