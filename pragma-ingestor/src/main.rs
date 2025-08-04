@@ -23,15 +23,30 @@ use crate::db::process::{
 mod config;
 mod db;
 mod error;
+mod metrics;
 
 #[tokio::main]
 #[tracing::instrument]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv().ok();
-    pragma_common::telemetry::init_telemetry("pragma-ingestor", CONFIG.otel_endpoint.clone())?;
+
+    // We export our telemetry - so we can monitor the ingestor through Grafana.
+    pragma_common::telemetry::init_telemetry("pragma-ingestor", CONFIG.otel_endpoint.clone())
+        .expect("Failed to initialize telemetry");
 
     let pool = pragma_entities::connection::init_pool("pragma-ingestor", ENV_OFFCHAIN_DATABASE_URL)
         .expect("Failed to connect to offchain database");
+
+    // Initialize metrics registry
+    let metrics_registry = metrics::IngestorMetricsRegistry::new();
+
+    // Start data freshness monitoring task
+    let freshness_pool = pool.clone();
+    let freshness_metrics = metrics_registry.clone();
+    tokio::spawn(metrics::start_data_freshness_monitor(
+        freshness_pool,
+        freshness_metrics,
+    ));
 
     // Set up channels for spot, future, and funding rate entries with backpressure
     let (spot_tx, spot_rx) = mpsc::channel::<NewEntry>(CONFIG.channel_capacity * 2);
@@ -43,18 +58,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Spawn database worker tasks
     let task_group = TaskGroup::new()
-        .with_handle(tokio::spawn(process_spot_entries(pool.clone(), spot_rx)))
+        .with_handle(tokio::spawn(process_spot_entries(
+            pool.clone(),
+            spot_rx,
+            metrics_registry.clone(),
+        )))
         .with_handle(tokio::spawn(process_future_entries(
             pool.clone(),
             future_rx,
+            metrics_registry.clone(),
         )))
         .with_handle(tokio::spawn(process_funding_rate_entries(
             pool.clone(),
             funding_rate_rx,
+            metrics_registry.clone(),
         )))
         .with_handle(tokio::spawn(process_open_interest_entries(
             pool,
             open_interest_rx,
+            metrics_registry.clone(),
         )));
 
     // Spawn consumers
