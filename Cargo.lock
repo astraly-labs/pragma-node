@@ -3878,6 +3878,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "pragma-migrations"
+version = "0.1.0"
+dependencies = [
+ "dotenvy",
+ "pragma-entities",
+ "tokio",
+]
+
+[[package]]
 name = "pragma-monitoring"
 version = "0.1.0"
 source = "git+https://github.com/astraly-labs/pragma-monitoring#83c7e93e5a13f0be3c70dde72eae9cca48697d41"

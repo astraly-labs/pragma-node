@@ -6,6 +6,7 @@ members = [
   "pragma-ingestor",
   "pragma-entities",
   "tests",
+  "scripts",
 ]
 
 [workspace.package]
