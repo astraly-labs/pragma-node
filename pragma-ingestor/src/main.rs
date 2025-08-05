@@ -7,7 +7,6 @@ use futures_util::StreamExt;
 use pragma_common::{InstrumentType, task_group::TaskGroup};
 use std::sync::Arc;
 use tokio::sync::mpsc;
-use tokio::task::JoinSet;
 use tokio::time::{Duration, interval};
 use tracing::{error, warn};
 
@@ -41,14 +40,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize metrics registry
     let metrics_registry = metrics::IngestorMetricsRegistry::new();
 
-    // Start data freshness monitoring task
-    let freshness_pool = pool.clone();
-    let freshness_metrics = metrics_registry.clone();
-    tokio::spawn(metrics::start_data_freshness_monitor(
-        freshness_pool,
-        freshness_metrics,
-    ));
-
     // Set up channels for spot, future, and funding rate entries with backpressure
     let (spot_tx, spot_rx) = mpsc::channel::<NewEntry>(CONFIG.channel_capacity * 2);
     let (future_tx, future_rx) = mpsc::channel::<NewFutureEntry>(CONFIG.channel_capacity);
@@ -57,8 +48,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (open_interest_tx, open_interest_rx) =
         mpsc::channel::<NewOpenInterest>(CONFIG.channel_capacity / 2);
 
-    // Spawn database worker tasks
-    let task_group = TaskGroup::new()
+    // Create task group with all tasks including metrics monitoring
+    let mut task_group = TaskGroup::new()
+        // Database worker tasks
         .with_handle(tokio::spawn(process_spot_entries(
             pool.clone(),
             spot_rx,
@@ -75,46 +67,69 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             metrics_registry.clone(),
         )))
         .with_handle(tokio::spawn(process_open_interest_entries(
-            pool,
+            pool.clone(),
             open_interest_rx,
+            metrics_registry.clone(),
+        )))
+        // Metrics monitoring task
+        .with_handle(tokio::spawn(metrics::start_data_freshness_monitor(
+            pool.clone(),
             metrics_registry.clone(),
         )));
 
-    // Spawn consumers
-    let mut join_set = JoinSet::new();
+    // Add consumer tasks to the task group
     for _ in 0..CONFIG.num_consumers {
-        join_set.spawn(run_price_consumer(
-            CONFIG.kafka_group_id.clone(),
-            spot_tx.clone(),
-            future_tx.clone(),
-            metrics_registry.clone(),
-        ));
-        join_set.spawn(run_funding_rate_consumer(
-            CONFIG.kafka_group_id.clone(),
-            funding_rate_tx.clone(),
-            metrics_registry.clone(),
-        ));
-        join_set.spawn(run_open_interest_consumer(
-            CONFIG.kafka_group_id.clone(),
-            open_interest_tx.clone(),
-            metrics_registry.clone(),
-        ));
+        let spot_tx_clone = spot_tx.clone();
+        let future_tx_clone = future_tx.clone();
+        let funding_rate_tx_clone = funding_rate_tx.clone();
+        let open_interest_tx_clone = open_interest_tx.clone();
+        let group_id = CONFIG.kafka_group_id.clone();
+        let metrics_clone = metrics_registry.clone();
+
+        task_group = task_group
+            .with_handle(tokio::spawn({
+                let spot_tx = spot_tx_clone.clone();
+                let future_tx = future_tx_clone.clone();
+                let group_id = group_id.clone();
+                let metrics = metrics_clone.clone();
+                async move {
+                    if let Err(e) = run_price_consumer(group_id, spot_tx, future_tx, metrics).await {
+                        error!("Price consumer error: {e}");
+                    }
+                }
+            }))
+            .with_handle(tokio::spawn({
+                let funding_rate_tx = funding_rate_tx_clone.clone();
+                let group_id = group_id.clone();
+                let metrics = metrics_clone.clone();
+                async move {
+                    if let Err(e) = run_funding_rate_consumer(group_id, funding_rate_tx, metrics).await {
+                        error!("Funding rate consumer error: {e}");
+                    }
+                }
+            }))
+            .with_handle(tokio::spawn({
+                let open_interest_tx = open_interest_tx_clone;
+                let group_id = group_id.clone();
+                let metrics = metrics_clone;
+                async move {
+                    if let Err(e) = run_open_interest_consumer(group_id, open_interest_tx, metrics).await {
+                        error!("Open interest consumer error: {e}");
+                    }
+                }
+            }));
     }
 
-    while let Some(result) = join_set.join_next().await {
-        if let Err(e) = result {
-            error!("Consumer error: {e}");
-        }
-    }
-
+    
+    // Await all tasks and abort if one fails
+    task_group.abort_all_if_one_resolves().await;
+    
     // Drop original senders to close channels when consumers finish
     drop(spot_tx);
     drop(future_tx);
     drop(funding_rate_tx);
     drop(open_interest_tx);
 
-    // Await all tasks and abort if one fails
-    task_group.abort_all_if_one_resolves().await;
     Ok(())
 }
 
