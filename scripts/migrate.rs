@@ -1,5 +1,3 @@
-use std::env;
-
 use pragma_entities::connection::{init_pool, ENV_OFFCHAIN_DATABASE_URL};
 use pragma_entities::db::run_migrations;
 
