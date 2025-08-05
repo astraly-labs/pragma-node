@@ -15,10 +15,12 @@ anyhow = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 deadpool-diesel = { workspace = true, features = ["postgres"] }
+diesel = { workspace = true }
 dotenvy = { workspace = true }
 envy = { workspace = true }
 futures-util = { workspace = true }
 lazy_static = { workspace = true }
+opentelemetry = { workspace = true }
 rdkafka = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -26,5 +28,3 @@ strum = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 tracing = { workspace = true }
-opentelemetry = { workspace = true }
-diesel = { workspace = true }
