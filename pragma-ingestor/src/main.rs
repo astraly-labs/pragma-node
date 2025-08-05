@@ -1,18 +1,15 @@
 use dotenvy::dotenv;
+use faucon_rs::FauconEntry;
 use faucon_rs::consumer::FauConsumerBuilder;
 use faucon_rs::topics::FauconTopic;
 use faucon_rs::{consumer::AutoOffsetReset, environment::FauconEnvironment};
 use futures_util::StreamExt;
-use pragma_common::{
-    InstrumentType,
-    entries::{FundingRateEntry, PriceEntry, open_interest::OpenInterestEntry},
-    task_group::TaskGroup,
-};
+use pragma_common::{InstrumentType, task_group::TaskGroup};
+use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio::task::JoinSet;
-use tokio::time::{interval, Duration};
+use tokio::time::{Duration, interval};
 use tracing::{error, warn};
-use std::sync::Arc;
 
 use pragma_entities::connection::ENV_OFFCHAIN_DATABASE_URL;
 use pragma_entities::{NewEntry, NewFundingRate, NewFutureEntry, NewOpenInterest};
@@ -154,7 +151,7 @@ async fn run_price_consumer(
             Some(result) = stream.next() => {
                 match result {
                     Ok(entry) => {
-                        if let Ok(entry) = entry.try_into::<PriceEntry>() {
+                        if let FauconEntry::Price(entry) = entry {
                             let timestamp = chrono::DateTime::from_timestamp_millis(entry.timestamp_ms)
                                 .map_or_else(
                                     || {
@@ -214,8 +211,6 @@ async fn run_price_consumer(
             }
         }
     }
-
-    Ok(())
 }
 
 /// Runs a Kafka consumer for funding rate entries
@@ -250,7 +245,7 @@ async fn run_funding_rate_consumer(
             Some(result) = stream.next() => {
                 match result {
                     Ok(entry) => {
-                        if let Ok(entry) = entry.try_into::<FundingRateEntry>() {
+                        if let FauconEntry::FundingRate(entry) = entry {
                             let timestamp = chrono::DateTime::from_timestamp_millis(entry.timestamp_ms)
                                 .map_or_else(
                                     || {
@@ -293,7 +288,6 @@ async fn run_funding_rate_consumer(
             }
         }
     }
-    Ok(())
 }
 
 /// Runs a Kafka consumer for open interest entries
@@ -328,7 +322,7 @@ async fn run_open_interest_consumer(
             Some(result) = stream.next() => {
                 match result {
                     Ok(entry) => {
-                        if let Ok(entry) = entry.try_into::<OpenInterestEntry>() {
+                        if let FauconEntry::OpenInterest(entry) = entry {
                             let timestamp = chrono::DateTime::from_timestamp_millis(entry.timestamp_ms)
                                 .map_or_else(
                                     || {
@@ -371,5 +365,4 @@ async fn run_open_interest_consumer(
             }
         }
     }
-    Ok(())
 }

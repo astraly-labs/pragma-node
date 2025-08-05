@@ -61,7 +61,7 @@ pragma-historical = { path = "./pragma-historical" }
 pragma-entities = { path = "./pragma-entities" }
 pragma-ingestor = { path = "./pragma-ingestor" }
 pragma-node = { path = "./pragma-node" }
-faucon-rs = { version = "0.2.9", registry = "pragma" }
+faucon-rs = { version = "0.5.1", registry = "pragma" }
 
 anyhow = "1.0.97"
 aws-config = { version = "1.5.1", features = ["behavior-version-latest"] }
@@ -101,7 +101,7 @@ serde_json = { version = "1.0.122", features = ["arbitrary_precision"] }
 starknet = "0.14.0"
 starknet-crypto = "0.7.4"
 clap = { version = "4.4", features = ["derive", "env"] }
-reqwest = { version = "0.12.5", features = ["blocking", "json"] }
+reqwest = { version = "0.12.22", features = ["blocking", "json"] }
 rdkafka = "0.37.0"
 thiserror = "2.0.12"
 strum = { version = "0.26", features = ["derive"] }
