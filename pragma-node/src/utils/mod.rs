@@ -18,7 +18,7 @@ use deadpool_diesel::postgres::Pool;
 use moka::future::Cache;
 use pragma_entities::dto::Publisher;
 use pragma_entities::{Entry as EntityEntry, EntryError, FutureEntry, PublisherError};
-use starknet_crypto::Felt;
+use starknet::core::types::Felt;
 
 use crate::infra::repositories::publisher_repository;
 use crate::infra::repositories::{

@@ -59,7 +59,8 @@ pub async fn get_onchain_checkpoints(
     PathExtractor(pair): PathExtractor<(String, String)>,
     Query(params): Query<GetOnchainCheckpointsParams>,
 ) -> Result<Json<GetOnchainCheckpointsResponse>, CheckpointError> {
-    let pair = Pair::from(pair);
+    let pair =
+        Pair::try_from(pair).map_err(|e| CheckpointError::InternalServerError(e.to_string()))?;
 
     let limit = params.limit.unwrap_or(DEFAULT_LIMIT);
     if !(1..=MAX_LIMIT).contains(&limit) {

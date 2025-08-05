@@ -134,8 +134,10 @@ pub async fn retry_with_routing(
     let mut routing_attempts = Vec::new();
 
     for alt_currency in ABSTRACT_CURRENCIES {
-        let base_alt_pair = Pair::from((pair.base.clone(), alt_currency.to_string()));
-        let alt_quote_pair = Pair::from((pair.quote.clone(), alt_currency.to_string()));
+        let base_alt_pair = Pair::try_from((pair.base.clone(), alt_currency.to_string()))
+            .map_err(|e| InfraError::PairNotFound(e.to_string()))?;
+        let alt_quote_pair = Pair::try_from((pair.quote.clone(), alt_currency.to_string()))
+            .map_err(|e| InfraError::PairNotFound(e.to_string()))?;
         let base_alt_pair_str = base_alt_pair.to_string();
         let alt_quote_pair_str = alt_quote_pair.to_string();
 
@@ -301,8 +303,10 @@ fn combine_entries(
         ))?
         .naive_utc();
 
-    let base_pair = Pair::from(base_entry.pair_id.clone());
-    let quote_pair = Pair::from(quote_entry.pair_id.clone());
+    let base_pair = Pair::try_from(base_entry.pair_id.clone())
+        .map_err(|e| InfraError::PairNotFound(e.to_string()))?;
+    let quote_pair = Pair::try_from(quote_entry.pair_id.clone())
+        .map_err(|e| InfraError::PairNotFound(e.to_string()))?;
 
     Ok(HistoricalEntryRaw {
         pair_id: Pair::create_routed_pair(&base_pair, &quote_pair).to_string(),

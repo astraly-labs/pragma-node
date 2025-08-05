@@ -63,7 +63,7 @@ pub async fn get_onchain_entry(
     PathExtractor(pair): PathExtractor<(String, String)>,
     Query(params): Query<GetOnchainEntryParams>,
 ) -> Result<Json<GetOnchainEntryResponse>, EntryError> {
-    let pair = Pair::from(pair);
+    let pair = Pair::try_from(pair).map_err(|e| EntryError::InternalServerError(e.to_string()))?;
 
     let with_components = params.components.unwrap_or(true);
     let with_variations = params.variations.unwrap_or(true);

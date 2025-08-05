@@ -79,7 +79,8 @@ pub async fn get_historical_funding_rates(
     Path(pair): Path<(String, String)>,
     Query(params): Query<GetHistoricalFundingRateParams>,
 ) -> Result<Json<GetHistoricalFundingRateResponse>, EntryError> {
-    let pair = Pair::from(pair);
+    let pair = Pair::try_from(pair).map_err(|e| EntryError::InternalServerError(e.to_string()))?;
+
     let source = params.source.to_ascii_uppercase();
 
     // Validate pagination parameters using the new helper methods

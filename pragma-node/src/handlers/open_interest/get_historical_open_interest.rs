@@ -43,7 +43,8 @@ pub async fn get_historical_open_interest(
     Path(pair): Path<(String, String)>,
     Query(params): Query<GetHistoricalOpenInterestParams>,
 ) -> Result<Json<GetHistoricalOpenInterestResponse>, EntryError> {
-    let pair = Pair::from(pair);
+    let pair = Pair::try_from(pair).map_err(|e| EntryError::InternalServerError(e.to_string()))?;
+
     let source = params.source.to_ascii_uppercase();
 
     let timestamp_range = params

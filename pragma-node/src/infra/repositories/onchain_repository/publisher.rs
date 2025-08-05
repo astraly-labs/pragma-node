@@ -80,7 +80,8 @@ impl RawLastPublisherEntryForPair {
         decimals_cache: &Cache<StarknetNetwork, HashMap<String, u32>>,
         rpc_clients: &RpcClients,
     ) -> Result<PublisherEntry, InfraError> {
-        let pair = Pair::from(self.pair_id.as_str());
+        let pair = Pair::try_from(self.pair_id.as_str())
+            .map_err(|e| InfraError::PairNotFound(e.to_string()))?;
         let decimals = get_onchain_decimals(decimals_cache, rpc_clients, network, &pair).await?;
 
         let entry = PublisherEntry {

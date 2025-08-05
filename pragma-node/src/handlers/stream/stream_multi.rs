@@ -59,7 +59,7 @@ pub async fn stream_entry_multi_pair(
     let pairs = params
         .pairs
         .iter()
-        .map(|pair| Pair::from(pair.clone()))
+        .filter_map(|pair| Pair::try_from(pair.clone()).ok())
         .collect::<Vec<_>>();
 
     let is_routing = params.get_entry_params.routing.unwrap_or(false);

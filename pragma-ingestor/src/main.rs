@@ -93,7 +93,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let group_id = group_id.clone();
                 let metrics = metrics_clone.clone();
                 async move {
-                    if let Err(e) = run_price_consumer(group_id, spot_tx, future_tx, metrics).await {
+                    if let Err(e) = run_price_consumer(group_id, spot_tx, future_tx, metrics).await
+                    {
                         error!("Price consumer error: {e}");
                     }
                 }
@@ -103,7 +104,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let group_id = group_id.clone();
                 let metrics = metrics_clone.clone();
                 async move {
-                    if let Err(e) = run_funding_rate_consumer(group_id, funding_rate_tx, metrics).await {
+                    if let Err(e) =
+                        run_funding_rate_consumer(group_id, funding_rate_tx, metrics).await
+                    {
                         error!("Funding rate consumer error: {e}");
                     }
                 }
@@ -113,17 +116,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let group_id = group_id.clone();
                 let metrics = metrics_clone;
                 async move {
-                    if let Err(e) = run_open_interest_consumer(group_id, open_interest_tx, metrics).await {
+                    if let Err(e) =
+                        run_open_interest_consumer(group_id, open_interest_tx, metrics).await
+                    {
                         error!("Open interest consumer error: {e}");
                     }
                 }
             }));
     }
 
-    
     // Await all tasks and abort if one fails
     task_group.abort_all_if_one_resolves().await;
-    
+
     // Drop original senders to close channels when consumers finish
     drop(spot_tx);
     drop(future_tx);

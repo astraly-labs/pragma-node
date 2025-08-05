@@ -129,7 +129,7 @@ pub async fn get_entry(
 
     let entry_params = EntryParams::try_from(params)?;
 
-    let pair = Pair::from(pair);
+    let pair = Pair::try_from(pair).map_err(|e| EntryError::InternalServerError(e.to_string()))?;
 
     let entry = routing(&state.offchain_pool, is_routing, &pair, &entry_params)
         .await

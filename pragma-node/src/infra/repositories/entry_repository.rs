@@ -143,8 +143,10 @@ async fn find_alternative_pair_price(
     entry_params: &EntryParams,
 ) -> Result<MedianEntry, InfraError> {
     for alt_currency in ABSTRACT_CURRENCIES {
-        let base_alt_pair = Pair::from((pair.base.clone(), alt_currency.to_string()));
-        let alt_quote_pair = Pair::from((pair.quote.clone(), alt_currency.to_string()));
+        let base_alt_pair = Pair::try_from((pair.base.clone(), alt_currency.to_string()))
+            .map_err(|e| InfraError::PairNotFound(e.to_string()))?;
+        let alt_quote_pair = Pair::try_from((pair.quote.clone(), alt_currency.to_string()))
+            .map_err(|e| InfraError::PairNotFound(e.to_string()))?;
 
         if pair_id_exist(pool, &base_alt_pair.clone()).await?
             && pair_id_exist(pool, &alt_quote_pair.clone()).await?

@@ -3,12 +3,11 @@ use std::{collections::HashMap, sync::LazyLock};
 use starknet::providers::Provider;
 use starknet::{
     core::{
-        types::{BlockId, BlockTag, FunctionCall},
+        types::{BlockId, BlockTag, Felt, FunctionCall},
         utils::{cairo_short_string_to_felt, get_selector_from_name},
     },
     macros::felt_hex,
 };
-use starknet_crypto::Felt;
 use url::Url;
 
 use pragma_common::{

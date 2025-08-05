@@ -49,7 +49,7 @@ redundant_pub_crate = "allow"
 missing_const_for_fn = "allow"
 
 [workspace.dependencies]
-pragma-common = { version = "0.3.11", features = [
+pragma-common = { version = "0.3.22", features = [
   "serde",
   "services",
   "task-group",
@@ -99,7 +99,7 @@ serde = { version = "1.0.204", features = ["derive"] }
 moka = { version = "0.12", features = ["future"] }
 nonzero_ext = { version = "0.3.0" }
 serde_json = { version = "1.0.122", features = ["arbitrary_precision"] }
-starknet = "0.14.0"
+starknet = "0.15.1"
 starknet-crypto = "0.7.4"
 clap = { version = "4.4", features = ["derive", "env"] }
 reqwest = { version = "0.12.22", features = ["blocking", "json"] }

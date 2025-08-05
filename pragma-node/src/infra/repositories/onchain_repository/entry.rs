@@ -95,7 +95,8 @@ pub async fn routing(
         )
         .await?;
         if !prices_and_entries.is_empty() {
-            let pair = Pair::from(pair_id.clone());
+            let pair = Pair::try_from(pair_id.clone())
+                .map_err(|e| InfraError::PairNotFound(e.to_string()))?;
             let decimal =
                 get_onchain_decimals(decimals_cache, rpc_clients, routing_args.network, &pair)
                     .await?;
@@ -136,7 +137,8 @@ pub async fn routing(
                 decimals_cache,
                 rpc_clients,
                 routing_args.network,
-                &Pair::from(base_alt_pair.clone()),
+                &Pair::try_from(base_alt_pair.clone())
+                    .map_err(|e| InfraError::PairNotFound(e.to_string()))?,
             )
             .await?;
             let quote_alt_result = get_sources_and_aggregate(
@@ -151,7 +153,8 @@ pub async fn routing(
                 decimals_cache,
                 rpc_clients,
                 routing_args.network,
-                &Pair::from(alt_quote_pair.clone()),
+                &Pair::try_from(alt_quote_pair.clone())
+                    .map_err(|e| InfraError::PairNotFound(e.to_string()))?,
             )
             .await?;
 

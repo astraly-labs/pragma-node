@@ -51,7 +51,7 @@ pub async fn get_onchain_history(
     PathExtractor(pair): PathExtractor<(String, String)>,
     Query(params): Query<GetOnchainHistoryParams>,
 ) -> Result<Json<GetOnchainHistoryResponse>, EntryError> {
-    let pair = Pair::from(pair);
+    let pair = Pair::try_from(pair).map_err(|e| EntryError::InternalServerError(e.to_string()))?;
 
     let network = params.network;
     let timestamp_range = params

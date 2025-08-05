@@ -1,6 +1,6 @@
 use pragma_common::starknet::{ConversionError, SignerError};
+use starknet::core::types::Felt;
 use starknet::signers::SigningKey;
-use starknet_crypto::Felt;
 
 pub trait Signable {
     fn try_get_hash(&self) -> Result<Felt, ConversionError>;

@@ -41,7 +41,8 @@ pub async fn get_latest_funding_rate(
     Path(pair): Path<(String, String)>,
     Query(params): Query<GetLatestFundingRateParams>,
 ) -> Result<Json<GetLatestFundingRateResponse>, EntryError> {
-    let pair = Pair::from(pair);
+    let pair = Pair::try_from(pair).map_err(|e| EntryError::InternalServerError(e.to_string()))?;
+
     let source = params.source.to_ascii_uppercase();
 
     let funding_rate = funding_rates_repository::get_at_timestamp(
