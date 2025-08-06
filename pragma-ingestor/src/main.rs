@@ -1,9 +1,11 @@
 use dotenvy::dotenv;
-use faucon_rs::FauconEntry;
 use faucon_rs::consumer::FauConsumerBuilder;
 use faucon_rs::topics::FauconTopic;
+use faucon_rs::topics::prices::PriceFilter;
+use faucon_rs::{FauconEntry, FauconFilter as _};
 use faucon_rs::{consumer::AutoOffsetReset, environment::FauconEnvironment};
 use futures_util::StreamExt;
+use pragma_common::pair;
 use pragma_common::{InstrumentType, task_group::TaskGroup};
 use std::sync::Arc;
 use tokio::sync::mpsc;
@@ -195,7 +197,26 @@ async fn run_price_consumer(
 
     tracing::info!("🚀 Starting price consumer");
 
-    let mut stream = consumer.stream();
+    let price_filter = PriceFilter::Any(vec![
+        // Filter only pairs we care about
+        PriceFilter::Any(vec![
+            PriceFilter::Pair(pair!("BTC/USD")),
+            PriceFilter::Pair(pair!("ETH/USD")),
+            PriceFilter::Pair(pair!("SOL/USD")),
+            PriceFilter::Pair(pair!("STRK/USD")),
+            PriceFilter::Pair(pair!("USDC/USD")),
+            PriceFilter::Pair(pair!("USDT/USD")),
+            PriceFilter::Pair(pair!("EUR/USD")),
+            PriceFilter::Pair(pair!("XAU/USD")),
+            PriceFilter::Pair(pair!("SPX500M/USD")),
+            PriceFilter::Pair(pair!("XBR/USD")),
+            PriceFilter::Pair(pair!("TECH100M/USD")),
+            PriceFilter::Pair(pair!("USD/JPY")),
+            PriceFilter::Pair(pair!("XAG/USD")),
+        ]),
+    ]);
+
+    let mut stream = consumer.filtered_stream(vec![price_filter.boxed()]);
     let mut check_lag_interval = interval(Duration::from_secs(2));
 
     loop {

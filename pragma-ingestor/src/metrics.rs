@@ -64,9 +64,15 @@ impl IngestorMetricsRegistry {
         );
     }
 
-    pub(crate) fn update_data_staleness(&self, staleness_seconds: f64) {
-        debug!("Updating data staleness: {} seconds", staleness_seconds);
-        self.data_staleness.record(staleness_seconds, &[]);
+    pub(crate) fn update_data_staleness(&self, staleness_seconds: f64, data_type: DataType) {
+        debug!(
+            "Updating data staleness for {:?}: {} seconds",
+            data_type, staleness_seconds
+        );
+        self.data_staleness.record(
+            staleness_seconds,
+            &[KeyValue::new("data_type", data_type.to_string())],
+        );
     }
 
     pub(crate) fn record_consumer_lag(&self, consumer_type: ConsumerType, lag: i64) {
@@ -97,6 +103,12 @@ pub(crate) enum ConsumerType {
 pub(crate) enum Status {
     Success,
     Error,
+}
+
+#[derive(Display, Clone, Debug)]
+pub(crate) enum DataType {
+    Entries,
+    FutureEntries,
 }
 
 pub(crate) async fn start_data_freshness_monitor(
@@ -155,33 +167,45 @@ pub(crate) async fn check_data_freshness(
         )
         .await??;
 
-    // Find the most recent timestamp across both tables
-    let latest_timestamp = match (latest_spot_timestamp, latest_future_timestamp) {
-        (Some(spot), Some(future)) => Some(spot.max(future)),
-        (Some(spot), None) => Some(spot),
-        (None, Some(future)) => Some(future),
-        (None, None) => None,
-    };
+    let now = Utc::now();
 
-    if let Some(latest) = latest_timestamp {
-        let now = Utc::now();
-        let staleness_seconds = (now - latest).num_seconds() as f64;
+    // Update staleness for spot entries
+    if let Some(latest_spot) = latest_spot_timestamp {
+        let staleness_seconds = (now - latest_spot).num_seconds() as f64;
+        metrics_registry.update_data_staleness(staleness_seconds, DataType::Entries);
 
-        metrics_registry.update_data_staleness(staleness_seconds);
-
-        // Log warning if data is more than 5 minutes old
-        tracing::info!("Current data staleness: {} seconds", staleness_seconds);
+        tracing::info!("Spot entries data staleness: {} seconds", staleness_seconds);
         if staleness_seconds > 300.0 {
             warn!(
-                "Data is stale! Latest entry is {} seconds old ({})",
+                "Spot entries data is stale! Latest entry is {} seconds old ({})",
                 staleness_seconds,
-                latest.format("%Y-%m-%d %H:%M:%S UTC")
+                latest_spot.format("%Y-%m-%d %H:%M:%S UTC")
             );
         }
     } else {
-        warn!("No entries found in database!");
-        // Set a high staleness value to trigger alerts
-        metrics_registry.update_data_staleness(99999.0);
+        warn!("No spot entries found in database!");
+        metrics_registry.update_data_staleness(99999.0, DataType::Entries);
+    }
+
+    // Update staleness for future entries
+    if let Some(latest_future) = latest_future_timestamp {
+        let staleness_seconds = (now - latest_future).num_seconds() as f64;
+        metrics_registry.update_data_staleness(staleness_seconds, DataType::FutureEntries);
+
+        tracing::info!(
+            "Future entries data staleness: {} seconds",
+            staleness_seconds
+        );
+        if staleness_seconds > 300.0 {
+            warn!(
+                "Future entries data is stale! Latest entry is {} seconds old ({})",
+                staleness_seconds,
+                latest_future.format("%Y-%m-%d %H:%M:%S UTC")
+            );
+        }
+    } else {
+        warn!("No future entries found in database!");
+        metrics_registry.update_data_staleness(99999.0, DataType::FutureEntries);
     }
 
     Ok(())
