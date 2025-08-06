@@ -8,7 +8,7 @@ use pragma_common::{InstrumentType, task_group::TaskGroup};
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio::time::{Duration, interval};
-use tracing::{error, warn};
+use tracing::{error, info, warn};
 
 use pragma_entities::connection::ENV_OFFCHAIN_DATABASE_URL;
 use pragma_entities::{NewEntry, NewFundingRate, NewFutureEntry, NewOpenInterest};
@@ -31,14 +31,44 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv().ok();
 
     // We export our telemetry - so we can monitor the ingestor through Grafana.
+    info!(
+        "Initializing telemetry with endpoint: {:?}",
+        CONFIG.otel_endpoint
+    );
     pragma_common::telemetry::init_telemetry("pragma-ingestor", CONFIG.otel_endpoint.clone())
         .expect("Failed to initialize telemetry");
+    info!("Telemetry initialized successfully");
+
+    // Test metrics export by creating a simple test metric
+    if let Some(otel_endpoint) = &CONFIG.otel_endpoint {
+        info!("Testing metrics export to: {}", otel_endpoint);
+
+        // Create a test meter and metric
+        let meter = opentelemetry::global::meter("pragma-ingestor-test");
+        let test_counter = meter
+            .u64_counter("test_metric_export")
+            .with_description("Test metric to verify export is working")
+            .with_unit("count")
+            .init();
+
+        // Record a test value
+        test_counter.add(
+            1,
+            &[opentelemetry::KeyValue::new("test", "export_verification")],
+        );
+        info!("Test metric recorded, checking if it's exported...");
+
+        // Wait a moment for export
+        tokio::time::sleep(Duration::from_secs(2)).await;
+        info!("Test metric should have been exported");
+    }
 
     let pool = pragma_entities::connection::init_pool("pragma-ingestor", ENV_OFFCHAIN_DATABASE_URL)
         .expect("Failed to connect to offchain database");
 
     // Initialize metrics registry
     let metrics_registry = metrics::IngestorMetricsRegistry::new();
+    info!("Metrics registry initialized");
 
     // Set up channels for spot, future, and funding rate entries with backpressure
     let (spot_tx, spot_rx) = mpsc::channel::<NewEntry>(CONFIG.channel_capacity * 2);
