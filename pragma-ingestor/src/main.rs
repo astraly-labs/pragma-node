@@ -134,6 +134,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     drop(funding_rate_tx);
     drop(open_interest_tx);
 
+    // Ensure that the tracing provider is shutdown correctly
+    opentelemetry::global::shutdown_tracer_provider();
+
     Ok(())
 }
 

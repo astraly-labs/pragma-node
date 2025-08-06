@@ -160,6 +160,7 @@ pub(crate) async fn check_data_freshness(
         metrics_registry.update_data_staleness(staleness_seconds);
 
         // Log warning if data is more than 5 minutes old
+        tracing::info!("Current data staleness: {} seconds", staleness_seconds);
         if staleness_seconds > 300.0 {
             warn!(
                 "Data is stale! Latest entry is {} seconds old ({})",
