@@ -10,7 +10,7 @@ use opentelemetry::{
 use pragma_entities::InfraError;
 use strum::Display;
 use tokio::time::interval;
-use tracing::{error, warn};
+use tracing::{debug, error, warn};
 
 #[derive(Debug)]
 pub(crate) struct IngestorMetricsRegistry {
@@ -41,6 +41,8 @@ impl IngestorMetricsRegistry {
             .with_unit("count")
             .init();
 
+        debug!("Created OpenTelemetry metrics: db_operations, data_staleness, consumer_lag");
+
         Arc::new(Self {
             db_operations,
             data_staleness,
@@ -49,6 +51,10 @@ impl IngestorMetricsRegistry {
     }
 
     pub(crate) fn record_db_operation(&self, operation: DbOperation, status: Status) {
+        debug!(
+            "Recording DB operation: {:?} with status: {:?}",
+            operation, status
+        );
         self.db_operations.add(
             1,
             &[
@@ -59,10 +65,12 @@ impl IngestorMetricsRegistry {
     }
 
     pub(crate) fn update_data_staleness(&self, staleness_seconds: f64) {
+        debug!("Updating data staleness: {} seconds", staleness_seconds);
         self.data_staleness.record(staleness_seconds, &[]);
     }
 
     pub(crate) fn record_consumer_lag(&self, consumer_type: ConsumerType, lag: i64) {
+        debug!("Recording consumer lag: {:?} = {}", consumer_type, lag);
         self.consumer_lag.record(
             lag,
             &[KeyValue::new("consumer_type", consumer_type.to_string())],
@@ -95,6 +103,7 @@ pub(crate) async fn start_data_freshness_monitor(
     pool: Pool,
     metrics_registry: Arc<IngestorMetricsRegistry>,
 ) {
+    debug!("Starting data freshness monitor");
     let mut interval = interval(Duration::from_secs(30));
 
     loop {
@@ -110,6 +119,7 @@ pub(crate) async fn check_data_freshness(
     pool: &Pool,
     metrics_registry: &IngestorMetricsRegistry,
 ) -> Result<(), InfraError> {
+    debug!("Checking data freshness...");
     let conn = pool.get().await?;
 
     // Get latest timestamps from both tables using efficient ORDER BY + LIMIT
