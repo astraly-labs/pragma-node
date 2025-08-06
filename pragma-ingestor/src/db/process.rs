@@ -11,7 +11,7 @@ use crate::db::insert::{
 };
 use crate::metrics::{DbOperation, IngestorMetricsRegistry, Status};
 
-const PUBLISHING_DELAY: Duration = Duration::from_millis(50);
+const PUBLISHING_DELAY: Duration = Duration::from_millis(500);
 const MINUTE_PUBLISHING_DELAY: Duration = Duration::from_secs(60);
 
 #[tracing::instrument(skip(pool, rx, metrics_registry))]
