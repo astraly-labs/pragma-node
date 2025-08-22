@@ -213,6 +213,7 @@ async fn run_price_consumer(
             PriceFilter::Pair(pair!("TECH100M/USD")),
             PriceFilter::Pair(pair!("USD/JPY")),
             PriceFilter::Pair(pair!("XAG/USD")),
+            PriceFilter::Pair(pair!("XPL/USD")),
         ]),
     ]);
 
