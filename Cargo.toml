@@ -11,6 +11,7 @@ members = [
 
 [workspace.package]
 version = "0.1.0"
+rust-version = "1.89.0"
 edition = "2024"
 repository = "https://github.com/astraly-labs/pragma-node/"
 authors = ["Pragma Labs <support@pragma.build>"]
@@ -49,7 +50,7 @@ redundant_pub_crate = "allow"
 missing_const_for_fn = "allow"
 
 [workspace.dependencies]
-pragma-common = { version = "0.3.22", features = [
+pragma-common = { version = "0.4.1", features = [
   "serde",
   "services",
   "task-group",
@@ -62,7 +63,7 @@ pragma-historical = { path = "./pragma-historical" }
 pragma-entities = { path = "./pragma-entities" }
 pragma-ingestor = { path = "./pragma-ingestor" }
 pragma-node = { path = "./pragma-node" }
-faucon-rs = { version = "0.5.1", registry = "pragma" }
+faucon-rs = { version = "0.6.2", registry = "pragma" }
 
 anyhow = "1.0.97"
 aws-config = { version = "1.5.1", features = ["behavior-version-latest"] }
@@ -72,9 +73,9 @@ axum = { version = "0.8", features = ["macros", "ws", "tokio"] }
 axum-extra = { version = "0.10.0", features = ["typed-header", "query"] }
 axum-macros = "0.5"
 async-trait = "0.1.86"
-cainome = { git = "https://github.com/cartridge-gg/cainome", tag = "v0.4.5", features = [
+cainome = { version = "0.9.1", features = [
   "abigen-rs",
-] }
+], git = "https://github.com/cartridge-gg/cainome", rev = "cb41794" }
 dashmap = "6.1.0"
 diesel = { version = "2.1", features = [
   "postgres",
@@ -99,8 +100,8 @@ serde = { version = "1.0.204", features = ["derive"] }
 moka = { version = "0.12", features = ["future"] }
 nonzero_ext = { version = "0.3.0" }
 serde_json = { version = "1.0.122", features = ["arbitrary_precision"] }
-starknet = "0.15.1"
-starknet-crypto = "0.7.4"
+starknet = "0.17.0"
+starknet-crypto = "0.8.1"
 clap = { version = "4.4", features = ["derive", "env"] }
 reqwest = { version = "0.12.22", features = ["blocking", "json"] }
 rdkafka = "0.37.0"
@@ -136,7 +137,7 @@ tracing-subscriber = { version = "0.3.18", features = [
 ] }
 tracing-opentelemetry = "0.27.0"
 
-pragma-monitoring = { git = "https://github.com/astraly-labs/pragma-monitoring" }
+pragma-monitoring = { git = "https://github.com/astraly-labs/pragma-monitoring", branch = "chore/bump_deps" }
 
 # Test dependencies
 rstest = "0.18.2"

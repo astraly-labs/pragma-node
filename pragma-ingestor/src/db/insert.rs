@@ -29,10 +29,10 @@ pub(crate) async fn insert_future_entries(
     let new_entries = new_entries
         .into_iter()
         .map(|mut entry| {
-            if let Some(expiration_timestamp) = entry.expiration_timestamp {
-                if expiration_timestamp.and_utc().timestamp() == 0 {
-                    entry.expiration_timestamp = None;
-                }
+            if let Some(expiration_timestamp) = entry.expiration_timestamp
+                && expiration_timestamp.and_utc().timestamp() == 0
+            {
+                entry.expiration_timestamp = None;
             }
             entry
         })

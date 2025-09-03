@@ -106,7 +106,7 @@ pub async fn call_get_decimals(
     };
 
     let call_result = rpc_client
-        .call(request, BlockId::Tag(BlockTag::Pending))
+        .call(request, BlockId::Tag(BlockTag::PreConfirmed))
         .await
         .map_err(|e| InfraError::RpcError(format!("{e:?}")))?;
 

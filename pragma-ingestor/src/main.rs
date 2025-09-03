@@ -24,9 +24,9 @@ use crate::metrics::{ConsumerType, IngestorMetricsRegistry};
 
 mod config;
 mod db;
-mod error;
 mod metrics;
 
+#[allow(clippy::too_many_lines)]
 #[tokio::main]
 #[tracing::instrument]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

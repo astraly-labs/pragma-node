@@ -9,13 +9,13 @@ use crate::db::insert::{
     insert_funding_rate_entries, insert_future_entries, insert_open_interest_entries,
     insert_spot_entries,
 };
-use crate::metrics::{DbOperation, IngestorMetricsRegistry, Status};
+use crate::metrics::{IngestorMetricsRegistry, InsertDbOperation, Status};
 
 const PUBLISHING_DELAY: Duration = Duration::from_millis(500);
 const MINUTE_PUBLISHING_DELAY: Duration = Duration::from_secs(60);
 
 #[tracing::instrument(skip(pool, rx, metrics_registry))]
-pub async fn process_spot_entries(
+pub(crate) async fn process_spot_entries(
     pool: Pool,
     mut rx: mpsc::Receiver<NewEntry>,
     metrics_registry: Arc<IngestorMetricsRegistry>,
@@ -33,12 +33,12 @@ pub async fn process_spot_entries(
                 let batch = std::mem::take(&mut batched_data);
                 let batch = batch.into_values().collect();
                 match insert_spot_entries(&pool, batch).await {
-                    Ok(_) => {
-                        metrics_registry.record_db_operation(DbOperation::InsertSpotEntries, Status::Success);
+                    Ok(()) => {
+                        metrics_registry.record_db_operation(InsertDbOperation::SpotEntries, Status::Success);
                     }
                     Err(e) => {
                         tracing::error!("❌ Failed to insert spot entries: {e:?}");
-                        metrics_registry.record_db_operation(DbOperation::InsertSpotEntries, Status::Error);
+                        metrics_registry.record_db_operation(InsertDbOperation::SpotEntries, Status::Error);
                     }
                 }
             }
@@ -47,7 +47,7 @@ pub async fn process_spot_entries(
 }
 
 #[tracing::instrument(skip(pool, rx, metrics_registry))]
-pub async fn process_future_entries(
+pub(crate) async fn process_future_entries(
     pool: Pool,
     mut rx: mpsc::Receiver<NewFutureEntry>,
     metrics_registry: Arc<IngestorMetricsRegistry>,
@@ -65,12 +65,12 @@ pub async fn process_future_entries(
                 let batch = std::mem::take(&mut batched_data);
                 let batch = batch.into_values().collect();
                 match insert_future_entries(&pool, batch).await {
-                    Ok(_) => {
-                        metrics_registry.record_db_operation(DbOperation::InsertFutureEntries, Status::Success);
+                    Ok(()) => {
+                        metrics_registry.record_db_operation(InsertDbOperation::FutureEntries, Status::Success);
                     }
                     Err(e) => {
                         tracing::error!("❌ Failed to insert future entries: {e:?}");
-                        metrics_registry.record_db_operation(DbOperation::InsertFutureEntries, Status::Error);
+                        metrics_registry.record_db_operation(InsertDbOperation::FutureEntries, Status::Error);
                     }
                 }
             }
@@ -79,7 +79,7 @@ pub async fn process_future_entries(
 }
 
 #[tracing::instrument(skip(pool, rx, metrics_registry))]
-pub async fn process_funding_rate_entries(
+pub(crate) async fn process_funding_rate_entries(
     pool: Pool,
     mut rx: mpsc::Receiver<NewFundingRate>,
     metrics_registry: Arc<IngestorMetricsRegistry>,
@@ -102,12 +102,12 @@ pub async fn process_funding_rate_entries(
                 let batch = std::mem::take(&mut batched_data);
                 let batch = batch.into_values().collect();
                 match insert_funding_rate_entries(&pool, batch).await {
-                    Ok(_) => {
-                        metrics_registry.record_db_operation(DbOperation::InsertFundingRates, Status::Success);
+                    Ok(()) => {
+                        metrics_registry.record_db_operation(InsertDbOperation::FundingRates, Status::Success);
                     }
                     Err(e) => {
                         tracing::error!("❌ Failed to insert funding rates: {e:?}");
-                        metrics_registry.record_db_operation(DbOperation::InsertFundingRates, Status::Error);
+                        metrics_registry.record_db_operation(InsertDbOperation::FundingRates, Status::Error);
                     }
                 }
             }
@@ -116,7 +116,7 @@ pub async fn process_funding_rate_entries(
 }
 
 #[tracing::instrument(skip(pool, rx, metrics_registry))]
-pub async fn process_open_interest_entries(
+pub(crate) async fn process_open_interest_entries(
     pool: Pool,
     mut rx: mpsc::Receiver<NewOpenInterest>,
     metrics_registry: Arc<IngestorMetricsRegistry>,
@@ -139,12 +139,12 @@ pub async fn process_open_interest_entries(
                 let batch = std::mem::take(&mut batched_data);
                 let batch = batch.into_values().collect();
                 match insert_open_interest_entries(&pool, batch).await {
-                    Ok(_) => {
-                        metrics_registry.record_db_operation(DbOperation::InsertOpenInterest, Status::Success);
+                    Ok(()) => {
+                        metrics_registry.record_db_operation(InsertDbOperation::OpenInterest, Status::Success);
                     }
                     Err(e) => {
                         tracing::error!("❌ Failed to insert open interest entries: {e:?}");
-                        metrics_registry.record_db_operation(DbOperation::InsertOpenInterest, Status::Error);
+                        metrics_registry.record_db_operation(InsertDbOperation::OpenInterest, Status::Error);
                     }
                 }
             }

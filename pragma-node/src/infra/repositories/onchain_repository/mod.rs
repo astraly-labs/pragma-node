@@ -27,10 +27,10 @@ pub(crate) async fn get_onchain_decimals(
     let pair_id = pair.to_pair_id();
 
     // Try to get decimals from cache first
-    if let Some(network_decimals) = decimals_cache.get(&network).await {
-        if let Some(decimals) = network_decimals.get(&pair_id) {
-            return Ok(*decimals);
-        }
+    if let Some(network_decimals) = decimals_cache.get(&network).await
+        && let Some(decimals) = network_decimals.get(&pair_id)
+    {
+        return Ok(*decimals);
     }
 
     // If not found in cache, call RPC

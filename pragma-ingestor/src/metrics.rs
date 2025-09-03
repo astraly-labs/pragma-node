@@ -50,7 +50,7 @@ impl IngestorMetricsRegistry {
         })
     }
 
-    pub(crate) fn record_db_operation(&self, operation: DbOperation, status: Status) {
+    pub(crate) fn record_db_operation(&self, operation: InsertDbOperation, status: Status) {
         debug!(
             "Recording DB operation: {:?} with status: {:?}",
             operation, status
@@ -85,11 +85,11 @@ impl IngestorMetricsRegistry {
 }
 
 #[derive(Display, Clone, Debug)]
-pub(crate) enum DbOperation {
-    InsertSpotEntries,
-    InsertFutureEntries,
-    InsertFundingRates,
-    InsertOpenInterest,
+pub(crate) enum InsertDbOperation {
+    SpotEntries,
+    FutureEntries,
+    FundingRates,
+    OpenInterest,
 }
 
 #[derive(Display, Clone, Debug)]
@@ -127,6 +127,7 @@ pub(crate) async fn start_data_freshness_monitor(
     }
 }
 
+#[allow(clippy::cognitive_complexity)]
 pub(crate) async fn check_data_freshness(
     pool: &Pool,
     metrics_registry: &IngestorMetricsRegistry,
