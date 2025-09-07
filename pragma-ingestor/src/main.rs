@@ -30,6 +30,11 @@ mod metrics;
 #[tokio::main]
 #[tracing::instrument]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Initialize the default crypto provider for rustls before any TLS operations
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .expect("Failed to install default crypto provider");
+    
     dotenv().ok();
 
     // We export our telemetry - so we can monitor the ingestor through Grafana.

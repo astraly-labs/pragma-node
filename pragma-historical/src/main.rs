@@ -98,6 +98,11 @@ struct Cli {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    // Initialize the default crypto provider for rustls before any TLS operations
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .expect("Failed to install default crypto provider");
+    
     check_timescaledb_parallel_copy()?;
 
     let cli = Cli::parse();
