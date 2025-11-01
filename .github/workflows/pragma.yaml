@@ -11,7 +11,7 @@ jobs:
   prettier:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Run prettier
         run: |-
           npx prettier --check .
@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout toml files
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Run toml check
         run: npx @taplo/cli fmt --config ./taplo/taplo.toml --check
 
@@ -34,7 +34,7 @@ jobs:
 
     steps:
       - name: Checkout toml files
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -51,7 +51,7 @@ jobs:
     name: Rust Code Linting checks
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
       - name: Rust Lint
@@ -68,7 +68,7 @@ jobs:
     name: Rust Code Scanning checks
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
       - name: Rust Scanner
