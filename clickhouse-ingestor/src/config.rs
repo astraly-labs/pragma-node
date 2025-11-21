@@ -21,11 +21,7 @@ pub(crate) struct Config {
     /// Channel capacity for message queues
     #[arg(long, env = "CHANNEL_CAPACITY", default_value = "100000")]
     pub channel_capacity: usize,
-
-    /// Publisher name for entries
-    #[arg(long, env = "PUBLISHER_NAME", default_value = "PRAGMA")]
-    pub publisher_name: String,
-
+    
     /// ClickHouse URL
     #[arg(long, env = "CLICKHOUSE_URL", default_value = "http://localhost:8123")]
     pub clickhouse_url: String,
