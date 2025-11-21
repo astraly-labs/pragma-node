@@ -4,6 +4,7 @@ members = [
   "pragma-node",
   "pragma-historical",
   "pragma-ingestor",
+  "clickhouse-ingestor",
   "pragma-entities",
   "tests",
   "scripts",
