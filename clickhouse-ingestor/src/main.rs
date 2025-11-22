@@ -1,13 +1,13 @@
 use clickhouse::{Client, Row};
 use dotenvy::dotenv;
 use faucon_rs::consumer::FauConsumerBuilder;
-use faucon_rs::topics::prices::PriceFilter;
 use faucon_rs::topics::FauconTopic;
-use faucon_rs::{consumer::AutoOffsetReset, environment::FauconEnvironment};
+use faucon_rs::topics::prices::PriceFilter;
 use faucon_rs::{FauconEntry, FauconFilter as _};
+use faucon_rs::{consumer::AutoOffsetReset, environment::FauconEnvironment};
 use futures_util::StreamExt;
-use pragma_common::task_group::TaskGroup;
 use pragma_common::Pair;
+use pragma_common::task_group::TaskGroup;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::Duration;
@@ -43,6 +43,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Initialize ClickHouse client
     let client = Client::default()
+        .with_password(&CONFIG.clickhouse_password)
+        .with_user(&CONFIG.clickhouse_user)
         .with_url(&CONFIG.clickhouse_url)
         .with_database(&CONFIG.clickhouse_database);
 
@@ -142,11 +144,7 @@ async fn run_price_consumer(tx: mpsc::Sender<PriceEntry>) -> anyhow::Result<()> 
     let pair_filters: Vec<PriceFilter> = CONFIG
         .pairs
         .iter()
-        .filter_map(|p| {
-            p.parse::<Pair>()
-                .ok()
-                .map(PriceFilter::Pair)
-        })
+        .filter_map(|p| p.parse::<Pair>().ok().map(PriceFilter::Pair))
         .collect();
 
     let price_filter = PriceFilter::Any(vec![PriceFilter::Any(pair_filters)]);

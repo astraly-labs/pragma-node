@@ -30,6 +30,13 @@ pub(crate) struct Config {
     #[arg(long, env = "CLICKHOUSE_DATABASE", default_value = "default")]
     pub clickhouse_database: String,
 
+    /// ClickHouse password
+    #[arg(long, env = "CLICKHOUSE_PASSWORD", default_value = "")]
+    pub clickhouse_password: String,
+
+    /// ClickHouse user
+    #[arg(long, env = "CLICKHOUSE_USER", default_value = "default")]
+    pub clickhouse_user: String,
     /// Pairs to ingest (comma-separated, e.g., "BTC/USD,ETH/USD")
     #[arg(
         long,
