@@ -4060,9 +4060,9 @@ dependencies = [
 
 [[package]]
 name = "pragma-common"
-version = "0.4.1"
+version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9d07709fd90ba81ba1d441648e076ee1d63edbbd6666772ba24bf0ef19045fd2"
+checksum = "e077b49f9976aff394d668b386f5c4876cbd3f6afdf8003cc79826a6b26676ed"
 dependencies = [
  "anyhow",
  "async-trait",

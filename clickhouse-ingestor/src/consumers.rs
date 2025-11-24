@@ -243,6 +243,8 @@ pub(crate) async fn run_trade_consumer(tx: mpsc::Sender<TradeEntry>) -> anyhow::
                             side: side_str,
                             timestamp,
                             source: entry.source,
+                            buyer_address: entry.buyer_address,
+                            seller_address: entry.seller_address,
                         };
 
                         if let Err(e) = tx.send(trade_entry).await {

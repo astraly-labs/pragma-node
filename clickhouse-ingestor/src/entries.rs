@@ -46,5 +46,7 @@ pub(crate) struct TradeEntry {
     pub side: String,
     pub timestamp: u32,
     pub source: String,
+    pub buyer_address: String,
+    pub seller_address: String,
 }
 
