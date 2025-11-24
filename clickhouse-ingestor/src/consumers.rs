@@ -1,6 +1,9 @@
 use faucon_rs::consumer::FauConsumerBuilder;
 use faucon_rs::topics::FauconTopic;
 use faucon_rs::topics::prices::PriceFilter;
+use faucon_rs::topics::funding_rates::FundingRateFilter;
+use faucon_rs::topics::open_interest::OpenInterestFilter;
+use faucon_rs::topics::trades::TradeFilter;
 use faucon_rs::{FauconEntry, FauconFilter as _};
 use faucon_rs::{consumer::AutoOffsetReset, environment::FauconEnvironment};
 use futures_util::StreamExt;
@@ -89,9 +92,18 @@ pub(crate) async fn run_funding_rate_consumer(tx: mpsc::Sender<FundingRateEntry>
 
     consumer.subscribe(&[FauconTopic::FUNDING_RATES_V1])?;
 
-    info!("Starting funding rate consumer");
+    info!("Starting funding rate consumer with {} pairs", CONFIG.pairs.len());
 
-    let mut stream = consumer.stream();
+    // Build filter from configured pairs
+    let pair_filters: Vec<FundingRateFilter> = CONFIG
+        .pairs
+        .iter()
+        .filter_map(|p| p.parse::<Pair>().ok().map(FundingRateFilter::Pair))
+        .collect();
+
+    let funding_rate_filter = FundingRateFilter::Any(vec![FundingRateFilter::Any(pair_filters)]);
+
+    let mut stream = consumer.filtered_stream(vec![funding_rate_filter.boxed()]);
 
     loop {
         if let Some(result) = stream.next().await {
@@ -140,9 +152,18 @@ pub(crate) async fn run_open_interest_consumer(tx: mpsc::Sender<OpenInterestEntr
 
     consumer.subscribe(&[FauconTopic::OPEN_INTEREST_V1])?;
 
-    info!("Starting open interest consumer");
+    info!("Starting open interest consumer with {} pairs", CONFIG.pairs.len());
 
-    let mut stream = consumer.stream();
+    // Build filter from configured pairs
+    let pair_filters: Vec<OpenInterestFilter> = CONFIG
+        .pairs
+        .iter()
+        .filter_map(|p| p.parse::<Pair>().ok().map(OpenInterestFilter::Pair))
+        .collect();
+
+    let open_interest_filter = OpenInterestFilter::Any(vec![OpenInterestFilter::Any(pair_filters)]);
+
+    let mut stream = consumer.filtered_stream(vec![open_interest_filter.boxed()]);
 
     loop {
         if let Some(result) = stream.next().await {
@@ -191,9 +212,18 @@ pub(crate) async fn run_trade_consumer(tx: mpsc::Sender<TradeEntry>) -> anyhow::
 
     consumer.subscribe(&[FauconTopic::TRADES_V1])?;
 
-    info!("Starting trade consumer");
+    info!("Starting trade consumer with {} pairs", CONFIG.pairs.len());
 
-    let mut stream = consumer.stream();
+    // Build filter from configured pairs
+    let pair_filters: Vec<TradeFilter> = CONFIG
+        .pairs
+        .iter()
+        .filter_map(|p| p.parse::<Pair>().ok().map(TradeFilter::Pair))
+        .collect();
+
+    let trades_filter = TradeFilter::Any(vec![TradeFilter::Any(pair_filters)]);
+
+    let mut stream = consumer.filtered_stream(vec![trades_filter.boxed()]);
 
     loop {
         if let Some(result) = stream.next().await {
