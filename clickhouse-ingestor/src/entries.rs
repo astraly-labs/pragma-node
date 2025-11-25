@@ -49,4 +49,3 @@ pub(crate) struct TradeEntry {
     pub buyer_address: String,
     pub seller_address: String,
 }
-

@@ -21,7 +21,7 @@ pub(crate) struct Config {
     /// Channel capacity for message queues
     #[arg(long, env = "CHANNEL_CAPACITY", default_value = "100000")]
     pub channel_capacity: usize,
-    
+
     /// ClickHouse URL
     #[arg(long, env = "CLICKHOUSE_URL", default_value = "http://localhost:8123")]
     pub clickhouse_url: String,
@@ -46,6 +46,15 @@ pub(crate) struct Config {
     )]
     pub pairs: Vec<String>,
 
+    /// Sources to ingest (comma-separated, e.g., "binance,kraken")
+    #[arg(
+        long,
+        env = "SOURCES",
+        value_delimiter = ',',
+        default_values_t = default_sources()
+    )]
+    pub sources: Vec<String>,
+
     /// OpenTelemetry endpoint for telemetry data
     #[arg(long, env = "OTEL_EXPORTER_OTLP_ENDPOINT")]
     pub otel_endpoint: Option<String>,
@@ -67,6 +76,10 @@ fn default_pairs() -> Vec<String> {
         "XAG/USD".to_string(),
         "XPL/USD".to_string(),
     ]
+}
+
+fn default_sources() -> Vec<String> {
+    vec![] // Empty by default means all sources
 }
 
 pub(crate) fn load_configuration() -> Config {

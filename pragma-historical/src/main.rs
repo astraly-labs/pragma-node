@@ -102,7 +102,7 @@ async fn main() -> anyhow::Result<()> {
     rustls::crypto::ring::default_provider()
         .install_default()
         .expect("Failed to install default crypto provider");
-    
+
     check_timescaledb_parallel_copy()?;
 
     let cli = Cli::parse();

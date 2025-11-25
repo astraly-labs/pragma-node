@@ -45,16 +45,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Set up channels for all entry types
     let (price_tx, price_rx) = mpsc::channel::<PriceEntry>(CONFIG.channel_capacity);
-    let (funding_rate_tx, funding_rate_rx) = mpsc::channel::<FundingRateEntry>(CONFIG.channel_capacity);
-    let (open_interest_tx, open_interest_rx) = mpsc::channel::<OpenInterestEntry>(CONFIG.channel_capacity);
+    let (funding_rate_tx, funding_rate_rx) =
+        mpsc::channel::<FundingRateEntry>(CONFIG.channel_capacity);
+    let (open_interest_tx, open_interest_rx) =
+        mpsc::channel::<OpenInterestEntry>(CONFIG.channel_capacity);
     let (trade_tx, trade_rx) = mpsc::channel::<TradeEntry>(CONFIG.channel_capacity);
 
     // Create task group
     let task_group = TaskGroup::new()
-        .with_handle(tokio::spawn(process_price_entries(client.clone(), price_rx)))
-        .with_handle(tokio::spawn(process_funding_rate_entries(client.clone(), funding_rate_rx)))
-        .with_handle(tokio::spawn(process_open_interest_entries(client.clone(), open_interest_rx)))
-        .with_handle(tokio::spawn(process_trade_entries(client.clone(), trade_rx)))
+        .with_handle(tokio::spawn(process_price_entries(
+            client.clone(),
+            price_rx,
+        )))
+        .with_handle(tokio::spawn(process_funding_rate_entries(
+            client.clone(),
+            funding_rate_rx,
+        )))
+        .with_handle(tokio::spawn(process_open_interest_entries(
+            client.clone(),
+            open_interest_rx,
+        )))
+        .with_handle(tokio::spawn(process_trade_entries(
+            client.clone(),
+            trade_rx,
+        )))
         .with_handle(tokio::spawn(async move {
             if let Err(e) = run_price_consumer(price_tx).await {
                 error!("Price consumer error: {}", e);
@@ -90,8 +104,8 @@ mod tests {
     use clickhouse::test;
     use uuid::Uuid;
 
-    use crate::insert::insert_price_batch;
     use crate::entries::PriceEntry;
+    use crate::insert::insert_price_batch;
 
     async fn do_insert(client: &Client, entries: Vec<PriceEntry>) -> clickhouse::error::Result<()> {
         let mut insert = client.insert::<PriceEntry>("prices").await?;

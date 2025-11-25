@@ -1,8 +1,8 @@
 use faucon_rs::consumer::FauConsumerBuilder;
 use faucon_rs::topics::FauconTopic;
-use faucon_rs::topics::prices::PriceFilter;
 use faucon_rs::topics::funding_rates::FundingRateFilter;
 use faucon_rs::topics::open_interest::OpenInterestFilter;
+use faucon_rs::topics::prices::PriceFilter;
 use faucon_rs::topics::trades::TradeFilter;
 use faucon_rs::{FauconEntry, FauconFilter as _};
 use faucon_rs::{consumer::AutoOffsetReset, environment::FauconEnvironment};
@@ -32,7 +32,11 @@ pub(crate) async fn run_price_consumer(tx: mpsc::Sender<PriceEntry>) -> anyhow::
 
     consumer.subscribe(&[FauconTopic::PRICES_V1])?;
 
-    info!("Starting price consumer with {} pairs", CONFIG.pairs.len());
+    info!(
+        "Starting price consumer with {} pairs and {} sources",
+        CONFIG.pairs.len(),
+        CONFIG.sources.len()
+    );
 
     // Build filter from configured pairs
     let pair_filters: Vec<PriceFilter> = CONFIG
@@ -41,7 +45,27 @@ pub(crate) async fn run_price_consumer(tx: mpsc::Sender<PriceEntry>) -> anyhow::
         .filter_map(|p| p.parse::<Pair>().ok().map(PriceFilter::Pair))
         .collect();
 
-    let price_filter = PriceFilter::Any(vec![PriceFilter::Any(pair_filters)]);
+    // Build filter from configured sources
+    let source_filters: Vec<PriceFilter> = CONFIG
+        .sources
+        .iter()
+        .map(|s| PriceFilter::Source(s.clone()))
+        .collect();
+
+    // Combine pair and source filters
+    let mut filters = vec![];
+    if !pair_filters.is_empty() {
+        filters.push(PriceFilter::Any(pair_filters));
+    }
+    if !source_filters.is_empty() {
+        filters.push(PriceFilter::Any(source_filters));
+    }
+
+    let price_filter = if filters.is_empty() {
+        PriceFilter::Any(vec![]) // No filter means accept all
+    } else {
+        PriceFilter::Any(filters)
+    };
 
     let mut stream = consumer.filtered_stream(vec![price_filter.boxed()]);
 
@@ -76,7 +100,9 @@ pub(crate) async fn run_price_consumer(tx: mpsc::Sender<PriceEntry>) -> anyhow::
 }
 
 /// Runs the Kafka consumer for funding rate entries
-pub(crate) async fn run_funding_rate_consumer(tx: mpsc::Sender<FundingRateEntry>) -> anyhow::Result<()> {
+pub(crate) async fn run_funding_rate_consumer(
+    tx: mpsc::Sender<FundingRateEntry>,
+) -> anyhow::Result<()> {
     let kafka_environment = FauconEnvironment::Custom(CONFIG.kafka_broker_id.clone());
     let mut consumer = FauConsumerBuilder::on_environment(kafka_environment)
         .group_id(&CONFIG.kafka_group_id)
@@ -92,7 +118,11 @@ pub(crate) async fn run_funding_rate_consumer(tx: mpsc::Sender<FundingRateEntry>
 
     consumer.subscribe(&[FauconTopic::FUNDING_RATES_V1])?;
 
-    info!("Starting funding rate consumer with {} pairs", CONFIG.pairs.len());
+    info!(
+        "Starting funding rate consumer with {} pairs and {} sources",
+        CONFIG.pairs.len(),
+        CONFIG.sources.len()
+    );
 
     // Build filter from configured pairs
     let pair_filters: Vec<FundingRateFilter> = CONFIG
@@ -101,7 +131,27 @@ pub(crate) async fn run_funding_rate_consumer(tx: mpsc::Sender<FundingRateEntry>
         .filter_map(|p| p.parse::<Pair>().ok().map(FundingRateFilter::Pair))
         .collect();
 
-    let funding_rate_filter = FundingRateFilter::Any(vec![FundingRateFilter::Any(pair_filters)]);
+    // Build filter from configured sources
+    let source_filters: Vec<FundingRateFilter> = CONFIG
+        .sources
+        .iter()
+        .map(|s| FundingRateFilter::Source(s.clone()))
+        .collect();
+
+    // Combine pair and source filters
+    let mut filters = vec![];
+    if !pair_filters.is_empty() {
+        filters.push(FundingRateFilter::Any(pair_filters));
+    }
+    if !source_filters.is_empty() {
+        filters.push(FundingRateFilter::Any(source_filters));
+    }
+
+    let funding_rate_filter = if filters.is_empty() {
+        FundingRateFilter::Any(vec![]) // No filter means accept all
+    } else {
+        FundingRateFilter::Any(filters)
+    };
 
     let mut stream = consumer.filtered_stream(vec![funding_rate_filter.boxed()]);
 
@@ -136,7 +186,9 @@ pub(crate) async fn run_funding_rate_consumer(tx: mpsc::Sender<FundingRateEntry>
 }
 
 /// Runs the Kafka consumer for open interest entries
-pub(crate) async fn run_open_interest_consumer(tx: mpsc::Sender<OpenInterestEntry>) -> anyhow::Result<()> {
+pub(crate) async fn run_open_interest_consumer(
+    tx: mpsc::Sender<OpenInterestEntry>,
+) -> anyhow::Result<()> {
     let kafka_environment = FauconEnvironment::Custom(CONFIG.kafka_broker_id.clone());
     let mut consumer = FauConsumerBuilder::on_environment(kafka_environment)
         .group_id(&CONFIG.kafka_group_id)
@@ -152,7 +204,11 @@ pub(crate) async fn run_open_interest_consumer(tx: mpsc::Sender<OpenInterestEntr
 
     consumer.subscribe(&[FauconTopic::OPEN_INTEREST_V1])?;
 
-    info!("Starting open interest consumer with {} pairs", CONFIG.pairs.len());
+    info!(
+        "Starting open interest consumer with {} pairs and {} sources",
+        CONFIG.pairs.len(),
+        CONFIG.sources.len()
+    );
 
     // Build filter from configured pairs
     let pair_filters: Vec<OpenInterestFilter> = CONFIG
@@ -161,7 +217,27 @@ pub(crate) async fn run_open_interest_consumer(tx: mpsc::Sender<OpenInterestEntr
         .filter_map(|p| p.parse::<Pair>().ok().map(OpenInterestFilter::Pair))
         .collect();
 
-    let open_interest_filter = OpenInterestFilter::Any(vec![OpenInterestFilter::Any(pair_filters)]);
+    // Build filter from configured sources
+    let source_filters: Vec<OpenInterestFilter> = CONFIG
+        .sources
+        .iter()
+        .map(|s| OpenInterestFilter::Source(s.clone()))
+        .collect();
+
+    // Combine pair and source filters
+    let mut filters = vec![];
+    if !pair_filters.is_empty() {
+        filters.push(OpenInterestFilter::Any(pair_filters));
+    }
+    if !source_filters.is_empty() {
+        filters.push(OpenInterestFilter::Any(source_filters));
+    }
+
+    let open_interest_filter = if filters.is_empty() {
+        OpenInterestFilter::Any(vec![]) // No filter means accept all
+    } else {
+        OpenInterestFilter::Any(filters)
+    };
 
     let mut stream = consumer.filtered_stream(vec![open_interest_filter.boxed()]);
 
@@ -212,7 +288,11 @@ pub(crate) async fn run_trade_consumer(tx: mpsc::Sender<TradeEntry>) -> anyhow::
 
     consumer.subscribe(&[FauconTopic::TRADES_V1])?;
 
-    info!("Starting trade consumer with {} pairs", CONFIG.pairs.len());
+    info!(
+        "Starting trade consumer with {} pairs and {} sources",
+        CONFIG.pairs.len(),
+        CONFIG.sources.len()
+    );
 
     // Build filter from configured pairs
     let pair_filters: Vec<TradeFilter> = CONFIG
@@ -221,7 +301,27 @@ pub(crate) async fn run_trade_consumer(tx: mpsc::Sender<TradeEntry>) -> anyhow::
         .filter_map(|p| p.parse::<Pair>().ok().map(TradeFilter::Pair))
         .collect();
 
-    let trades_filter = TradeFilter::Any(vec![TradeFilter::Any(pair_filters)]);
+    // Build filter from configured sources
+    let source_filters: Vec<TradeFilter> = CONFIG
+        .sources
+        .iter()
+        .map(|s| TradeFilter::Source(s.clone()))
+        .collect();
+
+    // Combine pair and source filters
+    let mut filters = vec![];
+    if !pair_filters.is_empty() {
+        filters.push(TradeFilter::Any(pair_filters));
+    }
+    if !source_filters.is_empty() {
+        filters.push(TradeFilter::Any(source_filters));
+    }
+
+    let trades_filter = if filters.is_empty() {
+        TradeFilter::Any(vec![]) // No filter means accept all
+    } else {
+        TradeFilter::Any(filters)
+    };
 
     let mut stream = consumer.filtered_stream(vec![trades_filter.boxed()]);
 
@@ -259,4 +359,3 @@ pub(crate) async fn run_trade_consumer(tx: mpsc::Sender<TradeEntry>) -> anyhow::
         }
     }
 }
-

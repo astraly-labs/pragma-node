@@ -43,7 +43,10 @@ pub(crate) async fn process_price_entries(client: Client, mut rx: mpsc::Receiver
 }
 
 /// Processes and batches funding rate entries before inserting into ClickHouse
-pub(crate) async fn process_funding_rate_entries(client: Client, mut rx: mpsc::Receiver<FundingRateEntry>) {
+pub(crate) async fn process_funding_rate_entries(
+    client: Client,
+    mut rx: mpsc::Receiver<FundingRateEntry>,
+) {
     let mut batched_data: HashMap<(String, String), FundingRateEntry> = HashMap::new();
     let mut interval = tokio::time::interval(Duration::from_millis(CONFIG.flush_interval_ms));
 
@@ -75,7 +78,10 @@ pub(crate) async fn process_funding_rate_entries(client: Client, mut rx: mpsc::R
 }
 
 /// Processes and batches open interest entries before inserting into ClickHouse
-pub(crate) async fn process_open_interest_entries(client: Client, mut rx: mpsc::Receiver<OpenInterestEntry>) {
+pub(crate) async fn process_open_interest_entries(
+    client: Client,
+    mut rx: mpsc::Receiver<OpenInterestEntry>,
+) {
     let mut batched_data: HashMap<(String, String), OpenInterestEntry> = HashMap::new();
     let mut interval = tokio::time::interval(Duration::from_millis(CONFIG.flush_interval_ms));
 
@@ -136,4 +142,3 @@ pub(crate) async fn process_trade_entries(client: Client, mut rx: mpsc::Receiver
         }
     }
 }
-

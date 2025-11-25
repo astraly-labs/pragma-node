@@ -34,7 +34,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     rustls::crypto::ring::default_provider()
         .install_default()
         .expect("Failed to install default crypto provider");
-    
+
     dotenv().ok();
 
     // We export our telemetry - so we can monitor the ingestor through Grafana.
