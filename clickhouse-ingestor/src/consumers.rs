@@ -62,9 +62,9 @@ pub(crate) async fn run_price_consumer(tx: mpsc::Sender<PriceEntry>) -> anyhow::
     }
 
     let price_filter = if filters.is_empty() {
-        PriceFilter::Any(vec![]) // No filter means accept all
+        PriceFilter::All // No filter means accept all
     } else {
-        PriceFilter::Any(filters)
+        PriceFilter::And(filters)
     };
 
     let mut stream = consumer.filtered_stream(vec![price_filter.boxed()]);
@@ -148,9 +148,9 @@ pub(crate) async fn run_funding_rate_consumer(
     }
 
     let funding_rate_filter = if filters.is_empty() {
-        FundingRateFilter::Any(vec![]) // No filter means accept all
+        FundingRateFilter::All // No filter means accept all
     } else {
-        FundingRateFilter::Any(filters)
+        FundingRateFilter::And(filters)
     };
 
     let mut stream = consumer.filtered_stream(vec![funding_rate_filter.boxed()]);
@@ -234,9 +234,9 @@ pub(crate) async fn run_open_interest_consumer(
     }
 
     let open_interest_filter = if filters.is_empty() {
-        OpenInterestFilter::Any(vec![]) // No filter means accept all
+        OpenInterestFilter::All // No filter means accept all
     } else {
-        OpenInterestFilter::Any(filters)
+        OpenInterestFilter::And(filters)
     };
 
     let mut stream = consumer.filtered_stream(vec![open_interest_filter.boxed()]);
@@ -318,9 +318,9 @@ pub(crate) async fn run_trade_consumer(tx: mpsc::Sender<TradeEntry>) -> anyhow::
     }
 
     let trades_filter = if filters.is_empty() {
-        TradeFilter::Any(vec![]) // No filter means accept all
+        TradeFilter::All // No filter means accept all
     } else {
-        TradeFilter::Any(filters)
+        TradeFilter::And(filters)
     };
 
     let mut stream = consumer.filtered_stream(vec![trades_filter.boxed()]);
