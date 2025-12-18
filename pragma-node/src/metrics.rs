@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use opentelemetry::{metrics::Counter, KeyValue};
+use opentelemetry::{KeyValue, metrics::Counter};
 use strum::Display;
 
 #[derive(Debug)]
