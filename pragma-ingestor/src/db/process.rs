@@ -14,6 +14,23 @@ use crate::metrics::{IngestorMetricsRegistry, InsertDbOperation, Status};
 const PUBLISHING_DELAY: Duration = Duration::from_millis(500);
 const MINUTE_PUBLISHING_DELAY: Duration = Duration::from_secs(60);
 
+/// Sources allowed for EUR/USD pair ingestion.
+/// Only PYTH and LMAX are authorized for this forex pair.
+const EURUSD_ALLOWED_SOURCES: &[&str] = &["PYTH", "LMAX"];
+
+/// Checks if an entry should be ingested based on pair/source filtering rules.
+/// Returns false (skip) for EUR/USD entries from non-allowed sources.
+fn should_ingest_entry(pair_id: &str, source: &str) -> bool {
+    if pair_id == "EUR/USD" {
+        let source_upper = source.to_uppercase();
+        EURUSD_ALLOWED_SOURCES
+            .iter()
+            .any(|allowed| *allowed == source_upper)
+    } else {
+        true
+    }
+}
+
 #[tracing::instrument(skip(pool, rx, metrics_registry))]
 pub(crate) async fn process_spot_entries(
     pool: Pool,
@@ -26,6 +43,10 @@ pub(crate) async fn process_spot_entries(
     loop {
         tokio::select! {
             Some(entry) = rx.recv() => {
+                // Filter EUR/USD to only allow PYTH and LMAX sources
+                if !should_ingest_entry(&entry.pair_id, &entry.source) {
+                    continue;
+                }
                 let key = (entry.source.clone(), entry.pair_id.clone());
                 batched_data.insert(key, entry);
             },
