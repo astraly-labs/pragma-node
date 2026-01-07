@@ -9,7 +9,7 @@ pub(crate) async fn insert_price_batch(client: &Client, entries: Vec<PriceEntry>
         return Ok(());
     }
 
-    let mut insert = client.insert::<PriceEntry>("prices").await?;
+    let mut insert = client.insert::<PriceEntry>("prices_v2").await?;
 
     for entry in entries {
         insert.write(&entry).await?;
@@ -28,7 +28,9 @@ pub(crate) async fn insert_funding_rate_batch(
         return Ok(());
     }
 
-    let mut insert = client.insert::<FundingRateEntry>("funding_rates").await?;
+    let mut insert = client
+        .insert::<FundingRateEntry>("funding_rates_v2")
+        .await?;
 
     for entry in entries {
         insert.write(&entry).await?;
@@ -47,7 +49,9 @@ pub(crate) async fn insert_open_interest_batch(
         return Ok(());
     }
 
-    let mut insert = client.insert::<OpenInterestEntry>("open_interest").await?;
+    let mut insert = client
+        .insert::<OpenInterestEntry>("open_interest_v2")
+        .await?;
 
     for entry in entries {
         insert.write(&entry).await?;
@@ -63,7 +67,7 @@ pub(crate) async fn insert_trade_batch(client: &Client, entries: Vec<TradeEntry>
         return Ok(());
     }
 
-    let mut insert = client.insert::<TradeEntry>("trades").await?;
+    let mut insert = client.insert::<TradeEntry>("trades_v2").await?;
 
     for entry in entries {
         insert.write(&entry).await?;

@@ -101,6 +101,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::Utc;
     use clickhouse::test;
     use uuid::Uuid;
 
@@ -120,20 +121,27 @@ mod tests {
         let mock = test::Mock::new();
         let client = Client::default().with_mock(&mock);
 
+        let now = Utc::now();
         let entries = vec![
             PriceEntry {
                 id: Uuid::new_v4(),
+                market_id: "BTC:USD:SPOT".to_string(),
+                instrument_type: "SPOT".to_string(),
                 pair_id: "BTC/USD".to_string(),
                 price: "50000.00".to_string(),
-                timestamp: 1700000000,
-                source: "binance".to_string(),
+                exchange_timestamp: now,
+                received_timestamp: now,
+                source: "BINANCE".to_string(),
             },
             PriceEntry {
                 id: Uuid::new_v4(),
+                market_id: "ETH:USD:SPOT".to_string(),
+                instrument_type: "SPOT".to_string(),
                 pair_id: "ETH/USD".to_string(),
                 price: "3000.00".to_string(),
-                timestamp: 1700000000,
-                source: "binance".to_string(),
+                exchange_timestamp: now,
+                received_timestamp: now,
+                source: "BINANCE".to_string(),
             },
         ];
 
@@ -144,8 +152,8 @@ mod tests {
         // Verify recorded rows match
         let rows: Vec<PriceEntry> = recording.collect().await;
         assert_eq!(rows.len(), 2);
-        assert_eq!(rows[0].pair_id, "BTC/USD");
-        assert_eq!(rows[1].pair_id, "ETH/USD");
+        assert_eq!(rows[0].market_id, "BTC:USD:SPOT");
+        assert_eq!(rows[1].market_id, "ETH:USD:SPOT");
     }
 
     #[tokio::test]
@@ -163,12 +171,16 @@ mod tests {
         let mock = test::Mock::new();
         let client = Client::default().with_mock(&mock);
 
+        let now = Utc::now();
         let entries = vec![PriceEntry {
             id: Uuid::new_v4(),
+            market_id: "BTC:USD:SPOT".to_string(),
+            instrument_type: "SPOT".to_string(),
             pair_id: "BTC/USD".to_string(),
             price: "50000.00".to_string(),
-            timestamp: 1700000000,
-            source: "binance".to_string(),
+            exchange_timestamp: now,
+            received_timestamp: now,
+            source: "BINANCE".to_string(),
         }];
 
         // Simulate server error

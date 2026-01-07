@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use faucon_rs::consumer::FauConsumerBuilder;
 use faucon_rs::topics::FauconTopic;
 use faucon_rs::topics::funding_rates::FundingRateFilter;
@@ -13,7 +14,15 @@ use tracing::{error, info};
 use uuid::Uuid;
 
 use crate::config::CONFIG;
-use crate::entries::{FundingRateEntry, OpenInterestEntry, PriceEntry, TradeEntry};
+use crate::entries::{
+    FundingRateEntry, OpenInterestEntry, PriceEntry, TradeEntry, instrument_type_str,
+    make_market_id,
+};
+
+/// Converts milliseconds timestamp to DateTime<Utc>
+fn millis_to_datetime(ms: i64) -> DateTime<Utc> {
+    DateTime::from_timestamp_millis(ms).unwrap_or_else(Utc::now)
+}
 
 /// Runs the Kafka consumer for price entries
 pub(crate) async fn run_price_consumer(tx: mpsc::Sender<PriceEntry>) -> anyhow::Result<()> {
@@ -30,10 +39,10 @@ pub(crate) async fn run_price_consumer(tx: mpsc::Sender<PriceEntry>) -> anyhow::
         .auto_offset_reset(AutoOffsetReset::Latest)
         .build()?;
 
-    consumer.subscribe(&[FauconTopic::PRICES_V1])?;
+    consumer.subscribe(&[FauconTopic::PRICES_V2])?;
 
     info!(
-        "Starting price consumer with {} pairs and {} sources",
+        "Starting price consumer (V2) with {} pairs and {} sources",
         CONFIG.pairs.len(),
         CONFIG.sources.len()
     );
@@ -74,15 +83,14 @@ pub(crate) async fn run_price_consumer(tx: mpsc::Sender<PriceEntry>) -> anyhow::
             match result {
                 Ok(entry) => {
                     if let FauconEntry::Price(entry) = entry {
-                        let timestamp = chrono::DateTime::from_timestamp_millis(entry.timestamp_ms)
-                            .map(|dt| dt.timestamp() as u32)
-                            .unwrap_or(0);
-
                         let price_entry = PriceEntry {
                             id: Uuid::new_v4(),
+                            market_id: make_market_id(&entry.pair, entry.instrument_type),
+                            instrument_type: instrument_type_str(entry.instrument_type),
                             pair_id: entry.pair.to_string(),
                             price: entry.price.to_string(),
-                            timestamp,
+                            exchange_timestamp: millis_to_datetime(entry.timestamp_ms),
+                            received_timestamp: millis_to_datetime(entry.received_timestamp_ms),
                             source: entry.source,
                         };
 
@@ -116,10 +124,10 @@ pub(crate) async fn run_funding_rate_consumer(
         .auto_offset_reset(AutoOffsetReset::Latest)
         .build()?;
 
-    consumer.subscribe(&[FauconTopic::FUNDING_RATES_V1])?;
+    consumer.subscribe(&[FauconTopic::FUNDING_RATES_V2])?;
 
     info!(
-        "Starting funding rate consumer with {} pairs and {} sources",
+        "Starting funding rate consumer (V2) with {} pairs and {} sources",
         CONFIG.pairs.len(),
         CONFIG.sources.len()
     );
@@ -160,15 +168,14 @@ pub(crate) async fn run_funding_rate_consumer(
             match result {
                 Ok(entry) => {
                     if let FauconEntry::FundingRate(entry) = entry {
-                        let timestamp = chrono::DateTime::from_timestamp_millis(entry.timestamp_ms)
-                            .map(|dt| dt.timestamp() as u32)
-                            .unwrap_or(0);
-
                         let funding_rate_entry = FundingRateEntry {
                             id: Uuid::new_v4(),
+                            market_id: make_market_id(&entry.pair, entry.instrument_type),
+                            instrument_type: instrument_type_str(entry.instrument_type),
                             pair_id: entry.pair.to_string(),
                             annualized_rate: entry.annualized_rate,
-                            timestamp,
+                            exchange_timestamp: millis_to_datetime(entry.timestamp_ms),
+                            received_timestamp: millis_to_datetime(entry.received_timestamp_ms),
                             source: entry.source,
                         };
 
@@ -202,10 +209,10 @@ pub(crate) async fn run_open_interest_consumer(
         .auto_offset_reset(AutoOffsetReset::Latest)
         .build()?;
 
-    consumer.subscribe(&[FauconTopic::OPEN_INTEREST_V1])?;
+    consumer.subscribe(&[FauconTopic::OPEN_INTEREST_V2])?;
 
     info!(
-        "Starting open interest consumer with {} pairs and {} sources",
+        "Starting open interest consumer (V2) with {} pairs and {} sources",
         CONFIG.pairs.len(),
         CONFIG.sources.len()
     );
@@ -246,15 +253,14 @@ pub(crate) async fn run_open_interest_consumer(
             match result {
                 Ok(entry) => {
                     if let FauconEntry::OpenInterest(entry) = entry {
-                        let timestamp = chrono::DateTime::from_timestamp_millis(entry.timestamp_ms)
-                            .map(|dt| dt.timestamp() as u32)
-                            .unwrap_or(0);
-
                         let open_interest_entry = OpenInterestEntry {
                             id: Uuid::new_v4(),
+                            market_id: make_market_id(&entry.pair, entry.instrument_type),
+                            instrument_type: instrument_type_str(entry.instrument_type),
                             pair_id: entry.pair.to_string(),
                             open_interest_value: entry.open_interest,
-                            timestamp,
+                            exchange_timestamp: millis_to_datetime(entry.timestamp_ms),
+                            received_timestamp: millis_to_datetime(entry.received_timestamp_ms),
                             source: entry.source,
                         };
 
@@ -286,10 +292,10 @@ pub(crate) async fn run_trade_consumer(tx: mpsc::Sender<TradeEntry>) -> anyhow::
         .auto_offset_reset(AutoOffsetReset::Latest)
         .build()?;
 
-    consumer.subscribe(&[FauconTopic::TRADES_V1])?;
+    consumer.subscribe(&[FauconTopic::TRADES_V2])?;
 
     info!(
-        "Starting trade consumer with {} pairs and {} sources",
+        "Starting trade consumer (V2) with {} pairs and {} sources",
         CONFIG.pairs.len(),
         CONFIG.sources.len()
     );
@@ -330,18 +336,17 @@ pub(crate) async fn run_trade_consumer(tx: mpsc::Sender<TradeEntry>) -> anyhow::
             match result {
                 Ok(entry) => {
                     if let FauconEntry::Trade(entry) = entry {
-                        let timestamp = chrono::DateTime::from_timestamp_millis(entry.timestamp_ms)
-                            .map(|dt| dt.timestamp() as u32)
-                            .unwrap_or(0);
-
                         let side_str = format!("{:?}", entry.side);
                         let trade_entry = TradeEntry {
                             id: Uuid::new_v4(),
+                            market_id: make_market_id(&entry.pair, entry.instrument_type),
+                            instrument_type: instrument_type_str(entry.instrument_type),
                             pair_id: entry.pair.to_string(),
                             price: entry.price.to_string(),
                             size: entry.size.to_string(),
                             side: side_str,
-                            timestamp,
+                            exchange_timestamp: millis_to_datetime(entry.timestamp_ms),
+                            received_timestamp: millis_to_datetime(entry.received_timestamp_ms),
                             source: entry.source,
                             buyer_address: entry.buyer_address,
                             seller_address: entry.seller_address,

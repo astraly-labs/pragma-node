@@ -18,7 +18,8 @@ pub(crate) async fn process_price_entries(client: Client, mut rx: mpsc::Receiver
     loop {
         tokio::select! {
             Some(entry) = rx.recv() => {
-                let key = (entry.source.clone(), entry.pair_id.clone());
+                // Use market_id for deduplication (includes instrument type)
+                let key = (entry.source.clone(), entry.market_id.clone());
                 batched_data.insert(key, entry);
             },
             _ = interval.tick() => {
@@ -53,7 +54,8 @@ pub(crate) async fn process_funding_rate_entries(
     loop {
         tokio::select! {
             Some(entry) = rx.recv() => {
-                let key = (entry.source.clone(), entry.pair_id.clone());
+                // Use market_id for deduplication (includes instrument type)
+                let key = (entry.source.clone(), entry.market_id.clone());
                 batched_data.insert(key, entry);
             },
             _ = interval.tick() => {
@@ -88,7 +90,8 @@ pub(crate) async fn process_open_interest_entries(
     loop {
         tokio::select! {
             Some(entry) = rx.recv() => {
-                let key = (entry.source.clone(), entry.pair_id.clone());
+                // Use market_id for deduplication (includes instrument type)
+                let key = (entry.source.clone(), entry.market_id.clone());
                 batched_data.insert(key, entry);
             },
             _ = interval.tick() => {
