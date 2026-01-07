@@ -242,7 +242,7 @@ async fn run_price_consumer(
                                     |dt| dt.naive_utc(),
                                 );
 
-                            match entry.instrument_type() {
+                            match entry.instrument_type {
                                 InstrumentType::Spot => {
                                     let spot_entry = NewEntry {
                                         source: entry.source,

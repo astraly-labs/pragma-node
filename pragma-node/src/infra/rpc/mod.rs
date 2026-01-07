@@ -1,13 +1,10 @@
 use std::{collections::HashMap, sync::LazyLock};
 
-use starknet::providers::Provider;
-use starknet::{
-    core::{
-        types::{BlockId, BlockTag, Felt, FunctionCall},
-        utils::{cairo_short_string_to_felt, get_selector_from_name},
-    },
-    macros::felt_hex,
+use starknet::core::{
+    types::{BlockId, BlockTag, Felt, FunctionCall},
+    utils::{cairo_short_string_to_felt, get_selector_from_name},
 };
+use starknet::providers::Provider;
 use url::Url;
 
 use pragma_common::{
@@ -26,11 +23,13 @@ pub static ORACLE_ADDRESS_PER_NETWORK: LazyLock<HashMap<StarknetNetwork, Felt>> 
         let mut addresses = HashMap::new();
         addresses.insert(
             StarknetNetwork::Mainnet,
-            felt_hex!("0x2a85bd616f912537c50a49a4076db02c00b29b2cdc8a197ce92ed1837fa875b"),
+            Felt::from_hex("0x2a85bd616f912537c50a49a4076db02c00b29b2cdc8a197ce92ed1837fa875b")
+                .unwrap(),
         );
         addresses.insert(
             StarknetNetwork::Sepolia,
-            felt_hex!("0x36031daa264c24520b11d93af622c848b2499b66b41d611bac95e13cfca131a"),
+            Felt::from_hex("0x36031daa264c24520b11d93af622c848b2499b66b41d611bac95e13cfca131a")
+                .unwrap(),
         );
         addresses
     });
