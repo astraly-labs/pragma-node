@@ -24,6 +24,25 @@ fn millis_to_datetime(ms: i64) -> DateTime<Utc> {
     DateTime::from_timestamp_millis(ms).unwrap_or_else(Utc::now)
 }
 
+/// Normalizes a price value from 18 decimal precision to human-readable format.
+/// Divides by 10^18 and formats with appropriate precision.
+fn normalize_price(price: u128) -> String {
+    const DECIMALS: u32 = 18;
+    const DIVISOR: u128 = 10u128.pow(DECIMALS);
+
+    let integer_part = price / DIVISOR;
+    let fractional_part = price % DIVISOR;
+
+    if fractional_part == 0 {
+        format!("{}.0", integer_part)
+    } else {
+        // {:018} preserves leading zeros for 18 decimal places
+        let frac_str = format!("{:018}", fractional_part);
+        let trimmed = frac_str.trim_end_matches('0');
+        format!("{}.{}", integer_part, trimmed)
+    }
+}
+
 /// Runs the Kafka consumer for price entries
 pub(crate) async fn run_price_consumer(tx: mpsc::Sender<PriceEntry>) -> anyhow::Result<()> {
     let kafka_environment = FauconEnvironment::Custom(CONFIG.kafka_broker_id.clone());
@@ -88,7 +107,7 @@ pub(crate) async fn run_price_consumer(tx: mpsc::Sender<PriceEntry>) -> anyhow::
                             market_id: make_market_id(&entry.pair, entry.instrument_type),
                             instrument_type: instrument_type_str(entry.instrument_type),
                             pair_id: entry.pair.to_string(),
-                            price: entry.price.to_string(),
+                            price: normalize_price(entry.price),
                             exchange_timestamp: millis_to_datetime(entry.timestamp_ms),
                             received_timestamp: millis_to_datetime(entry.received_timestamp_ms),
                             source: entry.source,
