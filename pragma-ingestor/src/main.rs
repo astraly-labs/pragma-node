@@ -5,6 +5,10 @@ use faucon_rs::topics::prices::PriceFilter;
 use faucon_rs::{FauconEntry, FauconFilter as _};
 use faucon_rs::{consumer::AutoOffsetReset, environment::FauconEnvironment};
 use futures_util::StreamExt;
+use opentelemetry::global;
+use opentelemetry_otlp::WithExportConfig as _;
+use opentelemetry_sdk::Resource;
+use opentelemetry_semantic_conventions::resource::SERVICE_NAME;
 use pragma_common::pair;
 use pragma_common::{InstrumentType, task_group::TaskGroup};
 use std::sync::Arc;
@@ -44,6 +48,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     pragma_common::telemetry::init_telemetry("pragma-ingestor", CONFIG.otel_endpoint.clone())
         .expect("Failed to initialize telemetry");
+
+    // Initialize OTEL metrics exporter (separate from pragma_common telemetry)
+    tracing::info!("📊 Initializing OTEL metrics exporter...");
+    let meter_provider = opentelemetry_otlp::new_pipeline()
+        .metrics(opentelemetry_sdk::runtime::Tokio)
+        .with_exporter(
+            opentelemetry_otlp::new_exporter().tonic().with_endpoint(
+                CONFIG
+                    .otel_endpoint
+                    .as_deref()
+                    .unwrap_or("http://localhost:4317"),
+            ),
+        )
+        .with_resource(Resource::new([opentelemetry::KeyValue::new(
+            SERVICE_NAME,
+            "pragma-ingestor",
+        )]))
+        .with_period(Duration::from_secs(5))
+        .build()
+        .expect("Failed to create meter provider");
+
+    global::set_meter_provider(meter_provider);
+
     info!("Telemetry initialized successfully");
 
     // Test metrics export by creating a simple test metric
