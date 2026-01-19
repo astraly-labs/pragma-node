@@ -2,16 +2,13 @@ CREATE FUNCTION add_compression_to_onchain_aggregates()
 RETURNS void AS $$
 DECLARE
     median_views text[] := ARRAY[
-        'mainnet_spot_median_100_ms', 'mainnet_spot_median_1_s', 'mainnet_spot_median_5_s', 'mainnet_spot_median_10_s',
-        'mainnet_spot_median_1_min', 'mainnet_spot_median_15_min', 'mainnet_spot_median_1_h', 'mainnet_spot_median_2_h',
+        
+         'mainnet_spot_median_15_min', 'mainnet_spot_median_1_h', 'mainnet_spot_median_2_h',
         'mainnet_spot_median_1_day', 'mainnet_spot_median_1_week',
-        'spot_median_100_ms', 'spot_median_1_s', 'spot_median_5_s', 'spot_median_10_s',
+         'spot_median_10_s',
         'spot_median_1_min', 'spot_median_15_min', 'spot_median_1_h', 'spot_median_2_h',
         'spot_median_1_day', 'spot_median_1_week',
-        'mainnet_perp_median_100_ms', 'mainnet_perp_median_1_s', 'mainnet_perp_median_5_s', 'mainnet_perp_median_10_s',
-        'mainnet_perp_median_1_min', 'mainnet_perp_median_15_min', 'mainnet_perp_median_1_h', 'mainnet_perp_median_2_h',
-        'mainnet_perp_median_1_day', 'mainnet_perp_median_1_week',
-        'perp_median_100_ms', 'perp_median_1_s', 'perp_median_5_s', 'perp_median_10_s',
+        'perp_median_10_s',
         'perp_median_1_min', 'perp_median_15_min', 'perp_median_1_h', 'perp_median_2_h',
         'perp_median_1_day', 'perp_median_1_week'
     ];
@@ -26,13 +23,13 @@ DECLARE
         'perp_twap_1_h', 'perp_twap_2_h', 'perp_twap_1_day'
     ];
     candle_views text[] := ARRAY[
-        'mainnet_spot_candle_10_s', 'mainnet_spot_candle_1_min', 'mainnet_spot_candle_5_min', 'mainnet_spot_candle_15_min',
+         'mainnet_spot_candle_5_min', 'mainnet_spot_candle_15_min',
         'mainnet_spot_candle_1_h', 'mainnet_spot_candle_1_day',
-        'spot_candle_10_s', 'spot_candle_1_min', 'spot_candle_5_min', 'spot_candle_15_min',
+         'spot_candle_5_min', 'spot_candle_15_min',
         'spot_candle_1_h', 'spot_candle_1_day',
-        'mainnet_perp_candle_10_s', 'mainnet_perp_candle_1_min', 'mainnet_perp_candle_5_min', 'mainnet_perp_candle_15_min',
+        'mainnet_perp_candle_5_min', 'mainnet_perp_candle_15_min',
         'mainnet_perp_candle_1_h', 'mainnet_perp_candle_1_day',
-        'perp_candle_10_s', 'perp_candle_1_min', 'perp_candle_5_min', 'perp_candle_15_min',
+        'perp_candle_5_min', 'perp_candle_15_min',
         'perp_candle_1_h', 'perp_candle_1_day'
     ];
     view_to_compress text;
