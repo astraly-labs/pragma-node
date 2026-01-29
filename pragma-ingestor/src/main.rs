@@ -241,6 +241,7 @@ async fn run_price_consumer(
             PriceFilter::Pair(pair!("EUR/USD")),
             PriceFilter::Pair(pair!("EUR/USDW")),
             PriceFilter::Pair(pair!("XAU/USD")),
+            PriceFilter::Pair(pair!("XCU/USD")),
             PriceFilter::Pair(pair!("SPX500M/USD")),
             PriceFilter::Pair(pair!("XBR/USD")),
             PriceFilter::Pair(pair!("TECH100M/USD")),
