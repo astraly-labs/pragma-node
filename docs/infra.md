@@ -8,7 +8,7 @@ flowchart TD
     OnchainDB["On-chain DB<br/>(Timescale)"]
     OffchainDB["Off-chain DB<br/>(Timescale)"]
     Pulse["Pulse"]
-    Kafka(("Kafka"))         
+    Kafka(("Kafka"))
     Ingestor["Ingestor"]
     Martin["Martin Delbert"]
 

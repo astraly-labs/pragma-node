@@ -123,6 +123,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
+    #[ignore = "requires external Extended Exchange API access"]
     async fn test_fetch_historical_fundings() {
         let client = Client::new();
         let market = "BTC-USD";

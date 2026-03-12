@@ -3,12 +3,14 @@
 Fetches historical funding rates from Hyperliquid, Paradex, Bybit, Kraken or Extended and stores them in a CSV file and TimescaleDB.
 
 ## Prerequisites
+
 - Rust (latest stable)
 - TimescaleDB
 - `timescaledb-parallel-copy` (see [installation](https://github.com/timescale/timescaledb-parallel-copy))
 - PostgreSQL database
 
 ## Installation
+
 1. Clone the repository:
    ```bash
    git clone <repository-url>
@@ -20,6 +22,7 @@ Fetches historical funding rates from Hyperliquid, Paradex, Bybit, Kraken or Ext
    ```
 
 ## Usage
+
 Run the program with the following command:
 
 ```bash
@@ -32,5 +35,6 @@ cargo run --bin pragma-historical -- --source hyperliquid --range 1746057600000,
 - `--connection`: PostgreSQL connection string
 
 ## Notes
+
 - Ensure `timescaledb-parallel-copy` is installed.
 - Update the database connection string with your credentials.

@@ -43,7 +43,6 @@ autoscaling:
   targetCPUUtilizationPercentage: 80
   # targetMemoryUtilizationPercentage: 80
 
-
 service:
   enabled: true
   type: ClusterIP
@@ -54,7 +53,6 @@ service:
       containerPort: 8080
       protocol: TCP
       portName: http
-
 
 podDisruptionBudget: {}
   # minAvailable: 1
@@ -78,13 +76,13 @@ tolerations: []
 
 affinity: {}
 
-ingress:  {}
+ingress: {}
   # - name: "dummy"
   #   className: "nginx"
   #   annotations: {}
   #     # kubernetes.io/ingress.class: nginx
   #     # Add other annotations as needed
-  #   hosts: 
+  #   hosts:
   #     - host: chart-example.local
   #       paths:
   #         - path: /
@@ -111,7 +109,7 @@ gcpSecrets:
 
 # Environment variables from secret
 envFromSecret: {}
-    # secretName: "monitoring-secrets"
+  # secretName: "monitoring-secrets"
 
 terminationGracePeriodSeconds: 60
 

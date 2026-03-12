@@ -33,6 +33,7 @@ git clone git@github.com:astraly-labs/indexer-service.git
 ```
 
 Optional environment variables:
+
 - `APIBARA_KEY`: will be used as your Apibara API key instead of asking for it.
 - `STARTING_BLOCK`: will be used as the indexer starting block.
 
@@ -59,6 +60,7 @@ make init-kafka-topics
 #### Onchain Database
 
 **Option 1: Using the indexer**
+
 ```bash
 git clone git@github.com:astraly-labs/indexer-service.git
 cd indexer-service
@@ -67,6 +69,7 @@ apibara run examples/pragma/testnet/sepolia-script-spot.js -A [YOUR_APIBARA_API_
 ```
 
 **Option 2: Using a backup file**
+
 ```bash
 # copy the backup file to the container
 docker cp /path/to/the/backup.sql pragma-node-postgre-db-1:/backup.sql
@@ -93,7 +96,7 @@ INSERT INTO PUBLISHERS
 ) VALUES
 (
     'YOUR_PUBLISHER_NAME', -- or any other name you want
-    
+
     -- For the keys below, make sure they correspond to a correct Starknet Account.
     -- You can generate keys using any starknet wallet.
     -- This is needed for publishing later, since you will need your private key.
@@ -132,7 +135,6 @@ export KAFKA_BROKERS=localhost:29092
 # Optional but allows you to export OTEL logs anywhere
 export OTEL_EXPORTER_OTLP_ENDPOINT=localhost:4317
 ```
-
 
 #### 5. Start Pragma Node
 

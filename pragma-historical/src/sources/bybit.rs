@@ -178,6 +178,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
+    #[ignore = "requires external Bybit API access"]
     async fn test_fetch_historical_fundings() {
         let client = Client::new();
         let market = "BTC";
