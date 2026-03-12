@@ -1366,7 +1366,7 @@ dependencies = [
  "faucon-rs",
  "futures-util",
  "opentelemetry 0.26.0",
- "pragma-common 0.6.0",
+ "pragma-common 0.6.4",
  "serde",
  "tokio",
  "tracing",
@@ -2071,14 +2071,14 @@ checksum = "37909eebbb50d72f9059c3b6d82c0463f2ff062c9e95845c43a6c9c0355411be"
 
 [[package]]
 name = "faucon-rs"
-version = "0.7.0"
-source = "sparse+https://registry.devnet.pragma.build/api/v1/crates/"
-checksum = "4f318c39c245263a0645d3b8b8fda3e65b8f77257a60d9f313f98634829f3b76"
+version = "0.7.4"
+source = "sparse+https://registry.production.pragma.build/api/v1/crates/"
+checksum = "fd3a3db3ad8010af8d6df7ea5834343049b5977aa4028230fd7baba3dcd5a3e6"
 dependencies = [
  "anyhow",
  "derive_more",
  "futures-util",
- "pragma-common 0.6.0",
+ "pragma-common 0.6.4",
  "rdkafka",
  "thiserror 2.0.16",
 ]
@@ -4163,9 +4163,9 @@ dependencies = [
 
 [[package]]
 name = "pragma-common"
-version = "0.6.0"
+version = "0.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "36603f8e6e7fd9d96c2bbbd434e2f197cc3111e20fd679894da48a42b98f0c51"
+checksum = "4953f6abebc0b5bead2c0ba24d0a948f66c5577c3eb343f74d3d187ed70f33b4"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4207,7 +4207,7 @@ dependencies = [
  "deadpool-diesel",
  "diesel",
  "diesel_migrations",
- "pragma-common 0.6.0",
+ "pragma-common 0.6.4",
  "serde",
  "serde_json",
  "starknet-rust",
@@ -4230,7 +4230,7 @@ dependencies = [
  "envy",
  "futures-util",
  "lazy_static",
- "pragma-common 0.6.0",
+ "pragma-common 0.6.4",
  "pragma-entities",
  "rdkafka",
  "reqwest 0.12.23",
@@ -4261,7 +4261,7 @@ dependencies = [
  "opentelemetry-otlp 0.26.0",
  "opentelemetry-semantic-conventions 0.26.0",
  "opentelemetry_sdk 0.26.0",
- "pragma-common 0.6.0",
+ "pragma-common 0.6.4",
  "pragma-entities",
  "rdkafka",
  "rustls 0.23.31",
@@ -4357,7 +4357,7 @@ dependencies = [
  "moka",
  "nonzero_ext",
  "opentelemetry 0.26.0",
- "pragma-common 0.6.0",
+ "pragma-common 0.6.4",
  "pragma-entities",
  "pragma-monitoring",
  "ratatui",
@@ -4473,8 +4473,8 @@ version = "0.13.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "be769465445e8c1474e9c5dac2018218498557af32d9ed057325ec9a41ae81bf"
 dependencies = [
- "heck 0.4.1",
- "itertools 0.11.0",
+ "heck 0.5.0",
+ "itertools 0.13.0",
  "log",
  "multimap",
  "once_cell",
@@ -4494,7 +4494,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a56d757972c98b346a9b766e3f02746cde6dd1cd1d1d563472929fdd74bec4d"
 dependencies = [
  "anyhow",
- "itertools 0.11.0",
+ "itertools 0.13.0",
  "proc-macro2",
  "quote",
  "syn 2.0.106",
@@ -6383,7 +6383,7 @@ dependencies = [
  "diesel",
  "diesel-async",
  "futures-util",
- "pragma-common 0.6.0",
+ "pragma-common 0.6.4",
  "pragma-node",
  "pretty_assertions",
  "rand 0.9.2",
