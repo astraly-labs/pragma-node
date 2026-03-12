@@ -65,17 +65,7 @@ pub(crate) struct Config {
 }
 
 fn default_pairs() -> Vec<String> {
-    vec![
-        "TSLA/USD".to_string(),
-        "EUR/USD".to_string(),
-        "XAU/USD".to_string(),
-        "SPX500M/USD".to_string(),
-        "XBR/USD".to_string(),
-        "TECH100M/USD".to_string(),
-        "USD/JPY".to_string(),
-        "XAG/USD".to_string(),
-        "XPL/USD".to_string(),
-    ]
+    vec![] // Empty by default means all pairs
 }
 
 fn default_sources() -> Vec<String> {
