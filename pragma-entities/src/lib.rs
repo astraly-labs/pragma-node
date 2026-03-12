@@ -4,18 +4,22 @@ pub mod dto;
 pub mod error;
 pub mod macros;
 pub mod models;
+pub mod pagination;
 pub mod schema;
 
 pub use models::entries::entry_error::EntryError;
+pub use models::entries::timestamp::TimestampError;
+pub use models::entries::timestamp::UnixTimestamp;
 
-// exporting for idiomatic use
-pub use error::{adapt_infra_error, InfraError};
+pub use error::InfraError;
+pub use pagination::{PaginationParams, PaginationResponse};
+
 pub use models::{
     checkpoint_error::CheckpointError,
-    currency::Currency,
     entry::{Entry, NewEntry},
-    entry_error::VolatilityError,
+    funding_rate::{FundingRate, NewFundingRate},
     future_entry::{FutureEntry, NewFutureEntry},
+    open_interest::{NewOpenInterest, OpenInterest},
     publisher::{NewPublisher, Publishers},
     publisher_error::PublisherError,
 };
