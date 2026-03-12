@@ -22,10 +22,10 @@ futures-util = { workspace = true }
 lazy_static = { workspace = true }
 rdkafka = { workspace = true }
 reqwest = { workspace = true }
+rustls = { version = "0.23", features = ["ring"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 tracing = { workspace = true }
 uuid = { workspace = true }
-rustls = { version = "0.23", features = ["ring"] }
