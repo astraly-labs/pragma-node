@@ -34,4 +34,3 @@ thiserror = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 tracing = { workspace = true }
 rustls = { version = "0.23", features = ["ring"] }
-
