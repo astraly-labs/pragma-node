@@ -854,17 +854,6 @@ dependencies = [
 
 [[package]]
 name = "bigdecimal"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a6773ddc0eafc0e509fb60e48dff7f450f8e674a0686ae8605e8d9901bd5eefa"
-dependencies = [
- "num-bigint",
- "num-integer",
- "num-traits",
-]
-
-[[package]]
-name = "bigdecimal"
 version = "0.4.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1a22f228ab7a1b23027ccc6c350b72868017af7ea8356fbdf19f8d991c690013"
@@ -1762,7 +1751,7 @@ version = "2.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ff236accb9a5069572099f0b350a92e9560e8e63a9b8d546162f4a5e03026bb2"
 dependencies = [
- "bigdecimal 0.4.8",
+ "bigdecimal",
  "bitflags 2.9.4",
  "byteorder",
  "chrono",
@@ -4202,7 +4191,7 @@ name = "pragma-entities"
 version = "0.1.0"
 dependencies = [
  "axum 0.8.4",
- "bigdecimal 0.4.8",
+ "bigdecimal",
  "chrono",
  "deadpool-diesel",
  "diesel",
@@ -4291,7 +4280,7 @@ dependencies = [
  "axum 0.6.20",
  "axum-macros 0.3.8",
  "axum-tracing-opentelemetry",
- "bigdecimal 0.4.8",
+ "bigdecimal",
  "chrono",
  "deadpool",
  "diesel",
@@ -4340,8 +4329,7 @@ dependencies = [
  "axum-extra",
  "axum-macros 0.5.0",
  "axum-tracing-opentelemetry",
- "bigdecimal 0.3.1",
- "bigdecimal 0.4.8",
+ "bigdecimal",
  "chrono",
  "crossterm",
  "dashmap 6.1.0",
@@ -6377,13 +6365,14 @@ dependencies = [
 name = "tests"
 version = "0.1.0"
 dependencies = [
- "bigdecimal 0.4.8",
+ "bigdecimal",
  "chrono",
  "deadpool-diesel",
  "diesel",
  "diesel-async",
  "futures-util",
  "pragma-common 0.6.4",
+ "pragma-entities",
  "pragma-node",
  "pretty_assertions",
  "rand 0.9.2",

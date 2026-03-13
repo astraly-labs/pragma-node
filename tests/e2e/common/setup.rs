@@ -12,7 +12,7 @@ use testcontainers_modules::zookeeper::Zookeeper;
 use crate::common::containers::{
     Containers, Timescale,
     kafka::{init_kafka_topics, setup_kafka},
-    offchain_db::setup_offchain_db,
+    offchain_db::{run_offchain_migrations, setup_offchain_db},
     onchain_db::{run_onchain_migrations, setup_onchain_db},
     pragma_node::{
         SERVER_PORT,
@@ -135,6 +135,7 @@ pub async fn setup_containers(
     tracing::info!("🔨 Setup offchain db..");
     let offchain_db = setup_offchain_db.await;
     let offchain_pool = get_db_pool(offchain_db.get_host_port_ipv4(5432).await.unwrap());
+    run_offchain_migrations(&offchain_pool).await;
     tracing::info!("✅ ... offchain db ready!\n");
 
     tracing::info!("🔨 Setup onchain db..");

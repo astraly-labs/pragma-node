@@ -1,3 +1,4 @@
+use deadpool_diesel::postgres::Pool;
 use testcontainers::runners::AsyncRunner;
 use testcontainers::{ContainerAsync, ImageExt};
 use testcontainers_modules::postgres::Postgres;
@@ -19,4 +20,8 @@ pub async fn setup_offchain_db() -> ContainerAsync<Timescale> {
         .start()
         .await
         .unwrap()
+}
+
+pub async fn run_offchain_migrations(db_pool: &Pool) {
+    pragma_entities::db::run_migrations(db_pool).await;
 }

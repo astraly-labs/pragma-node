@@ -8,8 +8,6 @@ pub const KAFKA_CONTAINER_NAME: &str = "test-kafka";
 #[rstest::fixture]
 pub async fn setup_kafka() -> ContainerAsync<Kafka> {
     Kafka::default()
-        .with_name("confluentinc/cp-kafka")
-        .with_tag("latest")
         .with_env_var("KAFKA_AUTO_CREATE_TOPICS_ENABLE", "true")
         .with_network("pragma-tests-network")
         .with_container_name(KAFKA_CONTAINER_NAME)
