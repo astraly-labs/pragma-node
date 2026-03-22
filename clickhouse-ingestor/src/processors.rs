@@ -7,7 +7,8 @@ use tracing::{error, info};
 use crate::config::CONFIG;
 use crate::entries::{FundingRateEntry, OpenInterestEntry, PriceEntry, TradeEntry};
 use crate::insert::{
-    insert_funding_rate_batch, insert_open_interest_batch, insert_price_batch, insert_trade_batch,
+    insert_funding_rate_batch, insert_mark_price_batch, insert_open_interest_batch,
+    insert_oracle_price_batch, insert_price_batch, insert_trade_batch,
 };
 
 /// Processes and batches price entries before inserting into ClickHouse
@@ -108,6 +109,73 @@ pub(crate) async fn process_open_interest_entries(
                     }
                     Err(e) => {
                         error!("Failed to insert open interest entries: {}", e);
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Processes and batches oracle price entries before inserting into ClickHouse
+pub(crate) async fn process_oracle_price_entries(
+    client: Client,
+    mut rx: mpsc::Receiver<PriceEntry>,
+) {
+    let mut batched_data: HashMap<(String, String), PriceEntry> = HashMap::new();
+    let mut interval = tokio::time::interval(Duration::from_millis(CONFIG.flush_interval_ms));
+
+    loop {
+        tokio::select! {
+            Some(entry) = rx.recv() => {
+                let key = (entry.source.clone(), entry.market_id.clone());
+                batched_data.insert(key, entry);
+            },
+            _ = interval.tick() => {
+                if batched_data.is_empty() {
+                    continue;
+                }
+
+                let batch: Vec<PriceEntry> = std::mem::take(&mut batched_data).into_values().collect();
+                let batch_size = batch.len();
+
+                match insert_oracle_price_batch(&client, batch).await {
+                    Ok(()) => {
+                        info!("Inserted {} oracle price entries into ClickHouse", batch_size);
+                    }
+                    Err(e) => {
+                        error!("Failed to insert oracle price entries: {}", e);
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Processes and batches mark price entries before inserting into ClickHouse
+pub(crate) async fn process_mark_price_entries(client: Client, mut rx: mpsc::Receiver<PriceEntry>) {
+    let mut batched_data: HashMap<(String, String), PriceEntry> = HashMap::new();
+    let mut interval = tokio::time::interval(Duration::from_millis(CONFIG.flush_interval_ms));
+
+    loop {
+        tokio::select! {
+            Some(entry) = rx.recv() => {
+                let key = (entry.source.clone(), entry.market_id.clone());
+                batched_data.insert(key, entry);
+            },
+            _ = interval.tick() => {
+                if batched_data.is_empty() {
+                    continue;
+                }
+
+                let batch: Vec<PriceEntry> = std::mem::take(&mut batched_data).into_values().collect();
+                let batch_size = batch.len();
+
+                match insert_mark_price_batch(&client, batch).await {
+                    Ok(()) => {
+                        info!("Inserted {} mark price entries into ClickHouse", batch_size);
+                    }
+                    Err(e) => {
+                        error!("Failed to insert mark price entries: {}", e);
                     }
                 }
             }

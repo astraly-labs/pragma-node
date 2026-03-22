@@ -2,7 +2,9 @@ use chrono::{DateTime, Utc};
 use faucon_rs::consumer::FauConsumerBuilder;
 use faucon_rs::topics::FauconTopic;
 use faucon_rs::topics::funding_rates::FundingRateFilter;
+use faucon_rs::topics::mark_prices::MarkPriceFilter;
 use faucon_rs::topics::open_interest::OpenInterestFilter;
+use faucon_rs::topics::oracle_prices::OraclePriceFilter;
 use faucon_rs::topics::prices::PriceFilter;
 use faucon_rs::topics::trades::TradeFilter;
 use faucon_rs::{FauconEntry, FauconFilter as _};
@@ -378,6 +380,166 @@ pub(crate) async fn run_trade_consumer(tx: mpsc::Sender<TradeEntry>) -> anyhow::
                 }
                 Err(e) => {
                     error!("Failed to consume trade entry: {}", e);
+                }
+            }
+        }
+    }
+}
+
+/// Runs the Kafka consumer for oracle price entries
+pub(crate) async fn run_oracle_price_consumer(tx: mpsc::Sender<PriceEntry>) -> anyhow::Result<()> {
+    let kafka_environment = FauconEnvironment::Custom(CONFIG.kafka_broker_id.clone());
+    let mut consumer = FauConsumerBuilder::on_environment(kafka_environment)
+        .group_id(&CONFIG.kafka_group_id)
+        .fetch_min_bytes(100_000)
+        .fetch_wait_max_ms(25)
+        .session_timeout(6000)
+        .max_poll_interval(30000)
+        .auto_commit(true)
+        .auto_commit_interval(1000)
+        .max_partition_fetch_bytes(1_048_576)
+        .auto_offset_reset(AutoOffsetReset::Latest)
+        .build()?;
+
+    consumer.subscribe(&[FauconTopic::ORACLE_PRICES_V2])?;
+
+    info!(
+        "Starting oracle price consumer (V2) with {} pairs and {} sources",
+        CONFIG.pairs.len(),
+        CONFIG.sources.len()
+    );
+
+    let pair_filters: Vec<OraclePriceFilter> = CONFIG
+        .pairs
+        .iter()
+        .filter_map(|p| p.parse::<Pair>().ok().map(OraclePriceFilter::Pair))
+        .collect();
+
+    let source_filters: Vec<OraclePriceFilter> = CONFIG
+        .sources
+        .iter()
+        .map(|s| OraclePriceFilter::Source(s.clone()))
+        .collect();
+
+    let mut filters = vec![];
+    if !pair_filters.is_empty() {
+        filters.push(OraclePriceFilter::Any(pair_filters));
+    }
+    if !source_filters.is_empty() {
+        filters.push(OraclePriceFilter::Any(source_filters));
+    }
+
+    let oracle_filter = if filters.is_empty() {
+        OraclePriceFilter::All
+    } else {
+        OraclePriceFilter::And(filters)
+    };
+
+    let mut stream = consumer.filtered_stream(vec![oracle_filter.boxed()]);
+
+    loop {
+        if let Some(result) = stream.next().await {
+            match result {
+                Ok(entry) => {
+                    if let FauconEntry::OraclePrice(entry) = entry {
+                        let price_entry = PriceEntry {
+                            id: Uuid::new_v4(),
+                            market_id: make_market_id(&entry.pair, entry.instrument_type),
+                            instrument_type: instrument_type_str(entry.instrument_type),
+                            pair_id: entry.pair.to_string(),
+                            price: normalize_price(entry.price),
+                            exchange_timestamp: millis_to_datetime(entry.timestamp_ms),
+                            received_timestamp: millis_to_datetime(entry.received_timestamp_ms),
+                            source: entry.source,
+                        };
+
+                        if let Err(e) = tx.send(price_entry).await {
+                            error!("Failed to send oracle price entry: {}", e);
+                        }
+                    }
+                }
+                Err(e) => {
+                    error!("Failed to consume oracle price entry: {}", e);
+                }
+            }
+        }
+    }
+}
+
+/// Runs the Kafka consumer for mark price entries
+pub(crate) async fn run_mark_price_consumer(tx: mpsc::Sender<PriceEntry>) -> anyhow::Result<()> {
+    let kafka_environment = FauconEnvironment::Custom(CONFIG.kafka_broker_id.clone());
+    let mut consumer = FauConsumerBuilder::on_environment(kafka_environment)
+        .group_id(&CONFIG.kafka_group_id)
+        .fetch_min_bytes(100_000)
+        .fetch_wait_max_ms(25)
+        .session_timeout(6000)
+        .max_poll_interval(30000)
+        .auto_commit(true)
+        .auto_commit_interval(1000)
+        .max_partition_fetch_bytes(1_048_576)
+        .auto_offset_reset(AutoOffsetReset::Latest)
+        .build()?;
+
+    consumer.subscribe(&[FauconTopic::MARK_PRICES_V2])?;
+
+    info!(
+        "Starting mark price consumer (V2) with {} pairs and {} sources",
+        CONFIG.pairs.len(),
+        CONFIG.sources.len()
+    );
+
+    let pair_filters: Vec<MarkPriceFilter> = CONFIG
+        .pairs
+        .iter()
+        .filter_map(|p| p.parse::<Pair>().ok().map(MarkPriceFilter::Pair))
+        .collect();
+
+    let source_filters: Vec<MarkPriceFilter> = CONFIG
+        .sources
+        .iter()
+        .map(|s| MarkPriceFilter::Source(s.clone()))
+        .collect();
+
+    let mut filters = vec![];
+    if !pair_filters.is_empty() {
+        filters.push(MarkPriceFilter::Any(pair_filters));
+    }
+    if !source_filters.is_empty() {
+        filters.push(MarkPriceFilter::Any(source_filters));
+    }
+
+    let mark_filter = if filters.is_empty() {
+        MarkPriceFilter::All
+    } else {
+        MarkPriceFilter::And(filters)
+    };
+
+    let mut stream = consumer.filtered_stream(vec![mark_filter.boxed()]);
+
+    loop {
+        if let Some(result) = stream.next().await {
+            match result {
+                Ok(entry) => {
+                    if let FauconEntry::MarkPrice(entry) = entry {
+                        let price_entry = PriceEntry {
+                            id: Uuid::new_v4(),
+                            market_id: make_market_id(&entry.pair, entry.instrument_type),
+                            instrument_type: instrument_type_str(entry.instrument_type),
+                            pair_id: entry.pair.to_string(),
+                            price: normalize_price(entry.price),
+                            exchange_timestamp: millis_to_datetime(entry.timestamp_ms),
+                            received_timestamp: millis_to_datetime(entry.received_timestamp_ms),
+                            source: entry.source,
+                        };
+
+                        if let Err(e) = tx.send(price_entry).await {
+                            error!("Failed to send mark price entry: {}", e);
+                        }
+                    }
+                }
+                Err(e) => {
+                    error!("Failed to consume mark price entry: {}", e);
                 }
             }
         }

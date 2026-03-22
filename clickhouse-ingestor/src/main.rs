@@ -12,12 +12,13 @@ mod processors;
 
 use crate::config::CONFIG;
 use crate::consumers::{
-    run_funding_rate_consumer, run_open_interest_consumer, run_price_consumer, run_trade_consumer,
+    run_funding_rate_consumer, run_mark_price_consumer, run_open_interest_consumer,
+    run_oracle_price_consumer, run_price_consumer, run_trade_consumer,
 };
 use crate::entries::{FundingRateEntry, OpenInterestEntry, PriceEntry, TradeEntry};
 use crate::processors::{
-    process_funding_rate_entries, process_open_interest_entries, process_price_entries,
-    process_trade_entries,
+    process_funding_rate_entries, process_mark_price_entries, process_open_interest_entries,
+    process_oracle_price_entries, process_price_entries, process_trade_entries,
 };
 
 #[tokio::main]
@@ -50,6 +51,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (open_interest_tx, open_interest_rx) =
         mpsc::channel::<OpenInterestEntry>(CONFIG.channel_capacity);
     let (trade_tx, trade_rx) = mpsc::channel::<TradeEntry>(CONFIG.channel_capacity);
+    let (oracle_price_tx, oracle_price_rx) = mpsc::channel::<PriceEntry>(CONFIG.channel_capacity);
+    let (mark_price_tx, mark_price_rx) = mpsc::channel::<PriceEntry>(CONFIG.channel_capacity);
 
     // Create task group
     let task_group = TaskGroup::new()
@@ -69,6 +72,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             client.clone(),
             trade_rx,
         )))
+        .with_handle(tokio::spawn(process_oracle_price_entries(
+            client.clone(),
+            oracle_price_rx,
+        )))
+        .with_handle(tokio::spawn(process_mark_price_entries(
+            client.clone(),
+            mark_price_rx,
+        )))
         .with_handle(tokio::spawn(async move {
             if let Err(e) = run_price_consumer(price_tx).await {
                 error!("Price consumer error: {}", e);
@@ -87,6 +98,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_handle(tokio::spawn(async move {
             if let Err(e) = run_trade_consumer(trade_tx).await {
                 error!("Trade consumer error: {}", e);
+            }
+        }))
+        .with_handle(tokio::spawn(async move {
+            if let Err(e) = run_oracle_price_consumer(oracle_price_tx).await {
+                error!("Oracle price consumer error: {}", e);
+            }
+        }))
+        .with_handle(tokio::spawn(async move {
+            if let Err(e) = run_mark_price_consumer(mark_price_tx).await {
+                error!("Mark price consumer error: {}", e);
             }
         }));
 

@@ -64,7 +64,7 @@ pragma-historical = { path = "./pragma-historical" }
 pragma-entities = { path = "./pragma-entities" }
 pragma-ingestor = { path = "./pragma-ingestor" }
 pragma-node = { path = "./pragma-node" }
-faucon-rs = { version = "0.7.0", registry = "pragma" }
+faucon-rs = { version = "0.7.6", registry = "pragma" }
 
 anyhow = "1.0.97"
 aws-config = { version = "1.5.1", features = ["behavior-version-latest"] }

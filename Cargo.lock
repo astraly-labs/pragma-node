@@ -2060,9 +2060,9 @@ checksum = "37909eebbb50d72f9059c3b6d82c0463f2ff062c9e95845c43a6c9c0355411be"
 
 [[package]]
 name = "faucon-rs"
-version = "0.7.4"
+version = "0.7.6"
 source = "sparse+https://registry.production.pragma.build/api/v1/crates/"
-checksum = "fd3a3db3ad8010af8d6df7ea5834343049b5977aa4028230fd7baba3dcd5a3e6"
+checksum = "852d74d541d0206859b3a0c74061319369b4a7be880bc2bd41d2969f6537bfe2"
 dependencies = [
  "anyhow",
  "derive_more",

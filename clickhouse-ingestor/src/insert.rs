@@ -61,6 +61,44 @@ pub(crate) async fn insert_open_interest_batch(
     Ok(())
 }
 
+/// Inserts a batch of oracle price entries into ClickHouse
+pub(crate) async fn insert_oracle_price_batch(
+    client: &Client,
+    entries: Vec<PriceEntry>,
+) -> Result<()> {
+    if entries.is_empty() {
+        return Ok(());
+    }
+
+    let mut insert = client.insert::<PriceEntry>("oracle_prices_v2").await?;
+
+    for entry in entries {
+        insert.write(&entry).await?;
+    }
+
+    insert.end().await?;
+    Ok(())
+}
+
+/// Inserts a batch of mark price entries into ClickHouse
+pub(crate) async fn insert_mark_price_batch(
+    client: &Client,
+    entries: Vec<PriceEntry>,
+) -> Result<()> {
+    if entries.is_empty() {
+        return Ok(());
+    }
+
+    let mut insert = client.insert::<PriceEntry>("mark_prices_v2").await?;
+
+    for entry in entries {
+        insert.write(&entry).await?;
+    }
+
+    insert.end().await?;
+    Ok(())
+}
+
 /// Inserts a batch of trade entries into ClickHouse
 pub(crate) async fn insert_trade_batch(client: &Client, entries: Vec<TradeEntry>) -> Result<()> {
     if entries.is_empty() {
