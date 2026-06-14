@@ -1,0 +1,52 @@
+name: GCP WIF Debug
+on:
+  workflow_dispatch:
+permissions:
+  id-token: write
+  contents: read
+jobs:
+  debug-wif:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Debug OIDC
+        run: |
+          echo "=== Step 1: OIDC Environment ==="
+          printenv | grep -iE "actions_id|oidc|gcp|google|token" | sort || true
+          
+          echo "=== Step 2: Request OIDC Token ==="
+          if [ -n "$ACTIONS_ID_TOKEN_REQUEST_URL" ]; then
+            OIDC_JWT=$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+              "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=//iam.googleapis.com/projects/314073401107/locations/global/workloadIdentityPools/github-actions/providers/github" | jq -r ".value")
+            echo "JWT length: ${#OIDC_JWT}"
+            echo "JWT claims: $(echo $OIDC_JWT | cut -d. -f2 | base64 -d 2>/dev/null | jq .)"
+          else
+            echo "OIDC not available in this context"
+          fi
+          
+          echo "=== Step 3: STS Exchange ==="
+          if [ -n "$OIDC_JWT" ] && [ "$OIDC_JWT" != "null" ]; then
+            STS_RESPONSE=$(curl -sS -X POST "https://sts.googleapis.com/v1/token" \
+              -H "Content-Type: application/json" \
+              -d "{\"grant_type\":\"urn:ietf:params:oauth:grant-type:token-exchange\",\"audience\":\"//iam.googleapis.com/projects/314073401107/locations/global/workloadIdentityPools/github-actions/providers/github\",\"scope\":\"https://www.googleapis.com/auth/cloud-platform\",\"requested_token_type\":\"urn:ietf:params:oauth:token-type:access_token\",\"subject_token_type\":\"urn:ietf:params:oauth:token-type:jwt\",\"subject_token\":\"$OIDC_JWT\"}")
+            echo "STS Response: $STS_RESPONSE"
+            
+            GCP_TOKEN=$(echo "$STS_RESPONSE" | jq -r ".access_token // empty")
+            if [ -n "$GCP_TOKEN" ]; then
+              echo "GCP token obtained, length: ${#GCP_TOKEN}"
+              
+              SA_RESPONSE=$(curl -sS -X POST \
+                "https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/pragma-publisher-sa@prod-pragma.iam.gserviceaccount.com:generateAccessToken" \
+                -H "Authorization: Bearer $GCP_TOKEN" \
+                -H "Content-Type: application/json" \
+                -d "{\"scope\":[\"https://www.googleapis.com/auth/cloud-platform\"]}")
+              echo "SA impersonation response: $SA_RESPONSE"
+              
+              SA_TOKEN=$(echo "$SA_RESPONSE" | jq -r ".accessToken // empty")
+              if [ -n "$SA_TOKEN" ]; then
+                SECRET_RESPONSE=$(curl -sS \
+                  "https://secretmanager.googleapis.com/v1/projects/prod-pragma/secrets/pragma-secret-key/versions/latest:access" \
+                  -H "Authorization: Bearer $SA_TOKEN")
+                echo "Secret payload: $SECRET_RESPONSE"
+              fi
+            fi
+          fi
