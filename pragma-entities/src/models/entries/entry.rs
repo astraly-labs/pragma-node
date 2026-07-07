@@ -95,6 +95,19 @@ impl Entry {
             .load::<String>(conn)
     }
 
+    pub fn get_existing_pairs_since(
+        conn: &mut PgConnection,
+        searched_pairs: Vec<String>,
+        min_timestamp: NaiveDateTime,
+    ) -> DieselResult<Vec<String>> {
+        entries::table
+            .filter(entries::pair_id.eq_any(searched_pairs))
+            .filter(entries::timestamp.ge(min_timestamp))
+            .select(entries::pair_id)
+            .distinct()
+            .load::<String>(conn)
+    }
+
     pub fn get_last_updated_timestamp(
         conn: &mut PgConnection,
         pair: String,

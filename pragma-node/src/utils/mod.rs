@@ -25,6 +25,8 @@ use crate::infra::repositories::{
     entry_repository::MedianEntry, onchain_repository::entry::get_existing_pairs,
 };
 
+const EXISTING_PAIR_LOOKBACK_HOURS: i64 = 24;
+
 /// Returns the mid price between two prices.
 pub fn get_mid_price(low: &BigDecimal, high: &BigDecimal) -> BigDecimal {
     (low + high) / BigDecimal::from(2)
@@ -124,6 +126,8 @@ pub(crate) async fn only_existing_pairs(
         .iter()
         .map(|pair| pair.to_uppercase().trim().to_string())
         .collect::<Vec<String>>();
+    let min_timestamp =
+        chrono::Utc::now().naive_utc() - chrono::Duration::hours(EXISTING_PAIR_LOOKBACK_HOURS);
 
     // Check spot entries
     let spot_pairs = pairs
@@ -131,11 +135,16 @@ pub(crate) async fn only_existing_pairs(
         .filter(|pair| !pair.contains(':'))
         .map(ToString::to_string)
         .collect::<Vec<String>>();
-    let spot_pairs = conn
-        .interact(move |conn| EntityEntry::get_existing_pairs(conn, spot_pairs))
+    let spot_pairs = if spot_pairs.is_empty() {
+        Vec::new()
+    } else {
+        conn.interact(move |conn| {
+            EntityEntry::get_existing_pairs_since(conn, spot_pairs, min_timestamp)
+        })
         .await
         .expect("Couldn't check if pair exists")
-        .expect("Couldn't get table result");
+        .expect("Couldn't get table result")
+    };
 
     // Check perp entries
     let perp_pairs = pairs
@@ -144,13 +153,18 @@ pub(crate) async fn only_existing_pairs(
         .map(|pair| pair.replace(":MARK", ""))
         .collect::<Vec<String>>();
 
-    let perp_pairs = conn
-        .interact(move |conn| FutureEntry::get_existing_perp_pairs(conn, perp_pairs))
+    let perp_pairs = if perp_pairs.is_empty() {
+        Vec::new()
+    } else {
+        conn.interact(move |conn| {
+            FutureEntry::get_existing_perp_pairs_since(conn, perp_pairs, min_timestamp)
+        })
         .await
         .expect("Couldn't check if pair exists")
         .expect("Couldn't get table result")
         .into_iter()
-        .collect::<Vec<String>>();
+        .collect::<Vec<String>>()
+    };
 
     (spot_pairs, perp_pairs)
 }

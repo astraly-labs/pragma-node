@@ -125,4 +125,20 @@ impl FutureEntry {
             .distinct()
             .load::<String>(conn)
     }
+
+    pub fn get_existing_perp_pairs_since(
+        conn: &mut PgConnection,
+        searched_pairs: Vec<String>,
+        min_timestamp: NaiveDateTime,
+    ) -> DieselResult<Vec<String>> {
+        future_entries::table
+            .filter(future_entries::pair_id.eq_any(searched_pairs))
+            .filter(future_entries::expiration_timestamp.is_null().or(
+                future_entries::expiration_timestamp.eq(sql("timestamp '1970-01-01 00:00:00'")),
+            ))
+            .filter(future_entries::timestamp.ge(min_timestamp))
+            .select(future_entries::pair_id)
+            .distinct()
+            .load::<String>(conn)
+    }
 }
