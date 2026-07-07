@@ -11,7 +11,7 @@ use pragma_entities::{EntryError, TimestampError};
 
 use crate::constants::EIGHTEEN_DECIMALS;
 use crate::infra::repositories::entry_repository::{
-    MedianEntry, get_last_updated_timestamp, routing,
+    MedianEntry, get_last_updated_timestamp_in_freshness_window, routing,
 };
 use crate::state::AppState;
 use crate::utils::PathExtractor;
@@ -135,7 +135,7 @@ pub async fn get_entry(
         .await
         .map_err(EntryError::from)?;
 
-    let last_updated_timestamp: NaiveDateTime = get_last_updated_timestamp(
+    let last_updated_timestamp: NaiveDateTime = get_last_updated_timestamp_in_freshness_window(
         &state.offchain_pool,
         pair.to_pair_id(),
         entry_params.timestamp,

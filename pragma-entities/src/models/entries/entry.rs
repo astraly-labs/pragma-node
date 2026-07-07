@@ -127,4 +127,33 @@ impl Entry {
             .first(conn)
             .optional()
     }
+
+    pub fn get_last_updated_timestamp_since(
+        conn: &mut PgConnection,
+        pair: String,
+        min_timestamp: i64,
+        max_timestamp: i64,
+    ) -> DieselResult<Option<chrono::NaiveDateTime>> {
+        let min_timestamp = convert_timestamp_to_datetime!(min_timestamp).map_err(|_| {
+            diesel::result::Error::DatabaseError(
+                diesel::result::DatabaseErrorKind::CheckViolation,
+                Box::new(format!("Invalid timestamp value: {min_timestamp}")),
+            )
+        })?;
+        let max_timestamp = convert_timestamp_to_datetime!(max_timestamp).map_err(|_| {
+            diesel::result::Error::DatabaseError(
+                diesel::result::DatabaseErrorKind::CheckViolation,
+                Box::new(format!("Invalid timestamp value: {max_timestamp}")),
+            )
+        })?;
+
+        entries::table
+            .filter(entries::pair_id.eq(pair))
+            .filter(entries::timestamp.ge(min_timestamp))
+            .filter(entries::timestamp.le(max_timestamp))
+            .select(entries::timestamp)
+            .order(entries::timestamp.desc())
+            .first(conn)
+            .optional()
+    }
 }

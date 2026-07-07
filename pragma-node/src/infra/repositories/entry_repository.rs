@@ -87,13 +87,13 @@ pub async fn routing(
     // If we have entries for the pair_id and the latest entry is fresh enough,
     // Or if we are not routing, we can return the price directly.
     if !is_routing
-        || (pair_id_exist(pool, pair).await?
-            && get_last_updated_timestamp(pool, pair.to_pair_id(), entry_params.timestamp)
-                .await?
-                .unwrap_or(chrono::Utc::now().naive_utc())
-                .and_utc()
-                .timestamp()
-                >= entry_params.timestamp - ROUTING_FRESHNESS_THRESHOLD)
+        || get_last_updated_timestamp_in_freshness_window(
+            pool,
+            pair.to_pair_id(),
+            entry_params.timestamp,
+        )
+        .await?
+        .is_some()
     {
         return get_price(pool, pair, entry_params).await;
     }
@@ -148,9 +148,22 @@ async fn find_alternative_pair_price(
         let alt_quote_pair = Pair::try_from((pair.quote.clone(), alt_currency.to_string()))
             .map_err(|e| InfraError::PairNotFound(e.to_string()))?;
 
-        if pair_id_exist(pool, &base_alt_pair.clone()).await?
-            && pair_id_exist(pool, &alt_quote_pair.clone()).await?
-        {
+        let has_fresh_base_alt = get_last_updated_timestamp_in_freshness_window(
+            pool,
+            base_alt_pair.to_pair_id(),
+            entry_params.timestamp,
+        )
+        .await?
+        .is_some();
+        let has_fresh_alt_quote = get_last_updated_timestamp_in_freshness_window(
+            pool,
+            alt_quote_pair.to_pair_id(),
+            entry_params.timestamp,
+        )
+        .await?
+        .is_some();
+
+        if has_fresh_base_alt && has_fresh_alt_quote {
             let base_alt_result = get_price(pool, &base_alt_pair, entry_params).await?;
             let alt_quote_result = get_price(pool, &alt_quote_pair, entry_params).await?;
 
@@ -159,22 +172,6 @@ async fn find_alternative_pair_price(
     }
 
     Err(InfraError::RoutingError(pair.to_pair_id()))
-}
-
-async fn pair_id_exist(
-    pool: &deadpool_diesel::postgres::Pool,
-    pair: &Pair,
-) -> Result<bool, InfraError> {
-    let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
-
-    let pair_str = pair.to_string();
-    let res = conn
-        .interact(move |conn| Entry::exists(conn, pair_str))
-        .await
-        .map_err(InfraError::DbInteractionError)?
-        .map_err(InfraError::DbResultError)?;
-
-    Ok(res)
 }
 
 async fn get_price(
@@ -733,6 +730,35 @@ pub async fn get_last_updated_timestamp(
         .await
         .map_err(InfraError::DbInteractionError)?
         .map_err(InfraError::DbResultError)
+}
+
+pub async fn get_last_updated_timestamp_since(
+    pool: &deadpool_diesel::postgres::Pool,
+    pair_id: String,
+    min_timestamp: i64,
+    max_timestamp: i64,
+) -> Result<Option<NaiveDateTime>, InfraError> {
+    let conn = pool.get().await.map_err(InfraError::DbPoolError)?;
+    conn.interact(move |conn| {
+        Entry::get_last_updated_timestamp_since(conn, pair_id, min_timestamp, max_timestamp)
+    })
+    .await
+    .map_err(InfraError::DbInteractionError)?
+    .map_err(InfraError::DbResultError)
+}
+
+pub async fn get_last_updated_timestamp_in_freshness_window(
+    pool: &deadpool_diesel::postgres::Pool,
+    pair_id: String,
+    max_timestamp: i64,
+) -> Result<Option<NaiveDateTime>, InfraError> {
+    get_last_updated_timestamp_since(
+        pool,
+        pair_id,
+        max_timestamp.saturating_sub(ROUTING_FRESHNESS_THRESHOLD),
+        max_timestamp,
+    )
+    .await
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Queryable, ToSchema)]

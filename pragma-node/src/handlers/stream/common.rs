@@ -64,7 +64,7 @@ pub async fn get_latest_entry(
         .await
         .map_err(EntryError::from)?;
 
-    let last_updated_timestamp = entry_repository::get_last_updated_timestamp(
+    let last_updated_timestamp = entry_repository::get_last_updated_timestamp_in_freshness_window(
         &state.offchain_pool,
         pair.to_pair_id(),
         new_routing.timestamp,
