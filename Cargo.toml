@@ -51,7 +51,7 @@ redundant_pub_crate = "allow"
 missing_const_for_fn = "allow"
 
 [workspace.dependencies]
-pragma-common = { version = "0.6.4", features = [
+pragma-common = { version = "0.7.0", features = [
   "serde",
   "services",
   "task-group",
@@ -69,9 +69,9 @@ faucon-rs = { version = "0.7.6", registry = "pragma" }
 anyhow = "1.0.97"
 aws-config = { version = "1.5.1", features = ["behavior-version-latest"] }
 aws-sdk-secretsmanager = "1.32.0"
-google-secretmanager1 = "6.0.0"
+google-secretmanager1 = "7.0.0"
 axum = { version = "0.8", features = ["macros", "ws", "tokio"] }
-axum-extra = { version = "0.10.0", features = ["typed-header", "query"] }
+axum-extra = { version = "0.12.1", features = ["typed-header", "query"] }
 axum-macros = "0.5"
 async-trait = "0.1.86"
 cainome = { version = "0.9.1", features = [
@@ -87,11 +87,11 @@ diesel = { version = "2.1", features = [
 diesel-async = { version = "0.4.1", features = ["postgres"] }
 bigdecimal = { version = "0.4.1", features = ["serde"] }
 diesel_migrations = "2"
-deadpool-diesel = { version = "0.4", features = ["postgres"] }
+deadpool-diesel = { version = "0.6", features = ["postgres"] }
 futures-util = "0.3.30"
 futures = "0.3.31"
 tokio-stream = "0.1.17"
-governor = { version = "0.6.0" }
+governor = { version = "0.10.4" }
 dotenvy = "0.15.7"
 envy = "0.4.2"
 indexmap = { version = "2.2.6", features = ["serde"] }
@@ -105,52 +105,52 @@ starknet = { package = "starknet-rust", version = "0.18.0" }
 starknet-crypto = "0.8.1"
 clap = { version = "4.4", features = ["derive", "env"] }
 reqwest = { version = "0.12.22", features = ["blocking", "json"] }
-rdkafka = "0.37.0"
+rdkafka = "0.39.0"
 thiserror = "2.0.12"
-strum = { version = "0.26", features = ["derive"] }
+strum = { version = "0.27", features = ["derive"] }
 url = "2.5.0"
 tower-http = { version = "0.6.2", features = ["fs", "trace", "cors"] }
 tokio = { version = "^1.43.0", features = ["full"] }
 tokio-util = "0.7.14"
 utoipa = { version = "5", features = ["axum_extras", "chrono", "uuid"] }
-utoipauto = "0.1.14"
+utoipauto = "0.2.0"
 utoipa-swagger-ui = { version = "9", features = ["axum"] }
 uuid = { version = "1.4", features = ["fast-rng", "v4", "serde"] }
 
 # David Bernard (sacre jojo)
 tracing = "0.1"
-axum-tracing-opentelemetry = "0.23.0"
-opentelemetry = { version = "0.26.0", features = ["metrics", "logs"] }
-opentelemetry_sdk = { version = "0.26.0", features = ["rt-tokio", "logs"] }
+axum-tracing-opentelemetry = "0.33.1"
+opentelemetry = { version = "0.31.0", features = ["metrics", "logs"] }
+opentelemetry_sdk = { version = "0.29.0", features = ["rt-tokio", "logs"] }
 opentelemetry-stdout = { version = "0.26.0" }
-opentelemetry-otlp = { version = "0.26.0", features = [
+opentelemetry-otlp = { version = "0.29.0", features = [
   "tonic",
   "metrics",
   "logs",
 ] }
-opentelemetry-semantic-conventions = { version = "0.26.0" }
-opentelemetry-appender-tracing = { version = "0.26.0", default-features = false }
+opentelemetry-semantic-conventions = { version = "0.31.0" }
+opentelemetry-appender-tracing = { version = "0.29.1", default-features = false }
 tracing-core = { version = "0.1.32", default-features = false }
 tracing-subscriber = { version = "0.3.18", features = [
   "env-filter",
   "registry",
   "std",
 ] }
-tracing-opentelemetry = "0.27.0"
+tracing-opentelemetry = "0.32.1"
 
 pragma-monitoring = { git = "https://github.com/astraly-labs/pragma-monitoring", branch = "chore/bump_deps" }
 
 # Test dependencies
-rstest = "0.18.2"
+rstest = "0.26.1"
 serial_test = "3.2.0"
-testcontainers = { version = "0.21.1" }
+testcontainers = { version = "0.23.1" }
 tracing-test = "0.2.5"
-testcontainers-modules = { version = "0.9.0", features = [
+testcontainers-modules = { version = "0.11.6", features = [
   "postgres",
   "kafka",
   "zookeeper",
   "http_wait",
 ] }
 pretty_assertions = "1.4.0"
-rand = "0.9.0"
+rand = "0.10.1"
 csv = "1.3.1"
