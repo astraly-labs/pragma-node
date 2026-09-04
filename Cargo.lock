@@ -4153,8 +4153,7 @@ dependencies = [
 [[package]]
 name = "pragma-common"
 version = "0.6.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4953f6abebc0b5bead2c0ba24d0a948f66c5577c3eb343f74d3d187ed70f33b4"
+source = "git+https://github.com/astraly-labs/pragma-common?rev=a69730e466c9165b39be2dd9ec17cdf0172d3ed5#a69730e466c9165b39be2dd9ec17cdf0172d3ed5"
 dependencies = [
  "anyhow",
  "async-trait",

@@ -17,6 +17,9 @@ edition = "2024"
 repository = "https://github.com/astraly-labs/pragma-node/"
 authors = ["Pragma Labs <support@pragma.build>"]
 
+[patch.crates-io]
+pragma-common = { git = "https://github.com/astraly-labs/pragma-common", rev = "a69730e466c9165b39be2dd9ec17cdf0172d3ed5" }
+
 [workspace.lints]
 rust.missing_debug_implementations = "allow"
 rust.unreachable_pub = "warn"
