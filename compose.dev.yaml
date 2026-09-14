@@ -14,6 +14,7 @@ services:
       - ./sql/06-create-timescale-twap-aggregates.sql:/docker-entrypoint-initdb.d/06-create-timescale-twap-aggregates.sql
       - ./sql/07-add-compression.sql:/docker-entrypoint-initdb.d/07-add-compression.sql
       - ./sql/08-create-indexes.sql:/docker-entrypoint-initdb.d/08-create-indexes.sql
+      - ./sql/09-backfill-publishers.sql:/docker-entrypoint-initdb.d/09-backfill-publishers.sql
       - onchain-db-data:/var/lib/postgresql/data
     environment:
       - POSTGRES_DB=pragma
