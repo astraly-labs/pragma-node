@@ -61,8 +61,9 @@ mod tests {
     async fn test_fetch_historical_fundings() {
         let client = Client::new();
         let market = "PF_XBTUSD";
-        let start = 1_746_057_600_000; // Same timestamp as other tests
-        let end = start + 86_400_000; // One day later
+        // The live endpoint retains a rolling window of funding history.
+        let end = chrono::Utc::now().timestamp_millis();
+        let start = end - 86_400_000;
 
         let result = Kraken::fetch_historical_fundings(market, start, end, &client)
             .await

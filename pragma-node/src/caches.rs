@@ -11,7 +11,9 @@ use crate::constants::caches::{
     PUBLISHERS_CACHE_TIME_TO_LIVE_IN_SECONDS, PUBLISHERS_UDPATES_CACHE_TIME_TO_IDLE_IN_SECONDS,
     PUBLISHERS_UDPATES_CACHE_TIME_TO_LIVE_IN_SECONDS,
 };
-use crate::infra::repositories::onchain_repository::publisher::RawPublisherUpdates;
+use crate::infra::repositories::onchain_repository::publisher::{
+    RawLastPublisherEntryForPair, RawPublisherUpdates,
+};
 
 /// Structure responsible of holding our Databases caches.
 /// All the caches are initialized empty with their associated time to live in the
@@ -19,6 +21,7 @@ use crate::infra::repositories::onchain_repository::publisher::RawPublisherUpdat
 #[derive(Clone, Debug)]
 pub struct CacheRegistry {
     onchain_publishers_updates: Cache<String, HashMap<String, RawPublisherUpdates>>,
+    onchain_publisher_history: Cache<String, Vec<RawLastPublisherEntryForPair>>,
     onchain_decimals: Cache<StarknetNetwork, HashMap<String, u32>>,
     publishers: Cache<String, Publisher>,
 }
@@ -54,8 +57,15 @@ impl CacheRegistry {
             ))
             .build();
 
+        // Only the historical coverage scan is cached; recent observations overlay it on every request.
+        let onchain_publisher_history = Cache::builder()
+            .max_capacity(256)
+            .time_to_live(Duration::from_secs(30 * 60))
+            .build();
+
         Self {
             onchain_publishers_updates,
+            onchain_publisher_history,
             onchain_decimals,
             publishers,
         }
@@ -65,6 +75,12 @@ impl CacheRegistry {
         &self,
     ) -> &Cache<String, HashMap<String, RawPublisherUpdates>> {
         &self.onchain_publishers_updates
+    }
+
+    pub const fn onchain_publisher_history(
+        &self,
+    ) -> &Cache<String, Vec<RawLastPublisherEntryForPair>> {
+        &self.onchain_publisher_history
     }
 
     pub const fn onchain_decimals(&self) -> &Cache<StarknetNetwork, HashMap<String, u32>> {

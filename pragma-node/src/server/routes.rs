@@ -10,8 +10,8 @@ use crate::handlers::funding_rates::{
 };
 use crate::handlers::onchain::{
     get_checkpoints::get_onchain_checkpoints, get_entry::get_onchain_entry,
-    get_history::get_onchain_history, get_publishers::get_onchain_publishers,
-    subscribe_to_ohlc::subscribe_to_onchain_ohlc,
+    get_history::get_onchain_history, get_observations::get_onchain_observations,
+    get_publishers::get_onchain_publishers, subscribe_to_ohlc::subscribe_to_onchain_ohlc,
 };
 use crate::handlers::open_interest::{
     get_historical_open_interest, get_latest_open_interest,
@@ -65,6 +65,10 @@ fn onchain_routes(state: AppState) -> Router<AppState> {
     Router::new()
         .route("/{base}/{quote}", get(get_onchain_entry))
         .route("/history/{base}/{quote}", get(get_onchain_history))
+        .route(
+            "/observations/{base}/{quote}",
+            get(get_onchain_observations),
+        )
         .route("/checkpoints/{base}/{quote}", get(get_onchain_checkpoints))
         .route("/publishers", get(get_onchain_publishers))
         .route("/ohlc/subscribe", get(subscribe_to_onchain_ohlc))
