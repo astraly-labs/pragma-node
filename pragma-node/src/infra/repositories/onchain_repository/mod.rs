@@ -1,6 +1,7 @@
 pub mod checkpoint;
 pub mod entry;
 pub mod history;
+pub mod observations;
 pub mod ohlc;
 pub mod publisher;
 

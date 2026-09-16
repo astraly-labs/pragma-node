@@ -15,6 +15,8 @@ use crate::state::AppState;
 pub struct GetOnchainPublishersParams {
     pub network: StarknetNetwork,
     pub data_type: InstrumentType,
+    /// A detail lookup includes historical markets and inactive sources.
+    pub publisher: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
@@ -57,17 +59,18 @@ pub async fn get_onchain_publishers(
     State(state): State<AppState>,
     Query(params): Query<GetOnchainPublishersParams>,
 ) -> Result<Json<GetOnchainPublishersResponse>, EntryError> {
-    let publishers = get_publishers(&state.onchain_pool, params.network)
+    let mut publishers = get_publishers(&state.onchain_pool, params.network)
         .await
         .map_err(EntryError::from)?;
+    if let Some(name) = &params.publisher {
+        publishers.retain(|publisher| publisher.name == *name);
+    }
 
     let publishers_with_components = get_publishers_with_components(
         &state.onchain_pool,
-        params.network,
-        params.data_type,
+        &params,
         publishers,
-        state.caches.onchain_publishers_updates(),
-        state.caches.onchain_decimals(),
+        &state.caches,
         &state.rpc_clients,
     )
     .await
