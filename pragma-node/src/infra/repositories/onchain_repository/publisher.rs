@@ -229,6 +229,9 @@ async fn get_publisher_with_components(
         .map_err(InfraError::DbInteractionError)?
         .map_err(InfraError::DbResultError)?;
 
+    // The historical cache loader checks out another connection from the same pool.
+    drop(conn);
+
     let raw_components = if include_history {
         let snapshot = get_publisher_history(
             pool,
