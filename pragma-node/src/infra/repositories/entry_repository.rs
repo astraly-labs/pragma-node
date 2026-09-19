@@ -87,13 +87,7 @@ pub async fn routing(
     // If we have entries for the pair_id and the latest entry is fresh enough,
     // Or if we are not routing, we can return the price directly.
     if !is_routing
-        || get_last_updated_timestamp_in_freshness_window(
-            pool,
-            pair.to_pair_id(),
-            entry_params.timestamp,
-        )
-        .await?
-        .is_some()
+        || has_entry_in_routing_freshness_window(pool, pair.to_pair_id(), entry_params).await?
     {
         return get_price(pool, pair, entry_params).await;
     }
@@ -148,20 +142,12 @@ async fn find_alternative_pair_price(
         let alt_quote_pair = Pair::try_from((pair.quote.clone(), alt_currency.to_string()))
             .map_err(|e| InfraError::PairNotFound(e.to_string()))?;
 
-        let has_fresh_base_alt = get_last_updated_timestamp_in_freshness_window(
-            pool,
-            base_alt_pair.to_pair_id(),
-            entry_params.timestamp,
-        )
-        .await?
-        .is_some();
-        let has_fresh_alt_quote = get_last_updated_timestamp_in_freshness_window(
-            pool,
-            alt_quote_pair.to_pair_id(),
-            entry_params.timestamp,
-        )
-        .await?
-        .is_some();
+        let has_fresh_base_alt =
+            has_entry_in_routing_freshness_window(pool, base_alt_pair.to_pair_id(), entry_params)
+                .await?;
+        let has_fresh_alt_quote =
+            has_entry_in_routing_freshness_window(pool, alt_quote_pair.to_pair_id(), entry_params)
+                .await?;
 
         if has_fresh_base_alt && has_fresh_alt_quote {
             let base_alt_result = get_price(pool, &base_alt_pair, entry_params).await?;
@@ -172,6 +158,72 @@ async fn find_alternative_pair_price(
     }
 
     Err(InfraError::RoutingError(pair.to_pair_id()))
+}
+
+async fn has_entry_in_routing_freshness_window(
+    pool: &deadpool_diesel::postgres::Pool,
+    pair_id: String,
+    entry_params: &EntryParams,
+) -> Result<bool, InfraError> {
+    get_last_updated_timestamp_since(
+        pool,
+        pair_id,
+        entry_params
+            .timestamp
+            .saturating_sub(routing_freshness_threshold(entry_params)),
+        entry_params.timestamp,
+    )
+    .await
+    .map(|timestamp| timestamp.is_some())
+}
+
+fn routing_freshness_threshold(entry_params: &EntryParams) -> i64 {
+    let is_historical = entry_params.timestamp
+        < chrono::Utc::now()
+            .timestamp()
+            .saturating_sub(ROUTING_FRESHNESS_THRESHOLD);
+
+    if is_historical {
+        ROUTING_FRESHNESS_THRESHOLD.max(entry_params.interval.to_seconds())
+    } else {
+        ROUTING_FRESHNESS_THRESHOLD
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rstest::rstest;
+
+    #[rstest]
+    #[case(Interval::FifteenMinutes, 900)]
+    #[case(Interval::OneMinute, ROUTING_FRESHNESS_THRESHOLD)]
+    fn historical_routing_freshness_matches_the_interval(
+        #[case] interval: Interval,
+        #[case] expected: i64,
+    ) {
+        let params = EntryParams {
+            interval,
+            timestamp: 1,
+            ..Default::default()
+        };
+
+        assert_eq!(routing_freshness_threshold(&params), expected);
+    }
+
+    #[test]
+    fn live_routing_freshness_stays_strict() {
+        let params = EntryParams {
+            interval: Interval::FifteenMinutes,
+            timestamp: chrono::Utc::now().timestamp(),
+            ..Default::default()
+        };
+
+        assert_eq!(
+            routing_freshness_threshold(&params),
+            ROUTING_FRESHNESS_THRESHOLD
+        );
+    }
 }
 
 async fn get_price(
