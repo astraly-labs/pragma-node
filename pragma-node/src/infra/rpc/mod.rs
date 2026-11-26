@@ -36,17 +36,10 @@ pub static ORACLE_ADDRESS_PER_NETWORK: LazyLock<HashMap<StarknetNetwork, Felt>> 
 
 /// The list of all the starknet rpcs that the `FallbackProvider` may use.
 /// They're sorted by priority (so we sorted them by reliability here).
-pub const MAINNET_STARKNET_RPC_URLS: [&str; 10] = [
-    "https://api.cartridge.gg/x/starknet/mainnet",
-    "https://starknet-mainnet.g.alchemy.com/starknet/version/rpc/v0_8/WrkE4HqPXT-zi7gQn8bUtH-TXgYYs3w1",
-    "https://starknet-mainnet.blastapi.io/d4c81751-861c-4970-bef5-9decd7f7aa39",
+pub const MAINNET_STARKNET_RPC_URLS: [&str; 3] = [
     "https://starknet-mainnet.infura.io/v3/1e978c4df1984be09e18e5cd849228e4",
-    "https://mainnet-pragma.karnot.xyz/",
     "https://api.zan.top/public/starknet-mainnet",
     "https://starknet.api.onfinality.io/public",
-    "https://rpc.starknet.lava.build:443",
-    "https://starknet-mainnet.reddio.com",
-    "https://starknet.drpc.org",
 ];
 
 pub const SEPOLIA_STARKNET_RPC_URLS: [&str; 6] = [

@@ -39,23 +39,12 @@ pub(crate) async fn get_onchain_decimals(
         return Err(InfraError::NoRpcAvailable(network));
     };
 
-    let decimals = match call_get_decimals(rpc_client, pair, network).await {
-        Ok(decimals) => decimals,
-        Err(e) => {
-            tracing::error!("Could not get on-chain decimals for {pair}: {e}");
-            0
-        }
-    };
+    let decimals = call_get_decimals(rpc_client, pair, network).await?;
 
     // Update cache with the new decimals
-    if decimals != 0 {
-        let network_decimals = decimals_cache.get(&network).await.unwrap_or_default();
-        let mut updated_network_decimals = network_decimals.clone();
-        updated_network_decimals.insert(pair_id, decimals);
-        decimals_cache
-            .insert(network, updated_network_decimals)
-            .await;
-    }
+    let mut network_decimals = decimals_cache.get(&network).await.unwrap_or_default();
+    network_decimals.insert(pair_id, decimals);
+    decimals_cache.insert(network, network_decimals).await;
 
     Ok(decimals)
 }
@@ -118,4 +107,71 @@ pub(crate) fn get_onchain_aggregate_table_name(
     let table_name = format!("{prefix_name}_{interval_specifier}");
 
     Ok(table_name)
+}
+
+#[cfg(test)]
+mod tests {
+    use axum::{Router, http::StatusCode, routing::post};
+    use pragma_common::starknet::fallback_provider::FallbackProvider;
+    use url::Url;
+
+    use super::*;
+
+    #[rstest::rstest]
+    #[case("0x8", 8)]
+    #[case("0x6", 6)]
+    #[case("0x0", 0)]
+    #[tokio::test]
+    async fn decimals_are_read_and_cached(#[case] result: &str, #[case] expected: u32) {
+        let body = serde_json::json!({"jsonrpc": "2.0", "id": 1, "result": [result]});
+        let app = Router::new().route("/", post(move || async move { axum::Json(body) }));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = Url::parse(&format!("http://{}", listener.local_addr().unwrap())).unwrap();
+        let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        let network = StarknetNetwork::Mainnet;
+        let clients = HashMap::from([(network, FallbackProvider::new(vec![url]).unwrap())]);
+        let cache = Cache::new(1);
+        let pair = Pair::try_from("BTC/USD").unwrap();
+
+        let decimals = get_onchain_decimals(&cache, &clients, network, &pair)
+            .await
+            .unwrap();
+        server.abort();
+        assert_eq!(decimals, expected);
+        assert_eq!(
+            cache.get(&network).await.unwrap().get("BTC/USD"),
+            Some(&expected)
+        );
+        assert_eq!(
+            get_onchain_decimals(&cache, &HashMap::new(), network, &pair)
+                .await
+                .unwrap(),
+            expected
+        );
+    }
+
+    #[tokio::test]
+    async fn failed_decimal_lookup_is_not_a_zero_decimal_price() {
+        let app = Router::new().route(
+            "/",
+            post(|| async { (StatusCode::UNAUTHORIZED, "Unauthorized") }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = Url::parse(&format!("http://{}", listener.local_addr().unwrap())).unwrap();
+        let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        let network = StarknetNetwork::Mainnet;
+        let clients = HashMap::from([(network, FallbackProvider::new(vec![url]).unwrap())]);
+        let cache = Cache::new(1);
+
+        let result = get_onchain_decimals(
+            &cache,
+            &clients,
+            network,
+            &Pair::try_from("BTC/USD").unwrap(),
+        )
+        .await;
+        server.abort();
+        assert!(matches!(result, Err(InfraError::RpcError(_))));
+        assert!(cache.get(&network).await.is_none());
+    }
 }
